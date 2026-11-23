@@ -433,7 +433,9 @@ Never change `transportTimeoutMs`: it must stay 5000.
 
 Debates cannot be deleted: the database refuses to delete a debate's rows, by design. What strangers and friends can
 see is only the list of **published** test debates. Hiding is the supported way to take one down. Only the staff
-screens (Admin → Team) can hide a debate by hand; the public Report button can also hide one by itself (5.1b).
+screens (the Team page, `/admin/team`) can hide a debate by hand; the public Report button can also hide one by itself
+(5.1b). No menu links to the Team page: type its address after the name the site answers as, for example
+https://v3-preview.dezbatere.ro/admin/team (before the rename) or https://dezbatere.ro/admin/team (after it).
 
 **First, see whether the staff screens are on.** STAFFCHECK only reads. Run it before the upload:
 
@@ -487,12 +489,12 @@ browser). **This is your last chance for staff work (Hide now, reports, publicat
 
 Do this **before DR2** of the upload, while the old release still runs on the test name:
 1. Sign in. Open the home page's **Public** tab. Read every published debate.
-2. If one should not be public: tell the team first (each hide e-mails the debate's author). Then Admin → Team →
-   public review → **Hide now**. Each hide needs the staff hardware key, and the staff key you have now works only on the test name.
+2. If one should not be public: tell the team first (each hide e-mails the debate's author). Then open
+   https://v3-preview.dezbatere.ro/admin/team (the Team page; no menu links to it) → public review → **Hide now**. Each hide needs the staff hardware key, and the staff key you have now works only on the test name.
 3. If the Team page shows open reports, settle them now too. Publication reviews (**Publication reviews**, Cereri de
    publicare) open from the link on the Team page once your key is verified. Settling usually needs the team tools unlocked: if the page says
-   `Team tools are locked…` (in step 2 or 3), run `systemctl start debateai-preview-team-unlock` as root. It unlocks
-   them for one hour.
+   `Team tools are locked…` (in step 2 or 3), run UNLOCK (5.7, step 3) as root. It unlocks them for one hour and ends
+   with `UNLOCK_DONE` once the unlock has written its first "ready" row; `UNLOCK_NOT_DONE` says why not.
    If the Team page also shows **Threat reports** (Rapoarte despre amenințări) with unread ones, read and decide them
    now: this upload removes that screen and its mail for good, so before DR2 is the last moment anyone can read a kept
    report. A report nobody reads is deleted by itself 30 days after it was kept. After the upload the Team page's
@@ -1424,11 +1426,12 @@ apistart() { local t i; sleep 1; t=$(date +%s); systemctl reset-failed "$API" 2>
   [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" = 0 ] && [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -c '^PREVIEW_API_STARTED ' || true)" -gt 0 ] && [ "$(systemctl is-active "$API" || true)" = active ] || { echo "the API did not start (systemctl is-active of the API: $(systemctl is-active "$API" || true))"; return 1; }; }
 apiup() { local i c=000; apistart || return 1
   for i in $(seq 1 40); do c=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$UIP/login" || true); [ "$c" = 200 ] && break; [ "$(systemctl is-active "$WEB" || true)" = failed ] && break; sleep 3; done
-  [ "$c" = 200 ] || { echo "the API started, but the website does not answer its Log in page (systemctl is-active of the website: $(systemctl is-active "$WEB" || true))"; return 1; }; }
+  [ "$c" = 200 ] || { echo "the API started, but the website does not answer its Log in page (systemctl is-active of the website: $(systemctl is-active "$WEB" || true))"; return 2; }; }
 webup() { local t i c=000; sleep 1; t=$(date +%s); systemctl reset-failed "$WEB" 2>/dev/null || true; systemctl restart "$WEB" || echo 'systemctl restart of the website returned non-zero'
   for i in $(seq 1 40); do c=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$UIP/login" || true); [ "$c" = 200 ] && break; [ "$(systemctl is-active "$WEB" || true)" = failed ] && break; sleep 3; done
   journalctl -u "$WEB" --since "@$t" -o cat --no-pager | grep -E 'PREVIEW_LIFECYCLE_PRESTART_REFUSED|PREVIEW_UI_STARTUP_REFUSED' | cut -c1-300 || true
   [ "$c" = 200 ] && [ "$(journalctl -u "$WEB" --since "@$t" -o cat --no-pager | grep -cE 'PREVIEW_UI_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" = 0 ] && [ "$(systemctl is-active "$WEB" || true)" = active ] || { echo "the website did not start (its Log in page answered $c; systemctl is-active of the website: $(systemctl is-active "$WEB" || true))"; return 1; }; }
+upfail() { if [ "$1" = 2 ]; then printf 'the API started on %s, but the website did not answer its Log in page (the line above)' "$2"; else printf 'the API refused %s (its code is above)' "$2"; fi; }
 relay() { local p; p=$(systemctl show -p MainPID --value debateai-preview-turnstile); [ "${p:-0}" != 0 ] && tr '\0' '\n' < "/proc/$p/environ" | grep '^PUBLIC_APP_URL=' || true; }
 loc() { curl -sI "$1" | tr -d '\r' | tr 'A-Z' 'a-z' | grep '^location:' || true; }
 notify() { curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' "https://$1/api/v1/billing/netopia/notify" || true; }
@@ -1461,8 +1464,10 @@ with that upload's `rNN` filled in. If any later script says `NAMES_NOT_DONE`, t
 (`names.sh.before-<time>`) and writes it anew from this guide: with `rNN` left as it is, the first line stays the one
 the file had; with `rNN` filled in, it names that upload. Nothing live changes. Run it when a step says the names file
 is from an earlier version of this guide: NAME3 and NAME5 (5.3, 5.5) need its `apistart`, and stop before they stop
-anything when the file has none. On a server whose names file was written before `apistart` came, run LOCKS0 once,
-with `rNN` left as it is, before the next NAME3 or NAME5.
+anything when the file has none; every step that restarts only the API (MAIL_ALLOW, MAIL_OPEN, MAIL_CLOSE, STAFFOFF,
+STAFFON, STAFFMAIN, ASKS_OPEN, ASKS_CLOSE, PAY_SWITCH and PAY_BACK) needs its `upfail`, and stops, with nothing changed,
+when the file has none. On a server whose names file was written before `upfail` came, run LOCKS0 once, with `rNN`
+left as it is, before the next of those steps, NAME3 or NAME5.
 
 If LOCKS0's last line is `NAMES_NOT_DONE`, the file was written already. Fix what the line names (when it names the
 release: the first line of the file, with `nano`, or LOCKS0 again with the right `rNN`), then run CLOSED (3.1). A
@@ -1473,16 +1478,22 @@ What the helpers do, in short:
 - `apistart` restarts the API and waits for its start line (or its refusal), and nothing more; when the API did not
   start, it says so (`the API did not start …`). `apiup` is `apistart`, then, because the website restarts with its
   API, it waits for the website's Log in page too, and fails if the website does not answer it within about two
-  minutes (`the API started, but the website does not answer its Log in page …`). `webup` restarts the website alone
-  and waits for the same page (`the website did not start …` when it does not answer). Each first clears systemd's
-  count of recent starts, of both the API and the website: systemd refuses a fifth start of either within 15 minutes,
-  and a way back must never be refused for that.
+  minutes (`the API started, but the website does not answer its Log in page …`). It fails with code 1 when the API
+  did not start, and with code 2 when the API started and the website did not answer. `webup` restarts the website
+  alone and waits for the same page (`the website did not start …` when it does not answer). Each first clears
+  systemd's count of recent starts, of both the API and the website: systemd refuses a fifth start of either within
+  15 minutes, and a way back must never be refused for that.
+- `upfail` words a step's last line from `apiup`'s code: `the API refused <what> (its code is above)` for 1,
+  `the API started on <what>, but the website did not answer its Log in page (the line above)` for 2. So the last line
+  never says the API refused a setting it took.
 - Why both: the website's unit is bound to its API (`BindsTo=` and `After=` the API, in
   `deploy/preview-lifecycle/v1/systemd/debateai-preview-ui@.service.d/50-lifecycle.conf`). Restarting the API restarts
   a website that runs, but a website that was stopped stays stopped: systemd passes a restart on only to a unit that
   is running. So a step that restarts only the API, while the website runs, uses `apiup`. A step that stops the
   website and the API first (NAME3 and NAME5) uses `apistart`, then `webup`: `apiup` would wait for a website nothing
-  starts, and fail although the API had started.
+  starts, and fail although the API had started. The same holds for the way back of a step that restarts only the
+  API: when the API refused, systemd stopped the website with it (or the website itself failed), so after the file
+  before is back the step starts the API alone and then the website (`apistart`, then `webup`), never `apiup` again.
 - `inv` shows a service's journal since its last start; `said` asks whether the API's journal since its last start
   holds a line.
 - `gates` shows the four spending gates (DeepInfra, Anthropic, Perplexity, Amazon Bedrock); `gatesok` says whether all
@@ -1640,12 +1651,14 @@ Expect two equal digests, then `MAIL_KEEP_DONE`. Write the digest down: part 9 c
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # MAIL_ALLOW: mail plan v2 "allow-list": the same four addresses as today, every mail family on the new path.
+declare -F upfail >/dev/null || { echo "MAIL_ALLOW_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then MAIL_ALLOW"; exit 1; }
 [ -s "$M/mail/mail-plan.v1.json" ] && cmp -s "$MP" "$M/mail/mail-plan.v1.json" || { echo "MAIL_ALLOW_NOT_DONE: the live plan is not the kept v1 file (MAIL_KEEP first)"; exit 1; }
 CG=$(jq -r .recipientPolicy.clientGid "$MP")
 [ "$(stat -c '%U %g %a %h' "$MR")" = "root $CG 640 1" ] && [ "$(stat -c %s "$MR")" -le 1024 ] || { echo "MAIL_ALLOW_NOT_DONE: $MR is not root:<clientGid> 0640 with one link and at most 1 KiB"; exit 1; }
 ( umask 022; jq -c --arg o "https://$HOST" '.schema="preview-auth-dev-mail-v2" | .recipients="allow-list" | .publicAppUrl=$o' "$M/mail/mail-plan.v1.json" > "$M/mail/mail-plan.v2-allow-list.json" )
 { install -o root -g root -m 0644 "$M/mail/mail-plan.v2-allow-list.json" "$MP.new" && mv -f "$MP.new" "$MP" && cmp -s "$M/mail/mail-plan.v2-allow-list.json" "$MP"; } || { echo "MAIL_ALLOW_NOT_DONE: the allow-list plan was not put in place (nothing restarted): ask"; exit 1; }
-if ! apiup; then { install -o root -g root -m 0644 "$M/mail/mail-plan.v1.json" "$MP.new" && mv -f "$MP.new" "$MP"; } || { echo "MAIL_ALLOW_NOT_DONE: the API refused the allow-list plan, and the v1 file could not be put back: ask at once"; exit 1; }; apiup || { echo "MAIL_ALLOW_NOT_DONE: the API refused the allow-list plan; the v1 file is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "MAIL_ALLOW_NOT_DONE: the API refused the allow-list plan (code above); the v1 file is back and the API restarted on it"; exit 1; fi
+R=0; apiup || R=$?
+if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the allow-list plan'); { install -o root -g root -m 0644 "$M/mail/mail-plan.v1.json" "$MP.new" && mv -f "$MP.new" "$MP"; } || { echo "MAIL_ALLOW_NOT_DONE: $WHY, and the v1 file could not be put back: ask at once"; exit 1; }; { apistart && webup; } || { echo "MAIL_ALLOW_NOT_DONE: $WHY; the v1 file is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "MAIL_ALLOW_NOT_DONE: $WHY; the v1 file is back, and the API and the website started on it"; exit 1; fi
 said -xF "PREVIEW_MAIL_MODE {\"mode\":\"allow-list\",\"origin\":\"https://$HOST\"}" || { echo "MAIL_ALLOW_NOT_DONE: no allow-list mode line: ask"; exit 1; }
 echo MAIL_ALLOW_DONE
 exit 0
@@ -1673,12 +1686,14 @@ real addresses, when mail opens.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # MAIL_OPEN: mail plan v2 "open": each mail to its own address.
+declare -F upfail >/dev/null || { echo "MAIL_OPEN_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then MAIL_OPEN"; exit 1; }
 ! said '^PREVIEW_MAIL_MODE {"mode":"open",' || { echo "MAIL_OPEN_NOT_DONE: mail is open already (MAIL_OPEN ran before): nothing to do"; exit 1; }
 said '^PREVIEW_MAIL_MODE {"mode":"allow-list",' || { echo "MAIL_OPEN_NOT_DONE: the running API is not in mode allow-list (MAIL_ALLOW first)"; exit 1; }
 cp -p "$MP" "$M/mail/mail-plan.before-open.json"
 ( umask 022; jq -c --arg o "https://$HOST" '.schema="preview-auth-dev-mail-v2" | .recipients="open" | del(.recipientPolicy) | .publicAppUrl=$o' "$M/mail/mail-plan.v1.json" > "$M/mail/mail-plan.v2-open.json" )
 { install -o root -g root -m 0644 "$M/mail/mail-plan.v2-open.json" "$MP.new" && mv -f "$MP.new" "$MP" && cmp -s "$M/mail/mail-plan.v2-open.json" "$MP"; } || { echo "MAIL_OPEN_NOT_DONE: the open plan was not put in place (nothing restarted): ask"; exit 1; }
-if ! apiup; then { install -o root -g root -m 0644 "$M/mail/mail-plan.before-open.json" "$MP.new" && mv -f "$MP.new" "$MP"; } || { echo "MAIL_OPEN_NOT_DONE: the API refused the open plan, and the allow-list file could not be put back: ask at once"; exit 1; }; apiup || { echo "MAIL_OPEN_NOT_DONE: the API refused the open plan; the allow-list file is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "MAIL_OPEN_NOT_DONE: the API refused the open plan (code above); the allow-list file is back and the API restarted on it"; exit 1; fi
+R=0; apiup || R=$?
+if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the open plan'); { install -o root -g root -m 0644 "$M/mail/mail-plan.before-open.json" "$MP.new" && mv -f "$MP.new" "$MP"; } || { echo "MAIL_OPEN_NOT_DONE: $WHY, and the allow-list file could not be put back: ask at once"; exit 1; }; { apistart && webup; } || { echo "MAIL_OPEN_NOT_DONE: $WHY; the allow-list file is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "MAIL_OPEN_NOT_DONE: $WHY; the allow-list file is back, and the API and the website started on it"; exit 1; fi
 said -xF "PREVIEW_MAIL_MODE {\"mode\":\"open\",\"origin\":\"https://$HOST\"}" || { echo "MAIL_OPEN_NOT_DONE: no open mode line: ask"; exit 1; }
 echo MAIL_OPEN_DONE
 exit 0
@@ -1705,13 +1720,15 @@ plan for the main name.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # MAIL_CLOSE: mail back to the allow-listed addresses.
+declare -F upfail >/dev/null || { echo "MAIL_CLOSE_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then MAIL_CLOSE"; exit 1; }
 ! grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || { echo "MAIL_CLOSE_NOT_DONE: payments are live and the site is open: PWON first"; exit 1; }
 [ -s "$M/mail/mail-plan.v1.json" ] || { echo "MAIL_CLOSE_NOT_DONE: no kept v1 file: ask"; exit 1; }
 cp -p "$MP" "$M/mail/mail-plan.before-close.json"
 if [ "$HOST" = v3-preview.dezbatere.ro ]; then W=$M/mail/mail-plan.v1.json; WANT='PREVIEW_MAIL_MODE {"mode":"legacy","origin":"https://v3-preview.dezbatere.ro"}'
 else ( umask 022; jq -c --arg o "https://$HOST" '.schema="preview-auth-dev-mail-v2" | .recipients="allow-list" | .publicAppUrl=$o' "$M/mail/mail-plan.v1.json" > "$M/mail/mail-plan.v2-allow-list-main.json" ); W=$M/mail/mail-plan.v2-allow-list-main.json; WANT="PREVIEW_MAIL_MODE {\"mode\":\"allow-list\",\"origin\":\"https://$HOST\"}"; fi
 { install -o root -g root -m 0644 "$W" "$MP.new" && mv -f "$MP.new" "$MP" && cmp -s "$W" "$MP"; } || { echo "MAIL_CLOSE_NOT_DONE: the closed plan was not put in place (nothing restarted): ask"; exit 1; }
-if ! apiup; then { install -o root -g root -m 0644 "$M/mail/mail-plan.before-close.json" "$MP.new" && mv -f "$MP.new" "$MP"; } || { echo "MAIL_CLOSE_NOT_DONE: the API refused the closed plan, and the plan before could not be put back: ask at once"; exit 1; }; apiup || { echo "MAIL_CLOSE_NOT_DONE: the API refused the closed plan; the plan before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "MAIL_CLOSE_NOT_DONE: the API refused the closed plan (code above); the plan before is back: ask"; exit 1; fi
+R=0; apiup || R=$?
+if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the closed plan'); { install -o root -g root -m 0644 "$M/mail/mail-plan.before-close.json" "$MP.new" && mv -f "$MP.new" "$MP"; } || { echo "MAIL_CLOSE_NOT_DONE: $WHY, and the plan before could not be put back: ask at once"; exit 1; }; { apistart && webup; } || { echo "MAIL_CLOSE_NOT_DONE: $WHY; the plan before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "MAIL_CLOSE_NOT_DONE: $WHY; the plan before is back, and the API and the website started on it: ask"; exit 1; fi
 said -xF "$WANT" || { echo "MAIL_CLOSE_NOT_DONE: the mode line is not the closed one: ask"; exit 1; }
 echo MAIL_CLOSE_DONE
 exit 0
@@ -1727,8 +1744,9 @@ MAIL_CLOSE runs only with the site password on (PWON first): a buyer outside the
 Before you start: the upload is finished and proven (DR6 and SB13b done, the old release retired), the release guide's
 LOGOCHECK ended with `LOGOCHECK_DONE`, **mail is on the v2 plan** (part 4.2 or 4.3), and social sign-in is not set up
 (NAME2 stops if the API file has `SOCIAL_SOCKET_PATH`: its relay's callbacks name the test name). If you did not do
-1.3 (b) to (e), do them now. If the names file was written before it had `apistart`, run LOCKS0 again first (3.0,
-"LOCKS0 again"): NAME3 and NAME5 stop, with nothing stopped, until it has.
+1.3 (b) to (e), do them now. If the names file was written before it had `upfail`, run LOCKS0 again first (3.0,
+"LOCKS0 again"): NAME3 and NAME5 stop, with nothing stopped, until it has `apistart`, and STAFFOFF, STAFFON and
+STAFFMAIN, with nothing changed, until it has `upfail`.
 
 This upload does not change Caddy. Its two-slot health check is still the transition's (the edge secret in the probe, a
 1-second limit, out after one miss); nothing is worse than before. It changes only with its own reviewed step, written
@@ -1900,6 +1918,7 @@ set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # STAFFOFF: the staff screens off, on the test name: the one line STAFF_ACCESS_POLICY_VERSION=2 taken out of the API file (a copy kept), then the API restarts (a minute or more down). If the API refuses, the file before comes back.
 # The NETOPIA review window (5.8) opens only on dezbatere.ro, and this step runs only on the test name, so with the window open it refuses.
+declare -F upfail >/dev/null || { echo "STAFFOFF_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then STAFFOFF"; exit 1; }
 K=$M/name/api-$LABEL.env.before-staffoff-$(date -u +%Y%m%dT%H%M%SZ)
 [ "$HOST" = v3-preview.dezbatere.ro ] || { echo "STAFFOFF_NOT_DONE: the API already answers as $HOST; nothing changed: ask"; exit 1; }
 P=$(grep -c '^STAFF_ACCESS_POLICY_VERSION=' "$A" || true); AL=$(grep -c '^INTERNAL_ALLOWANCE_' "$A" || true)
@@ -1916,7 +1935,8 @@ cp -p "$A" "$K" || { rm -f "$K"; echo "STAFFOFF_NOT_DONE: the copy $K was not ke
 [ "$(diff "$A" "$A.new" | grep -c '^[<>]' || true)" = 1 ] && [ "$(diff "$A" "$A.new" | grep -cx '< STAFF_ACCESS_POLICY_VERSION=2' || true)" = 1 ] || { rm -f "$A.new" "$K"; echo "STAFFOFF_NOT_DONE: not a one-line removal; nothing changed: ask"; exit 1; }
 mv "$A.new" "$A" || { rm -f "$A.new" "$K"; echo "STAFFOFF_NOT_DONE: the new file was not put in place; nothing changed: ask"; exit 1; }
 echo "taken out: STAFF_ACCESS_POLICY_VERSION=2 (the file before is $K); the API restarts without it"
-if ! apiup; then { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFOFF_NOT_DONE: the API or the website did not start without the line (the line above says which), and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; apiup || { echo "STAFFOFF_NOT_DONE: the API or the website did not start without the line; the file before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "STAFFOFF_NOT_DONE: the API or the website did not start without the line (the lines above say which, and why); the file before is back and the API restarted on it, with the staff screens on: ask"; exit 1; fi
+R=0; apiup || R=$?
+if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the file without the line'); { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFOFF_NOT_DONE: $WHY, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; { apistart && webup; } || { echo "STAFFOFF_NOT_DONE: $WHY; the file before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "STAFFOFF_NOT_DONE: $WHY; the file before is back, and the API and the website started on it, with the staff screens on: ask"; exit 1; fi
 echo STAFFOFF_DONE
 exit 0
 ```
@@ -1927,8 +1947,9 @@ Expect the `taken out` line, the API's start lines (`PREVIEW_API_STARTED …`), 
 - It changes nothing in the database: the staff records, the staff keys, the Owner role and the audit history stay.
 - If it says `the staff screens are off already`, nothing changed: go on with NAME2.
 - If it stops on `team allowance lines`, run nothing more and ask.
-- If it stops with `the file before is back and the API restarted on it`, the staff screens are still on and nothing
-  else changed. Run nothing more and ask.
+- If it stops with `the file before is back, and the API and the website started on it`, the staff screens are still
+  on and nothing else changed. The start of the line says which one did not come up without the policy line: `the API
+  refused …` or `the API started on …, but the website did not answer …`. Run nothing more and ask.
 - If NAME2 then stops for another reason and you will not rename today, run STAFFON (5.5b). It puts the staff screens
   back on the test name. (If STAFFOFF said `the staff screens are off already`, there is nothing to put back.)
 - The way back is STAFFON (5.5b) on the test name, and STAFFMAIN (5.7) on dezbatere.ro.
@@ -1936,7 +1957,7 @@ Expect the `taken out` line, the API's start lines (`PREVIEW_API_STARTED …`), 
 **While the staff screens are off**, nobody can:
 - hide a published debate by hand (Hide now);
 - settle a report the AI check did not accept, or decide a publication review;
-- invite, grant or disable a staff member, or change the team limit (Admin → Team);
+- invite, grant or disable a staff member, or change the team limit (the Team page, `/admin/team`);
 - read the staff audit page.
 
 These wait in the database; nothing is lost. This holds on both names, during the friends' test (part 6) and while
@@ -2153,8 +2174,8 @@ Then, by hand:
    the key, ask. Keep the old entry until the name is final: after NAME5 only the old one works. Remove it later with
    its Remove button, your password and your code.
 5. **Your staff key.** A staff key belongs to one name too, and the one you enrolled works only on the test name. Do
-   5.7 now, or later the same day: it enrols your staff key again under dezbatere.ro. Until then Admin → Team cannot
-   verify you: **Verify security key for team access** (Verifică cheia de securitate pentru accesul echipei) ends
+   5.7 now, or later the same day: it enrols your staff key again under dezbatere.ro. Until then the Team page
+   (https://dezbatere.ro/admin/team) cannot verify you: **Verify security key for team access** (Verifică cheia de securitate pentru accesul echipei) ends
    with "The action could not be completed…" (Acțiunea nu a putut fi finalizată…), or is greyed out if the staff
    screens are off. That is expected. Your ordinary passkey (step 4) is separate, and it works. Part 8 waits for
    5.7: once the site is open to everyone, Hide now is the only way you can take a published debate down yourself.
@@ -2236,6 +2257,7 @@ set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # STAFFON: the staff screens back on the test name: the line STAFF_ACCESS_POLICY_VERSION=2 back into the API file, then the API restarts.
 # The NETOPIA review window (5.8) opens only on dezbatere.ro, and this step runs only on the test name, so with the window open it refuses.
+declare -F upfail >/dev/null || { echo "STAFFON_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then STAFFON"; exit 1; }
 K=$M/name/api-$LABEL.env.before-staffon-$(date -u +%Y%m%dT%H%M%SZ)
 [ "$HOST" = v3-preview.dezbatere.ro ] || { echo "STAFFON_NOT_DONE: the API answers as $HOST; on dezbatere.ro the step is STAFFMAIN (5.7); nothing changed"; exit 1; }
 P=$(grep -c '^STAFF_ACCESS_POLICY_VERSION=' "$A" || true)
@@ -2249,7 +2271,8 @@ cp -p "$A" "$K" || { rm -f "$K"; echo "STAFFON_NOT_DONE: the copy $K was not kep
 { ( umask 077; { cat "$A"; printf 'STAFF_ACCESS_POLICY_VERSION=2\n'; } > "$A.new" ) && chown --reference="$A" "$A.new" && chmod --reference="$A" "$A.new"; } || { rm -f "$A.new"; echo "STAFFON_NOT_DONE: the new file was not written; nothing changed: ask"; exit 1; }
 [ "$(diff "$A" "$A.new" | grep -c '^[<>]' || true)" = 1 ] && [ "$(diff "$A" "$A.new" | grep -cx '> STAFF_ACCESS_POLICY_VERSION=2' || true)" = 1 ] || { rm -f "$A.new"; echo "STAFFON_NOT_DONE: not a one-line addition; nothing changed: ask"; exit 1; }
 mv "$A.new" "$A" || { rm -f "$A.new"; echo "STAFFON_NOT_DONE: the new file was not put in place; nothing changed: ask"; exit 1; }
-if ! apiup; then { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFON_NOT_DONE: the API refused the staff screens, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; apiup || { echo "STAFFON_NOT_DONE: the API refused the staff screens; the file before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "STAFFON_NOT_DONE: the API refused the staff screens (code above); the file before is back and the API restarted on it: ask"; exit 1; fi
+R=0; apiup || R=$?
+if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the file with the staff screens on'); { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFON_NOT_DONE: $WHY, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; { apistart && webup; } || { echo "STAFFON_NOT_DONE: $WHY; the file before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "STAFFON_NOT_DONE: $WHY; the file before is back, and the API and the website started on it: ask"; exit 1; fi
 echo STAFFON_DONE
 exit 0
 ```
@@ -2307,7 +2330,7 @@ before the day.
 
 **What happens, in plain words.**
 - A staff key belongs to one site name. The one you enrolled belongs to the test name, so on dezbatere.ro the Team
-  page cannot verify you.
+  page (https://dezbatere.ro/admin/team; no menu links to it, so type the address) cannot verify you.
 - The site never lets an account that is already staff add a staff key with password and code alone. Otherwise a
   thief with your password and your phone could add a key of their own and act as the Owner.
 - So the server's operator (you, as root) first says yes for one person and one key. That yes is a **permit**. It
@@ -2324,27 +2347,56 @@ whatever STAFFCHECK (1.6) said:
 ```sh
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
-# REKEYCHECK: whether this server can do 5.7 (read-only): the release, the tools folder, the database step, and the database's own rule for the login REKEY uses.
+# REKEYCHECK: whether this server can do 5.7 (read-only): the release, the tools folder, the database step, the database's own rule for the login REKEY uses, and whether the team unlock (step 3) can write.
 # The NETOPIA review window (5.8) may be open: this step only reads.
-BAD=''; chk() { echo "NOT READY: $1"; BAD=yes; }
+BAD=''; NB=0; chk() { echo "NOT READY: $1"; NB=$((NB + 1)); [ -n "$BAD" ] || BAD=$1; }
 [ -f "$CAPI/dialectical-engine/migrations/0184_staff_rekey_permit.sql" ] || chk 'this release does not carry the staff re-key (the upload first)'
 [ -f "$L/rekey-staff-key.mjs" ] || chk "the tools folder does not carry rekey-staff-key.mjs (the upload's tools-folder swap first)"
 [ "$(psqlq "SELECT count(*) FROM pg_proc WHERE oid = to_regprocedure('staff.arm_rekey(uuid,text,text,text)')" || true)" = 1 ] || chk "the database does not hold the staff re-key step (the upload's database step first)"
 HB=$(psqlq "SELECT COALESCE((SELECT auth_method FROM pg_hba_file_rules WHERE error IS NULL AND type = 'local' AND database && ARRAY['all', 'debateai'] AND user_name && ARRAY['all', 'debateai_prod_staff_recovery'] ORDER BY rule_number LIMIT 1), 'none')" || true)
 [ "$HB" = scram-sha-256 ] || chk "the database's pg_hba.conf does not admit debateai_prod_staff_recovery on the local socket with scram-sha-256 (the first rule that matches it says: ${HB:-unreadable}): ask"
+# The team unlock writes its ready row either as its own login, from the dedicated user debateai-readiness (the lifecycle guide, install step 7 a-e), or with its fallback (step 7 f), never both. The own login is tried the way the unlock starts its helper: that user's uid and gid, no other group, no environment, no password.
+TU=debateai-preview-team-unlock
+[ "$(systemctl show -p LoadState --value "$TU" 2>/dev/null || true)" = loaded ] || chk "the team unlock's unit is not installed (the lifecycle guide, install step 6): ask"
+FB=$(systemctl show -p ExecStart "$TU" 2>/dev/null | grep -c 'PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login' || true)
+OWN=''; RU=$(id -u debateai-readiness 2>/dev/null || true); RG=$(id -g debateai-readiness 2>/dev/null || true)
+if [ -z "$RU" ] || [ -z "$RG" ] || [ "$RU" = 0 ] || [ "$RG" = 0 ]; then OWN='the dedicated user debateai-readiness is missing, or has uid or gid 0 (step 7 b)'
+else
+  AO=$(setpriv --reuid="$RU" --regid="$RG" --clear-groups --inh-caps=-all --no-new-privs -- /usr/bin/env -i "$N" "$L/readiness-writer-actor.mjs" < /dev/null 2>&1 || true)
+  PO=$(setpriv --reuid="$RU" --regid="$RG" --clear-groups --inh-caps=-all --no-new-privs -- /usr/bin/env -i /usr/lib/postgresql/18/bin/psql -w --host=/run/debateai-v3-preview/postgresql --port=5434 --username=debateai_staff_readiness_writer -d debateai -XAtc 'SELECT session_user, current_user' 2>&1 || true)
+  if [ "$AO" != '{"schema":"preview-lifecycle-readiness-v1","ok":false,"code":"STAFF_READINESS_INPUT_REFUSED"}' ]; then OWN="debateai-readiness cannot start the unlock's helper (it said: $(printf '%s\n' "$AO" | head -n 1 | cut -c1-160); step 7 b)"
+  elif [ "$PO" != 'debateai_staff_readiness_writer|debateai_staff_readiness_writer' ]; then OWN="debateai-readiness, with no other group, does not get in as debateai_staff_readiness_writer (psql said: $(printf '%s\n' "$PO" | head -n 1 | cut -c1-200); the socket folder is $(stat -c '%a %U:%G' /run/debateai-v3-preview/postgresql 2>/dev/null || echo unreadable); step 7 e says what each answer means)"; fi
+fi
+if [ "$FB" = 0 ]; then [ -z "$OWN" ] || chk "the team unlock cannot write as its own login: $OWN. Until it can, install the unlock's fallback (the lifecycle guide, install step 7 f), then run REKEYCHECK again"
+elif [ -z "$OWN" ]; then chk "the team unlock's fallback is installed, but its own login works, so the unlock would refuse to start (STAFF_WRITER_FALLBACK_NOT_NEEDED): move the fallback out (the lifecycle guide, install step 7 f, back to the default), then run REKEYCHECK again"; fi
 echo "the API answers as $HOST; policy line: $(grep -x 'STAFF_ACCESS_POLICY_VERSION=.*' "$A" || echo none); staff name lines: $(grep -E '^STAFF_WEBAUTHN_(ORIGIN|RP_ID)=' "$A" | tr '\n' ' ' || true)"
-[ -z "$BAD" ] || { echo "REKEYCHECK_NOT_DONE: a line above says NOT READY"; exit 1; }
+[ -z "$BAD" ] || { echo "REKEYCHECK_NOT_DONE: $BAD$([ "$NB" = 1 ] || echo " (and $((NB - 1)) more NOT READY line(s) above)")"; exit 1; }
+if [ "$FB" = 0 ]; then echo "the team unlock writes as its own login: in 5.7, UNLOCK (step 3) comes before REKEY (step 4)"; else echo "the team unlock writes with its fallback: in 5.7, REKEY (step 4) comes first, then UNLOCK (step 3) right after REKEY_DONE"; fi
 echo REKEYCHECK_DONE
 exit 0
 ```
 
-Expect the line about the API file, then `REKEYCHECK_DONE`. If it says the database's `pg_hba.conf` does not admit
-the login: ask, before the day. REKEY connects to the database as the staff recovery login, on the database's local
+Expect the line about the API file, the line on the team unlock (which of the two orders 5.7 takes: below, step 3),
+then `REKEYCHECK_DONE`. If it says the database's `pg_hba.conf` does not admit the login: ask, before the day.
+REKEY connects to the database as the staff recovery login, on the database's local
 socket, with a password that exists for three minutes; the database lets that login in only if its `pg_hba.conf`
 holds the line `local debateai debateai_prod_staff_recovery scram-sha-256` (it is in
 `deploy/postgres/pg_hba.conf.template`) above any broader `local` line. STAFFHBA
 (`deploy/preview-lifecycle/v1/README.md`), run in the upload's preparation (1.8), adds that line with a copy of the file,
 a check for errors and a reload, so the upload's cold copy holds it. If REKEYCHECK still says the line is missing, ask. Do not edit that file alone.
+
+**The team unlock, before the day.** A new staff key needs the team tools unlocked (step 3), and the unlock writes its
+"ready" row in one of two ways (the lifecycle guide, `deploy/preview-lifecycle/v1/README.md`, install step 7):
+- **Its own login**, `debateai_staff_readiness_writer`, which needs the database's batch step, the dedicated user
+  `debateai-readiness`, two lines in `pg_hba.conf` and `pg_ident.conf`, and a socket folder that lets that user in.
+  The unlock starts its helper as that user's own uid and gid with no other group, so REKEYCHECK logs in exactly so.
+- **Its fallback**, a drop-in that makes the unlock use the staff recovery login with a temporary password, as REKEY
+  does. It needs the same `pg_hba.conf` line as REKEY, and it refuses to start once the own login works.
+
+`NOT READY: the team unlock cannot write as its own login: …` names what failed (the user, the helper, or the login,
+with psql's own answer and the socket folder's mode); install the fallback (step 7 f) and run REKEYCHECK again.
+`NOT READY: the team unlock's fallback is installed, but its own login works …`: move the fallback out (step 7 f, back to
+the default). Either is a change to the server: do it before the day, and only the step the line names.
 
 **1. The staff screens on (skip if they are on already).** If the rename was done with the staff screens on, they are
 on already and STAFFMAIN says so. If it was done after STAFFOFF, STAFFMAIN puts the line
@@ -2357,6 +2409,7 @@ set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # STAFFMAIN: the staff screens on, on dezbatere.ro: the API file's two staff name lines name dezbatere.ro and the line STAFF_ACCESS_POLICY_VERSION=2 is in it (a copy kept), then the API restarts (a minute or more down). If the API refuses, the file before comes back.
 # The NETOPIA review window (5.8) may be open: this step changes the API file and restarts the API, never Caddy. While the API restarts, the open pages show an error.
+declare -F upfail >/dev/null || { echo "STAFFMAIN_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then STAFFMAIN"; exit 1; }
 K=$M/name/api-$LABEL.env.before-staffmain-$(date -u +%Y%m%dT%H%M%SZ)
 [ "$HOST" = dezbatere.ro ] || { echo "STAFFMAIN_NOT_DONE: the API answers as $HOST; on the test name the step is STAFFON (5.5b), on a server where STAFFOFF once ran; nothing changed"; exit 1; }
 [ -f "$CAPI/dialectical-engine/migrations/0184_staff_rekey_permit.sql" ] && [ -f "$L/rekey-staff-key.mjs" ] || { echo "STAFFMAIN_NOT_DONE: this release, or the tools folder, does not carry the staff re-key (the upload first, with its tools-folder swap); nothing changed"; exit 1; }
@@ -2377,14 +2430,15 @@ D=$(diff "$A" "$A.new" | grep -c '^[<>]' || true)
 { [ "$D" = 1 ] || [ "$D" = 5 ]; } && [ "$(diff "$A" "$A.new" | grep -cx '> STAFF_ACCESS_POLICY_VERSION=2' || true)" = 1 ] && [ "$(diff "$A" "$A.new" | grep '^<' | grep -cvE '^< STAFF_WEBAUTHN_(ORIGIN|RP_ID)=' || true)" = 0 ] && [ "$(grep -cx 'STAFF_WEBAUTHN_ORIGIN=https://dezbatere.ro' "$A.new" || true)" = 1 ] && [ "$(grep -cx 'STAFF_WEBAUTHN_RP_ID=dezbatere.ro' "$A.new" || true)" = 1 ] || { rm -f "$A.new"; echo "STAFFMAIN_NOT_DONE: the new file is not the policy line added and, at most, the two staff name lines moved; nothing changed: ask"; exit 1; }
 mv "$A.new" "$A" || { rm -f "$A.new"; echo "STAFFMAIN_NOT_DONE: the new file was not put in place; nothing changed: ask"; exit 1; }
 echo "in the API file: the staff name lines name dezbatere.ro and STAFF_ACCESS_POLICY_VERSION=2 is back (the file before is $K); the API restarts"
-if ! apiup; then { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFMAIN_NOT_DONE: the API refused the staff screens, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; apiup || { echo "STAFFMAIN_NOT_DONE: the API refused the staff screens; the file before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "STAFFMAIN_NOT_DONE: the API refused the staff screens (code above); the file before is back and the API restarted on it: ask"; exit 1; fi
+R=0; apiup || R=$?
+if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the file with the staff screens on'); { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFMAIN_NOT_DONE: $WHY, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; { apistart && webup; } || { echo "STAFFMAIN_NOT_DONE: $WHY; the file before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "STAFFMAIN_NOT_DONE: $WHY; the file before is back, and the API and the website started on it: ask"; exit 1; fi
 echo STAFFMAIN_DONE
 exit 0
 ```
 
 Expect the `in the API file` line, the API's start lines (`PREVIEW_API_STARTED …`), then `STAFFMAIN_DONE`. If it says
-`already`, nothing changed. If it stops with `the file before is back and the API restarted on it`, the staff screens
-are still off and nothing else changed: run nothing more and ask. The way back is NAME5 (it moves the name and the
+`already`, nothing changed. If it stops with `the file before is back, and the API and the website started on it`, the
+staff screens are still off and nothing else changed: run nothing more and ask. The way back is NAME5 (it moves the name and the
 staff name lines back together); to have the staff screens off again on dezbatere.ro, ask.
 
 **2. Sign in, and read your sign-in code.** Sign in at https://dezbatere.ro/login with your password and
@@ -2397,8 +2451,60 @@ browser signed in until the key is enrolled: if you sign out or sign in again, t
 If the list shows an **Other session** (Altă sesiune) you do not recognise, press its **Revoke** (Revocați) and
 change your password after this step; it cannot use the permit either way.
 
-**3. Unlock the team tools.** As root: `systemctl start debateai-preview-team-unlock`. It unlocks them for one hour
-(a new staff key is one of the things that need them unlocked). Wait about half a minute.
+**3. Unlock the team tools (UNLOCK).** A new staff key is one of the things that need them unlocked; the unlock keeps
+them unlocked for one hour. The order depends on REKEYCHECK's line on the team unlock:
+- `writes as its own login`: run UNLOCK now, then step 4.
+- `writes with its fallback`: do step 4 (REKEY) first. Right after `REKEY_DONE`, run UNLOCK, then step 5 within the
+  permit's 15 minutes. The fallback uses the same staff recovery login REKEY opens, so the two never run at once:
+  REKEY refuses while the fallback runs.
+
+Do not take `systemctl is-active` alone as the sign that the tools are unlocked. The unlock is active for about a
+minute while it checks the release, and its start line `PREVIEW_TEAM_TOOLS_UNLOCKED` comes before its first database
+call: an unlock that cannot write stops a moment later with `PREVIEW_TEAM_TOOLS_LOCKED` and `"outcome":"FAILED"`. The
+sign is the first "ready" row it writes, which the Team page needs. UNLOCK starts the unlock (or finds it running) and
+waits for that row, at most five minutes. As root:
+
+```sh
+set -euo pipefail
+# UNLOCK: the team tools unlocked for one hour (the team unlock started, or found running), then checked: it must write a fresh ready row and still run. Nothing else changes.
+U=debateai-preview-team-unlock
+psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
+[ "$(systemctl show -p ExecStart "$U" 2>/dev/null | grep -c 'PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login' || true)" = 0 ] || echo "the team unlock uses its fallback (the lifecycle guide, install step 7 f): in 5.7 it runs right after REKEY_DONE, never before REKEY"
+if [ "$(systemctl is-active "$U" || true)" = active ]; then
+  T=$(date -d "$(systemctl show -p ActiveEnterTimestamp --value "$U")" +%s 2>/dev/null || date +%s); echo "the team unlock runs already: nothing started; checking it"
+else
+  T=$(date +%s); sleep 1; systemctl reset-failed "$U" 2>/dev/null || true; systemctl start "$U" || true
+fi
+R=''
+for i in $(seq 1 60); do
+  sleep 5
+  J=$(journalctl -u "$U" --since "@$T" -o cat --no-pager 2>/dev/null | grep -E '"event":"PREVIEW_TEAM_TOOLS_(UNLOCKED|LOCKED)"' || true)
+  if grep -q '"event":"PREVIEW_TEAM_TOOLS_LOCKED"' <<<"$J"; then R=$(grep '"event":"PREVIEW_TEAM_TOOLS_LOCKED"' <<<"$J" | tail -n 1 | jq -r '.reason // .outcome // "no reason given"' 2>/dev/null || echo unreadable); break; fi
+  S=$(systemctl is-active "$U" || true); case "$S" in active|activating) ;; *) R="the unit is $S"; break;; esac
+  if grep -q '"event":"PREVIEW_TEAM_TOOLS_UNLOCKED"' <<<"$J" && [ "$(psqlq "SELECT count(*) FROM staff.independent_alert_readiness WHERE published_at >= to_timestamp($T) AND valid_until > clock_timestamp()" || true)" = 1 ]; then
+    echo "the team tools are unlocked until $(grep '"event":"PREVIEW_TEAM_TOOLS_UNLOCKED"' <<<"$J" | tail -n 1 | jq -r '.until // "?"' 2>/dev/null || echo '?') (UTC); they lock again by themselves then, or at  systemctl stop $U"
+    echo UNLOCK_DONE; exit 0
+  fi
+done
+journalctl -u "$U" --since "@$T" -o cat --no-pager 2>/dev/null | tail -n 5 | cut -c1-300 || true
+if [ -n "$R" ]; then
+  case "$R" in
+    STAFF_READINESS_*|STAFF_DB_HOST_REFUSED) W='the unlock cannot write as its own login: run REKEYCHECK (5.7), which names the step to do (the lifecycle guide, install step 7), then UNLOCK again';;
+    STAFF_WRITER_FALLBACK_NOT_NEEDED) W='its own login works, so its fallback refuses to start: move the fallback out (the lifecycle guide, install step 7 f), then UNLOCK again';;
+    STAFF_JIT_*) W='its fallback could not open or keep the staff recovery login (REKEY holds it for up to three minutes): wait three minutes, then UNLOCK again; if it says this twice, ask';;
+    *) W='ask, and give this line and the lines above';;
+  esac
+  echo "UNLOCK_NOT_DONE: the team unlock stopped ($R): $W"; exit 1
+fi
+echo "UNLOCK_NOT_DONE: the team unlock runs, but wrote no fresh ready row within five minutes: run  systemctl stop $U , then ask"
+exit 1
+```
+
+Expect `the team tools are unlocked until …`, then `UNLOCK_DONE`, usually within two minutes. `UNLOCK_NOT_DONE` says
+why and what to do. An unlock that can neither write as its own login nor use a fallback looks active for about a
+minute, then stops with a `STAFF_READINESS_…` reason (for example `STAFF_READINESS_USER_MISSING` when the dedicated
+user does not exist, or `STAFF_READINESS_DATABASE_UNAVAILABLE` when that user cannot reach the database's socket):
+REKEYCHECK names the step to do.
 
 **4. Arm the permit.**
 
@@ -2412,10 +2518,10 @@ grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { echo "REKEY_NOT_DONE: the sta
 [ "$(psqlq "SELECT COALESCE((SELECT auth_method FROM pg_hba_file_rules WHERE error IS NULL AND type = 'local' AND database && ARRAY['all', 'debateai'] AND user_name && ARRAY['all', 'debateai_prod_staff_recovery'] ORDER BY rule_number LIMIT 1), 'none')" || true)" = scram-sha-256 ] || { echo "REKEY_NOT_DONE: the database's pg_hba.conf does not admit debateai_prod_staff_recovery on the local socket with scram-sha-256 (REKEYCHECK says the same), so the tool cannot connect; adding the line is a reviewed change: ask; nothing changed"; exit 1; }
 UA=$(systemctl is-active debateai-preview-team-unlock || true)
 if [ "$(systemctl show -p ExecStart debateai-preview-team-unlock 2>/dev/null | grep -c 'PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login' || true)" != 0 ]; then
-  [ "$UA" != active ] || { echo "REKEY_NOT_DONE: the team unlock runs on its fallback writer, which holds the login this step needs: run  systemctl stop debateai-preview-team-unlock , run REKEY again, then start the unlock again; nothing changed"; exit 1; }
-  echo "the team unlock uses its fallback writer: start it right after REKEY_DONE (systemctl start debateai-preview-team-unlock)"
+  [ "$UA" != active ] || { echo "REKEY_NOT_DONE: the team unlock runs on its fallback writer, which holds the login this step needs: run  systemctl stop debateai-preview-team-unlock , run REKEY again, then UNLOCK (step 3) right after REKEY_DONE; nothing changed"; exit 1; }
+  echo "the team unlock uses its fallback writer: run UNLOCK (step 3) right after REKEY_DONE"
 else
-  [ "$UA" = active ] || { echo "REKEY_NOT_DONE: the team tools are locked: run  systemctl start debateai-preview-team-unlock , wait half a minute, then run REKEY again; nothing changed"; exit 1; }
+  [ "$UA" = active ] || { echo "REKEY_NOT_DONE: the team tools are locked: run UNLOCK (step 3) until it ends with UNLOCK_DONE, then REKEY again; nothing changed"; exit 1; }
 fi
 read -r -p 'The sign-in code your browser shows under Current session (8 characters): ' SC
 SC=$(printf '%s' "$SC" | tr -d '[:space:]' | tr 'A-F' 'a-f')
@@ -2455,7 +2561,8 @@ After `REKEY_NOT_DONE`, the line says what to do, and whether a permit was armed
 recovery login itself if the tool left it open, and says so.
 
 **5. Enrol the key (within 15 minutes, in the browser of step 2, without signing out in between).**
-1. Open Admin → Team. Open **Security key setup and recovery** (Configurarea cheilor și recuperarea accesului).
+1. Open https://dezbatere.ro/admin/team, the Team page (type the address: no menu links to it). Open **Security key
+   setup and recovery** (Configurarea cheilor și recuperarea accesului).
 2. Under **Register security key** (Înregistrează cheia de securitate), type your **Account password** (Parola
    contului) and the **Authenticator code** (Codul autentificatorului) your phone shows now. Press **Register
    security key**.
@@ -2469,8 +2576,8 @@ was wrong, or the permit ended, was used already, or is for another sign-in than
 authenticator code (each try needs a new one). If it says the same, run REKEY again (step 4): it arms a new permit,
 or says one is still armed (then wait until its end time). If the page says "Security key verification unavailable
 or cancelled…", the browser's key prompt was closed or timed out; the permit is used by then, so run REKEY again. If
-the page says "Team tools are locked…" (Instrumentele echipei sunt blocate…), do step 3 and try again within the 15
-minutes. If the browser refuses the key twice, ask.
+the page says "Team tools are locked…" (Instrumentele echipei sunt blocate…), run UNLOCK (step 3) and try again
+within the 15 minutes. If the browser refuses the key twice, ask.
 
 **6. Verify, and check.** On the Team page press **Verify security key for team access** (Verifică cheia de
 securitate pentru accesul echipei) and touch the key. The page now shows your access. Open public review and check
@@ -2506,7 +2613,7 @@ a test payment. This step lets anyone read the public pages of dezbatere.ro. Eve
 password: sign-in, sign-up, debates and buying. 5.8b says what to check on the open site, and when to ask NETOPIA.
 
 **Before you start:** do 5.8a first, on your Mac (below REVIEW_CLOSE): REVIEW_MACTEST must end with
-`REVIEW_MACTEST_DONE`. Then check: NAME4 passed and you did the checks by hand of 5.4; billing is on (`/pricing`
+`REVIEW_MACTEST_DONE` both times, on the recorded file and on the copy of the server's live Caddyfile. Then check: NAME4 passed and you did the checks by hand of 5.4; billing is on (`/pricing`
 exists); the site password is on; no upload is running. Do 5.7 (your staff key) first if you can: STAFFMAIN restarts
 the API, and with the window open the open pages would show an error meanwhile.
 
@@ -2556,6 +2663,8 @@ wlines() {
     "$1" "$WE" \
     "$1" 'basic_auth @review_locked {'
 }
+# The robots header the Caddyfile may send already (the same lines in REVIEW_OPEN, REVIEW_MACTEST, PWOFF1 and PWOFF2). It prints none; group, when the one robots line is exactly X-Robots-Tag "noindex, nofollow" in a plain header group after the password, inside the dezbatere.ro block (a server's own file can have it from when the server was set up); or other, for any other robots line, which every step refuses.
+robots() { awk '{ t = $0; sub(/^[ \t]+/, "", t) } $0 == "dezbatere.ro {" { s = 1 } s && $0 == "}" { s = 0 } s && t ~ /^basic_auth([ \t]|$)/ { a = 1 } s && g && t == "}" { g = 0 } tolower(t) ~ /x-robots-tag/ { n++; if (s && a && g && t == "X-Robots-Tag \"noindex, nofollow\"") k++ } s && a && t == "header {" { g = 1 } END { print (n == 0 ? "none" : (n == 1 && k == 1 ? "group" : "other")) }' "$1"; }
 code() { curl -s -o /dev/null -m 15 -w '%{http_code}' "$@" || true; }
 heads() { { curl -s -o /dev/null -m 15 -D - "$@" || true; } | tr -d '\r' | tr 'A-Z' 'a-z'; }
 box() { heads "$@" | grep -c '^www-authenticate: basic' || true; }
@@ -2620,12 +2729,13 @@ cmp -s "$C" "$M/name/Caddyfile.main" || { echo "REVIEW_OPEN_NOT_DONE: the live C
 [ -s "$M/name/notify-code.before-dezbatere" ] || { echo "REVIEW_OPEN_NOT_DONE: NAME1's notice code is missing; nothing changed: ask"; exit 1; }
 for P in / /terms /login; do [ "$(code "$U$P")" = 401 ] || { echo "REVIEW_OPEN_NOT_DONE: $P does not ask for the site password now; nothing changed: ask at once"; exit 1; }; done
 for P in /pricing /cancel /withdraw /terms /privacy /legal; do [ "$(code "http://127.0.0.1:$UIP$P")" = 200 ] || { echo "REVIEW_OPEN_NOT_DONE: the website does not serve $P (billing off, or the website is down); nothing changed: ask"; exit 1; }; done
-! grep -qi 'x-robots-tag' "$C" || { echo "REVIEW_OPEN_NOT_DONE: the live Caddyfile sends a robots header already; nothing changed: ask"; exit 1; }
 [ "$(grep -cx 'dezbatere\.ro {' "$C" || true)" = 1 ] && [ "$(grep -cE '^[[:space:]]*basic_auth([[:space:]]|$)' "$C" || true)" = 1 ] && [ "$(grep -cE '^[[:space:]]*basic_auth \{$' "$C" || true)" = 1 ] || { echo "REVIEW_OPEN_NOT_DONE: the live Caddyfile has not one dezbatere.ro block with one basic_auth line, written basic_auth {; nothing changed: ask"; exit 1; }
 DL=$(grep -nx 'dezbatere\.ro {' "$C" | cut -d: -f1); DE=$(awk -v s="$DL" 'NR > s && $0 == "}" { print NR; exit }' "$C"); BL=$(grep -nE '^[[:space:]]*basic_auth \{$' "$C" | cut -d: -f1)
 [ -n "$DE" ] && [ "$BL" -gt "$DL" ] && [ "$BL" -lt "$DE" ] || { echo "REVIEW_OPEN_NOT_DONE: the basic_auth line is not inside the dezbatere.ro block; nothing changed: ask"; exit 1; }
 [ "$(sed -n "$((BL - 1))p" "$C" | sed 's/^[[:space:]]*//')" = 'respond @wrongOrigin "ORIGIN_REFUSED" 403' ] && [ "$(sed -n "$((BL + 1))p" "$C" | sed 's/^[[:space:]]*//')" = '{$PREVIEW_BASIC_AUTH_USER} {$PREVIEW_BASIC_AUTH_HASH}' ] || { echo "REVIEW_OPEN_NOT_DONE: the lines around basic_auth are not the recorded ones (the origin check before it, the caddy.env pair inside it); nothing changed: ask"; exit 1; }
 I=$(sed -n "${BL}p" "$C" | sed -E 's/^([[:space:]]*).*$/\1/'); [ -n "$I" ] || { echo "REVIEW_OPEN_NOT_DONE: the basic_auth line has no indentation; nothing changed: ask"; exit 1; }
+# A robots header the file sends already must be exactly the window's own value, in the header group after the password: the window's line then sets the same header again, and it is still sent once (the probes check it).
+[ "$(robots "$C")" != other ] || { echo "REVIEW_OPEN_NOT_DONE: the live Caddyfile has a robots line other than X-Robots-Tag \"noindex, nofollow\" in the header group after the password; nothing changed: ask"; exit 1; }
 install -d -o root -g root -m 0700 "$RV"
 [ ! -e "$RK" ] && [ ! -e "$RW" ] || { echo "REVIEW_OPEN_NOT_DONE: copies of an earlier window are in $RV; nothing changed: run REVIEW_CLOSE (it moves them aside), then REVIEW_OPEN again"; exit 1; }
 cp -p "$C" "$RK"
@@ -2672,6 +2782,11 @@ are on NETOPIA's sandbox (0 once real payments are on, 7.6); what is open now. T
 logo, or for the note while payments are on the sandbox: ask before 5.8b. A `LOOK:` line changes nothing: read it, and
 ask before you write to NETOPIA. On a later run, with the window open, expect `the review window is open already: checks
 only, nothing changes`, the `/terms/versions` line and `REVIEW_OPEN_DONE`.
+
+The live Caddyfile may send the robots header already: a server's own file can have `X-Robots-Tag "noindex, nofollow"`
+in the `header {` group after the `basic_auth` block, from when the server was set up. REVIEW_OPEN goes on then: the
+window's own robots line sets the same value, and the probes check that `/` sends it once. Any other robots line in the
+file stops REVIEW_OPEN before it changes anything.
 
 If it says `REVIEW_OPEN_NOT_DONE`, read the reason:
 - On the first run (the window was closed), a failed check puts the file before back, and every page asks for the
@@ -2776,11 +2891,30 @@ folder: `rm -f ~/review-mactest.sh; nano ~/review-mactest.sh`, paste, Ctrl-O, En
 handler lines, `ok` lines, and `REVIEW_MACTEST_DONE`. Any `FAIL` or `REVIEW_MACTEST_NOT_DONE`: do not open the window
 on the server; ask.
 
+That run tries the file this guide records and rebuilds. The server's own file can differ from it (its indentation, a
+header group that sends the robots header already, Caddy's own rule for the payment marks), and REVIEW_OPEN changes the
+server's file. So run it a second time, on a copy of the server's live Caddyfile, after NAME4 and before REVIEW_OPEN:
+1. On the server, as root: `sha256sum /etc/debateai-v3-preview/public/Caddyfile`. Write down the first eight characters.
+2. On the Mac, in Terminal: `ssh <PREVIEW_SSH> 'sudo -n cat /etc/debateai-v3-preview/public/Caddyfile' > ~/Caddyfile.live`
+   (your ssh name of 1.8, step 2), then `shasum -a 256 ~/Caddyfile.live`. Its first eight characters must be the ones
+   you wrote down; if not, take the copy again. The file holds no secret: only the names of the values in `caddy.env`
+   (`{$PREVIEW_BASIC_AUTH_USER}`, `{$PREVIEW_BASIC_AUTH_HASH}`, `{$PREVIEW_ACME_EMAIL}`) and the path of the edge
+   secret's file, never the values. Still, keep it on the Mac only, outside the project folder.
+3. Run `bash ~/review-mactest.sh <the full path of the dialectical-engine folder> ~/Caddyfile.live`. Expect
+   `the file under test: …Caddyfile.live …`, the same lines as above, and `REVIEW_MACTEST_DONE`. Any `FAIL` or
+   `REVIEW_MACTEST_NOT_DONE`: do not open the window; ask.
+
+The copy is tested exactly as it is, with two local changes in the test's own folder: the global `admin off` line is
+followed by local ports and a local certificate authority, and root's payment-mark folder is a stand-in file. Where the
+server's file serves the three payment marks itself (Caddy's own rule, from root's folder), the test expects
+`/payment-marks/netopia.svg` from that stand-in; where it passes them to the website, from the website.
+
 ```bash
 #!/usr/bin/env bash
-# REVIEW_MACTEST: the review window tried on the Mac, before the server. The recorded dezbatere.ro Caddyfile is rebuilt with the kit's own caddy-slots.mjs and NAME2's rename, REVIEW_OPEN's lines are added by the same lines of code, and REVIEW_OPEN's file checks run. Then Caddy validates and adapts both files, and a local Caddy in front of two echo servers is probed with curl: with the window, without it, and after its lines come out again. Everything is written in a new temporary folder, removed at the end; nothing is installed or trusted.
+# REVIEW_MACTEST: the review window tried on the Mac, before the server. The recorded dezbatere.ro Caddyfile is rebuilt with the kit's own caddy-slots.mjs and NAME2's rename; given a copy of the server's live Caddyfile as the second argument, that copy is tested instead. REVIEW_OPEN's lines are added by the same lines of code, and REVIEW_OPEN's file checks run. Then Caddy validates and adapts both files, and a local Caddy in front of two echo servers is probed with curl: with the window, without it, and after its lines come out again. Everything is written in a new temporary folder, removed at the end; nothing is installed or trusted.
 set -euo pipefail
-REPO=$(cd "${1:?usage: bash review-mactest.sh <the dialectical-engine folder>}" && pwd)
+REPO=$(cd "${1:?usage: bash review-mactest.sh <the dialectical-engine folder> [a copy of the live Caddyfile of the server]}" && pwd)
+LIVE=${2:-}
 nd() { echo "REVIEW_MACTEST_NOT_DONE: $1"; exit 1; }
 T=$(mktemp -d); CP=''; UPS=''; FAILS=0
 cleanup() { if [ -n "$CP" ]; then kill "$CP" 2>/dev/null || true; fi; for P in $UPS; do kill "$P" 2>/dev/null || true; done; rm -rf "$T"; }
@@ -2809,6 +2943,8 @@ wlines() {
     "$1" "$WE" \
     "$1" 'basic_auth @review_locked {'
 }
+# The robots header the Caddyfile may send already (the same lines in REVIEW_OPEN, REVIEW_MACTEST, PWOFF1 and PWOFF2). It prints none; group, when the one robots line is exactly X-Robots-Tag "noindex, nofollow" in a plain header group after the password, inside the dezbatere.ro block (a server's own file can have it from when the server was set up); or other, for any other robots line, which every step refuses.
+robots() { awk '{ t = $0; sub(/^[ \t]+/, "", t) } $0 == "dezbatere.ro {" { s = 1 } s && $0 == "}" { s = 0 } s && t ~ /^basic_auth([ \t]|$)/ { a = 1 } s && g && t == "}" { g = 0 } tolower(t) ~ /x-robots-tag/ { n++; if (s && a && g && t == "X-Robots-Tag \"noindex, nofollow\"") k++ } s && a && t == "header {" { g = 1 } END { print (n == 0 ? "none" : (n == 1 && k == 1 ? "group" : "other")) }' "$1"; }
 # 1. The recorded live file of the test name (LIVE_PREVIEW in tests/unit/preview-release-caddy-slots.test.ts).
 EDGE='header_up X-Debateai-Edge-Secret {file./etc/debateai-v3-preview/ui-edge.caddy.secret}'
 printf '%b\n' '# Protected preview only.' '{' '\temail {$PREVIEW_ACME_EMAIL}' '\tadmin off' '\tauto_https disable_redirects' '\tlog {' '\t\toutput discard' '\t}' '}' '' \
@@ -2822,7 +2958,7 @@ printf '%b\n' '# Protected preview only.' '{' '\temail {$PREVIEW_ACME_EMAIL}' '\
   '\t\theader {' '\t\t\tCache-Control "no-store"' '\t\t\t-Server' '\t\t}' '\t\trequest_body {' '\t\t\tmax_size 1MB' '\t\t}' \
   '\t\treverse_proxy 127.0.0.1:3100 {' '\t\t\theader_up Host v3-preview.dezbatere.ro' '\t\t\theader_up X-Forwarded-For {remote_host}' '\t\t\theader_up X-Forwarded-Proto https' "\t\t\t$EDGE" '\t\t\theader_up -Authorization' '\t\t}' \
   '\t}' '}' '' 'http://v3-preview.dezbatere.ro {' '\tredir https://v3-preview.dezbatere.ro{uri} 308' '}' > "$T/Caddyfile.recorded"
-# 2. The two slots, by the kit's own code (the release guide's T). PM2's payment-marks rule is not added: this server shows NETOPIA's hosted logo and has no mark files.
+# 2. The two slots, by the kit's own code (the release guide's T). PM2's payment-marks rule is not added (this guide's uploads skip PM2); a server that has it from an earlier upload is tried with its live copy, the second argument.
 cat > "$T/build.mjs" <<'JS'
 import { readFileSync, writeFileSync } from 'node:fs';
 const [repo, dir] = process.argv.slice(2);
@@ -2833,12 +2969,23 @@ zsh -lic "node '$T/build.mjs' '$REPO' '$T'" || nd "the kit's caddy-slots.mjs did
 # 3. NAME2: the rename and the HTTPS header group (MAIN-SITE.md 5.2); the result stands for NAME3's Caddyfile.main.
 sed 's/v3-preview\.dezbatere\.ro/dezbatere.ro/g' "$T/Caddyfile.two-slot" > "$T/Caddyfile.renamed"
 awk '{print} $0=="dezbatere.ro {"{n++; print "\theader {"; print "\t\tStrict-Transport-Security \"max-age=31536000\""; print "\t\t-Server"; print "\t}"} END{if(n!=1)exit 1}' "$T/Caddyfile.renamed" > "$T/Caddyfile.main" || nd "the renamed file has not exactly one dezbatere.ro block"
+# The copy of the server's live Caddyfile, when given, is the file under test instead: it is the file REVIEW_OPEN reads, and it may differ from the recorded one (its indentation, a header group, Caddy's own payment-marks rule).
+if [ -n "$LIVE" ]; then
+  [ -f "$LIVE" ] && [ -s "$LIVE" ] || nd "$LIVE is not a file with something in it: give the copy of the server's live Caddyfile (5.8a)"
+  cp "$LIVE" "$T/Caddyfile.main"
+  echo "the file under test: $LIVE (the copy of the server's live Caddyfile)"
+else
+  echo "the file under test: the recorded file, rebuilt"
+fi
 # 4. REVIEW_OPEN's lines, by the same code, and REVIEW_OPEN's file checks.
 C=$T/Caddyfile.main; RK=$T/Caddyfile.before-window; RW=$T/Caddyfile.window; HOST=dezbatere.ro
 cp -p "$C" "$RK"
-[ "$(grep -cE '^[[:space:]]*basic_auth \{$' "$RK" || true)" = 1 ] || nd "not exactly one basic_auth line"
-BL=$(grep -nE '^[[:space:]]*basic_auth \{$' "$RK" | cut -d: -f1)
+[ "$(grep -cx 'dezbatere\.ro {' "$RK" || true)" = 1 ] && [ "$(grep -cE '^[[:space:]]*basic_auth([[:space:]]|$)' "$RK" || true)" = 1 ] && [ "$(grep -cE '^[[:space:]]*basic_auth \{$' "$RK" || true)" = 1 ] || nd "the file has not one dezbatere.ro block with one basic_auth line, written basic_auth { (a copy from before NAME3?)"
+BL=$(grep -nE '^[[:space:]]*basic_auth \{$' "$RK" | cut -d: -f1); DL=$(grep -nx 'dezbatere\.ro {' "$RK" | cut -d: -f1); DE=$(awk -v s="$DL" 'NR > s && $0 == "}" { print NR; exit }' "$RK")
+[ -n "$DE" ] && [ "$BL" -gt "$DL" ] && [ "$BL" -lt "$DE" ] || nd "the basic_auth line is not inside the dezbatere.ro block"
 [ "$(sed -n "$((BL - 1))p" "$RK" | sed 's/^[[:space:]]*//')" = 'respond @wrongOrigin "ORIGIN_REFUSED" 403' ] && [ "$(sed -n "$((BL + 1))p" "$RK" | sed 's/^[[:space:]]*//')" = '{$PREVIEW_BASIC_AUTH_USER} {$PREVIEW_BASIC_AUTH_HASH}' ] || nd "the lines around basic_auth are not the recorded ones"
+RB=$(robots "$RK"); [ "$RB" != other ] || nd "the file has a robots line other than X-Robots-Tag \"noindex, nofollow\" in the header group after the password: REVIEW_OPEN refuses it too"
+echo "the robots header in the file before the window: $RB (none, or group: sent already by the header group after the password)"
 I=$(sed -n "${BL}p" "$RK" | sed -E 's/^([[:space:]]*).*$/\1/')
 wlines "$I" > "$RW.lines"
 awk -v n="$BL" -v f="$RW.lines" 'NR == n { while ((getline l < f) > 0) print l; next } { print }' "$RK" > "$RW"
@@ -2861,12 +3008,14 @@ O1=$(order "$RK" "$HOST" || true); O2=$(order "$RW" "$HOST" || true); echo "hand
 AX=$(cad adapt --config "$RW" --adapter caddyfile 2>/dev/null | jq -r --arg h "$HOST" 'def ex: if type == "object" then .expr else . end; [.apps.http.servers[].routes[] | select(.match[0].host[0] == $h) | .. | objects | select(has("handle"))] as $r | [$r[] | select(any(.handle[]?; .handler? == "authentication"))] as $a | [$r[] | select(any(.handle[]?; .handler? == "static_response" and ((.status_code // "") | tostring) == "401"))] as $q | if ($a | length) == 1 and ($a[0].match | length) == 1 and ($a[0].match[0] | keys) == ["not"] and ($a[0].match[0].not | length) == 1 and ($a[0].match[0].not[0] | keys) == ["expression"] and ($q | length) == 1 and ($q[0].match | length) == 1 and ($q[0].match[0] | keys) == ["expression"] then ($a[0].match[0].not[0].expression | ex), ($q[0].match[0].expression | ex) else "SHAPE" end' || true)
 [ "$AX" = "$PUB"$'\n'"$QUIET" ] || { cad adapt --config "$RW" --adapter caddyfile 2>/dev/null | jq -c '.. | objects | select(has("handle")) | select(any(.handle[]?; .handler? == "authentication" or .handler? == "static_response")) | .match' || true; nd "Caddy does not read the window's two rules as written (what it reads is above; REVIEW_OPEN's check must change with it)"; }
 echo "caddy validate, the handler order and the two rules: as REVIEW_OPEN expects"
-# 6. Local copies: local ports, a local certificate authority that nothing trusts, the edge secret here.
+# 6. Local copies: local ports, a local certificate authority that nothing trusts, the edge secret here, and a stand-in for root's payment-mark folder (Caddy's own payment-marks rule serves it in a server's live file). The global admin off line is found however it is indented.
 printf 'mactest\n' > "$T/edge.secret"
+mkdir -p "$T/payment-marks"; printf '%s\n' '<svg xmlns="http://www.w3.org/2000/svg"><title>mactest mark</title></svg>' > "$T/payment-marks/netopia.svg"
 wstrip "$RW" > "$T/Caddyfile.after-close"
 for F in before-window window after-close; do
-  awk -v t="$T" '{ gsub("/etc/debateai-v3-preview/ui-edge.caddy.secret", t "/edge.secret"); print }
-    $0 == "\tadmin off" { print "\tlocal_certs"; print "\tskip_install_trust"; print "\thttp_port 18080"; print "\thttps_port 18443" }' "$T/Caddyfile.$F" > "$T/local.$F"
+  awk -v t="$T" '{ gsub("/etc/debateai-v3-preview/ui-edge.caddy.secret", t "/edge.secret"); gsub("/etc/debateai-v3-preview/public/payment-marks", t "/payment-marks"); print }
+    $0 ~ /^[ \t]*admin off$/ { print "\tlocal_certs"; print "\tskip_install_trust"; print "\thttp_port 18080"; print "\thttps_port 18443" }' "$T/Caddyfile.$F" > "$T/local.$F"
+  [ "$(grep -cx "$(printf '\t')https_port 18443" "$T/local.$F" || true)" = 1 ] || nd "the $F file has not one global admin off line, so its local copy would not get local ports"
 done
 # 7. Two echo servers for the two slots: 200 with the request line they received, exactly as received.
 cat > "$T/echo.py" <<'PY'
@@ -2897,7 +3046,8 @@ start() {
   for i in $(seq 1 60); do [ "$(curl -sk --resolve "$H:18443:127.0.0.1" -m 2 -o /dev/null -w '%{http_code}' "$B/readyz" || true)" = 404 ] && return 0; sleep 0.5; done
   tail -n 20 "$T/caddy-$1.log"; nd "the local Caddy did not answer on the $1 file"
 }
-probe() { # probe <want> <method> <path> [curl options]; want: open, box, quiet, trick, refused, caddy404
+probe() { # probe <want> <method> <path> [curl options]; want: open, mark, box, quiet, trick, refused, caddy404
+  # mark: open, and answered either by the website (no payment-marks rule in the file) or by Caddy's own payment-marks rule from the stand-in file.
   local want=$1 m=$2 p=$3 c ch up; shift 3
   if [ "$m" = HEAD ]; then set -- -I "$@"; else set -- -X "$m" "$@"; fi
   : > "$T/body"; : > "$T/head"
@@ -2906,6 +3056,7 @@ probe() { # probe <want> <method> <path> [curl options]; want: open, box, quiet,
   up=$(head -c 9 "$T/body" || true)
   case "$want" in
     open) [ "$c" = 200 ] && { [ "$m" = HEAD ] || [ "$up" = 'UPSTREAM ' ]; } ;;
+    mark) [ "$c" = 200 ] && { [ "$up" = 'UPSTREAM ' ] || cmp -s "$T/body" "$T/payment-marks/netopia.svg"; } ;;
     box) [ "$c" = 401 ] && [ "$ch" = 1 ] && [ "$up" != 'UPSTREAM ' ] ;;
     quiet) [ "$c" = 401 ] && [ "$ch" = 0 ] && [ "$up" != 'UPSTREAM ' ] ;;
     trick) { [ "$c" = 401 ] || [ "$c" = 400 ]; } && [ "$up" != 'UPSTREAM ' ] ;;
@@ -2926,7 +3077,7 @@ for P in / '/?tab=public' /pricing '/pricing?country=RO&postal_code=10001' /term
 probe open HEAD /
 probe open GET /terms -H 'RSC: 1' -H 'Next-Router-State-Tree: %5B%22%22%5D'
 probe open GET /terms -H 'Cookie: debateai.locale=ro'
-probe open GET /payment-marks/netopia.svg
+probe mark GET /payment-marks/netopia.svg
 for P in /api/v1/billing/cancel-link /api/v1/billing/cancel-by-token; do probe open POST "$P" -H "$J" -H "$OR" --data '{}'; done
 probe refused POST /api/v1/billing/cancel-link -H "$J" -H 'Origin: https://example.invalid' --data '{}'
 same GET '/terms?lang=ro' '/terms?lang=ro'
@@ -3065,6 +3216,7 @@ set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # ASKS_OPEN: every signed-in account may start debates (V below). The runner's file says the same; only the API restarts.
 V=everyone-with-test-payments                             # part 6 (friends' test); part 8: V=everyone
+declare -F upfail >/dev/null || { echo "ASKS_OPEN_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then ASKS_OPEN"; exit 1; }
 case "$V" in everyone|everyone-with-test-payments) ;; *) echo "ASKS_OPEN_NOT_DONE: V is not one of the two values"; exit 1;; esac
 ! grep -q '^PREVIEW_ASKS_OPEN_TO=' "$A" "$RF" || { echo "ASKS_OPEN_NOT_DONE: already open: ASKS_CLOSE first"; exit 1; }
 grep -q '^PREVIEW_TEAM_USER_IDS_JSON=' "$A" || { echo "ASKS_OPEN_NOT_DONE: no team line to keep"; exit 1; }
@@ -3082,7 +3234,8 @@ back() { for F in "$A" "$RF"; do cp -p "$AS/$(basename "$F").before-open" "$F"; 
 for F in "$A" "$RF"; do ( umask 077; grep -v '^PREVIEW_TEAM_USER_IDS_JSON=' "$F" > "$F.new"; printf 'PREVIEW_ASKS_OPEN_TO=%s\n' "$V" >> "$F.new" ); chown --reference="$F" "$F.new"; chmod --reference="$F" "$F.new"; mv "$F.new" "$F"; done
 lc release-env.mjs same --labels "$LABEL" --slots "$SLOT" || { back; echo "ASKS_OPEN_NOT_DONE: a SAME check is BAD (above); both files are back, nothing restarted"; exit 1; }
 [ "$(grep -cx "PREVIEW_ASKS_OPEN_TO=$V" "$A")" = 1 ] && [ "$(grep -cx "PREVIEW_ASKS_OPEN_TO=$V" "$RF")" = 1 ] && ! grep -q '^PREVIEW_TEAM_USER_IDS_JSON=' "$A" "$RF" || { back; echo "ASKS_OPEN_NOT_DONE: the two files do not both say the value without a team line; both are back"; exit 1; }
-if ! apiup; then back; apiup || { echo "ASKS_OPEN_NOT_DONE: the API refused the open start; both files are back, but the API or the website did not start on them either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "ASKS_OPEN_NOT_DONE: the API refused the open start (code above); both files are back and the API restarted on them"; exit 1; fi
+R=0; apiup || R=$?
+if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the files with asks open'); back; { apistart && webup; } || { echo "ASKS_OPEN_NOT_DONE: $WHY; both files are back, but the API or the website did not start on them either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "ASKS_OPEN_NOT_DONE: $WHY; both files are back, and the API and the website started on them"; exit 1; fi
 said -xF "{\"event\":\"api.preview.asks_open\",\"to\":\"$V\"}" || { echo "ASKS_OPEN_NOT_DONE: no asks_open line: ask"; exit 1; }
 echo ASKS_OPEN_DONE
 exit 0
@@ -3120,6 +3273,7 @@ exit 0
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # ASKS_CLOSE: only the team may start debates again. Edits the current release's two files, so it works after any later upload.
+declare -F upfail >/dev/null || { echo "ASKS_CLOSE_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then ASKS_CLOSE"; exit 1; }
 ! grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || { echo "ASKS_CLOSE_NOT_DONE: payments are live and the site is open: PWON first"; exit 1; }
 [ -s "$M/asks/names.sh" ] || { echo "ASKS_CLOSE_NOT_DONE: $M/asks/names.sh is missing (asks were never opened by ASKS_OPEN): ask"; exit 1; }
 . "$M/asks/names.sh"                                      # ASKS_ARCHIVE, ASKS_LABEL
@@ -3132,7 +3286,8 @@ back() { for F in "$A" "$RF"; do cp -p "$AC/$(basename "$F").before-close" "$F";
 for F in "$A" "$RF"; do ( umask 077; grep -v -e '^PREVIEW_ASKS_OPEN_TO=' -e '^PREVIEW_TEAM_USER_IDS_JSON=' "$F" > "$F.new"; printf '%s\n' "$TL" >> "$F.new" ); chown --reference="$F" "$F.new"; chmod --reference="$F" "$F.new"; mv "$F.new" "$F"; done
 lc release-env.mjs same --labels "$LABEL" --slots "$SLOT" || { back; echo "ASKS_CLOSE_NOT_DONE: a SAME check is BAD (above); both files are back, nothing restarted"; exit 1; }
 ! grep -q '^PREVIEW_ASKS_OPEN_TO=' "$A" "$RF" && [ "$(grep -c '^PREVIEW_TEAM_USER_IDS_JSON=' "$A")" = 1 ] && [ "$(grep -c '^PREVIEW_TEAM_USER_IDS_JSON=' "$RF")" = 1 ] || { back; echo "ASKS_CLOSE_NOT_DONE: the two files do not both hold the team line without the open line; both are back"; exit 1; }
-if ! apiup; then back; apiup || { echo "ASKS_CLOSE_NOT_DONE: the API refused the start; both files are back, but the API or the website did not start on them either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "ASKS_CLOSE_NOT_DONE: the API refused the start (code above); both files are back and the API restarted on them"; exit 1; fi
+R=0; apiup || R=$?
+if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the files with asks closed'); back; { apistart && webup; } || { echo "ASKS_CLOSE_NOT_DONE: $WHY; both files are back, but the API or the website did not start on them either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "ASKS_CLOSE_NOT_DONE: $WHY; both files are back, and the API and the website started on them"; exit 1; fi
 ! said '"event":"api.preview.asks_open"' || { echo "ASKS_CLOSE_NOT_DONE: the API still says open: ask"; exit 1; }
 echo "open work now: $(psqlq "SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')")"
 echo ASKS_CLOSE_DONE
@@ -3509,6 +3664,7 @@ start on the new file.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # PAY_SWITCH: the API's payment lines swapped to the live ones and the API restarted. On a refusal everything goes back to the sandbox.
+declare -F upfail >/dev/null || { echo "PAY_SWITCH_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then PAY_SWITCH"; exit 1; }
 QL=$(grep -oE '^QUADERNO_API_BASE_URL=https://[a-z0-9-]+' "$M/pay/live.lines" | cut -d/ -f3 || true)
 [ "$HOST" = dezbatere.ro ] || { echo "PAY_SWITCH_NOT_DONE: the API answers as $HOST: open the main name first (part 5)"; exit 1; }
 ! grep -q '^PREVIEW_ASKS_OPEN_TO=' "$A" "$RF" || { echo "PAY_SWITCH_NOT_DONE: asks are open: ASKS_CLOSE first (the live start refuses everyone-with-test-payments)"; exit 1; }
@@ -3517,7 +3673,8 @@ QL=$(grep -oE '^QUADERNO_API_BASE_URL=https://[a-z0-9-]+' "$M/pay/live.lines" | 
 cmp -s "$M/pay/sandbox.lines" <(grep -E "$KEYS" "$A") || { echo "PAY_SWITCH_NOT_DONE: the API file's payment lines changed since PAY_LINES: ask"; exit 1; }
 [ "$(swap "$M/pay/live.lines")" = swapped ] || { echo "PAY_SWITCH_NOT_DONE: the swap did not finish (compare the API file with $M/pay/api-$LABEL.env.before-live); nothing restarted: ask"; exit 1; }
 [ "$(grep -cE "$KEYS" "$A")" = 11 ] || { swap "$M/pay/sandbox.lines"; echo "PAY_SWITCH_NOT_DONE: the swap did not leave 11 payment lines; the sandbox lines are back, nothing restarted"; exit 1; }
-if ! apiup; then swap "$M/pay/sandbox.lines"; sandboxdrop; apiup || { echo "PAY_SWITCH_NOT_DONE: the live start was refused; the sandbox lines and the proxy's sandbox form are back, but the API or the website did not start on them either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "PAY_SWITCH_NOT_DONE: the live start was refused (code above; part 10); the sandbox lines and the proxy's sandbox form are back and the API restarted on them"; exit 1; fi
+R=0; apiup || R=$?
+if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the live lines'); swap "$M/pay/sandbox.lines"; sandboxdrop; { apistart && webup; } || { echo "PAY_SWITCH_NOT_DONE: $WHY; the sandbox lines and the proxy's sandbox form are back, but the API or the website did not start on them either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "PAY_SWITCH_NOT_DONE: $WHY; the sandbox lines and the proxy's sandbox form are back, and the API and the website started on them"; exit 1; fi
 echo PAY_SWITCH_DONE
 exit 0
 ```
@@ -3676,6 +3833,7 @@ set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # PAY_BACK: the five live counts must be 0; then the sandbox lines and the proxy's sandbox form, and the API restarted.
 # If the sandbox start is refused, the live lines and form go back at once and the API restarts on them.
+declare -F upfail >/dev/null || { echo "PAY_BACK_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then PAY_BACK"; exit 1; }
 QL=$(grep -oE '^QUADERNO_API_BASE_URL=https://[a-z0-9-]+' "$M/pay/live.lines" | cut -d/ -f3 || true)
 grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || { echo "PAY_BACK_NOT_DONE: the API file is not live"; exit 1; }
 ! grep -q '^PREVIEW_ASKS_OPEN_TO=' "$A" "$RF" || { echo "PAY_BACK_NOT_DONE: asks are open: ASKS_CLOSE first (the sandbox start refuses everyone)"; exit 1; }
@@ -3691,7 +3849,8 @@ echo "live plans not over $W1; live payments not final $W2; live refunds not rec
 sandboxdrop
 journalctl -u "$EGU" -n 3 -o cat --no-pager
 [ "$(systemctl is-active "$EGU" || true)" = active ] && [ "$(modecheck "$QL")" = 'egress: PREVIEW_LIVE_PAYMENTS_REFUSED:egress' ] || { swap "$M/pay/live.lines"; livedrop "$QL"; MC=$(modecheck "$QL"); echo "$MC"; [ "$MC" = 'egress: live' ] || { echo "PAY_BACK_NOT_DONE: the proxy did not take its sandbox form, and it is not live again either, so no real payment can go through; the API file is live again, and the API was not restarted: ask at once"; exit 1; }; echo "PAY_BACK_NOT_DONE: the proxy did not take its sandbox form; the live lines and the proxy's live form are back, and the API kept running on them (it was not restarted): ask"; exit 1; }
-if ! apiup; then swap "$M/pay/live.lines"; livedrop "$QL"; modecheck "$QL"; apiup || { echo "PAY_BACK_NOT_DONE: the sandbox start was refused; the live lines and form are back, but the API or the website did not start on them either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "PAY_BACK_NOT_DONE: the sandbox start was refused (code above); the live lines and form are back and the API restarted on them: wait, then run this again"; exit 1; fi
+R=0; apiup || R=$?
+if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the sandbox lines'); swap "$M/pay/live.lines"; livedrop "$QL"; modecheck "$QL"; { apistart && webup; } || { echo "PAY_BACK_NOT_DONE: $WHY; the live lines and form are back, but the API or the website did not start on them either (the line above says which): the site is DOWN: ask at once"; exit 1; }; if [ "$R" = 2 ]; then echo "PAY_BACK_NOT_DONE: $WHY; the live lines and form are back, and the API and the website started on them: ask"; else echo "PAY_BACK_NOT_DONE: $WHY; the live lines and form are back, and the API and the website started on them: wait, then run this again"; fi; exit 1; fi
 RUNAPI apps/api/src/billing/check-cli.ts || true
 echo PAY_BACK_DONE
 exit 0
@@ -3757,7 +3916,8 @@ exit 0
 ## 8. Opening to everyone
 
 **Only after 5.7.** Do not start part 8 until the staff screens are on and your staff key works on dezbatere.ro:
-sign in there, open Admin → Team → public review, and check that your staff key is accepted. Without it nothing
+sign in there, open https://dezbatere.ro/admin/team (the Team page) → public review, and check that your staff key is
+accepted. Without it nothing
 published can be hidden by hand while the site is open, and the way back to the test name is closed while payments
 are real. PWOFF1 (8.2) refuses while the API file has no line `STAFF_ACCESS_POLICY_VERSION=2`, and while the database
 holds no working staff key of the Owner account under the name the site answers as.
@@ -3782,6 +3942,8 @@ Run ASKS_OPEN (6.1) with the line `V=everyone`. It refuses unless payments are l
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # PWOFF1: the guards, then two copies of the live Caddyfile, one to edit. Nothing live changes.
+# The robots header the Caddyfile may send already (the same lines in REVIEW_OPEN, REVIEW_MACTEST, PWOFF1 and PWOFF2). It prints none; group, when the one robots line is exactly X-Robots-Tag "noindex, nofollow" in a plain header group after the password, inside the dezbatere.ro block (a server's own file can have it from when the server was set up); or other, for any other robots line, which every step refuses.
+robots() { awk '{ t = $0; sub(/^[ \t]+/, "", t) } $0 == "dezbatere.ro {" { s = 1 } s && $0 == "}" { s = 0 } s && t ~ /^basic_auth([ \t]|$)/ { a = 1 } s && g && t == "}" { g = 0 } tolower(t) ~ /x-robots-tag/ { n++; if (s && a && g && t == "X-Robots-Tag \"noindex, nofollow\"") k++ } s && a && t == "header {" { g = 1 } END { print (n == 0 ? "none" : (n == 1 && k == 1 ? "group" : "other")) }' "$1"; }
 grep -qx 'PREVIEW_ASKS_OPEN_TO=everyone' "$A" && grep -qx 'PREVIEW_ASKS_OPEN_TO=everyone' "$RF" || { echo "PWOFF1_NOT_DONE: asks are not open to everyone in both files (8.1 first)"; exit 1; }
 said -xF '{"event":"api.preview.asks_open","to":"everyone"}' || { echo "PWOFF1_NOT_DONE: the running API does not say asks open to everyone"; exit 1; }
 ! grep -qxE 'NETOPIA_API_BASE_URL=https://secure(-sandbox|\.sandbox)\.netopia-payments\.com' "$A" || { echo "PWOFF1_NOT_DONE: the API file names NETOPIA's sandbox"; exit 1; }
@@ -3795,7 +3957,9 @@ said -xF "PREVIEW_MAIL_MODE {\"mode\":\"open\",\"origin\":\"https://$HOST\"}" ||
 [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || { echo "PWOFF1_NOT_DONE: the site does not ask for the password now: look"; exit 1; }
 ! grep -qE 'review_locked|review_quiet|review window begin' "$C" || { echo "PWOFF1_NOT_DONE: the NETOPIA review window is open: REVIEW_CLOSE (5.8) first"; exit 1; }
 [ ! -e "$M/password/Caddyfile.before-open" ] || { echo "PWOFF1_NOT_DONE: $M/password/Caddyfile.before-open exists (look first)"; exit 1; }
+RB=$(robots "$C"); [ "$RB" != other ] || { echo "PWOFF1_NOT_DONE: the live Caddyfile has a robots line other than X-Robots-Tag \"noindex, nofollow\" in the header group after the password: ask"; exit 1; }
 cp -p "$C" "$M/password/Caddyfile.before-open"; cp -p "$C" "$M/password/Caddyfile.open"
+if [ "$RB" = group ]; then echo "the live Caddyfile sends the robots header already, in the header group after the password: in the copy, take out the basic_auth block and add no robots line (8.2)"; else echo "the live Caddyfile sends no robots header: in the copy, take out the basic_auth block and add the robots line (8.2)"; fi
 echo "now edit $M/password/Caddyfile.open, then run PWOFF2"
 echo PWOFF1_DONE
 exit 0
@@ -3807,8 +3971,15 @@ the site block (dezbatere.ro):
    test server was set up, these are three lines: `basic_auth {`,
    `{$PREVIEW_BASIC_AUTH_USER} {$PREVIEW_BASIC_AUTH_HASH}` and `}`. (To confirm on the server: what the block's lines
    look like. Delete nothing else.)
-2. Right after the line `respond @wrongHost "NOT_FOUND" 404`, add one line, at the same indentation:
-   `header X-Robots-Tag "noindex, nofollow"`. It asks search engines not to list the site.
+2. The robots header, which asks search engines not to list the site. PWOFF1's line `the live Caddyfile sends …`
+   says which case this file is:
+   - `sends no robots header`: right after the line `respond @wrongHost "NOT_FOUND" 404`, add one line, at the same
+     indentation: `header X-Robots-Tag "noindex, nofollow"`.
+   - `sends the robots header already`: add nothing. The `header {` group after the `basic_auth` block already has the
+     line `X-Robots-Tag "noindex, nofollow"` (a server's own file can have it from when the server was set up), and
+     it stays in force with the password off. Change nothing in that group.
+
+   PWOFF2 reads the kept file again and refuses a copy that does the other thing.
 3. Keep the `@netopia_notify` handle and `caddy.env` as they are.
 
 ### 8.3 Take the site password off: put the copy in place
@@ -3817,15 +3988,23 @@ the site block (dezbatere.ro):
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # PWOFF2: the edited copy checked, then put in place; Caddy restarts (about a second). On any failed check the password goes back.
+# The robots header the Caddyfile may send already (the same lines in REVIEW_OPEN, REVIEW_MACTEST, PWOFF1 and PWOFF2). It prints none; group, when the one robots line is exactly X-Robots-Tag "noindex, nofollow" in a plain header group after the password, inside the dezbatere.ro block (a server's own file can have it from when the server was set up); or other, for any other robots line, which every step refuses.
+robots() { awk '{ t = $0; sub(/^[ \t]+/, "", t) } $0 == "dezbatere.ro {" { s = 1 } s && $0 == "}" { s = 0 } s && t ~ /^basic_auth([ \t]|$)/ { a = 1 } s && g && t == "}" { g = 0 } tolower(t) ~ /x-robots-tag/ { n++; if (s && a && g && t == "X-Robots-Tag \"noindex, nofollow\"") k++ } s && a && t == "header {" { g = 1 } END { print (n == 0 ? "none" : (n == 1 && k == 1 ? "group" : "other")) }' "$1"; }
 O=$M/password/Caddyfile.open; K=$M/password/Caddyfile.before-open
 [ -s "$K" ] && [ -s "$O" ] || { echo "PWOFF2_NOT_DONE: the two copies of PWOFF1 are missing (PWOFF1 first; nothing changed)"; exit 1; }
 ! cmp -s "$K" "$O" || { echo "PWOFF2_NOT_DONE: the copy is not edited yet (edit it as 8.2 says, then run this again; nothing changed)"; exit 1; }
 if cmp -s "$C" "$O"; then echo "PWOFF2_NOT_DONE: the edited copy is already the live Caddyfile (PWOFF2 ran before; nothing changed): move nothing, PWON needs both copies: ask"; exit 1; fi
 cmp -s "$C" "$K" || { echo "PWOFF2_NOT_DONE: the live Caddyfile changed since PWOFF1 (nothing changed): move nothing (PWON reads $K and $O): ask"; exit 1; }
 diff "$K" "$O" || true
-[ "$(diff "$K" "$O" | sed -n 's/^>[[:space:]]*//p')" = 'header X-Robots-Tag "noindex, nofollow"' ] || { echo "PWOFF2_NOT_DONE: the copy does not add exactly the one noindex line"; exit 1; }
+# The copy adds the one robots line when the file before sends none, and nothing when its header group after the password sends it already.
+case "$(robots "$K")" in
+  none) ADD='header X-Robots-Tag "noindex, nofollow"'; HUNKS=2; WANT='the one robots line';;
+  group) ADD=''; HUNKS=1; WANT='no line (the header group after the password sends the robots header already)';;
+  *) echo "PWOFF2_NOT_DONE: the Caddyfile kept by PWOFF1 has a robots line other than X-Robots-Tag \"noindex, nofollow\" in the header group after the password (nothing changed): ask"; exit 1;;
+esac
+[ "$(diff "$K" "$O" | sed -n 's/^>[[:space:]]*//p')" = "$ADD" ] || { echo "PWOFF2_NOT_DONE: the copy must add $WANT and take out the basic_auth block, nothing else (8.2; nothing changed)"; exit 1; }
 RM=$(diff "$K" "$O" | sed -n 's/^<[[:space:]]*//p' || true)
-[ "$(printf '%s\n' "$RM" | head -n 1 | cut -d' ' -f1)" = basic_auth ] && [ "$(printf '%s\n' "$RM" | tail -n 1)" = '}' ] && [ "$(diff "$K" "$O" | grep -c '^[0-9]' || true)" = 2 ] || { echo "PWOFF2_NOT_DONE: the copy does not remove exactly the basic_auth block"; exit 1; }
+[ "$(printf '%s\n' "$RM" | head -n 1 | cut -d' ' -f1)" = basic_auth ] && [ "$(printf '%s\n' "$RM" | tail -n 1)" = '}' ] && [ "$(diff "$K" "$O" | grep -c '^[0-9]' || true)" = "$HUNKS" ] || { echo "PWOFF2_NOT_DONE: the copy does not remove exactly the basic_auth block"; exit 1; }
 cad validate --config "$O" --adapter caddyfile >/dev/null 2>&1 || { echo "PWOFF2_NOT_DONE: caddy validate refused the copy"; exit 1; }
 [ -n "$(order "$O" "$HOST" || true)" ] && [ "$(order "$O" "$HOST" | grep -c authentication || true)" = 0 ] || { echo "PWOFF2_NOT_DONE: the copy still has a password step, or no route for $HOST"; exit 1; }
 { install -o root -g root -m 0644 "$O" "$C.new" && mv "$C.new" "$C" && cmp -s "$O" "$C"; } || { echo "PWOFF2_NOT_DONE: the copy was not put in place; Caddy was not restarted, so the password is still on: ask"; exit 1; }
@@ -3842,8 +4021,9 @@ echo PWOFF2_DONE
 exit 0
 ```
 
-Expect the diff (the removed `basic_auth` lines and the one added line), then `PWOFF2_DONE`. The site is now open to
-everyone.
+Expect the diff (the removed `basic_auth` lines, and the one added robots line when PWOFF1 said the file sends none),
+then `PWOFF2_DONE`. The site is now open to everyone. Either way PWOFF2 checks that `/` sends the robots header exactly
+once.
 
 ### 8.4 The site password back (the way back, and brake (b))
 
@@ -3897,7 +4077,7 @@ If the NETOPIA review window (5.8) is open, PWON closes it first, with the same 
 - The brakes are those of 6.5, with PWON as brake (b).
 - `everyone-with-test-payments` never runs without the password. Put the password back before anyone writes that
   value again.
-- Nothing becomes publicly listed by search engines while the noindex line is in place.
+- Nothing becomes publicly listed by search engines while the robots header is sent (the line PWOFF2 checked).
 
 ---
 

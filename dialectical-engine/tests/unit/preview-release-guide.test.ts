@@ -2246,12 +2246,17 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
     expect(verdict([['N1_HEADERS', true], ['DISK', false], ['SLOT_FREE', false]], 'NOT_READY')).toBe(`SB4_NOT_DONE: NOT_READY, BAD: DISK SLOT_FREE: ${waits}`);
     expect(verdict([['N1_HEADERS', true]], 'NEW_VERDICT')).toBe('SB4_NOT_DONE: the release check gave no verdict (the lines above): ask');
     // A restart a system update still wants: the last line says what it is, that the owner decides, and how to go on;
-    // on both paths, and only when every other BAD check waits for GRR or LIFE.
-    const restart = " (NO_MAINTENANCE: reboot required only says a system update still wants a restart, and nothing else in the upload reads it: going on, or restarting first, is the owner's decision; to go on, run SB4 again with REBOOT='later')";
-    expect(verdict([['N1_HEADERS', false], ['NO_MAINTENANCE', false, 'reboot required']])).toBe(`SB4_NOT_DONE: DRAINED_PATH, and BAD too: NO_MAINTENANCE: ${waits}${restart}`);
+    // on both paths, and only when every other BAD check waits for GRR or LIFE. Such a line no longer also says to stop
+    // and ask: the owner reads only that line, and it must not say both.
+    const restart = "reboot required only says a system update still wants a restart, and nothing else in the upload reads it: going on, or restarting first, is the owner's decision; to go on, run SB4 again with REBOOT='later'";
+    const reviews = 'on the first run GATE_ROWS_N1 and LIFECYCLE_FILES wait for GRR and LIFE (above)';
+    expect(verdict([['N1_HEADERS', false], ['NO_MAINTENANCE', false, 'reboot required']])).toBe(`SB4_NOT_DONE: DRAINED_PATH, and BAD too: NO_MAINTENANCE: ${restart}`);
     expect(verdict([['N1_HEADERS', false], ['GATE_ROWS_N1', false], ['NO_MAINTENANCE', false, 'reboot required'], ['LIFECYCLE_FILES', false]]))
-      .toBe(`SB4_NOT_DONE: DRAINED_PATH, and BAD too: GATE_ROWS_N1 NO_MAINTENANCE LIFECYCLE_FILES: ${waits}${restart}`);
-    expect(verdict([['N1_HEADERS', true], ['NO_MAINTENANCE', false, 'reboot required']], 'NOT_READY')).toBe(`SB4_NOT_DONE: NOT_READY, BAD: NO_MAINTENANCE: ${waits}${restart}`);
+      .toBe(`SB4_NOT_DONE: DRAINED_PATH, and BAD too: GATE_ROWS_N1 NO_MAINTENANCE LIFECYCLE_FILES: ${reviews}; NO_MAINTENANCE: ${restart}`);
+    expect(verdict([['N1_HEADERS', true], ['NO_MAINTENANCE', false, 'reboot required']], 'NOT_READY')).toBe(`SB4_NOT_DONE: NOT_READY, BAD: NO_MAINTENANCE: ${restart}`);
+    expect(verdict([['N1_HEADERS', true], ['GATE_ROWS_N1', false], ['NO_MAINTENANCE', false, 'reboot required']], 'NOT_READY')).not.toContain('stop and ask');
+    // The block's own comment says which verdicts go on, REBOOT='later' included.
+    expect(sb4[2]).toBe("# SB4: the release check. SIDE_BY_SIDE goes on, and so does NOT_READY whose only BAD check is the restart flag, with REBOOT='later'; DRAINED_PATH and every other NOT_READY stop here.");
     // Beside a real stop (DISK, MEMORY) there is no such sentence: that stop is read as a stop.
     expect(verdict([['N1_HEADERS', true], ['DISK', false], ['NO_MAINTENANCE', false, 'reboot required']], 'NOT_READY')).toBe(`SB4_NOT_DONE: NOT_READY, BAD: DISK NO_MAINTENANCE: ${waits}`);
     expect(verdict([['N1_HEADERS', false], ['MEMORY', false], ['NO_MAINTENANCE', false, 'reboot required']])).toBe(`SB4_NOT_DONE: DRAINED_PATH, and BAD too: MEMORY NO_MAINTENANCE: ${waits}`);
@@ -2284,6 +2289,17 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
     // The flag is read by the release check alone: the switch reads only MT1's flag.
     expect(read('deploy/preview-lifecycle/v1/release-switch.mjs')).not.toContain('reboot-required');
     expect(read('deploy/preview-lifecycle/v1/release-check.mjs')).toContain("export const REBOOT_REQUIRED_PATH = '/run/reboot-required';");
+  });
+
+  it('DR5 says what SB4 run again does after RELEASE_LOCK_INVALID: with the lock full it changes nothing; past the room check it is a stop', () => {
+    const dr5 = sectionOf(guide, guide.split('\n').find(line => line.startsWith('#### DR5. '))!).replace(/\s+/g, ' ');
+    expect(dr5).not.toContain('which only reads');
+    expect(dr5).toContain('run SB4 again. With the lock full it stops before the release check, changes nothing and names the retired release to archive; if it goes past the room check instead (it then runs the release check again and rewrites its two files in `$S`), stop and ask.');
+    // SB4 writes those two files only after its room check, which stops on a full lock.
+    const sb4 = scriptOf('SB4').lines;
+    const room = sb4.findIndex(line => line === 'echo "release lock: $NL of $MX releases, room for $LABEL"');
+    expect(room).toBeGreaterThan(0);
+    for (const file of ['> "$S/release-check.json"', '> "$S/lifecycle-files.txt"']) expect(sb4.findIndex(line => line.includes(file)), file).toBeGreaterThan(room);
   });
 });
 

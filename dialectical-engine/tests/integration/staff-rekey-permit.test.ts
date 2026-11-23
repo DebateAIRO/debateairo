@@ -446,6 +446,11 @@ describe('who may arm a permit, and for whom', () => {
     const rule = (await database.pool.query(admitted[0]!)).rows[0].coalesce as string;
     expect(typeof rule).toBe('string');
     expect(rule.length).toBeGreaterThan(0);
+    // UNLOCK (5.7, step 3) waits for the ready row the team unlock writes: its table and columns are the database's.
+    const ready = [...new Set(queries.filter((sql) => sql.includes('staff.independent_alert_readiness')))];
+    expect(ready).toHaveLength(1);
+    // The table holds one row at most (the tests above may have left one that is still valid).
+    expect(['0', '1']).toContain((await database.pool.query(ready[0]!.replace('$T', '0'))).rows[0].count);
     // The tool is called with the sign-in code the script asked for.
     expect(runbook).toContain('lc rekey-staff-key.mjs arm-owner "$SC"');
   });

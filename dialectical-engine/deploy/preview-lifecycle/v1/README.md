@@ -19,7 +19,7 @@ launchers still re-check every byte exactly as before.
 | `alert.mjs` | That email: "Preview: <unit> gave up after N restarts", the time in UTC and Bucharest, the last 20 log lines with secrets blanked. A crash that systemd is still fixing by itself sends nothing. At most one per service per 30 minutes. |
 | `backup.mjs` | A checked copy of the preview database every night at 03:15 Bucharest time; the 7 newest are kept. A local safety net, not an off-site backup. |
 | `unlock-team-tools.mjs` | `systemctl start debateai-preview-team-unlock` turns team (staff) tools on for one hour, then they lock again by themselves. It writes as a database login that has no password, reached only from one dedicated no-login OS user (the auth DB batch step; step 7). |
-| `rekey-staff-key.mjs` | Run by hand, as root, when a staff member has no staff key that works under the name the site answers as (after a rename). `rekey-staff-key.mjs arm-owner <sign-in code>` (or `arm-user <account id> <sign-in code>`) writes one permit that lasts at most 15 minutes, is bound to the sign-in the operator names by its code, and lets that person enrol one key on the Team page with password and authenticator code. It opens the staff recovery login for the one call and resets it; the name comes from the API file. `deploy/preview-auth-dev/v1/MAIN-SITE.md` (5.7) has the steps. |
+| `rekey-staff-key.mjs` | Run by hand, as root, when a staff member has no staff key that works under the name the site answers as (after a rename). `rekey-staff-key.mjs arm-owner <sign-in code>` (or `arm-user <account id> <sign-in code>`) writes one permit that lasts at most 15 minutes, is bound to the sign-in the operator names by its code, and lets that person enrol one key on the Team page (`/admin/team`; no menu links to it) with password and authenticator code. It opens the staff recovery login for the one call and resets it; the name comes from the API file. `deploy/preview-auth-dev/v1/MAIN-SITE.md` (5.7) has the steps. |
 
 ## Decisions you should know about
 
@@ -71,7 +71,8 @@ launchers still re-check every byte exactly as before.
   readiness line and no `pg_ident` map: production has no team-unlock helper, so there the
   login exists but cannot log in. The lines below (step 7) are the only place they are written.
 - **The old way stays as a fallback, switched on by hand.** Until the server has the auth DB
-  batch step, the dedicated user and the two lines, the operator installs one drop-in (step 7)
+  batch step, the dedicated user, the two lines and a socket folder that lets that user in (step 7), the operator
+  installs one drop-in (step 7 f)
   that names `PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login` on the unit's own `env -i`
   line. Any other value is refused (`STAFF_WRITER_REFUSED`). Then the unlock opens the existing
   recovery login with a temporary password, as before, and its lines say
@@ -501,6 +502,17 @@ unit files before installing; nothing else names them.
    `CONNECTION LIMIT 2`), reached only from the dedicated OS user `debateai-readiness` over the
    local socket, **never from root**. Five checks and two changes:
 
+   **What the socket folder must allow.** The unlock starts its helper as `debateai-readiness`'s own uid and gid with
+   no other group (`setpriv --clear-groups`), and the helper refuses to run with any other group. So the database's
+   socket folder `/run/debateai-v3-preview/postgresql` must let that user in by itself: search (`x`) on the folder (and
+   on each folder above it) and write (`w`) on the socket file `.s.PGSQL.5434` in it, through the bits for others (or
+   for the group `debateai-readiness`). Adding the user to the folder's group does not help: the helper drops that group, and b
+   requires the user's own group only. Read it with `stat -c '%a %U:%G' /run/debateai-v3-preview/postgresql
+   /run/debateai-v3-preview/postgresql/.s.PGSQL.5434`. Where the folder does not allow it (for example mode `750` with
+   a database-client group the user is not in), b to e cannot pass: use the fallback (f) until a reviewed change to the
+   socket folder or to the helper, and do not change either by hand. MAIN-SITE.md's REKEYCHECK (5.7) tries the login
+   exactly as the helper makes it and names what failed.
+
    a. **Is the auth DB batch step applied?** Applying it is its own reviewed step, not part of
       this install. This must print `debateai_staff_readiness_writer|t|t|2` (it can log in, has no
       password, at most 2 connections):
@@ -584,8 +596,12 @@ unit files before installing; nothing else names them.
       Expect `debateai_staff_readiness_writer|debateai_staff_readiness_writer`. If not:
       `no password supplied`: the `pg_hba` line is missing, not first, or not reloaded (c).
       `Peer authentication failed`: the `pg_ident` line is missing or misspelled (c).
-      `Permission denied` on the socket file: the socket folder does not let this user in; stop
-      and ask (the API's own user reaches it, so compare `namei -l` of the socket for both).
+      `connection to server on socket … failed: Permission denied` (psql adds `Is the server running locally and
+      accepting connections on that socket?`): the socket folder does not let this user in ("What the socket folder
+      must allow", above): use the fallback (f); change nothing on the folder by hand.
+      This check uses `runuser`, which gives the user the groups `/etc/group` lists for it; with b's single own group
+      that is what the unlock's helper has. If `id debateai-readiness` lists another group, this check can pass while
+      the unlock still fails: REKEYCHECK (MAIN-SITE.md 5.7) logs in without any other group, as the helper does.
       `permission denied for database`: the batch step grants this login CONNECT; check (a).
       `role … does not exist`: the batch step is not applied (a).
       `too many connections for role`: its 2 connections are in use; is an unlock running?
@@ -600,8 +616,9 @@ unit files before installing; nothing else names them.
       output row. If it prints `debateai_staff_readiness_writer`, root is still mapped: stop,
       redo c, and do not start the unlock until this check refuses.
 
-   f. **Fallback, only while a–e cannot pass yet.** Install the drop-in that switches the unlock
-      back to the old recovery login with a temporary password:
+   f. **Fallback, only while a–e cannot pass yet** (the batch step not applied, the user or the lines missing, or a
+      socket folder that does not let the user in). Install the drop-in that switches the unlock back to the old
+      recovery login with a temporary password:
 
       ```sh
       install -D -m 0644 -o root -g root /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/systemd/fallback/50-interim-recovery-login.conf /etc/systemd/system/debateai-preview-team-unlock.service.d/50-interim-recovery-login.conf
@@ -611,7 +628,8 @@ unit files before installing; nothing else names them.
 
       The last line prints `1`. The fallback logs in as `debateai_prod_staff_recovery` over the
       local socket, so the preview cluster's `pg_hba.conf` needs a `local` line for that role with
-      `scram-sha-256`, as in `deploy/postgres/pg_hba.conf.template`:
+      `scram-sha-256`, as in `deploy/postgres/pg_hba.conf.template`. The staff re-key tool uses the same login, so with
+      the fallback MAIN-SITE.md 5.7 runs REKEY first and the unlock (UNLOCK) right after `REKEY_DONE`, never both at once:
 
       ```sh
       runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc "SELECT line_number,type,database,user_name,auth_method FROM pg_hba_file_rules WHERE 'debateai_prod_staff_recovery' = ANY(user_name) OR 'all' = ANY(user_name) ORDER BY line_number"

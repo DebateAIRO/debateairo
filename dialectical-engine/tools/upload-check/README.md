@@ -77,7 +77,11 @@ behind. They are a few bytes each and do no harm; the password belongs to a data
    that added, removed or changed one of those, or changed a mode (Next has rewritten `apps/ui/next-env.d.ts`), is
    `REFUSED` with `UPLOAD_CHECK_WEBSITE_BUILD_CHANGED_SOURCE` and up to eight of them named, because the release tool's
    build on the server refuses it too (`PREVIEW_SOURCE_INVENTORY_REFUSED`). The server also reads every file inside
-   each `node_modules` folder again; this check does not, so a build that wrote inside one is seen only there.
+   each `node_modules` folder again; this check does not, so a build that wrote inside one is seen only there. The
+   entries are the server's, but not its custody checks: the server also refuses any folder it walks (an empty one
+   too) and any file that is writable by group or others, or owned by another user
+   (`PREVIEW_SOURCE_CUSTODY_REFUSED`). This check reads no folder's mode, so a build that leaves such a folder outside
+   `apps/ui/.next` is seen only on the server.
    On 2 November the server's build applied the plain
    7-day package rule to packages the owner had allowed early (fault 2). This check can only see that kind of fault
    while an early allowance (the owner's permission to use a package version before it is 7 days old) is in force.

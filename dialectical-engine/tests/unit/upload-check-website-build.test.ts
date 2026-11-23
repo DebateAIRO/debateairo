@@ -143,6 +143,22 @@ describe('check 2: the release install and the website build', () => {
     expect(manifest).toContain("if(!dependencies&&!complete&&(name==='node_modules'||excludedDirectories.includes(rel))){");
   });
 
+  it('reads no folder and no folder mode, and the two guides say that the server alone refuses such a folder', () => {
+    const { root } = fakeBuildThat('');
+    const before: Map<string, string> = website.inventoryOf(root);
+    // A new empty folder, and one writable by group and others: the Mac's inventory does not change.
+    mkdirSync(join(root, 'dialectical-engine/apps/ui/empty'));
+    mkdirSync(join(root, 'dialectical-engine/apps/ui/open'));
+    chmodSync(join(root, 'dialectical-engine/apps/ui/open'), 0o777);
+    expect([...website.inventoryOf(root).entries()]).toEqual([...before.entries()]);
+    // The server walks every folder and refuses one writable by group or others, so the guides say it is seen only there.
+    expect(read('deploy/preview-auth-dev/v1/source-manifest.mjs')).toContain("if(!stat.isDirectory()||stat.isSymbolicLink()||stat.uid!==uid||(stat.mode&0o022)!==0)refuse('PREVIEW_SOURCE_CUSTODY_REFUSED');");
+    const flat = (path: string) => read(path).replace(/\s+/g, ' ');
+    expect(flat('tools/upload-check/README.md')).toContain('This check reads no folder\'s mode, so a build that leaves such a folder outside `apps/ui/.next` is seen only on the server.');
+    expect(flat('deploy/preview-release/v1/README.md')).toContain('and a folder (an empty one too) that the build left writable by group or others: only the server reads folder modes (`PREVIEW_SOURCE_CUSTODY_REFUSED`)');
+    expect(read('tools/upload-check/website-build.mjs')).toContain('owned by another user (PREVIEW_SOURCE_CUSTODY_REFUSED)');
+  });
+
   it('a failed online fill is refused, not thrown', async () => {
     const { result, root } = await website.checkWebsiteBuild({
       // No retries: each download fails at once, so the test does not wait out pnpm's retry pauses.

@@ -1546,7 +1546,7 @@ every leftover.
 | Check | What it does | The 2 November fault it would have caught |
 |---|---|---|
 | 1. `tools-folder` | Builds the server's shared tools folder from the three `deploy/` folders alone, as they are at the commit (by `git archive`, so nothing else on the Mac can help), and loads every tool in it. Seven tools that always run from a release folder, where the packages are installed, are loaded in check 2 instead. | Fault 3: a tool that reached for a folder the shared tools folder does not have. |
-| 2. `website-build` | Installs a release the way step A3 does (one online package download, then installs that must download nothing), then builds the website with the settings the release tool itself gives the build, compares the release folder with what it was just before the build, read as the server's source inventory reads it (each file's content and mode, each link, each `node_modules` folder by name; not inside `node_modules`, `apps/ui/.next` or the generated contract), and loads the seven release-folder tools there. A build that added, removed or changed such a file, or changed its mode (for example a rewritten `apps/ui/next-env.d.ts`), is refused here, as the release tool's A6 refuses it on the server. | Fault 2, but only while one of the owner's early allowances is in force (an early allowance lets a package version be used before it is 7 days old, which the package rule otherwise refuses). The report says how many are in force; with none, this check has nothing of that kind to catch. |
+| 2. `website-build` | Installs a release the way step A3 does (one online package download, then installs that must download nothing), then builds the website with the settings the release tool itself gives the build, compares the release folder with what it was just before the build, read as the server's source inventory reads it (each file's content and mode, each link, each `node_modules` folder by name; not inside `node_modules`, `apps/ui/.next` or the generated contract, and not the folders' modes, which only the server reads), and loads the seven release-folder tools there. A build that added, removed or changed such a file, or changed its mode (for example a rewritten `apps/ui/next-env.d.ts`), is refused here, as the release tool's A6 refuses it on the server. | Fault 2, but only while one of the owner's early allowances is in force (an early allowance lets a package version be used before it is 7 days old, which the package rule otherwise refuses). The report says how many are in force; with none, this check has nothing of that kind to catch. |
 | 3. `start-checks` | Starts a throwaway database (PostgreSQL) shaped like the server's to the start checks: the same name, port and cluster name. It applies every database step (migration) of the commit and makes the production logins (their names and roles) with the product's own tool. Then it runs the API's and the runner's own start checks as those logins, not as the database's all-powerful administrator. | Fault 5: the runner's start check expected one database role, and row security gives its login two. |
 
 - **A commit that is too old for a check** gets `not checked` for that check, with the reason. Check 2 says `not checked`
@@ -1987,7 +1987,9 @@ release tool refuses to build again in a folder that holds a build (`UI_BUILD_EX
 `PREVIEW_SOURCE_INVENTORY_REFUSED` on the log's last line means the folder is no longer what A4 inventoried: a file
 changed after A4, or the build itself added, removed or rewrote a file, or changed a mode, outside `apps/ui/.next`
 (such as a rewritten `apps/ui/next-env.d.ts`). The Mac check's check 2 finds the second kind before the upload,
-except a write inside a `node_modules` folder, which only the server reads file by file.
+except a write inside a `node_modules` folder, which only the server reads file by file, and a folder (an empty one
+too) that the build left writable by group or others: only the server reads folder modes
+(`PREVIEW_SOURCE_CUSTODY_REFUSED`).
 
 A7, everything checked again, the builds included, then the operator digest:
 
@@ -5749,14 +5751,14 @@ On the drained path SB4 always ends with `SB4_NOT_DONE: DRAINED_PATH`, and its l
 is BAD too. The first run, without `GRR` and `LIFE`, usually names `GATE_ROWS_N1` and `LIFECYCLE_FILES` as well. The
 second run, with both filled in, must end with `SB4_NOT_DONE: DRAINED_PATH (expected on a drained upload): no other
 check is BAD`: that is the one expected stop of the day. Any other name on that line: stop and ask. When the other
-name is `NO_MAINTENANCE` and its detail is `reboot required`, the line ends with a sentence that says so, and the
-paragraph above holds: the owner decides. On the side-by-side path a `NOT_READY` line names its BAD checks the same
-way.
+name is `NO_MAINTENANCE` and its detail is `reboot required`, the line ends with a sentence that says so in place of
+`anything else: stop and ask`, and the paragraph above holds: the owner decides. On the side-by-side path a
+`NOT_READY` line names its BAD checks the same way.
 
 ```sh
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
-# SB4: the release check. SIDE_BY_SIDE goes on; DRAINED_PATH and NOT_READY stop here.
+# SB4: the release check. SIDE_BY_SIDE goes on, and so does NOT_READY whose only BAD check is the restart flag, with REBOOT='later'; DRAINED_PATH and every other NOT_READY stop here.
 GRR=''                                                    # the digest GATE_ROWS_N1 printed, once the owner reviewed those gate files; else empty
 LIFE=''                                                   # yes, once the owner reviewed the LIFECYCLE_FILES change; else empty
 REBOOT=''                                                 # later, once the owner chose to go on with the restart a system update still wants; else empty
@@ -5789,13 +5791,17 @@ jq -r '.checks[] | select(.name == "LIFECYCLE_FILES") | .detail' <<<"$OUT" > "$S
 NM=$(jq -r '.checks[] | select(.name == "NO_MAINTENANCE" and (.ok | not)) | .detail' <<<"$OUT")
 SKIP=''; if [ "$NM" = 'reboot required' ] && [ "$REBOOT" = later ]; then SKIP=NO_MAINTENANCE; echo "NO_MAINTENANCE: reboot required is not counted (REBOOT=later: the owner goes on with the restart still owed)"; fi
 OTHER=$(jq -r --arg skip "$SKIP" '[.checks[] | select(.ok | not) | .name | select(. != "N1_HEADERS" and . != $skip)] | join(" ")' <<<"$OUT")
-# The sentence on the restart: only when every other BAD check waits for GRR or LIFE, so a real stop never reads as a choice.
-RB=''; if [ "$NM" = 'reboot required' ] && [ -z "$SKIP" ] && [ -z "$(tr ' ' '\n' <<<"$OTHER" | grep -vxE 'NO_MAINTENANCE|GATE_ROWS_N1|LIFECYCLE_FILES' || true)" ]; then RB=" (NO_MAINTENANCE: reboot required only says a system update still wants a restart, and nothing else in the upload reads it: going on, or restarting first, is the owner's decision; to go on, run SB4 again with REBOOT='later')"; fi
+# What the stop line says after the BAD checks. The sentence on the restart comes only when every other BAD check waits for GRR or LIFE, so a real stop never reads as a choice; with it, the line no longer says to stop and ask.
+WAIT='on the first run GATE_ROWS_N1 and LIFECYCLE_FILES wait for GRR and LIFE (above); anything else: stop and ask'
+if [ "$NM" = 'reboot required' ] && [ -z "$SKIP" ] && [ -z "$(tr ' ' '\n' <<<"$OTHER" | grep -vxE 'NO_MAINTENANCE|GATE_ROWS_N1|LIFECYCLE_FILES' || true)" ]; then
+  WAIT="reboot required only says a system update still wants a restart, and nothing else in the upload reads it: going on, or restarting first, is the owner's decision; to go on, run SB4 again with REBOOT='later'"
+  [ "$OTHER" = NO_MAINTENANCE ] || WAIT="on the first run GATE_ROWS_N1 and LIFECYCLE_FILES wait for GRR and LIFE (above); NO_MAINTENANCE: $WAIT"
+fi
 case "$(jq -r .verdict <<<"$OUT")" in
   SIDE_BY_SIDE) ;;
   DRAINED_PATH) if [ -z "$OTHER" ]; then echo "SB4_NOT_DONE: DRAINED_PATH (expected on a drained upload): no other check is BAD${SKIP:+ but NO_MAINTENANCE (reboot required), not counted (REBOOT=later)}: use \"Drained upload on the template layout\""; exit 1; fi
-    echo "SB4_NOT_DONE: DRAINED_PATH, and BAD too: $OTHER: on the first run GATE_ROWS_N1 and LIFECYCLE_FILES wait for GRR and LIFE (above); anything else: stop and ask$RB"; exit 1;;
-  NOT_READY) [ -z "$OTHER" ] || { echo "SB4_NOT_DONE: NOT_READY, BAD: $OTHER: on the first run GATE_ROWS_N1 and LIFECYCLE_FILES wait for GRR and LIFE (above); anything else: stop and ask$RB"; exit 1; };;
+    echo "SB4_NOT_DONE: DRAINED_PATH, and BAD too: $OTHER: $WAIT"; exit 1;;
+  NOT_READY) [ -z "$OTHER" ] || { echo "SB4_NOT_DONE: NOT_READY, BAD: $OTHER: $WAIT"; exit 1; };;
   *) echo "SB4_NOT_DONE: the release check gave no verdict (the lines above): ask"; exit 1;;
 esac
 echo SB4_DONE
@@ -7131,9 +7137,10 @@ release's. DR5 also stops with nothing changed when DR4 is not done (the ledger 
 migrations). As in SB10, DR5 first checks that Caddy serves the payment marks when the new release's ui file names
 them, and stops otherwise with nothing changed. When DR5 stops after it started writing, DR5RESUME (below) says
 whether anything was published and goes on, or says why not. A pin refused with `RELEASE_LOCK_INVALID` (and nothing
-pinned) means the lock was full after all (SB4 and PRECHECK read its room): run SB4 again, which only reads and, with
-the lock full, stops before the release check and names the retired release to archive; then SB15 with that label, on
-the owner's yes, with the site still down; then DR5RESUME.
+pinned) means the lock was full after all (SB4 and PRECHECK read its room): run SB4 again. With the lock full it stops
+before the release check, changes nothing and names the retired release to archive; if it goes past the room check
+instead (it then runs the release check again and rewrites its two files in `$S`), stop and ask. Then SB15 with that
+label, on the owner's yes, with the site still down; then DR5RESUME.
 
 ```sh
 set -euo pipefail

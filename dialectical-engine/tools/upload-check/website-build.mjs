@@ -191,7 +191,10 @@ const NOT_INVENTORIED = new Set([`${ENGINE}/packages/contract/generated`, `${ENG
  * scanInventory), by root-relative path: a file as its sha256 and mode, a link as its target, a node_modules folder as
  * one entry. Folders are walked, not listed. The Mac's root holds only dialectical-engine/ and this check's own log
  * beside it, so the walk starts there; on the server the release root also holds the rest of the commit, which no
- * build writes to. The server also reads every file inside each node_modules folder again; this walk does not.
+ * build writes to. The server also reads every file inside each node_modules folder again; this walk does not. Nor
+ * does it read folders: the server refuses any folder it walks, an empty one included, that is writable by group or
+ * others or owned by another user (PREVIEW_SOURCE_CUSTODY_REFUSED), so a build that leaves such a folder outside
+ * apps/ui/.next is seen only there. A file's mode is compared here, as the server compares it.
  */
 export function inventoryOf(root) {
   const entries = new Map();
