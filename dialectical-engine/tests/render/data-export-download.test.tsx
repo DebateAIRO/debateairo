@@ -9,6 +9,7 @@ import { PENDING_EXPORT_KEY } from "../../apps/ui/lib/dataExportPending.js";
 import { endSession, finishSessionCleanup } from "../../apps/ui/lib/endSession.js";
 import { safeReturnPath } from "../../apps/ui/lib/returnPath.js";
 import settings from "../../apps/ui/messages/en/settings.json" with { type: "json" };
+import { holdSessionCookies } from "../support/sessionCookie.js";
 
 const token = "t".repeat(43);
 const filename = "dialectical-engine-export-2026-10-08.zip";
@@ -28,8 +29,10 @@ async function mount(view: React.ReactNode) {
 }
 async function flush() { await act(async () => { await Promise.resolve(); }); }
 function button(text: string) { const found = [...(host?.querySelectorAll("button") ?? [])].find((item) => item.textContent?.includes(text)); if (!found) throw new Error(`BUTTON_MISSING:${text}`); return found; }
-beforeEach(() => { sessionStorage.clear(); window.history.replaceState(null, "", "/export"); });
-afterEach(async () => { if (root) await act(async () => root!.unmount()); root = null; host?.remove(); host = null; sessionStorage.clear(); window.history.replaceState(null, "", "/"); vi.unstubAllGlobals(); });
+// The emailed link is opened in a signed-in browser unless a test says otherwise (D-13 opens it in one with no session).
+let cookies: ReturnType<typeof holdSessionCookies> | null = null;
+beforeEach(() => { sessionStorage.clear(); window.history.replaceState(null, "", "/export"); cookies = holdSessionCookies(); });
+afterEach(async () => { if (root) await act(async () => root!.unmount()); root = null; host?.remove(); host = null; sessionStorage.clear(); window.history.replaceState(null, "", "/"); vi.unstubAllGlobals(); cookies?.drop(); cookies = null; });
 
 it("D-1 stashes the fragment token and strips it from browser history", async () => {
   window.history.replaceState(null, "", `/export#${token}`);
@@ -50,6 +53,25 @@ it("D-2 sends signed-out users to login without the token in the URL", async () 
     await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
     expect(assign).toHaveBeenCalledWith("/login?next=/export");
     expect(JSON.stringify(assign.mock.calls)).not.toContain(token);
+    await act(async () => root!.unmount()); root = null; host?.remove(); host = null; vi.unstubAllGlobals();
+  }
+});
+it("D-13 a browser that holds no session goes to sign-in without sending the link, and keeps it for afterwards", async () => {
+  // No session cookies: the download could only be refused, and that refusal makes the browser forget the site password.
+  cookies?.drop(); cookies = null;
+  const realHistory = window.history;
+  for (const arrival of ["fragment", "kept"] as const) {
+    if (arrival === "kept") sessionStorage.setItem(PENDING_EXPORT_KEY, token); else sessionStorage.clear();
+    const client = stub();
+    const assign = vi.fn(); const replacement = Object.create(window);
+    Object.defineProperty(replacement, "location", { value: { ...window.location, assign, pathname: "/export", search: "", hash: arrival === "fragment" ? `#${token}` : "" } });
+    Object.defineProperty(replacement, "history", { value: realHistory });
+    vi.stubGlobal("window", replacement);
+    await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+    expect(client.downloadDataExport, arrival).not.toHaveBeenCalled();
+    expect(assign, arrival).toHaveBeenCalledWith("/login?next=/export");
+    expect(JSON.stringify(assign.mock.calls)).not.toContain(token);
+    expect(sessionStorage.getItem(PENDING_EXPORT_KEY), arrival).toBe(token);
     await act(async () => root!.unmount()); root = null; host?.remove(); host = null; vi.unstubAllGlobals();
   }
 });

@@ -103,6 +103,25 @@ export function holdsNoSession(): boolean {
 }
 
 /**
+ * True when this browser holds no password reset in progress. The reset cookie is HttpOnly, but the API's exchange sets
+ * the readable reset CSRF cookie in the same response, with the same lifetime, and no route clears either one early:
+ * after a completed or cancelled reset both stay until that lifetime ends, so the page can still read how it ended.
+ * Without the readable one the status read could only be refused (401). False without a document (a server render).
+ */
+export function holdsNoPasswordReset(): boolean {
+  return typeof document !== "undefined" && readBrowserCsrfCookie("__Host-debateai-password-reset-csrf") === null;
+}
+
+/**
+ * True when this browser holds no authenticator recovery in progress, by the same rule as a password reset: the API's
+ * exchange sets the HttpOnly recovery cookie and the readable recovery CSRF cookie together, with the same lifetime,
+ * and clears neither early. False without a document (a server render).
+ */
+export function holdsNoMfaRecovery(): boolean {
+  return typeof document !== "undefined" && readBrowserCsrfCookie("__Host-debateai-mfa-recovery-csrf") === null;
+}
+
+/**
  * Reads the API can only refuse without a session. A browser holding none answers them itself with the API's own
  * refusal: every 401 a page receives makes the browser forget the site password it sent at the edge, so a refused
  * read on a signed-out page would ask for that password again.
@@ -393,7 +412,9 @@ export interface EvaluatorDevMenuView {
 }
 
 /** Reads only non-HttpOnly CSRF cookies; duplicates or malformed members grant no header. */
-export function readBrowserCsrfCookie(name: "__Host-debateai-csrf" | "__Host-debateai-staff-csrf"): string | null {
+export function readBrowserCsrfCookie(
+  name: "__Host-debateai-csrf" | "__Host-debateai-staff-csrf" | "__Host-debateai-password-reset-csrf" | "__Host-debateai-mfa-recovery-csrf"
+): string | null {
   if (typeof document === "undefined") return null;
   const values = document.cookie.split(";").flatMap((member) => {
     const index = member.indexOf("=");

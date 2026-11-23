@@ -11,6 +11,7 @@ import { createPasswordResetClient } from "../../packages/contract/src/password-
 import { RecoveryFlow } from "../../apps/ui/components/auth/RecoveryFlow.js";
 import authCatalog from "../../apps/ui/messages/en/auth.json";
 import { createContractClient } from "../../packages/contract/src/client.js";
+import { holdReadableCookies, PASSWORD_RESET_CSRF_COOKIE } from "../support/sessionCookie.js";
 import en from "../../apps/ui/messages/en/mfa-recovery.json";
 import ro from "../../apps/ui/messages/ro/mfa-recovery.json";
 import ja from "../../apps/ui/messages/ja/mfa-recovery.json";
@@ -162,6 +163,8 @@ describe("safe entry into known-password authenticator recovery", () => {
   it("confirms cancellation before leaving an active password reset for the new method", async () => {
     const requests: string[] = [], destinations: string[] = [];
     const client = createPasswordResetClient(async url => { const path = String(url).split("/").at(-1)!; requests.push(path); return json(path === "cancel-current" ? { status: "cancelled" } : { status: "password_required", expires_at: new Date(Date.now() + 240000).toISOString(), password_min_length: 8 }); }, "/api", () => "B".repeat(43));
+    // An active reset: this browser holds the reset's cookies, so the page reads its step.
+    holdReadableCookies(PASSWORD_RESET_CSRF_COOKIE);
     await act(async () => root.render(<PasswordResetFlow client={client} onRecoverAuthenticator={() => destinations.push("/recover-authenticator")} />));
     await click(en["known.link"]); expect(requests).toEqual(["status"]); expect(destinations).toEqual([]);
     await click(en["switch.confirm"]); expect(requests).toEqual(["status", "cancel-current"]); expect(destinations).toEqual(["/recover-authenticator"]);

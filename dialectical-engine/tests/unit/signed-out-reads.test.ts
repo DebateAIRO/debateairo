@@ -2,8 +2,8 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
-import { createBrowserContractClient, createSameOriginFetch, holdsNoSession } from "../../apps/ui/lib/api.js";
-import { holdSessionCookies } from "../support/sessionCookie.js";
+import { createBrowserContractClient, createSameOriginFetch, holdsNoMfaRecovery, holdsNoPasswordReset, holdsNoSession } from "../../apps/ui/lib/api.js";
+import { holdReadableCookies, holdSessionCookies, MFA_RECOVERY_CSRF_COOKIE, PASSWORD_RESET_CSRF_COOKIE } from "../support/sessionCookie.js";
 
 /*
  * The site sits behind a site password at the edge, and a browser forgets that password whenever a request it sent with it
@@ -37,6 +37,26 @@ describe("a browser that holds no session sends no read the API can only refuse"
     expect(holdsNoSession()).toBe(true);
     vi.stubGlobal("document", undefined);
     expect(holdsNoSession(), "a server render").toBe(false);
+  });
+
+  it("holdsNoPasswordReset and holdsNoMfaRecovery each follow their own readable cookie, and know nothing without a document", () => {
+    expect([holdsNoPasswordReset(), holdsNoMfaRecovery()]).toEqual([true, true]);
+    // A session is neither a reset nor a recovery.
+    const session = holdSessionCookies();
+    expect([holdsNoPasswordReset(), holdsNoMfaRecovery()]).toEqual([true, true]);
+    session.drop();
+    const reset = holdReadableCookies(PASSWORD_RESET_CSRF_COOKIE);
+    expect([holdsNoPasswordReset(), holdsNoMfaRecovery(), holdsNoSession()]).toEqual([false, true, true]);
+    reset.drop();
+    const recovery = holdReadableCookies(MFA_RECOVERY_CSRF_COOKIE);
+    expect([holdsNoPasswordReset(), holdsNoMfaRecovery(), holdsNoSession()]).toEqual([true, false, true]);
+    recovery.drop();
+    // A value the API never sets is no reset: the site's proxy forwards no sign-in cookie at all beside a malformed one.
+    holdReadableCookies("__Host-debateai-password-reset-csrf=short");
+    expect(holdsNoPasswordReset()).toBe(true);
+    vi.restoreAllMocks();
+    vi.stubGlobal("document", undefined);
+    expect([holdsNoPasswordReset(), holdsNoMfaRecovery()], "a server render").toEqual([false, false]);
   });
 
   it("with no cookie, GET /v1/session and GET /v1/asks/room are answered 401 SESSION_REQUIRED without a request", async () => {

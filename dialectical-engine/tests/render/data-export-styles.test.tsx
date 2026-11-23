@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, onTestFinished, vi } from "vitest";
+import { holdSessionCookies } from "../support/sessionCookie.js";
 import { DataExportCard } from "../../apps/ui/components/DataExportCard.js";
 import { ExportDownloadClient } from "../../apps/ui/components/ExportDownloadClient.js";
 import { AccountErasureControls } from "../../apps/ui/components/AccountErasureControls.js";
@@ -91,6 +92,9 @@ it("Y-3 styles all three methods, the selected password form and its accessible 
 });
 it("Y-4 computes DONE title and message declarations in L1 and L6", async () => {
   injectStyles(); const token = "t".repeat(43);
+  // A signed-in browser opens the link; one without a session goes to sign-in before any of this shows.
+  const cookies = holdSessionCookies();
+  onTestFinished(() => cookies.drop());
   for (const unavailable of [false, true]) {
     sessionStorage.setItem("debateai.exportPending", token);
     const client = { downloadDataExport: vi.fn(unavailable ? async () => { throw new ContractHttpError("HTTP_ERROR", 503, "unavailable", "EXPORT_UNAVAILABLE"); } : async () => ({ bytes: new Uint8Array([80, 75]).buffer, filename: "dialectical-engine-export-2026-10-08.zip" })) };
