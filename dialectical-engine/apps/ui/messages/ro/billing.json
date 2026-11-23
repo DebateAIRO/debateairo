@@ -114,7 +114,7 @@
   "billing.checkout.reacceptRequired": "Vă rugăm să acceptați mai întâi Termenii actualizați, apoi să reveniți pe această pagină.",
   "billing.checkout.pageOutdated": "Această pagină nu mai este actuală. Vă rugăm să o reîncărcați.",
   "billing.checkout.erasurePending": "Contul dvs. este programat pentru ștergere. Anulați ștergerea din Setări ca să vă abonați sau să vă schimbați abonamentul.",
-  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
+  "billing.checkout.invitedBuyersOnly": "Deocamdată, cumpărarea unui abonament este deschisă doar conturilor invitate. Puteți folosi în continuare abonamentul Gratuit.",
   "billing.checkout.rateLimited": "Prea multe încercări în ultima oră. Vă rugăm să încercați din nou mai târziu.",
   "billing.checkout.genericError": "Ceva nu a mers. Vă rugăm să încercați din nou.",
   "billing.checkout.formUnavailable": "Pagina de plată nu a putut fi deschisă. Vă rugăm să încercați din nou peste un minut.",
