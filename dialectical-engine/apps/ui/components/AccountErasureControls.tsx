@@ -142,7 +142,10 @@ export function AccountErasureControls({
         (failure: unknown) => {
           if (!active) return;
           setMessage(unavailable);
-          if (failure instanceof ContractHttpError && failure.status === 401) stop();
+          // A 401 stops the poll only when the browser holds no session by then: the site's client has already removed
+          // the readable cookie when the API said the session ended. With a session still held, the read left with the
+          // old session cookie just before a security check replaced it, and the next read sends the new one.
+          if (failure instanceof ContractHttpError && failure.status === 401 && holdsNoSession()) stop();
         }
       );
     };

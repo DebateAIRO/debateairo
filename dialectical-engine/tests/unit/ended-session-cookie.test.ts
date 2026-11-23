@@ -61,6 +61,26 @@ describe("a session the server has ended is forgotten after its first refusal", 
     expect(api.calls, "only the first read reached the server").toEqual(["/api/v1/account/export"]);
   });
 
+  it("the readable cookie is already gone when the caller sees the refusal, though the body comes after the status", async () => {
+    // A real answer's body reaches the browser after its status line. A caller that looks at the session the moment the
+    // 401 is handed to it (a poll deciding whether to stop) must already find none.
+    const slowBody = (body: unknown, status: number): Response => {
+      const bytes = new TextEncoder().encode(JSON.stringify(body));
+      const stream = new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          await new Promise((resolve) => { setTimeout(resolve, 5); });
+          controller.enqueue(bytes);
+          controller.close();
+        }
+      });
+      return new Response(stream, { status, headers: { "content-type": "application/json" } });
+    };
+    const api = server(() => slowBody({ error: "SESSION_REQUIRED" }, 401));
+    const seen = await createSameOriginFetch("/api", api.fetch)(new URL("https://localhost/v1/account/export"))
+      .then((answer) => ({ status: answer.status, noSession: holdsNoSession() }));
+    expect(seen).toEqual({ status: 401, noSession: true });
+  });
+
   it("through the contract client: after a refused poll, the session and room reads send nothing", async () => {
     const api = server(() => json({ error: "SESSION_REQUIRED" }, 401));
     const client = createBrowserContractClient(api.fetch);
