@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "Các điều khoản hợp đồng tiêu chuẩn của EU (mẫu hợp đồng của Ủy ban Châu Âu để gửi dữ liệu ra ngoài EU)",
   "legal.providers.locationDeepInfra": "Chỉ ở Hoa Kỳ. Điều này áp dụng cho các mô hình DeepInfra chạy trên máy chủ riêng của mình; DeepInfra chuyển yêu cầu của một mô hình đến một công ty đối tác, được nêu ở mục tiếp theo",
   "legal.providers.retentionDeepInfra": "Không lưu. DeepInfra chỉ giữ văn bản trong bộ nhớ trong lúc trả lời yêu cầu, rồi xóa. Nhật ký của DeepInfra chứa chi tiết yêu cầu như thời gian và chi phí, không bao giờ chứa văn bản. Điều này áp dụng cho các mô hình DeepInfra chạy trên máy chủ riêng của mình",
-  "legal.providers.deepinfraPartnerName": "Công ty đối tác của DeepInfra cho một mô hình (DeepInfra không nêu tên công ty này)",
   "legal.providers.locationPerplexity": "Hoa Kỳ, nơi có Perplexity và các công ty mà Perplexity liệt kê là làm việc cho mình. Perplexity không nêu khu vực nào",
   "legal.providers.retentionPerplexity": "Perplexity không công bố thời hạn cố định cho các yêu cầu tìm kiếm: Perplexity cho biết thời hạn này tùy thuộc vào dịch vụ và tài khoản. Theo các điều khoản xử lý dữ liệu của Perplexity, dữ liệu cá nhân được xóa trong vòng 30 ngày sau khi chúng tôi ngừng sử dụng dịch vụ",
   "legal.providers.luxembourg": "Luxembourg",

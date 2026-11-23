@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "Klausul kontrak standar EU (model kontrak Komisi Eropa untuk mengirim data ke luar EU)",
   "legal.providers.locationDeepInfra": "Hanya Amerika Serikat. Ini mencakup model yang dijalankan DeepInfra di server miliknya sendiri; DeepInfra meneruskan permintaan satu model kepada perusahaan mitra, yang tercantum pada entri berikutnya",
   "legal.providers.retentionDeepInfra": "Tidak disimpan. DeepInfra menyimpan teks di memori hanya selama menjawab permintaan, lalu menghapusnya. Lognya memuat rincian permintaan seperti waktu dan biaya, tidak pernah teksnya. Ini mencakup model yang dijalankan DeepInfra di server miliknya sendiri",
-  "legal.providers.deepinfraPartnerName": "Mitra DeepInfra untuk satu model (DeepInfra tidak menyebutkan nama perusahaannya)",
   "legal.providers.locationPerplexity": "Amerika Serikat, tempat Perplexity dan perusahaan yang dicantumkannya sebagai pihak yang bekerja untuknya berada. Perplexity tidak menyebutkan wilayah",
   "legal.providers.retentionPerplexity": "Perplexity tidak menerbitkan periode tetap untuk permintaan pencarian: Perplexity menyatakan hal ini bergantung pada layanan dan akun. Berdasarkan ketentuan pemrosesan datanya, Perplexity menghapus data pribadi dalam 30 hari setelah kami berhenti menggunakan layanan",
   "legal.providers.luxembourg": "Luxembourg",

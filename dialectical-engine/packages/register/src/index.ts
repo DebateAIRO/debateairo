@@ -1657,6 +1657,7 @@ export {
 export {
   SETTINGS_EXEMPT_CEILING_ROW_KEY,
   readSettingsSeatRefs,
+  settingsGatePartnerServedCodes,
   settingsGateThinkingCodes,
   settingsGateTokenCeilingCodes,
   settingsGateUnreviewedCodes,

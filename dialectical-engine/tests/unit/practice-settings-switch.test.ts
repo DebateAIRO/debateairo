@@ -34,8 +34,11 @@ const GATE = { deployment: "v3-preview", requested_thinking_level: "high", budge
 /** The live runner.env's full form (finding 3): both rosters and the thinking levels. */
 const FULL_FORM = { ...GATE, free_model_ids: [GLM, DEEPSEEK, MIMO], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU],
   thinking_levels: { [DEEPSEEK]: { level: "low" } } };
-/** The switched-on version's line-up (made up): lean Free, no MiMo there. */
-const LINE_UP: PreviewLineUp = parsePreviewLineUp({ free_model_ids: [GLM, DEEPSEEK, QWEN, HAIKU], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU],
+/**
+ * The switched-on version's line-up (made up): lean Free, no MiMo there. No Qwen: DeepInfra forwards it to a partner company
+ * it does not name, so no new version seats it (tests/unit/partner-served-line-up.test.ts).
+ */
+const LINE_UP: PreviewLineUp = parsePreviewLineUp({ free_model_ids: [GLM, DEEPSEEK, HAIKU], premium_model_ids: [GLM, DEEPSEEK, MIMO, HAIKU],
   thinking_levels: { [DEEPSEEK]: { level: "low" } } });
 const settingsWith = (config: unknown, registerVersion = "11") => ["PREVIEW_PROVIDER_TEST_CONFIG_JSON=" + JSON.stringify(config),
   "PROVIDER_DISCOVERY_TARGETS_JSON=[]", `REGISTER_VERSION=${registerVersion}`, "DEBATEAI_DEPLOYMENT_MODE=local", "NODE_ENV=production",

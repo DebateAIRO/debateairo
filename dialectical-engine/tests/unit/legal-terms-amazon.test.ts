@@ -20,20 +20,27 @@ const section = (text: string, no: number): string => {
 };
 const paragraphs = (body: string): string[] => body.split("\n").filter((line) => line.trim() !== "");
 const RELEASED = ["en", "ro", "fr"];
-/** Not offered yet, but recorded in translated-from.json as translated from the current English: they carry the paragraph too. */
+/**
+ * Not offered yet, but recorded in translated-from.json as translated from the current English, or from an English text
+ * released since launch (the archive keeps each one): every such English text has the paragraph, so they carry it too.
+ */
 const englishNow = createHash("sha256").update(draft("en"), "utf8").digest("hex");
 const translatedFrom = (JSON.parse(readFileSync(resolve(process.cwd(), "apps/ui/legal/translated-from.json"), "utf8")) as {
   TERMS: Record<string, { sha256: string }>;
 }).TERMS;
+const releasedEnglish = new Set(Object.keys((JSON.parse(readFileSync(resolve(process.cwd(), "packages/legal-manifest/src/manifest.json"), "utf8")) as {
+  archive: Record<string, Record<string, Record<string, unknown>>>;
+}).archive.TERMS?.en ?? {}));
 const CURRENT_NOT_OFFERED = LOCALES.map(({ code }) => code)
-  .filter((code) => !RELEASED.includes(code) && translatedFrom[code]?.sha256 === englishNow);
+  .filter((code) => !RELEASED.includes(code)
+    && (translatedFrom[code]?.sha256 === englishNow || releasedEnglish.has(translatedFrom[code]?.sha256 ?? "")));
 
 /** English, word for word: section 8's paragraph on Amazon, the Privacy Policy's shortened. */
 const AMAZON =
   "**A debate model through Amazon.** One of the AI models that write and judge a debate, a model made by OpenAI, is served by **Amazon Web Services** (its service Amazon Bedrock), under our contract with Amazon Web Services EMEA SARL in Luxembourg. Amazon runs this model in the United States and is listed in the Provider Register. OpenAI, the company that made the model, does not receive your text, and Amazon's terms do not allow Amazon or OpenAI to train models on it. Amazon does not keep the text, with one exception: requests that its automatic abuse filter flags are kept for up to 30 days, in the United States, and Amazon may review them. Amazon never receives your email address, your account identifiers, your session records or your payment details.";
 /** English, word for word: whose terms forbid training, in the summary and in section 8, each exactly once. */
 const ENGLISH_SENTENCES = [
-  "The terms of DeepInfra, Anthropic and Amazon do not allow them to train models on it; section 8 says for which company we have not confirmed this yet.",
+  "The terms of DeepInfra, Anthropic and Amazon do not allow them to train models on it.",
   "**We do not train on your content.** The terms of DeepInfra, Anthropic and Amazon do not allow them to use your content to train or improve their models either. We have checked this"
 ];
 /** The sentence that named two companies only, in each language the release offers: it must not come back. */

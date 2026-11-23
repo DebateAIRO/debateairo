@@ -988,7 +988,8 @@ describe('the guide\'s commands are the tools\' real command lines (D1-D13)', ()
 // transition (so the step order above is unchanged); its scripts follow the same rules and its calls the same parsers.
 
 const SETTINGS = '## Changing debate settings without an upload (settings activation)';
-const SETTINGS_STEPS = Object.freeze(['SV0', 'SV1', 'SV2', 'SV3', 'SV4', 'SV5', 'SV6']);
+/** QWENOUT, the read-only check before the upload that first carries the partner rule, sits in "Taking Qwen out of the live line-up". */
+const SETTINGS_STEPS = Object.freeze(['SV0', 'SV1', 'SV2', 'SV3', 'SV4', 'SV5', 'SV6', 'QWENOUT']);
 
 describe('settings activation: the guide (side-by-side spec §13)', async () => {
   const section = sectionOf(guide, SETTINGS);
@@ -1003,7 +1004,8 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     for (const block of steps) {
       const step = stepOf(block)!;
       expect(block.lines[0], step).toBe('set -euo pipefail');
-      if (step !== 'SV0' && step !== 'SV6') expect(block.lines[1], step).toBe('. /root/preview-archive/settings-names.sh');
+      // SV0 makes the names file; SV6 and QWENOUT run on their own, outside a settings change.
+      if (step !== 'SV0' && step !== 'SV6' && step !== 'QWENOUT') expect(block.lines[1], step).toBe('. /root/preview-archive/settings-names.sh');
       for (const line of block.lines) {
         for (const match of line.matchAll(/([A-Z][A-Z0-9_]*)_NOT_DONE/g)) expect(match[1], `${step}: ${line}`).toBe(step);
         if (line.includes('_NOT_DONE')) expect(line, `${step}: ${line}`).toMatch(/exit 1/);
@@ -1061,11 +1063,34 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
       '### The first upload with this change (T+1)', '### The providers page']) expect(section.split('\n'), heading).toContain(heading);
   });
 
+  it('taking Qwen out: an activation first, then the upload (QWENOUT before SB1), then the gate; the refusals and the way back named', () => {
+    const qwen = sectionOf(guide, '### Taking Qwen out of the live line-up');
+    const prose = qwen.replace(/\s+/g, ' ');
+    for (const text of ['First, with the release that runs now, an activation without Qwen', 'Then the upload', 'Last, the gate',
+      'PREVIEW_LINE_UP_POLICY_INVALID:free_model_ids:partner_served', 'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-partner-served',
+      'SETTINGS_GATE_PARTNER_SERVED:Qwen/Qwen3.8-Flash', 'start the upload again from SB1', 'Bringing Qwen back',
+      'enabled_models:["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro"]']) expect(prose, text).toContain(text);
+    const blocks = blocksOf(qwen);
+    // The jq line takes Qwen out of both lists, and its table entry (an empty table becomes null).
+    const file = blocks.find(block => block.lines.some(line => line.includes('line-up-no-qwen.json')))!.lines.join('\n');
+    expect(file).toContain(`jq -c '.lineUp.free_model_ids -= ["Qwen/Qwen3.8-Flash"] | .lineUp.premium_model_ids -= ["Qwen/Qwen3.8-Flash"]`);
+    expect(file).toContain('if . == {} then null else . end');
+    expect(file).toContain('"preview:qwen-3-8-flash"');
+    // QWENOUT reads only: no write, no activation, and it reads both the lists and the four seats of the active version.
+    const check = blocks.find(block => stepOf(block) === 'QWENOUT')!.lines.join('\n');
+    expect(check).not.toMatch(/\bactivate\b|INSERT|UPDATE|DELETE|> "\$/u);
+    expect(check).toContain("row_key = 'previewLineUpPolicy'");
+    expect(check).toContain("row_key IN ('synthesizerRoleRef', 'evaluatorRoleRef', 'storytellerRoleRef', 'storyCheckerRoleRef')");
+    // SB3 names the refusal and its remedy, and the side-by-side section points to QWENOUT before SB1.
+    expect(scriptOf('SB3').lines.join('\n')).toContain('the active settings version still seats Qwen; the site is unchanged: SB3b, then Taking Qwen out of the live line-up, then this upload again from SB1');
+    expect(sectionOf(guide, '## Side-by-side release (from T+1)').replace(/\s+/g, ' ')).toContain('QWENOUT ("Taking Qwen out of the live line-up") must print `QWENOUT_DONE`');
+  });
+
   it('the line-up and thinking changes are activations; T+1 moves the line-up out of the env (SA11, addition D15, D23, D24)', () => {
     const prose = section.replace(/\s+/g, ' ');
     // The two plan members, the reviewed menus, and the order for a model the gate has not switched on yet.
     for (const text of ['`lineUp`: exactly `free_model_ids`, `premium_model_ids` and `thinking_levels`', '`answerSeats`: `writer` and `checker`',
-      'GLM `high`, `low`; DeepSeek `high`, `low`, `none`; Qwen `default`, `low`, `medium`, `none`; MiMo `default`, `none`; Claude Haiku `high`, `medium`, `low`.',
+      'GLM `high`, `low`; DeepSeek `high`, `low`, `none`; MiMo `default`, `none`; Claude Haiku `high`, `medium`, `low` (Qwen\'s menu, `default`, `low`, `medium`, `none`, stays for the debates recorded with it).',
       'Root switches it on at its spending gate', 'This stays root\'s step, and it comes first.']) expect(prose, text).toContain(text);
     const t1 = sectionOf(guide, '### The first upload with this change (T+1)');
     const t1Blocks = blocksOf(t1);

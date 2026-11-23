@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "Clauses contractuelles types de l’UE (le contrat type de la Commission européenne pour l’envoi de données hors de l’UE)",
   "legal.providers.locationDeepInfra": "États-Unis uniquement. Cela couvre les modèles que DeepInfra exécute sur ses propres serveurs ; il transmet les requêtes d’un modèle à une société partenaire, indiquée dans l’entrée suivante",
   "legal.providers.retentionDeepInfra": "Non conservé. DeepInfra ne garde le texte qu’en mémoire pendant qu’il répond à une requête, puis le supprime. Ses journaux contiennent des détails de la requête, comme l’heure et le coût, jamais le texte. Cela couvre les modèles que DeepInfra exécute sur ses propres serveurs",
-  "legal.providers.deepinfraPartnerName": "Partenaire de DeepInfra pour un modèle (DeepInfra ne nomme pas la société)",
   "legal.providers.locationPerplexity": "États-Unis, où se trouvent Perplexity et les sociétés qu’elle indique comme travaillant pour elle. Perplexity n’indique aucune région",
   "legal.providers.retentionPerplexity": "Perplexity ne publie aucune durée fixe pour les requêtes de recherche : elle indique que cela dépend du service et du compte. Selon ses conditions relatives au traitement des données, elle supprime les données personnelles dans un délai de 30 jours après que nous avons cessé d’utiliser le service",
   "legal.providers.luxembourg": "Luxembourg",

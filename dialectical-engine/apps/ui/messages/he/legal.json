@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "סעיפי החוזה האחידים של האיחוד האירופי (חוזה המודל של הנציבות האירופית לשליחת נתונים אל מחוץ לאיחוד האירופי)",
   "legal.providers.locationDeepInfra": "ארצות הברית בלבד. זה חל על המודלים ש-DeepInfra מפעיל בשרתים שלו; את הבקשות של מודל אחד הוא מעביר לחברה שותפה, הרשומה ברשומה הבאה",
   "legal.providers.retentionDeepInfra": "לא נשמר. DeepInfra מחזיק את הטקסט בזיכרון רק בזמן שהוא עונה על בקשה, ואז מוחק אותו. היומנים שלו מכילים פרטי בקשה כגון השעה והעלות, ולעולם לא את הטקסט. זה חל על המודלים ש-DeepInfra מפעיל בשרתים שלו",
-  "legal.providers.deepinfraPartnerName": "השותפה של DeepInfra למודל אחד (DeepInfra אינו נוקב בשם החברה)",
   "legal.providers.locationPerplexity": "ארצות הברית, שם נמצאים Perplexity והחברות שהוא מציין כעובדות עבורו. Perplexity אינו מציין אזור",
   "legal.providers.retentionPerplexity": "Perplexity אינו מפרסם תקופה קבועה לבקשות חיפוש: הוא מציין שהדבר תלוי בשירות ובחשבון. לפי תנאי עיבוד הנתונים שלו הוא מוחק נתונים אישיים תוך 30 ימים לאחר שנפסיק להשתמש בשירות",
   "legal.providers.luxembourg": "Luxembourg",

@@ -9,7 +9,9 @@
  * code, D16), and the set of models a version can seat (D20). Providers stays below the register: no import of it here.
  */
 import { TypedDomainError } from "@debateai/kernel";
-import { previewModelRow, previewModelRowForRef, previewRostersHonourMakerRule, PREVIEW_MODEL_ROWS } from "./preview-models.js";
+import {
+  previewModelRow, previewModelRowForRef, previewModelSeatable, previewRostersHonourMakerRule, PREVIEW_MODEL_ROWS
+} from "./preview-models.js";
 import {
   PREVIEW_GATE_SOCKET_KEYS, PREVIEW_STRUCTURE_REPAIR_MODEL, readPreviewEnvironmentSource, validatePreviewProviderTestConfig,
   type PreviewProviderTestConfig
@@ -67,6 +69,27 @@ export function parsePreviewLineUp(value: unknown): PreviewLineUp {
   if (!previewRostersHonourMakerRule(free, premium)) invalid("maker_rule");
   const table = value.thinking_levels === null ? null : parsePreviewThinkingLevels(value.thinking_levels);
   return Object.freeze({ free_model_ids: free, premium_model_ids: premium, thinking_levels: table });
+}
+
+/**
+ * The seating rule a NEW settings version must also meet: no roster names a partner-served model (previewModelSeatable).
+ * The row builder (previewLineUpPolicyRow) and the publish kit's carried line-up row ask it; the readers of a sealed
+ * version never do, so a debate admitted on an older version that seats such a model still runs to its end. The thinking
+ * table is not asked: an entry for a model no roster names seats nothing. Throws TypeError
+ * `PREVIEW_LINE_UP_POLICY_INVALID:<roster>:partner_served`, the free list first.
+ */
+export function assertPreviewLineUpSeatable(lineUp: Pick<PreviewLineUp, "free_model_ids" | "premium_model_ids">): void {
+  for (const member of ["free_model_ids", "premium_model_ids"] as const) {
+    if (lineUp[member].some(id => previewModelRow(id) !== undefined && !previewModelSeatable(id))) invalid(`${member}:partner_served`);
+  }
+}
+
+/** The answer seat refs among `refs` whose reviewed model is partner-served (previewModelSeatable), each once, in order. */
+export function previewPartnerServedSeatRefs(refs: readonly string[]): readonly string[] {
+  return Object.freeze([...new Set(refs.filter(ref => {
+    const reviewed = previewModelRowForRef(ref);
+    return reviewed !== undefined && !previewModelSeatable(reviewed.model);
+  }))]);
 }
 
 /**

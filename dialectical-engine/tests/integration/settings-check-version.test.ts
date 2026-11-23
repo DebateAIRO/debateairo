@@ -320,8 +320,11 @@ describe("check-version on the preview's line-up (SA10, addition D19-D20)", () =
   const QWEN = "Qwen/Qwen3.8-Flash", HAIKU = "claude-haiku-5-5";
   const OBSERVATION = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
     operatorSha256: "c".repeat(64), observedAt: "2026-10-22T08:00:00.000Z" };
-  /** The site version's line-up (today's live values, the kit's plan `lineUp`, addition D23). */
-  const SITE_LINE_UP = parsePreviewLineUp({ free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU], thinking_levels: null });
+  /**
+   * The site version's line-up (today's live values, the kit's plan `lineUp`, addition D23), without Qwen: the kit seals
+   * no partner-served model (tests/unit/partner-served-line-up.test.ts).
+   */
+  const SITE_LINE_UP = parsePreviewLineUp({ free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, HAIKU], thinking_levels: null });
   const SOCKETS_ONLY = parsePreviewEnvironmentConfig(JSON.stringify({ deployment: "v3-preview", requested_thinking_level: "high",
     budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock", anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock",
     scope_id: "settings-check-preview" }))!;
@@ -385,8 +388,8 @@ describe("check-version on the preview's line-up (SA10, addition D19-D20)", () =
     });
     return registerVersionToSafeLegacyNumber(receipt.registerVersion);
   }
-  const NEW_LINE_UP = { kind: "PREVIEW_LINE_UP_POLICY", free_model_ids: [QWEN, GLM], premium_model_ids: [GLM, DEEPSEEK, QWEN, HAIKU],
-    thinking_levels: { [QWEN]: { level: "low", steps: { judge_panel: "medium" } }, [GLM]: { level: "high" } } };
+  const NEW_LINE_UP = { kind: "PREVIEW_LINE_UP_POLICY", free_model_ids: [MIMO, GLM], premium_model_ids: [GLM, DEEPSEEK, MIMO, HAIKU],
+    thinking_levels: { [HAIKU]: { level: "low", steps: { judge_panel: "medium" } }, [GLM]: { level: "high" } } };
 
   it("the preview's own site version: both halves PASS under the sockets-only setting (its row is the line-up)", async () => {
     const { runner, api } = await checkPreview(PREVIEW_SITE);
@@ -411,6 +414,13 @@ describe("check-version on the preview's line-up (SA10, addition D19-D20)", () =
       runner: [`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`, `SETTINGS_GATE_THINKING_UNREVIEWED:${QWEN}:high`],
       api: [`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`]
     });
+  });
+
+  it("(l) a version an older code sealed that seats Qwen (written past the kit): the runner half names it, so this release never activates it", async () => {
+    const version = await publishFromPreview({ previewLineUpPolicy: () => ({ ...NEW_LINE_UP, premium_model_ids: [...NEW_LINE_UP.premium_model_ids, QWEN] }) });
+    const { runner, api } = await checkPreview(version);
+    expect({ runner: runner.codes, api: api.codes }).toEqual({ runner: [`SETTINGS_GATE_PARTNER_SERVED:${QWEN}`], api: [] });
+    expect(runner.verdict).toBe("FAIL");
   });
 
   it("(j) a roster naming a model no declared target serves: SETTINGS_NEEDS_ENV_CHANGE:TARGET:<model> from both halves", async () => {

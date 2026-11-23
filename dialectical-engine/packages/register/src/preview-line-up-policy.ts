@@ -1,7 +1,8 @@
 import type { Pool } from "pg";
 import { z } from "zod";
 import {
-  PREVIEW_LINE_UP_POLICY_INVALID, PREVIEW_MODEL_ROWS, parsePreviewLineUp, type PreviewLineUp, type PreviewThinkingLevels
+  assertPreviewLineUpSeatable, PREVIEW_LINE_UP_POLICY_INVALID, PREVIEW_MODEL_ROWS, parsePreviewLineUp, type PreviewLineUp,
+  type PreviewThinkingLevels
 } from "@debateai/providers";
 import { canonicalRegisterJson, type CanonicalJsonAst, type CanonicalRegisterJson } from "./register-publication.js";
 
@@ -140,8 +141,9 @@ function thinkingLevelsAst(table: PreviewThinkingLevels): CanonicalJsonAst {
 /**
  * Addition D12, D23: the row a publisher seals (the preview's kit, SA9), in the house row shape the kit's row check
  * accepts (`rowKey`, `valueJsonText`, `sourceRef`). The line-up is checked again (parsePreviewLineUp), so a builder can
- * never seal a value the reader would refuse; the text is canonical register JSON, so the key order of the line-up it is
- * handed never changes the sealed bytes.
+ * never seal a value the reader would refuse, and it must seat no partner-served model (assertPreviewLineUpSeatable:
+ * `PREVIEW_LINE_UP_POLICY_INVALID:<roster>:partner_served`), a rule for new versions that the reader does not apply; the
+ * text is canonical register JSON, so the key order of the line-up it is handed never changes the sealed bytes.
  */
 export function previewLineUpPolicyRow(lineUp: PreviewLineUp, sourceRef: string): Readonly<{
   rowKey: typeof PREVIEW_LINE_UP_POLICY_ROW_KEY; valueJsonText: CanonicalRegisterJson; sourceRef: string;
@@ -149,6 +151,7 @@ export function previewLineUpPolicyRow(lineUp: PreviewLineUp, sourceRef: string)
   if (typeof sourceRef !== "string" || sourceRef.trim() === "") return invalid("source_ref");
   const checked = parsePreviewLineUp({ free_model_ids: lineUp?.free_model_ids, premium_model_ids: lineUp?.premium_model_ids,
     thinking_levels: lineUp?.thinking_levels });
+  assertPreviewLineUpSeatable(checked);
   const valueAst: CanonicalJsonAst = Object.freeze({
     kind: KIND,
     free_model_ids: Object.freeze([...checked.free_model_ids]),

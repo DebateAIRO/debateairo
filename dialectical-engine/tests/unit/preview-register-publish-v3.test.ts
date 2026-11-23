@@ -480,12 +480,15 @@ describe('publish kit v3: the optional engineVersionPolicy row and the engine se
 /**
  * Side-by-side spec §13, addition D23 (owner 2026-10-22): kit v3 passes the plan's line-up and answer seats through to
  * kit v2's builder (v3's eleventh and twelfth arguments); the hosted story rows follow the chosen seats; a carried
- * previewLineUpPolicy row is re-parsed by the register's own reader.
+ * previewLineUpPolicy row is re-parsed by the register's own reader. The line-up here is the live one without
+ * Qwen3.8-Flash: DeepInfra forwards that model to a partner company it does not name, so no new version may seat it, in a
+ * list of AIs (given or carried from the base) or in an answer seat (tests/unit/partner-served-line-up.test.ts).
  */
 describe('publish kit v3: the optional previewLineUpPolicy row and the answer seats (side-by-side §13 addition D23)', () => {
   const GLM = 'zai-org/GLM-5.3-Flash', DEEPSEEK_MODEL = 'deepseek-ai/DeepSeek-V4.1-Flash', MIMO = 'XiaomiMiMo/MiMo-V2.6-Pro', QWEN = 'Qwen/Qwen3.8-Flash', HAIKU = 'claude-haiku-5-5';
   const OWNER_LIVE_TABLE = JSON.parse(`{"zai-org/GLM-5.3-Flash":{"level":"high"},"deepseek-ai/DeepSeek-V4.1-Flash":{"level":"none"},"Qwen/Qwen3.8-Flash":{"level":"medium"},"XiaomiMiMo/MiMo-V2.6-Pro":{"level":"default","steps":{"pros_cons":"none","cross_exchange":"none"}},"claude-haiku-5-5":{"level":"medium","steps":{"judge_panel":"high","reviewer":"high","answer_checker":"high","story_checker":"high","answer_writer":"high","story_writer":"high","slip_fix":"medium"}}}`) as Record<string, unknown>;
-  const LIVE = { free_model_ids: [GLM, DEEPSEEK_MODEL], premium_model_ids: [GLM, DEEPSEEK_MODEL, MIMO, QWEN, HAIKU], thinking_levels: OWNER_LIVE_TABLE };
+  const LIVE = { free_model_ids: [GLM, DEEPSEEK_MODEL], premium_model_ids: [GLM, DEEPSEEK_MODEL, MIMO, HAIKU], thinking_levels: OWNER_LIVE_TABLE };
+  const WITH_QWEN = { ...LIVE, premium_model_ids: [GLM, DEEPSEEK_MODEL, MIMO, QWEN, HAIKU] };
   const HAIKU_REF = 'preview:claude-haiku-5-5', GLM_B = 'preview:fixture-b', DEEPSEEK_REF = 'preview:deepseek-v4-1-flash';
   const v3 = async (lineUp?: unknown, answerSeats?: unknown, checker?: unknown) =>
     [...await (buildPreviewSourceRowsV3 as (...args: unknown[]) => Promise<readonly Row[]>)(await loadBootstrapRegister(), runtime, ON,
@@ -503,7 +506,10 @@ describe('publish kit v3: the optional previewLineUpPolicy row and the answer se
     expect(await v3(null, null)).toEqual(absent);
     expect(absent).toEqual([...await buildPreviewSourceRowsV3(await loadBootstrapRegister(), runtime, ON)]);
     expect(given.filter(row => row.rowKey !== PREVIEW_LINE_UP_POLICY_ROW_KEY)).toEqual(absent);
-    await expect(v3({ ...LIVE, thinking_levels: { [QWEN]: { level: 'high' } } })).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`);
+    await expect(v3({ ...LIVE, thinking_levels: { [MIMO]: { level: 'high' } } })).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level:${MIMO}`);
+    // A list of AIs that seats a partner-served model is refused before any row is built.
+    await expect(v3(WITH_QWEN)).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:partner_served');
+    await expect(v2(WITH_QWEN)).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:partner_served');
   });
 
   it('R19: a base line-up row the source leaves out is carried unchanged, outside the delta; a malformed one is refused, never carried', async () => {
@@ -517,6 +523,27 @@ describe('publish kit v3: the optional previewLineUpPolicy row and the answer se
     const broken = base.map(row => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"PREVIEW_LINE_UP_POLICY"', '"X"') } : row);
     const source = await v3();
     expect(refusal(() => compose(source, broken, '13'))).toContain('PREVIEW_LINE_UP_POLICY_INVALID:kind');
+  });
+
+  it('refuses to carry a base line-up row that seats a partner-served model, as an older code sealed it: the upload plans from the active version and stops', async () => {
+    const f = await fixture();
+    const base = [...compose(await v3(LIVE), f.v12).rows] as Row[];
+    // The live row with Qwen put back on Premium, sealed as the code before this rule sealed it.
+    const older = base.map(row => row.rowKey !== PREVIEW_LINE_UP_POLICY_ROW_KEY ? row
+      : { ...row, valueJsonText: canonicalRegisterJson({ ...JSON.parse(row.valueJsonText), premium_model_ids: WITH_QWEN.premium_model_ids }) });
+    expect(lineUpRow(older)?.valueJsonText).toContain(QWEN);
+    const source = await v3();
+    expect(refusal(() => compose(source, older, '13'))).toContain('PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:partner_served');
+    // A plan with a new line-up without it replaces the carried row and passes: the order the release guide gives.
+    const replaced = compose(await v3(LIVE), older, '13');
+    expect(lineUpRow([...replaced.rows] as Row[])).toEqual(lineUpRow(base));
+    expect(replaced.changedKeys).toContain(PREVIEW_LINE_UP_POLICY_ROW_KEY);
+  });
+
+  it('refuses Qwen in an answer seat, on its own or as a story seat', async () => {
+    for (const choice of [{ writer: 'preview:qwen-3-8-flash', checker: GLM_B }, { writer: HAIKU_REF, checker: 'preview:qwen-3-8-flash' },
+      { writer: HAIKU_REF, checker: GLM_B, storyChecker: 'preview:qwen-3-8-flash' }])
+      await expect(v3(null, choice)).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-partner-served');
   });
 
   it('the answer seats reach the hosted story rows: the Haiku writer seals the synthesizer and the storyteller; the story seats may move alone', async () => {

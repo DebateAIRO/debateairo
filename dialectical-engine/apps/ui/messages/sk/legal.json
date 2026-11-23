@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "Štandardné zmluvné doložky EÚ (vzorová zmluva Európskej komisie na odosielanie údajov mimo EÚ)",
   "legal.providers.locationDeepInfra": "Iba Spojené štáty. Týka sa to modelov, ktoré DeepInfra prevádzkuje na vlastných serveroch; požiadavky pre jeden model odovzdáva partnerskej spoločnosti, uvedenej v nasledujúcom zázname",
   "legal.providers.retentionDeepInfra": "Neuchováva sa. DeepInfra drží text v pamäti iba dovtedy, kým odpovedá na požiadavku, potom ho vymaže. Jeho protokoly obsahujú údaje o požiadavke, napríklad čas a cenu, nikdy text. Týka sa to modelov, ktoré DeepInfra prevádzkuje na vlastných serveroch",
-  "legal.providers.deepinfraPartnerName": "Partner spoločnosti DeepInfra pre jeden model (DeepInfra túto spoločnosť nemenuje)",
   "legal.providers.locationPerplexity": "Spojené štáty, kde sídli Perplexity a spoločnosti, ktoré uvádza ako pracujúce pre ňu. Perplexity neuvádza žiadny región",
   "legal.providers.retentionPerplexity": "Perplexity nezverejňuje pevné obdobie pre vyhľadávacie požiadavky: uvádza, že závisí od služby a účtu. Podľa svojich podmienok spracovania údajov vymaže osobné údaje do 30 dní po tom, ako službu prestaneme používať",
   "legal.providers.luxembourg": "Luxembourg",

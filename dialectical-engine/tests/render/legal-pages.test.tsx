@@ -575,11 +575,11 @@ describe("the model providers page lists the companies the API's targets reach (
   });
 
   it("renders one register entry per provider, the support chat's model last", () => {
-    // No answer from the API: every reviewed company (Anthropic, DeepInfra and Amazon), not the hosted cloud rows. DeepInfra is
-    // followed by the company it forwards one model to (16 November 2026: that company receives debate text).
+    // No answer from the API: every reviewed company (Anthropic, DeepInfra and Amazon), not the hosted cloud rows. No row for a
+    // partner of DeepInfra: no model DeepInfra forwards to one is seated (tests/unit/partner-served-line-up.test.ts).
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={PROVIDER_REGISTER} />);
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
-    expect(headings).toEqual(["Anthropic", "DeepInfra", legalEnglish["legal.providers.deepinfraPartnerName"], "Amazon (OpenAI models)", "Perplexity", "Support chat model"]);
+    expect(headings).toEqual(["Anthropic", "DeepInfra", "Amazon (OpenAI models)", "Perplexity", "Support chat model"]);
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
   });
 
@@ -607,11 +607,11 @@ describe("the model providers page lists the companies the API's targets reach (
     expect(support?.textContent).not.toMatch(/\[/u);
   });
 
-  it("when the API's targets reach DeepInfra alone (the GLM-only set), lists DeepInfra and its partner, then Perplexity, then the support chat's model, and no hosted cloud row", () => {
+  it("when the API's targets reach DeepInfra alone (the GLM-only set), lists DeepInfra, then Perplexity, then the support chat's model, and no hosted cloud row", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={providerRegister(["deepinfra"])} />);
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
     // Owner, 10 October 2026: the page names only the companies that receive text; addition D24: no own-servers Qwen row.
-    expect(headings).toEqual(["DeepInfra", legalEnglish["legal.providers.deepinfraPartnerName"], "Perplexity", "Support chat model"]);
+    expect(headings).toEqual(["DeepInfra", "Perplexity", "Support chat model"]);
   });
 
   it("states the Privacy Policy's Register facts for every provider (PP §5, Japan and Korea)", () => {
@@ -697,8 +697,8 @@ describe("the model providers page lists the companies the API's targets reach (
 
   it("claims nothing unverified: a cloud provider's contract facts stay bracketed until someone checks the row", () => {
     const uncheckedRows = WITH_UNCHECKED.filter(({ checkedOn }) => checkedOn === null);
-    // DeepInfra's partner for one model (a company DeepInfra does not name) and a host no catalogue row knows.
-    expect(uncheckedRows.map(({ key }) => key)).toEqual(["deepinfra-partner", "host:api.acme.example"]);
+    // A host no catalogue row knows.
+    expect(uncheckedRows.map(({ key }) => key)).toEqual(["host:api.acme.example"]);
     for (const entry of uncheckedRows) {
       expect(isUnverified(entry.entity)).toBe(true);
       expect(isUnverified(entry.contact)).toBe(true);
@@ -723,8 +723,8 @@ describe("the model providers page lists the companies the API's targets reach (
       const unchecked = register.some(({ checkedOn }) => checkedOn === null);
       expect(view.textContent.includes("[not checked yet]")).toBe(unchecked);
     }
-    // Perplexity's row is checked against its terms; only DeepInfra's unnamed partner is left.
-    expect(PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null).map(({ key }) => key)).toEqual(["deepinfra-partner"]);
+    // Every row of the whole reviewed catalogue is checked against its provider's terms.
+    expect(PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null).map(({ key }) => key)).toEqual([]);
   });
 
   it("shows every register label in every locale's catalogue", () => {

@@ -514,6 +514,11 @@ only its gate part:
   disagree, and the comparison in the DeepInfra README's switch-on section must print `match`).
 
 Five makers (Z.AI, DeepSeek, Xiaomi, Alibaba, Anthropic) in each list, so the two-maker rule holds.
+
+That was the first debate's line-up. Qwen3.8-Flash has since left it: DeepInfra passes its requests to a partner company
+it does not name, so no settings version seats it any more (`deploy/preview-release/v1/README.md`, "Taking Qwen out of
+the live line-up"). A line-up today names GLM, DeepSeek, MiMo and Haiku (four makers), and the website's `all-models`
+list keeps Qwen only as the fallback an older API would show.
 A debate's calls go to two gates: each gate is asked how much is left of its own pot before the
 debate starts.
 

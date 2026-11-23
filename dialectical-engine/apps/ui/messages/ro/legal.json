@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "Clauzele contractuale standard ale UE (contractul-model al Comisiei Europene pentru transferul datelor în afara UE)",
   "legal.providers.locationDeepInfra": "Numai Statele Unite. Aceasta cuprinde modelele pe care DeepInfra le rulează pe propriile servere; transmite solicitările unui model unei societăți partenere, indicată în intrarea următoare",
   "legal.providers.retentionDeepInfra": "Nu se stochează. DeepInfra păstrează textul doar în memorie cât timp răspunde la o solicitare, apoi îl șterge. Jurnalele sale conțin detalii ale solicitării, precum ora și costul, niciodată textul. Aceasta cuprinde modelele pe care DeepInfra le rulează pe propriile servere",
-  "legal.providers.deepinfraPartnerName": "Partenerul DeepInfra pentru un model (DeepInfra nu numește societatea)",
   "legal.providers.locationPerplexity": "Statele Unite, unde se află Perplexity și societățile pe care le enumeră ca lucrând pentru ea. Perplexity nu indică nicio regiune",
   "legal.providers.retentionPerplexity": "Nu este precizată nicio limită de timp. Perplexity primește numai expresiile scurte de căutare pe care le scriu modelele, fără nimic care să arate cine sunteți. Condițiile sale îi permit să păstreze aceste expresii și rezultatele și să le folosească în scopurile propriei activități, de exemplu pentru a-și îmbunătăți căutarea",
   "legal.providers.luxembourg": "Luxemburg",

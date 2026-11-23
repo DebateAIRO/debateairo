@@ -583,6 +583,12 @@ v3's records stay in its own folder and are not lost.
 This is steps 2 and 3 of "One deploy session" below: right after the switch-over has started v3
 with GLM only, and before the app is pointed at it.
 
+**Qwen3.8-Flash is no longer switched on.** DeepInfra passes its requests to a partner company it does not name
+(`docs/legal/2026-11-24-partner-model-out.md`), so the app's line-up no longer seats it, and once the debates admitted
+before that have finished it leaves `enabled_models` (`deploy/preview-release/v1/README.md`, "Taking Qwen out of the live
+line-up"). Its row stays in this gate's table, as it does in the app, so the debates recorded with it keep their prices.
+The steps below still hold for DeepSeek and MiMo; leave Qwen out of the probe and of `enabled_models`.
+
 **1. Probe the model (one paid call, a small fraction of a cent).** Probe when nobody is using the
 preview: an error answer halts the gate. The command runs the probe inside the same network fence
 as the service (only the resolver and DeepInfra's listed addresses), under its own unit name, with

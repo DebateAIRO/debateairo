@@ -24,13 +24,20 @@ const section = (text: string, no: number): string => {
 };
 const paragraphs = (body: string): string[] => body.split("\n").filter((line) => line.trim() !== "");
 const RELEASED = ["en", "ro", "fr"];
-/** Not offered yet, but recorded in translated-from.json as translated from the current English: they carry the paragraph too. */
+/**
+ * Not offered yet, but recorded in translated-from.json as translated from the current English, or from an English text
+ * released since launch (the archive keeps each one): every such English text has the paragraph, so they carry it too.
+ */
 const englishNow = createHash("sha256").update(draft("en"), "utf8").digest("hex");
 const translatedFrom = (JSON.parse(readFileSync(resolve(process.cwd(), "apps/ui/legal/translated-from.json"), "utf8")) as {
   PRIVACY: Record<string, { sha256: string }>;
 }).PRIVACY;
+const releasedEnglish = new Set(Object.keys((JSON.parse(readFileSync(resolve(process.cwd(), "packages/legal-manifest/src/manifest.json"), "utf8")) as {
+  archive: Record<string, Record<string, Record<string, unknown>>>;
+}).archive.PRIVACY?.en ?? {}));
 const CURRENT_NOT_OFFERED = LOCALES.map(({ code }) => code)
-  .filter((code) => !RELEASED.includes(code) && translatedFrom[code]?.sha256 === englishNow);
+  .filter((code) => !RELEASED.includes(code)
+    && (translatedFrom[code]?.sha256 === englishNow || releasedEnglish.has(translatedFrom[code]?.sha256 ?? "")));
 
 /** English, word for word: section 5's paragraph on Amazon. */
 const AMAZON =
@@ -38,7 +45,7 @@ const AMAZON =
 /** English, word for word: whose terms forbid training, and how the data is transferred, each exactly once. */
 const ENGLISH_SENTENCES = [
   // The summary, section 4 and section 5: whose terms forbid training.
-  "The terms of DeepInfra, Anthropic and Amazon do not allow them to train models on what you write; section 5 says for which company we have not confirmed this yet.",
+  "The terms of DeepInfra, Anthropic and Amazon do not allow them to train models on what you write.",
   "We do not use your content to train models, and the terms of DeepInfra, Anthropic and Amazon do not allow them to; section 5 says",
   "**Training and retention are different things.** The terms of DeepInfra, Anthropic and Amazon do not allow them to use your content to train or improve their models. We have checked this",
   // Section 5: the transfers paragraph.

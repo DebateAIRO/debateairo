@@ -143,6 +143,17 @@ export type PreviewModelRow = Readonly<{
    * the vendor's defaults apply.
    */
   sampling?: PreviewSampling;
+  /**
+   * Present on a row whose provider does not run the model itself but forwards each request to another company: DeepInfra
+   * marks such a model "Partner" on its model page ("This model is served by a partner. Your requests are forwarded to
+   * them. Their privacy policy applies") and does not name the company. The Privacy Policy, the Terms and the Provider
+   * Register name every company that receives debate text, and they name no such partner, so no new settings version may
+   * seat a partner-served model (`previewModelSeatable`). The row itself stays: debates already recorded with the model
+   * keep their prices, maker and badges, and a debate admitted on an older version still finishes on it. App only: the
+   * gate's row and the parity files do not carry it. tests/unit/partner-served-line-up.test.ts ties the mark to the
+   * Register: it carries a partner entry if and only if a seatable model is partner-served.
+   */
+  partnerServed?: true;
 }>;
 
 /** The DeepInfra connection's base URL and window, shared by every DeepInfra row. */
@@ -210,6 +221,7 @@ type RowInput = Readonly<{
   upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string; cacheWriteInputUsdPerM?: string }>;
   sampling?: PreviewSampling;
   cacheWriteInputUsdPerM?: string;
+  partnerServed?: true;
 }>;
 const PROVIDER_CONNECTIONS = Object.freeze({
   deepinfra: Object.freeze({ provider: "deepinfra", baseUrl: PREVIEW_DEEPINFRA_BASE_URL,
@@ -328,11 +340,14 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
     // it runs at its makers' thinking-mode settings: temperature 0.6, top_p 0.95, top_k 20.
     // Thinking levels (spec 2026-10-12 §2): Alibaba documents low, medium and xhigh (its default); "high" is not a Qwen value.
     // L26: DeepInfra's max_output_tokens 131,072 (…/Qwen/Qwen3.8-Flash, read 2026-10-15).
+    // DeepInfra forwards this model's requests to a partner company it does not name (its "Partner" tag), so no new
+    // settings version may seat it (`partnerServed`); the row stays for the debates already recorded with it.
     row("deepinfra", { model: "Qwen/Qwen3.8-Flash", maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
       outputBound: PREVIEW_ANSWER_CAP_TOKENS, finalWriterOutputBound: 128 * 1024, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["default", "low", "medium", "none"],
       effortsByStrength: ["default", "medium", "low", "none"], jsonObject: false,
       contextWindowTokens: 1_000_000,
-      sampling: { temperature: 0.6, top_p: 0.95, top_k: 20 } })
+      sampling: { temperature: 0.6, top_p: 0.95, top_k: 20 },
+      partnerServed: true })
   ]),
   // PR B, owner ruling 2026-10-10 (evening). Estimate and reserve at the lower step ($0.10 / $0.50);
   // a call whose bytes + 2048 are above 100,000 reserves at the upper step ($0.50 / $2.50), so an
@@ -455,6 +470,16 @@ export const PREVIEW_PROVIDER_NAMES: readonly PreviewProviderName[] = Object.fre
 /** The reviewed row for an exact model id, or undefined. */
 export function previewModelRow(model: unknown): PreviewModelRow | undefined {
   return typeof model === "string" ? PREVIEW_MODEL_ROWS.find((candidate) => candidate.model === model) : undefined;
+}
+
+/**
+ * Whether a new settings version may seat this model: one of the reviewed rows, and not a partner-served one
+ * (`partnerServed`). Asked where a version is sealed (the line-up row, the answer seats) and by check-version's
+ * condition 6, never where a sealed version is read, so a debate admitted on an older version runs to its end.
+ */
+export function previewModelSeatable(model: unknown): boolean {
+  const reviewed = previewModelRow(model);
+  return reviewed !== undefined && reviewed.partnerServed !== true;
 }
 
 /** The largest output bound of any reviewed row (the probe's outer limit off a known row). */
