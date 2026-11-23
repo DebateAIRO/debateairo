@@ -1546,7 +1546,7 @@ every leftover.
 | Check | What it does | The 2 November fault it would have caught |
 |---|---|---|
 | 1. `tools-folder` | Builds the server's shared tools folder from the three `deploy/` folders alone, as they are at the commit (by `git archive`, so nothing else on the Mac can help), and loads every tool in it. Seven tools that always run from a release folder, where the packages are installed, are loaded in check 2 instead. | Fault 3: a tool that reached for a folder the shared tools folder does not have. |
-| 2. `website-build` | Installs a release the way step A3 does (one online package download, then installs that must download nothing), then builds the website with the settings the release tool itself gives the build, and loads the seven release-folder tools there. | Fault 2, but only while one of the owner's early allowances is in force (an early allowance lets a package version be used before it is 7 days old, which the package rule otherwise refuses). The report says how many are in force; with none, this check has nothing of that kind to catch. |
+| 2. `website-build` | Installs a release the way step A3 does (one online package download, then installs that must download nothing), then builds the website with the settings the release tool itself gives the build, compares every committed file of the release folder with what it was just before the build, and loads the seven release-folder tools there. A build that rewrote a committed file (for example `apps/ui/next-env.d.ts`) is refused here, as the release tool's A6 refuses it on the server. | Fault 2, but only while one of the owner's early allowances is in force (an early allowance lets a package version be used before it is 7 days old, which the package rule otherwise refuses). The report says how many are in force; with none, this check has nothing of that kind to catch. |
 | 3. `start-checks` | Starts a throwaway database (PostgreSQL) shaped like the server's to the start checks: the same name, port and cluster name. It applies every database step (migration) of the commit and makes the production logins (their names and roles) with the product's own tool. Then it runs the API's and the runner's own start checks as those logins, not as the database's all-powerful administrator. | Fault 5: the runner's start check expected one database role, and row security gives its login two. |
 
 - **A commit that is too old for a check** gets `not checked` for that check, with the reason. Check 2 says `not checked`
@@ -1914,14 +1914,37 @@ echo A3_DONE
 - pnpm 11 keeps its index in one file, `v11/index.db`, and the server has no `sqlite3`. So name the new packages from
   the lockfile diff on the Mac.
 - When the lockfile did not change, skip the copy and the fill. Install from `$OSTORE` directly: put `$OSTORE` for
-  `$STORE` in the offline line, as R18 did.
+  `$STORE` in the offline line, as R18 did. Such a release has no store of its own: the next upload's SB1 then takes
+  the store this upload's names file names, and SB15 does not archive the release that holds it.
 
 ### A4-A7. Manifests, build values, UI builds, verify
 
-These are steps 2 to 5 of "Operator sequence for one release" above, pasted into a root shell after
-`. /root/preview-archive/rNN-names.sh`. Each `--out` goes to `$ART`. One thing differs: **the model list is `all-models`**, so give `--models all-models` to `build-env` and to
-both `ui-build`s. Both also take `--release-key "$KEY"`, where `KEY` is `r<the register version this release will
-publish, one above A1's>-<first 12 hex of REV>`. Check the build values against `ui.env` by hash:
+These are steps 2 to 5 of "Operator sequence for one release" above, as four scripts that read the names file: A4 the
+six source manifests, A5 the build values, A6 the two website builds, A7 the checks and the operator digest. Each
+`--out` goes to `$ART`. One thing differs from that sequence: **the model list is `all-models`**, so `--models
+all-models` goes to `build-env` and to both `ui-build`s. Both also take `--release-key "$KEY"`, where `KEY` is `r<the
+register version this release will publish, one above A1's>-<first 12 hex of REV>`: the names file's `KEY` on the
+template layout (SB1 writes it), else A5 and A6 work it out the same way. On the template layout (side by side and
+drained) SB1b takes A5's place, so the order there is A4, SB1b, A6, A7. Run A4, A6 and A7 as detached runs (A6 takes
+about 20 minutes).
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# A4: source manifests for the six release folders (step 2 of "Operator sequence for one release"). Nothing live changes.
+for KIND in candidate fallback; do for ROLE in api ui runner; do
+  [ ! -e "$ART/$KIND-$ROLE-source.json" ] || { echo "A4_NOT_DONE: $ART/$KIND-$ROLE-source.json exists (look first)"; exit 1; }
+done; done
+for KIND in candidate fallback; do for ROLE in api ui runner; do
+  rel source-manifest --repository "$ART/source-reference" --root "$RELS/auth-dev-$KIND-$LABEL-$ROLE" --role "$ROLE" --out "$ART/$KIND-$ROLE-source.json" || { echo "A4_NOT_DONE: source-manifest refused for $KIND $ROLE (the line above)"; exit 1; }
+done; done
+echo A4_DONE
+```
+
+Expect six lines `{"path":…,"sha256":…,"bytes":…}`, then `A4_DONE`. A4 never writes over a manifest: after a stop,
+move the manifests it did write (`$ART/*-source.json`) into `$S`, never delete them, then run A4 again.
+
+On the old layout, the build values against the shared `ui.env` by hash (on the template layout, SB1b instead):
 
 ```sh
 set -euo pipefail
@@ -1939,11 +1962,56 @@ done
 echo A5_DONE
 ```
 
-- A6, the builds: `rel ui-build --source "$ART/$KIND-ui-source.json" --models all-models --release-key "$KEY" --out "$ART/$KIND-ui-build.json"`,
-  for the candidate and the fallback, after setting `KEY` exactly as A5 does.
-- A7 must print six `PREVIEW_RELEASE_VERIFIED` lines naming `REV`, and the operator digest.
-  - The digest changes whenever a file in `deploy/preview-auth-dev/v1` changed.
-  - `nativeSha256` changes with new migrations.
+A6, the two builds. Each build's output goes into its own log in `$ART`; the script prints each build's exit code and
+the log's last line:
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# A6: the website built in the candidate and the fallback folder (step 4 of "Operator sequence for one release"), with the all-models list and this release's key. Nothing live changes.
+[ -n "${KEY:-}" ] || KEY="r$(( $(cat "$S/register-before") + 1 ))-${REV:0:12}"
+for KIND in candidate fallback; do
+  [ -s "$ART/$KIND-ui-source.json" ] || { echo "A6_NOT_DONE: $ART/$KIND-ui-source.json is missing (A4 first)"; exit 1; }
+  [ ! -e "$ART/$KIND-ui-build.json" ] || { echo "A6_NOT_DONE: $ART/$KIND-ui-build.json exists (look first)"; exit 1; }
+done
+for KIND in candidate fallback; do
+  RC=0; rel ui-build --source "$ART/$KIND-ui-source.json" --models all-models --release-key "$KEY" --out "$ART/$KIND-ui-build.json" > "$ART/$KIND-ui-build.log" 2>&1 || RC=$?
+  echo "$KIND exit $RC"; tail -n 1 "$ART/$KIND-ui-build.log" | cut -c1-300
+  [ "$RC" = 0 ] || { echo "A6_NOT_DONE: the $KIND website build failed (its log: $ART/$KIND-ui-build.log)"; exit 1; }
+done
+echo A6_DONE
+```
+
+Expect `candidate exit 0` and `fallback exit 0`, each with a `{"path":…}` line, then `A6_DONE`. After a stop, ask: the
+release tool refuses to build again in a folder that holds a build (`UI_BUILD_EXISTS`).
+`PREVIEW_SOURCE_INVENTORY_REFUSED` on the log's last line means a file of the folder is no longer what A4 inventoried:
+it changed after A4, or the build itself rewrote a committed file (such as `apps/ui/next-env.d.ts`). The Mac check's
+check 2 finds the second kind before the upload.
+
+A7, everything checked again, the builds included, then the operator digest:
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# A7: the six folders and the two builds checked again (step 5 of "Operator sequence for one release"), then the operator digest. Nothing live changes.
+for KIND in candidate fallback; do [ -s "$ART/$KIND-ui-build.json" ] || { echo "A7_NOT_DONE: $ART/$KIND-ui-build.json is missing (A6 first)"; exit 1; }; done
+V=$ART/a7-verify.out
+: > "$V"
+for KIND in candidate fallback; do
+  rel verify --source "$ART/$KIND-api-source.json" >> "$V" || { tail -n 3 "$V" | cut -c1-300; echo "A7_NOT_DONE: verify refused for $KIND api"; exit 1; }
+  rel verify --source "$ART/$KIND-ui-source.json" --ui-build "$ART/$KIND-ui-build.json" >> "$V" || { tail -n 3 "$V" | cut -c1-300; echo "A7_NOT_DONE: verify refused for $KIND ui"; exit 1; }
+  rel verify --source "$ART/$KIND-runner-source.json" >> "$V" || { tail -n 3 "$V" | cut -c1-300; echo "A7_NOT_DONE: verify refused for $KIND runner"; exit 1; }
+done
+cut -c1-400 "$V"
+[ "$(grep -c PREVIEW_RELEASE_VERIFIED "$V")" = 6 ] && [ "$(grep -o '"sourceRevision":"[0-9a-f]*"' "$V" | sort -u | wc -l)" = 1 ] && grep -q "\"sourceRevision\":\"$REV\"" "$V" || { echo "A7_NOT_DONE: not six PREVIEW_RELEASE_VERIFIED lines naming REV"; exit 1; }
+OD=$(rel operator-digest --source "$ART/candidate-api-source.json") || { echo "A7_NOT_DONE: operator-digest refused (the line above)"; exit 1; }
+printf '%s\n' "$OD" | cut -c1-400
+echo A7_DONE
+```
+
+What to expect: six `PREVIEW_RELEASE_VERIFIED` lines naming `REV`, the operator digest line, then `A7_DONE`.
+- The digest changes whenever a file in `deploy/preview-auth-dev/v1` changed.
+- `nativeSha256` changes with new migrations.
 - On 21 October 2026 the live list hashed to `cd299616…1c27`.
 
 ### A8. The register plan and its proposal (read-only; the site stays up)
@@ -3767,6 +3835,20 @@ step 2, then `README-anthropic.md`'s step 3: the GO must still get this release'
 With `NO ROOM`, the owner decides which other gate's pot is lowered, before piece 1. A Python error instead of these
 lines: ask.
 
+**What POTS does not answer.** POTS weighs one thing against the Anthropic gate's daily pot: what that gate may hold
+at once for four calls in flight (its own `activate` rule), with no debate in it. STEPCHECK's settings check asks
+more: for every plan the step is on, one debate at the widest choice that plan offers (a question at depth 1 and at
+depth 2, and a dig, at depth 2 on a paid plan; How wide at its widest; web search on a paid plan when the site has the
+search gate) must fit the daily pot of every gate it needs, its own calls and those holds together
+(`apps/api/src/settings-check.ts`: `gatePotCases`, `gatePotCaseNeeds`, `checkGatePotsFitOneDebate`; the holds are
+`previewGateEstimateNanoUsd` in `apps/api/src/preview-budget-estimate.ts`). So POTS can say `yes` while STEPCHECK
+names `GATE_POT_BELOW_ONE_DEBATE:<gate>:<plan>:dig:d2:p7:web`, a paid plan's widest dig. No step before the downtime
+asks STEPCHECK's question: the check reads the new settings version through the new release, so the version must be
+published and the release pinned, and on the drained path both happen only at DR5, inside the downtime. POTS and that
+check weigh money only: a gate's daily number of calls is `max_paid_posts_per_day` in its GO file, which the gate
+takes in at `activate` and shows in its `status` beside `today_posts`, and it is weighed only when someone asks, by
+the API against the calls left today that the gate's `/remaining` answers.
+
 ### STEPCHECK. The step is in force (right after DR6)
 
 First after `DR6_DONE` (or `DR6TAIL_DONE`), before AFTERDR6. It reads the facts of the version the new release made
@@ -3809,7 +3891,10 @@ migration 0158 in the ledger: 1`, then `verdict PASS ...`, `the step can run on 
 `STEPCHECK_DONE`. A `STEPCHECK_NOT_DONE` that names `START_STEP_UNREACHABLE` means the upload is done and the site
 runs this release without the step for the plans named: a designed state, nothing to undo. The fix is a settings
 activation on a later day (the engine row, or a line-up with two makers), never during an upload. A code
-`GATE_POT_BELOW_ONE_DEBATE` or `GATE_POT_UNANSWERED`: ask.
+`GATE_POT_BELOW_ONE_DEBATE` or `GATE_POT_UNANSWERED`: ask. The first names the gate and the choice that does not fit
+(`<gate>:<plan>:<question or dig>:d<depth>:p<paths>`, with `:web` when it searches), and the hint under it gives the
+two ways out, both the owner's decision after the upload: raise that gate's pot, or narrow How wide for that plan. POTS
+could not have seen it ("What POTS does not answer", above).
 
 ### STEPPROOF. The test debate went through the step (after SB13b)
 
@@ -5112,7 +5197,6 @@ set -euo pipefail
 # SB1: this release's names file, its archive folder S and the copies the way back needs. Nothing live changes.
 NN=rNN                                                    # this release's number, e.g. r21
 REV='<the full 40-character dev commit>'                  # on the Mac: git fetch origin dev && git rev-parse refs/remotes/origin/dev
-OSTORE='<the pnpm store the live release installed from>'
 LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json; E=/etc/debateai-v3-preview/auth-dev-v1
 L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
 NAMES=/root/preview-archive/$NN-names.sh; SP=/root/preview-archive/$NN-S.txt
@@ -5120,7 +5204,6 @@ psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debatea
 lc() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$L/$1" "${@:2}"; }
 [ ! -e "$NAMES" ] && [ ! -e "$SP" ] || { echo "SB1_NOT_DONE: $NAMES or $SP exists (look first)"; exit 1; }
 printf '%s\n' "$NN" | grep -qxE 'r[0-9]+' && printf '%s\n' "$REV" | grep -qxE '[0-9a-f]{40}' || { echo "SB1_NOT_DONE: NN or REV is not filled in"; exit 1; }
-[ -d "$OSTORE/v11" ] || { echo "SB1_NOT_DONE: OSTORE is not a pnpm store"; exit 1; }
 [ "$(jq -r '.schema // "none"' "$LOCK")" = preview-lifecycle-release-lock-v2 ] || { echo "SB1_NOT_DONE: the lock is not v2: the transition (T) comes first"; exit 1; }
 ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB1_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (above: run its next command, then this step again)"; exit 1; }
 jq -r '.releases[] | "\(.label) \(.releaseKey) slot \(.slot) \(.state) units \(.units.api)/\(.units.ui)/\(.units.runner) open work \(.openWork)"' <<<"$ST"
@@ -5135,6 +5218,11 @@ OPLANS=$(dirname "$(jq -r --arg o "$OLABEL" '.releases[$o].services.api.basePlan
 for F in api ui runner; do [ "$(jq -r --arg o "$OLABEL" --arg f "$F" '.releases[$o].services[$f].basePlan.path' "$LOCK")" = "$OPLANS/$F-launch.json" ] || { echo "SB1_NOT_DONE: the old release's $F plan is not in $OPLANS"; exit 1; }; done
 ONP=$E/native-plan-$OLABEL.json
 [ "$(jq -r .operation "$ONP")" = verify ] && [ "$(jq -r .sourceRevision "$ONP")" = "$OREV" ] && [ "$REV" != "$OREV" ] || { echo "SB1_NOT_DONE: $ONP is not the old release's verify plan, or REV is the old release"; exit 1; }
+# OSTORE, the pnpm store A3 starts from: the old release's own copy (A3 makes one), else the store its own upload's names file names.
+OSTORE=/opt/debateai-v3-preview/artifacts/auth-dev-$OLABEL/pnpm-store
+if [ ! -d "$OSTORE/v11" ]; then ONAMES=$(grep -lx "LABEL=$OLABEL" /root/preview-archive/r*-names.sh 2>/dev/null | head -n 1 || true); OSTORE=$( [ -n "$ONAMES" ] && sed -n 's/^OSTORE=//p' "$ONAMES" || true); fi
+[ -n "$OSTORE" ] && [ -d "$OSTORE/v11" ] || { echo "SB1_NOT_DONE: no pnpm store to start from: $OLABEL has none of its own, and the one its upload's names file names (${OSTORE:-none}) is gone (its release archived?): ask"; exit 1; }
+echo "pnpm store for A3: $OSTORE"
 LABEL=${REV:0:9}-$NN-v1
 printf '%s\n' "$LABEL" | grep -qxE '[a-z0-9][a-z0-9-]{0,62}[a-z0-9]' || { echo "SB1_NOT_DONE: $LABEL is not a release label of at most 64 characters"; exit 1; }
 REG0=$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1") || { echo "SB1_NOT_DONE: the database is unreadable"; exit 1; }
@@ -5211,7 +5299,13 @@ Then stage the new release with A2, A3 and A4–A7 of "A normal release on a hos
 file): the bundle since `OREV`, the reference clone, six folders, the store, six manifests, two builds with
 `--models all-models --release-key "$KEY"` (`KEY` from this names file), and six `PREVIEW_RELEASE_VERIFIED` lines. One
 exception: A5 compares the build values with the shared `ui.env`, which is no longer any live release's file. Run SB1b
-instead of A5.
+instead of A5, so the order is A2, A3, A4, SB1b, A6, A7.
+
+SB1 finds `OSTORE`, the pnpm store A3 copies, by itself, and prints it (`pnpm store for A3: …`): the old release's own
+copy (`/opt/debateai-v3-preview/artifacts/auth-dev-<OLABEL>/pnpm-store`, which its A3 made), else the store named on
+the `OSTORE=` line of the names file of the old release's own upload (a release staged without its own copy installed
+from that one). A store goes away only with its release's folders, when SB15 archives that release: SB15 refuses to
+archive, and SB4 never names for archiving, a release whose folder holds the store the next upload starts from.
 
 ### SB1b. The build values, against the old release's own `ui-<label>.env`
 
@@ -5610,10 +5704,32 @@ Two checks may need the owner first, and then a second run with their answer fil
   (`deploy/preview-lifecycle`, `deploy/preview-auth-dev`, `deploy/preview-release`). The owner reviews those files; with
   `LIFE=yes` the check passes (`changed (reviewed)`) and SB10 swaps the folder.
 
+**Room in the release lock.** Before the release check, SB4 reads the release lock (it changes nothing). The lock holds
+at most `MAX_RELEASES` releases, the number this release's own `prestart.mjs` sets (four: the release before, the
+current one, the next, and one being archived). When it is full and does not hold this release yet, this release's
+pin would be refused (`RELEASE_LOCK_INVALID`): at SB10, or at DR5 on the drained path, with the site down. SB4 then
+stops there, before the release check runs, with `SB4_NOT_DONE: the release lock is full …: archive <label> first
+with SB15 …`, naming the retired release pinned longest ago. Run SB15 with that label as `PREV`, on the owner's yes
+(the site stays up), then SB4 again. It never names the old release (`OLABEL`, the way back), the release whose folder
+the Turnstile relay's unit runs its program from (SB15), or one whose folder holds the pnpm store the next upload
+starts from (SB1). When no release is left to name, its line says so: ask.
+
+**`NO_MAINTENANCE`** says which of two things it found. `maintenance pending` is MT1's flag ("Infrastructure
+maintenance"); the switch refuses while it is there. `reboot required` is Ubuntu's own flag `/run/reboot-required`: a
+system update is installed that takes effect only after a restart. The release check is the only step that reads that
+flag: no other step of the upload reads it, and neither does the switch (SB13 and DR6 read only MT1's flag), so every
+step runs the same with it. On the side-by-side path it alone makes the verdict `NOT_READY`; on the drained path it is
+named with the other BAD checks. Whether to go on with the upload with the restart still owed, or to restart the
+server first and run SB4 again, is the owner's decision. A restart is a step of its own, at a quiet time while no
+release drains: after it no runner starts by itself, and on the upload that brings the Amazon gate not between piece 2
+and the yes (`deploy/preview-auth-dev/v1/MAIN-SITE.md`, part 2). Any other BAD check still stops the upload.
+
 On the drained path SB4 always ends with `SB4_NOT_DONE: DRAINED_PATH`, and its last line says whether any other check
 is BAD too. The first run, without `GRR` and `LIFE`, usually names `GATE_ROWS_N1` and `LIFECYCLE_FILES` as well. The
 second run, with both filled in, must end with `SB4_NOT_DONE: DRAINED_PATH (expected on a drained upload): no other
-check is BAD`: that is the one expected stop of the day. Any other name on that line: stop and ask.
+check is BAD`: that is the one expected stop of the day. Any other name on that line: stop and ask. When the other
+name is `NO_MAINTENANCE` and its detail is `reboot required`, the line ends with a sentence that says so, and the
+paragraph above holds: the owner decides.
 
 ```sh
 set -euo pipefail
@@ -5623,17 +5739,33 @@ GRR=''                                                    # the digest GATE_ROWS
 LIFE=''                                                   # yes, once the owner reviewed the LIFECYCLE_FILES change; else empty
 HC=$(psqlq "SELECT count(*) FROM pg_database WHERE datname = 'hatchet'") || { echo "SB4_NOT_DONE: the database is unreadable"; exit 1; }
 if [ "$HC" = 1 ]; then runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d hatchet -XAt -c 'SELECT 1' >/dev/null || { echo "SB4_NOT_DONE: the postgres administrator cannot connect to the hatchet database (the error above), so SB7's online backup would stop with DUMP_FAILED. The fix R21 needed: in pg_hba.conf, 'local postgres,debateai postgres peer map=preview_root' becomes 'local postgres,debateai,hatchet postgres peer map=preview_root', checked with pg_hba_file_rules, then SELECT pg_reload_conf() (a server change: the owner's yes first): ask"; exit 1; }; fi
+# Room in the release lock for this release's pin (SB10, or DR5 on the drained path). Read-only; when it is full, the retired release SB15 may archive first.
+MX=$(sed -n 's/^const MAX_RELEASES = \([1-9][0-9]*\);.*$/\1/p' "$CAPI/dialectical-engine/deploy/preview-lifecycle/v1/prestart.mjs")
+[ -n "$MX" ] || { echo "SB4_NOT_DONE: this release's prestart.mjs does not say how many releases the lock holds (MAX_RELEASES): ask"; exit 1; }
+NL=$(jq -r '.releases | length' "$LOCK")
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB4_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
+if [ "$(jq -r --arg l "$LABEL" '.releases | has($l)' "$LOCK")" = false ] && [ "$NL" -ge "$MX" ]; then
+  RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=$(readlink -f "$RP" 2>/dev/null || true)
+  [ -n "$RR" ] || { echo "SB4_NOT_DONE: the release lock is full ($NL of $MX releases), and the Turnstile relay's program path is unread, so no release can be named for SB15: ask"; exit 1; }
+  RF=''; case "$RR" in /opt/debateai-v3-preview/releases/*) RF=${RR#/opt/debateai-v3-preview/releases/}; RF=${RF%%/*};; esac
+  SH=''; [ -d "$STORE/v11" ] || { SH=${OSTORE#/opt/debateai-v3-preview/artifacts/auth-dev-}; SH=${SH%%/*}; }
+  PREV=$(jq -r --arg o "$OLABEL" --arg rf "$RF" --arg sh "$SH" --argjson st "$ST" '[.releases | to_entries[] | {l: .key, at: ([.value.services[].pinnedAt] | min)} | select(.l != $o and .l != $sh) | select(.l as $l | any($st.releases[]; .label == $l and .state == "RETIRED")) | select(.l as $l | $rf | contains($l) | not)] | sort_by(.at) | .[0].l // ""' "$LOCK") || { echo "SB4_NOT_DONE: the release lock is full ($NL of $MX releases), and the lock or the release table could not be read: ask"; exit 1; }
+  [ -n "$PREV" ] || { echo "SB4_NOT_DONE: the release lock is full ($NL of $MX releases), so this release's pin would be refused, and no retired release can be archived: the old release is the way back, and the Turnstile relay's and the package store's releases stay: ask"; exit 1; }
+  echo "SB4_NOT_DONE: the release lock is full ($NL of $MX releases), so this release's pin would be refused (RELEASE_LOCK_INVALID): archive $PREV first with SB15 (PREV='$PREV', on the owner's yes; the site stays up), then run SB4 again"; exit 1
+fi
+echo "release lock: $NL of $MX releases, room for $LABEL"
 RC=0; OUT=$(lc release-check.mjs check --label "$LABEL" --older-manifest "$OART/candidate-api-source.json" --newer-manifest "$ART/candidate-api-source.json" ${GRR:+--gate-rows-reviewed "$GRR"} ${LIFE:+--lifecycle-reviewed} 2>&1) || RC=$?
 printf '%s\n' "$OUT" > "$S/release-check.json"
 jq -r 'if .event == "PREVIEW_RELEASE_CHECK" then ((.checks[] | "\(if .ok then "OK " else "BAD" end) \(.name): \(.detail)"), "verdict \(.verdict)") else tostring end' <<<"$OUT" 2>/dev/null || echo "$OUT"
 [ "$RC" != 1 ] || { echo "SB4_NOT_DONE: the release check refused (the line above): ask"; exit 1; }
 jq -r '.checks[] | select(.name == "LIFECYCLE_FILES") | .detail' <<<"$OUT" > "$S/lifecycle-files.txt"
+RB=''; [ "$(jq -r '.checks[] | select(.name == "NO_MAINTENANCE" and (.ok | not)) | .detail' <<<"$OUT")" != 'reboot required' ] || RB=" (NO_MAINTENANCE: reboot required only says a system update still wants a restart, and nothing else in the upload reads it: going on, or restarting first, is the owner's decision)"
 case "$(jq -r .verdict <<<"$OUT")" in
   SIDE_BY_SIDE) ;;
   DRAINED_PATH) OTHER=$(jq -r '[.checks[] | select(.ok | not) | .name | select(. != "N1_HEADERS")] | join(" ")' <<<"$OUT")
     if [ -z "$OTHER" ]; then echo "SB4_NOT_DONE: DRAINED_PATH (expected on a drained upload): no other check is BAD: use \"Drained upload on the template layout\""; exit 1; fi
-    echo "SB4_NOT_DONE: DRAINED_PATH, and BAD too: $OTHER: on the first run GATE_ROWS_N1 and LIFECYCLE_FILES wait for GRR and LIFE (above); anything else: stop and ask"; exit 1;;
-  *) echo "SB4_NOT_DONE: NOT_READY: a check is BAD (above): stop and ask"; exit 1;;
+    echo "SB4_NOT_DONE: DRAINED_PATH, and BAD too: $OTHER: on the first run GATE_ROWS_N1 and LIFECYCLE_FILES wait for GRR and LIFE (above); anything else: stop and ask$RB"; exit 1;;
+  *) echo "SB4_NOT_DONE: NOT_READY: a check is BAD (above): stop and ask$RB"; exit 1;;
 esac
 echo SB4_DONE
 ```
@@ -6353,7 +6485,9 @@ Never archive the release whose folder the Turnstile relay's unit runs its progr
 again. Before the yes for SB15, read the program path the unit names
 (`systemctl show -p ExecStart --value debateai-preview-turnstile`) and compare it with `PREV`'s folders (every folder
 under `/opt/debateai-v3-preview/releases/` whose name holds `PREV`); when it lies inside one of them, ask. Moving the
-relay's program out of the release folders is a reviewed step of its own, on another day.
+relay's program out of the release folders is a reviewed step of its own, on another day. SB15 itself refuses a
+release whose artifacts folder holds the pnpm store the next upload's SB1 starts from: that is the case when the
+latest upload made no store of its own (A3) and installed from `PREV`'s.
 
 ```sh
 set -euo pipefail
@@ -6363,6 +6497,7 @@ PREV='<the label of the release that was current before OLABEL>'
 printf '%s\n' "$PREV" | grep -qxE '[a-z0-9][a-z0-9-]{0,62}[a-z0-9]' && [ "$PREV" != "$OLABEL" ] && [ "$PREV" != "$LABEL" ] || { echo "SB15_NOT_DONE: PREV is not filled in, or is the old or the new release"; exit 1; }
 ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB15_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 [ "$(jq -r --arg p "$PREV" '.releases[] | select(.label == $p) | .state' <<<"$ST")" = RETIRED ] || { echo "SB15_NOT_DONE: $PREV is not a RETIRED release of the lock"; exit 1; }
+[ -d "$STORE/v11" ] || case "$OSTORE" in "/opt/debateai-v3-preview/artifacts/auth-dev-$PREV/"*) echo "SB15_NOT_DONE: $LABEL has no pnpm store of its own and installed from the one in $PREV's folder ($OSTORE), which the next upload's SB1 starts from: $PREV stays (nothing changed): ask"; exit 1;; esac
 AR=$(lc release-archive.mjs archive --label "$PREV" 2>&1) || { echo "$AR"; echo "SB15_NOT_DONE: the archive refused (DAEMON_RELOAD_FAILED: the label is already unpinned; run systemctl daemon-reload by hand)"; exit 1; }
 echo "$AR"
 [ "$(jq -r '[.event, .label] | map(tostring) | join(" ")' <<<"$AR")" = "PREVIEW_RELEASE_ARCHIVED $PREV" ] && [ "$(jq -r --arg p "$PREV" '.releases | has($p)' "$LOCK")" = false ] || { echo "SB15_NOT_DONE: $PREV is not archived and unpinned"; exit 1; }

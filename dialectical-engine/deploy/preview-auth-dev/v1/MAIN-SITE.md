@@ -767,19 +767,17 @@ ask before part 2.
 
 **6. SB1** (the release guide's "Drained upload on the template layout" starts with SB1 to SB4). `NN` is the next plain
 number after the highest `r<number>-names.sh` in `/root/preview-archive` (a name with a second part, like `r22-1`, or
-with a word, does not count); `REV` is the one above, typed in full. `OSTORE` is the pnpm store the live release
-installed from: `/opt/debateai-v3-preview/artifacts/auth-dev-<the live release's label>/pnpm-store` when that folder
-exists (`ls -d /opt/debateai-v3-preview/artifacts/auth-dev-*/pnpm-store` lists the stores, and changes nothing). A
-release that made no copy installed from the one before it: then take the `OSTORE=` line of the names file of the live
-release's own upload (`grep '^OSTORE=' /root/preview-archive/<its rNN>-names.sh`). SB1 refuses a folder that is no pnpm
-store. Expect `SB1_DONE`. Nothing live changes. Then run
-SITEINPUTS (1.7), and settle your numbers before the practice.
+with a word, does not count); `REV` is the one above, typed in full. Nothing else is typed: SB1 finds the pnpm store
+the staging starts from by itself (the live release's own copy, else the store its upload's names file names) and
+prints `pnpm store for A3: <path>`. If that store is gone (its release was archived), SB1 stops and says so: ask.
+Expect `SB1_DONE`. Nothing live changes. Then run SITEINPUTS (1.7), and settle your numbers before the practice.
 
-**7. The staging.** As the release guide says under SB1: A2 (its Mac half makes the bundle; `OREV` is the names
-file's `OREV=` line, read on the server with `sed -n 's/^OREV=//p' /root/preview-archive/rNN-names.sh` and typed on the
-Mac), A3, A4 to A7, then SB1b instead of A5. Each ends with its own `_DONE` line, `A2_DONE` first and `SB1B_DONE`
-last. Run A3, A4, A6 and A7 as detached runs ("How to run a server step"), not with `nohup`: a closed window would
-stop them half way, and A3 then refuses to run again. The staging changes nothing live.
+**7. The staging.** As the release guide says under SB1, in this order: A2 (its Mac half makes the bundle; `OREV` is
+the names file's `OREV=` line, read on the server with `sed -n 's/^OREV=//p' /root/preview-archive/rNN-names.sh` and
+typed on the Mac), A3, A4, SB1b (in place of A5), A6 and A7. Each is a block of the release guide that ends with its
+own `_DONE` line, `A2_DONE` first and `A7_DONE` last. Run A3, A4, A6 and A7 as detached runs ("How to run a server
+step"), not with `nohup`: a closed window would stop them half way, and A3 then refuses to run again. The staging
+changes nothing live.
 
 **8. SHAPEON: the row of the step before Start** (the release guide's section "The step before Start, switched on in
 the upload"). It reads the live settings version's debate-shape row and checks what the step needs: the row switched
@@ -805,9 +803,19 @@ range of pots (on your screen only), the line `four calls at once fit the Anthro
 Write nothing of the range down outside the server: you type the Amazon gate's figures in part 2, step 3, on the
 server only.
 
+POTS answers only what it says: whether the Anthropic gate can hold four calls at once inside its pot. It does not
+price a debate. Whether one debate at the widest choice (for example a paid plan's dig, seven paths wide, with web
+search) fits each gate's daily pot is first asked by STEPCHECK, after the downtime (part 2, step 24): no step before
+the downtime can ask it, because that check needs the new settings version published and the new release pinned,
+and both happen at DR5. So `yes` here does not promise STEPCHECK's pass. POTS weighs money only: a gate's daily number
+of calls is `max_paid_posts_per_day` in its GO file, and it is weighed only when someone asks a question, against the
+calls the gate says are left today.
+
 **10. MAILTIME: how long this release's mail program takes to load.** From this release on, each mail's program loads
 its code afresh, inside the 4.5 seconds each mail has. This times the load on this server, in the staged release
-folder, and sends nothing: it hands the program an empty mail, which it refuses.
+folder, and sends nothing: it hands the program an empty mail, which it refuses. Run it on an idle server: not while
+A3, A6 or A7, the practice or another heavy step runs, and not right after one, while the server is still busy from
+it. A busy server makes the load slower, and that is not what this step measures.
 
 ```sh
 set -euo pipefail
@@ -831,8 +839,10 @@ echo MAILTIME_DONE
 exit 0
 ```
 
-Expect the time line (well under 4 seconds), then `MAILTIME_DONE`. Above 2 seconds the step stops: ask. A time of a
-few milliseconds means the program refused before it loaded anything, so nothing was timed: ask. After the
+Expect the time line (well under 4 seconds), then `MAILTIME_DONE`. Above 2 seconds the step stops. One stop right
+after the website builds (A6, A7) only says the server was still busy: wait a few minutes, with nothing else running,
+and run MAILTIME again. If it then prints `MAILTIME_DONE`, go on. If it stops again on the idle server: ask. A time of
+a few milliseconds means the program refused before it loaded anything, so nothing was timed: ask. After the
 upload, a mail that runs out of time shows as `SENDMAIL_EXIT_1` or `SENDMAIL_TIMEOUT` (4.2).
 
 **11. The practice** (it spends real money from the gates' day). Run it as the release guide's SB2 says (its commands
@@ -874,7 +884,7 @@ as that guide says. REKEYCHECK (5.7) reads the line again after the upload.
 
 **Before part 2 starts** you have seen, in this order: REV in the upload folder with nothing edited,
 `Legal texts: ready for release.` with the upload day twice, `ALL PASSED`, `TRYDETACH_DONE` after a closed window,
-`SB1_DONE`, the staging up to `SB1B_DONE`, `SHAPEON_DONE`, `POTS_DONE` (and your decision if it said `no` or `NO
+`SB1_DONE`, the staging up to `A7_DONE`, `SHAPEON_DONE`, `POTS_DONE` (and your decision if it said `no` or `NO
 ROOM`), `MAILTIME_DONE`, the practice's `PRACTICE_VERDICT PASS` lines with the rows matching, S-7's gates active, and
 `STAFFHBA_DONE`. If one is missing, part 2 waits.
 
@@ -1024,6 +1034,19 @@ aside; ask. Note the `deltaSha256`: your yes names it, and DR5's `YES` is that h
 - **The second run**, with `GRR` filled in and `LIFE=yes`, prints `changed (reviewed): <n> files`, and its last line
   must be `SB4_NOT_DONE: DRAINED_PATH (expected on a drained upload): no other check is BAD: use "Drained upload on
   the template layout"`. That is the one expected `_NOT_DONE` of the day: go on.
+
+Two other stops can come in either run:
+- **The release lock is full.** Before the release check, SB4 reads whether the lock has room for this release's pin
+  (at DR5, inside the downtime). If not, it stops with nothing changed:
+  `SB4_NOT_DONE: the release lock is full (…): archive <label> first with SB15 (PREV='<label>', …), then run SB4
+  again`. Run the release guide's SB15 with that label, on your yes (the site stays up), then SB4 again. It never
+  names the release you would go back to, the one the Turnstile relay runs from, or the one that holds the package
+  store; if none is left, its line says so: ask.
+- **`NO_MAINTENANCE` with `reboot required`.** A system update on the server wants a restart. Only SB4's release check
+  reads that flag: nothing else in the upload, and not the switch, reads it, so every step works the same with it.
+  Whether you go on with the restart still owed, or restart the server first, on a day of its own, and run SB4 again,
+  is your decision (step 4: no restart between piece 2 and your yes). SB4's last line then names `NO_MAINTENANCE` and
+  ends with a sentence that says so. `maintenance pending` instead, or any other new name: stop and ask.
 
 Two notes on the files: the restore fence's drop-in is installed by FENCEDIR (step 10), not by the tools-folder swap;
 and the swap (SWAP, step 21) changes nothing in Caddy.
@@ -1207,7 +1230,11 @@ no Luna), the database step of the charges before Start, then runs the settings 
     without it there; nothing is to undo. Go on with the upload's checks and ask. The fix is a settings activation on
     a later day (the engine row, or a line-up with two makers), never during an upload.
   - `GATE_POT_BELOW_ONE_DEBATE:<gate>:…` or `GATE_POT_UNANSWERED:<gate>`: the step is on, and one widest debate does
-    not fit that gate's daily pot, or that gate did not answer: ask.
+    not fit that gate's daily pot, or that gate did not answer: ask. After the gate, the code names the choice that
+    does not fit: the plan, `question` or `dig`, the depth, the paths, and `web` when it searches (for example
+    `…:dig:d2:p7:web`, a paid plan's dig at depth 2, seven paths wide, with web search). The hint under it gives the
+    two ways out, both your decision and both after the upload: raise that gate's pot, or narrow How wide for that
+    plan. POTS (1.8, step 9) could not have seen this: it never prices a debate.
 - If the step is on but its calls fail on the site (the paths never come, or the card shows errors), its own way back
   is a later settings version with the old row (`shape-base.json`), as that section says. Ask first.
 

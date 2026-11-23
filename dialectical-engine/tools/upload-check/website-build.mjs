@@ -6,10 +6,13 @@
 //
 // The build runs `pnpm --filter dialectical-engine-v2ui build` with the environment the release tool itself gives its
 // build: the release root's own uiBuildEnvironment. On 2 Nov the server's build refused, because its environment lacked
-// the owner's early-use package exemption; the same environment here meets the same fault on the Mac.
+// the owner's early-use package exemption; the same environment here meets the same fault on the Mac. After the build,
+// every committed file of the release root must be as it was just before it: the release tool's ui-build refuses a
+// build that rewrote one (PREVIEW_SOURCE_INVENTORY_REFUSED), as it did when Next rewrote apps/ui/next-env.d.ts.
 //
 //   installRelease({ repo, rev, workdir, node, pnpmDir })      the A3 install under <workdir>; { root } or a refusal
-//   buildWebsiteIn({ root, node, pnpmDir })                    the build and the release-folder tools: a CheckResult
+//   committedFilesOf(repo, rev)                                the commit's files under dialectical-engine/, as root-relative paths
+//   buildWebsiteIn({ root, node, pnpmDir, committed? })        the build, the committed files compared, the release-folder tools: a CheckResult
 //   checkWebsiteBuild({ repo, rev, workdir, node, pnpmDir })   the check: { result, root }, root null when not installed
 //   runChild(command, args, { cwd, env, log, limitMs? })       one child in its own process group; a timeout, stopRunning()
 //                                                              or this process exiting stops the whole group, pnpm's children included
@@ -20,7 +23,8 @@
 // not-checked, with the export's name. Nothing here reads a server address, a key or a limit.
 
 import { execFileSync, spawn } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { RELEASE_FOLDER_TOOLS, loadEachTool } from "./tools-folder.mjs";
@@ -174,8 +178,39 @@ function firstLine(error) {
   return (String(error?.message ?? error).trim().split("\n")[0] || "no message");
 }
 
-/** Builds the website in an installed release root, then loads the release-folder tools there. A CheckResult. */
-export async function buildWebsiteIn({ root, node, pnpmDir, extraEnv = {} }) {
+/**
+ * Every file <rev> commits under dialectical-engine/, as paths relative to a release root (which holds dialectical-engine/).
+ * The list is close to execFileSync's default 1 MiB output limit, so the limit here is larger.
+ */
+export function committedFilesOf(repo, rev) {
+  const listed = execFileSync("git", ["-C", repo, "ls-tree", "-r", "-z", "--name-only", rev, "--", ENGINE], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
+  return listed.split("\0").filter((path) => path !== "");
+}
+
+/** Each committed path's sha256 in <root> (a link: of its target), by path; a path that is not a file or link there is left out. */
+function fingerprintsOf(root, paths) {
+  const prints = new Map();
+  for (const path of paths) {
+    let stat;
+    try { stat = lstatSync(join(root, path)); } catch { continue; }
+    const bytes = stat.isSymbolicLink() ? readlinkSync(join(root, path)) : stat.isFile() ? readFileSync(join(root, path)) : null;
+    if (bytes !== null) prints.set(path, createHash("sha256").update(bytes).digest("hex"));
+  }
+  return prints;
+}
+
+/** The paths of <before> whose bytes differ now, or that are gone, sorted. */
+function changedSince(root, before) {
+  const after = fingerprintsOf(root, [...before.keys()]);
+  return [...before].filter(([path, print]) => after.get(path) !== print).map(([path]) => path).sort();
+}
+
+/**
+ * Builds the website in an installed release root, then loads the release-folder tools there. A CheckResult. With
+ * <committed> (root-relative paths, committedFilesOf), each of those files must be the same after the build as just
+ * before it, as the release tool's ui-build checks on the server.
+ */
+export async function buildWebsiteIn({ root, node, pnpmDir, committed, extraEnv = {} }) {
   const started = Date.now();
   const done = (status, lines) => ({ name: "website-build", status, lines, seconds: (Date.now() - started) / 1000 });
   let releaseTool;
@@ -196,6 +231,7 @@ export async function buildWebsiteIn({ root, node, pnpmDir, extraEnv = {} }) {
   // The running Node's folder stays first, so pnpm and next run on the Node the check was given.
   const env = { ...environment, PATH: `${dirname(node)}:${pnpmDir}:${environment.PATH}`, ...extraEnv };
   const buildLog = join(root, "website-build.log");
+  const before = committed === undefined ? null : fingerprintsOf(root, committed);
   if (await runChild(join(pnpmDir, "pnpm"), ["--filter", "dialectical-engine-v2ui", "build"], { cwd: join(root, ENGINE), env, log: buildLog }) !== 0) {
     return done("refused", ["website build: the build failed", "UPLOAD_CHECK_WEBSITE_BUILD_FAILED", ...tailOf(buildLog), allowances]);
   }
@@ -204,12 +240,19 @@ export async function buildWebsiteIn({ root, node, pnpmDir, extraEnv = {} }) {
   if (!existsSync(join(root, BUILD_ID))) {
     return done("refused", [`website build: the build exited 0 but left no ${BUILD_ID}`, "UPLOAD_CHECK_WEBSITE_BUILD_NO_OUTPUT", ...tailOf(buildLog), allowances]);
   }
+  // The server's ui-build refuses a build that changed a committed file (PREVIEW_SOURCE_INVENTORY_REFUSED): so does this.
+  const changed = before === null ? [] : changedSince(root, before);
+  if (changed.length > 0) {
+    return done("refused", [`website build: the build changed ${changed.length} committed file(s), which the server's release tool refuses`, "UPLOAD_CHECK_WEBSITE_BUILD_CHANGED_COMMITTED_FILES",
+      ...changed.slice(0, LOG_TAIL).map((path) => `  ${path}`), allowances]);
+  }
   // The tools that run from a release folder load there, with its packages, each on its own.
   const results = await loadEachTool({ folder: root, node, only: RELEASE_FOLDER_TOOLS });
   const failed = results.filter((result) => !result.ok);
   const absent = RELEASE_FOLDER_TOOLS.filter((tool) => !results.some((result) => result.tool === tool));
   const lines = [
     "website build: built with the release tool's own environment",
+    ...(before === null ? [] : [`committed files: the build changed none of the ${before.size} compared`]),
     `release-folder tools: ${results.length - failed.length} of ${results.length} loaded`,
     ...failed.map((result) => `${result.tool}: ${result.code ?? "failed with no error code"}`),
     ...absent.map((tool) => `${tool}: not in this commit, so not loaded`),
@@ -235,7 +278,7 @@ export async function checkWebsiteBuild({ repo, rev, workdir, node, pnpmDir, ext
   }
   let result;
   try {
-    result = await buildWebsiteIn({ root, node, pnpmDir, extraEnv });
+    result = await buildWebsiteIn({ root, node, pnpmDir, committed: committedFilesOf(repo, rev), extraEnv });
   } catch (error) {
     result = { name: "website-build", status: "not-checked", lines: [`the check could not finish: ${firstLine(error)}`] };
   }

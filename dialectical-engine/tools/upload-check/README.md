@@ -70,7 +70,11 @@ behind. They are a few bytes each and do no harm; the password belongs to a data
    named in one fixed list (`RELEASE_FOLDER_TOOLS` in `tools-folder.mjs`) and are loaded in check 2 instead.
 2. **`website-build`.** It installs a release the way the guide's step A3 does: one online fill, an install that must
    say `downloaded 0`, then the generated files. Then it builds the website with the settings the release tool itself
-   gives the build, and loads the seven release-folder tools there. On 2 November the server's build applied the plain
+   gives the build, checks that the build left every committed file as it was just before the build, and loads the
+   seven release-folder tools there. A build that rewrote a committed file (Next has rewritten `apps/ui/next-env.d.ts`)
+   is `REFUSED` with `UPLOAD_CHECK_WEBSITE_BUILD_CHANGED_COMMITTED_FILES` and the files named, because the release
+   tool's build on the server refuses it too (`PREVIEW_SOURCE_INVENTORY_REFUSED`).
+   On 2 November the server's build applied the plain
    7-day package rule to packages the owner had allowed early (fault 2). This check can only see that kind of fault
    while an early allowance (the owner's permission to use a package version before it is 7 days old) is in force.
 3. **`start-checks`.** It starts a throwaway database (PostgreSQL) that looks like the server's to the start checks:

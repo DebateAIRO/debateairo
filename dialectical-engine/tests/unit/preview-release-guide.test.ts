@@ -824,7 +824,9 @@ const VARS: Readonly<Record<string, string>> = Object.freeze({
   // S18 fix round 1: the choices a plan does not take from its base, read from the active version's publish plan.
   DS: 'yes', SEATS: '{"writer":"preview:claude-haiku-5-5","checker":"preview:fixture-b"}', ROT: 'off',
   // SB3's two lists: the inputs the upload takes from the owner's file, and the plans whose limits change, up or down.
-  NEWNUM: 'billingPlans dailyCeilingMicros', LIMITS: 'PLUS PRO'
+  NEWNUM: 'billingPlans dailyCeilingMicros', LIMITS: 'PLUS PRO',
+  // A4's to A7's loops over the six release folders.
+  RELS, KIND: 'candidate', ROLE: 'api'
 });
 
 type Invocation = Readonly<{ tool: string; script: string; argv: readonly string[]; line: string }>;
@@ -2227,12 +2229,24 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
 
   it('SB4 on the drained path names every other BAD check, so its one expected stop of the day is read right', () => {
     const sb4 = scriptOf('SB4').lines;
-    const from = sb4.findIndex(line => line.startsWith('case "$(jq -r .verdict <<<"$OUT")" in')), to = sb4.indexOf('esac', from);
-    const verdict = (checks: Array<[string, boolean]>, name = 'DRAINED_PATH') => bash(['set -euo pipefail',
-      `OUT='${JSON.stringify({ event: 'PREVIEW_RELEASE_CHECK', verdict: name, checks: checks.map(([check, ok]) => ({ name: check, ok, detail: '' })) })}'`, ...sb4.slice(from, to + 1), 'echo PASSED_ON']);
+    // From the line that reads NO_MAINTENANCE's detail, which the two stops below use, to the end of the verdict.
+    const from = sb4.findIndex(line => line.startsWith('RB=')), to = sb4.indexOf('esac', from);
+    expect(from).toBe(sb4.findIndex(line => line.startsWith('case "$(jq -r .verdict <<<"$OUT")" in')) - 1);
+    const verdict = (checks: Array<[string, boolean, string?]>, name = 'DRAINED_PATH') => bash(['set -euo pipefail',
+      `OUT='${JSON.stringify({ event: 'PREVIEW_RELEASE_CHECK', verdict: name, checks: checks.map(([check, ok, detail]) => ({ name: check, ok, detail: detail ?? '' })) })}'`, ...sb4.slice(from, to + 1), 'echo PASSED_ON']);
     expect(verdict([['N1_HEADERS', false], ['CURRENT_PINNED', true]])).toBe('SB4_NOT_DONE: DRAINED_PATH (expected on a drained upload): no other check is BAD: use "Drained upload on the template layout"');
-    expect(verdict([['N1_HEADERS', false], ['GATE_ROWS_N1', false], ['LIFECYCLE_FILES', false]])).toMatch(/^SB4_NOT_DONE: DRAINED_PATH, and BAD too: GATE_ROWS_N1 LIFECYCLE_FILES: on the first run /);
+    expect(verdict([['N1_HEADERS', false], ['GATE_ROWS_N1', false], ['LIFECYCLE_FILES', false]])).toMatch(/^SB4_NOT_DONE: DRAINED_PATH, and BAD too: GATE_ROWS_N1 LIFECYCLE_FILES: on the first run .*stop and ask$/);
     expect(verdict([['N1_HEADERS', true]], 'SIDE_BY_SIDE')).toBe('PASSED_ON');
+    // A restart a system update still wants: the last line says what it is, and that the owner decides; on both paths.
+    const restart = " (NO_MAINTENANCE: reboot required only says a system update still wants a restart, and nothing else in the upload reads it: going on, or restarting first, is the owner's decision)";
+    expect(verdict([['N1_HEADERS', false], ['NO_MAINTENANCE', false, 'reboot required']])).toBe(`SB4_NOT_DONE: DRAINED_PATH, and BAD too: NO_MAINTENANCE: on the first run GATE_ROWS_N1 and LIFECYCLE_FILES wait for GRR and LIFE (above); anything else: stop and ask${restart}`);
+    expect(verdict([['N1_HEADERS', true], ['NO_MAINTENANCE', false, 'reboot required']], 'NOT_READY')).toBe(`SB4_NOT_DONE: NOT_READY: a check is BAD (above): stop and ask${restart}`);
+    // MT1's flag is not a restart: no such sentence, the plain stop.
+    expect(verdict([['N1_HEADERS', true], ['NO_MAINTENANCE', false, 'maintenance pending, reboot required']], 'NOT_READY')).toBe('SB4_NOT_DONE: NOT_READY: a check is BAD (above): stop and ask');
+    expect(verdict([['N1_HEADERS', true], ['NO_MAINTENANCE', true, 'none']], 'SIDE_BY_SIDE')).toBe('PASSED_ON');
+    // The flag is read by the release check alone: the switch reads only MT1's flag.
+    expect(read('deploy/preview-lifecycle/v1/release-switch.mjs')).not.toContain('reboot-required');
+    expect(read('deploy/preview-lifecycle/v1/release-check.mjs')).toContain("export const REBOOT_REQUIRED_PATH = '/run/reboot-required';");
   });
 });
 
@@ -2446,5 +2460,140 @@ describe('the step before Start, switched on in the upload: SHAPEON, POTS, STEPC
       writeFileSync(join(dir, 'register-export.json'), exportOf('24'));
       expect(bash([`P='${dir}'`, write])).toBe('');
     } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+// What an upload with a full release lock, a restart still owed and an archived package store needs before the
+// downtime, and the staging's A4, A6 and A7 as scripts of the runbook's form. Every label and path below is made up.
+describe('before the downtime: room in the release lock, the package store, and A4 to A7 as scripts', () => {
+  const ROOT = resolve(import.meta.dirname, '../..');
+  const run = (script: string[]) => { const out = spawnSync('bash', ['-c', script.join('\n')], { encoding: 'utf8' }); return `${out.stdout}`.trim().split('\n').at(-1)!; };
+  const between = (lines: readonly string[], first: (line: string) => boolean, last: (line: string) => boolean) => {
+    const from = lines.findIndex(first), to = lines.findIndex((line, index) => index > from && last(line));
+    expect(from, 'first line').toBeGreaterThan(-1);
+    expect(to, 'last line').toBeGreaterThan(from);
+    return lines.slice(from, to + 1);
+  };
+
+  it('SB4 reads the lock before the release check and, when it is full, names the retired release SB15 may archive', () => {
+    const sb4 = scriptOf('SB4').lines;
+    const room = between(sb4, line => line.startsWith('# Room in the release lock'), line => line.startsWith('echo "release lock: '));
+    expect(sb4.indexOf(room[0]!)).toBeGreaterThan(sb4.findIndex(line => line.startsWith('if [ "$HC" = 1 ]')));
+    expect(sb4.indexOf(room.at(-1)!)).toBeLessThan(sb4.findIndex(line => line.includes('lc release-check.mjs check')));
+    for (const line of room.filter(code)) expect(line, line).not.toMatch(/(^|[\s;&|(])(cp|mv|install|chown|chmod|tee|put|nat|rel|pre)\s|systemctl (start|stop|restart|daemon-reload)/);
+    // The most the lock holds is read from the release's own prestart.mjs, the file whose pin would refuse.
+    expect(read('deploy/preview-lifecycle/v1/prestart.mjs')).toMatch(/^const MAX_RELEASES = 4;/m);
+    const releases = { 'old1-r20-v1': '2026-10-01', 'old2-r21-v1': '2026-10-08', 'old3-r22-v1': '2026-10-15', 'cur-r23-v1': '2026-10-22' } as Record<string, string>;
+    const relayOf = (label: string) => `{ path=/usr/bin/node ; argv[]=/usr/bin/node /opt/debateai-v3-preview/releases/auth-dev-candidate-${label}-api/dialectical-engine/deploy/turnstile/siteverify-relay.mjs ; ignore_errors=no }`;
+    const lockRoom = (o: { lock?: Record<string, string>; label?: string; relay?: string; ownStore?: boolean; storeOf?: string; retired?: string[] }) => {
+      const dir = mkdtempSync(join(tmpdir(), 'guide-lockroom-'));
+      try {
+        const lock = o.lock ?? releases;
+        writeFileSync(join(dir, 'lock.json'), JSON.stringify({ schema: 'preview-lifecycle-release-lock-v2', releases: Object.fromEntries(Object.entries(lock).map(([label, day]) => [label,
+          { releaseKey: 'r1-000000000000', slot: 'A', databaseAhead: null, services: { api: { pinnedAt: `${day}T10:00:00.000Z` }, ui: { pinnedAt: `${day}T09:00:00.000Z` } } }])) }));
+        mkdirSync(join(dir, 'capi'));
+        symlinkSync(ROOT, join(dir, 'capi', 'dialectical-engine'));
+        if (o.ownStore ?? true) mkdirSync(join(dir, 'store', 'v11'), { recursive: true });
+        const retired = o.retired ?? ['old1-r20-v1', 'old2-r21-v1', 'old3-r22-v1'];
+        const status = JSON.stringify({ releases: Object.keys(lock).map(label => ({ label, state: label === 'cur-r23-v1' ? 'CURRENT' : retired.includes(label) ? 'RETIRED' : 'DRAINING' })) });
+        return run(['set -euo pipefail', `LOCK='${dir}/lock.json'; CAPI='${dir}/capi'; LABEL='${o.label ?? 'new-r24-v1'}'; OLABEL=cur-r23-v1; STORE='${dir}/store'`,
+          `OSTORE='/opt/debateai-v3-preview/artifacts/auth-dev-${o.storeOf ?? 'cur-r23-v1'}/pnpm-store'`,
+          `lc() { [ "$1 $2" = 'release-check.mjs status' ] && printf '%s\\n' '${status}'; }`, `systemctl() { printf '%s\\n' '${o.relay ?? relayOf('old3-r22-v1')}'; }`,
+          'readlink() { printf \'%s\\n\' "$2"; }', ...room]);
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    };
+    const archive = (label: string) => `SB4_NOT_DONE: the release lock is full (4 of 4 releases), so this release's pin would be refused (RELEASE_LOCK_INVALID): archive ${label} first with SB15 (PREV='${label}', on the owner's yes; the site stays up), then run SB4 again`;
+    // Room: three releases, or this release pinned already (a run again after DR5 or SB10).
+    const three = Object.fromEntries(Object.entries(releases).slice(1));
+    expect(lockRoom({ lock: three })).toBe('release lock: 3 of 4 releases, room for new-r24-v1');
+    expect(lockRoom({ label: 'old1-r20-v1' })).toBe('release lock: 4 of 4 releases, room for old1-r20-v1');
+    // Full: the retired release pinned longest ago, never the old release, the relay's or the store's.
+    expect(lockRoom({})).toBe(archive('old1-r20-v1'));
+    expect(lockRoom({ relay: relayOf('old1-r20-v1') })).toBe(archive('old2-r21-v1'));
+    expect(lockRoom({ relay: relayOf('old1-r20-v1'), ownStore: false, storeOf: 'old2-r21-v1' })).toBe(archive('old3-r22-v1'));
+    expect(lockRoom({ ownStore: true, storeOf: 'old1-r20-v1' })).toBe(archive('old1-r20-v1'));
+    expect(lockRoom({ retired: ['old2-r21-v1', 'old3-r22-v1'] })).toBe(archive('old2-r21-v1'));
+    expect(lockRoom({ relay: relayOf('old1-r20-v1'), ownStore: false, storeOf: 'old2-r21-v1', retired: ['old1-r20-v1', 'old2-r21-v1'] }))
+      .toBe("SB4_NOT_DONE: the release lock is full (4 of 4 releases), so this release's pin would be refused, and no retired release can be archived: the old release is the way back, and the Turnstile relay's and the package store's releases stay: ask");
+    // A relay outside the release folders holds none of them back; an unread one names nothing.
+    expect(lockRoom({ relay: '{ path=/usr/bin/node ; argv[]=/usr/bin/node /opt/debateai-v3-preview/turnstile/siteverify-relay.mjs ; }' })).toBe(archive('old1-r20-v1'));
+    expect(lockRoom({ relay: '' })).toBe("SB4_NOT_DONE: the release lock is full (4 of 4 releases), and the Turnstile relay's program path is unread, so no release can be named for SB15: ask");
+  });
+
+  it('SB1 takes the old release\'s own store, else the one its upload\'s names file names, and stops when that one is gone', () => {
+    const sb1 = scriptOf('SB1').lines;
+    expect(sb1.some(line => line.startsWith('OSTORE=\''))).toBe(false);
+    const store = between(sb1, line => line.startsWith('# OSTORE, the pnpm store A3 starts from'), line => line.startsWith('echo "pnpm store for A3: '));
+    expect(sb1.indexOf(store[0]!)).toBeGreaterThan(sb1.findIndex(line => line.startsWith('OLABEL=$(')));
+    expect(sb1.indexOf(store.at(-1)!)).toBeLessThan(sb1.findIndex(line => line.startsWith('{ printf \'REV=%s\\nLABEL=%s\\n')));
+    const pick = (o: { own?: boolean; names?: string | null; older?: boolean }) => {
+      const dir = mkdtempSync(join(tmpdir(), 'guide-sb1-store-'));
+      try {
+        const artifacts = join(dir, 'artifacts'), archive = join(dir, 'archive');
+        mkdirSync(archive);
+        if (o.own) mkdirSync(join(artifacts, 'auth-dev-cur-r23-v1', 'pnpm-store', 'v11'), { recursive: true });
+        if (o.older) mkdirSync(join(artifacts, 'auth-dev-old-r22-v1', 'pnpm-store', 'v11'), { recursive: true });
+        if (o.names !== null) writeFileSync(join(archive, 'r23-names.sh'), `REV=x\nLABEL=cur-r23-v1\nOSTORE=${o.names ?? `${artifacts}/auth-dev-old-r22-v1/pnpm-store`}\n`);
+        writeFileSync(join(archive, 'r22-names.sh'), `REV=y\nLABEL=old-r22-v1\nOSTORE=${artifacts}/auth-dev-older-r21-v1/pnpm-store\n`);
+        const body = store.map(line => line.replaceAll('/opt/debateai-v3-preview/artifacts/', `${artifacts}/`).replaceAll('/root/preview-archive/', `${archive}/`));
+        return run(['set -euo pipefail', 'OLABEL=cur-r23-v1', ...body]).replaceAll(dir, '<dir>');
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    };
+    expect(pick({ own: true, older: true })).toBe('pnpm store for A3: <dir>/artifacts/auth-dev-cur-r23-v1/pnpm-store');
+    expect(pick({ older: true })).toBe('pnpm store for A3: <dir>/artifacts/auth-dev-old-r22-v1/pnpm-store');
+    expect(pick({})).toBe('SB1_NOT_DONE: no pnpm store to start from: cur-r23-v1 has none of its own, and the one its upload\'s names file names (<dir>/artifacts/auth-dev-old-r22-v1/pnpm-store) is gone (its release archived?): ask');
+    expect(pick({ names: null, older: true })).toBe('SB1_NOT_DONE: no pnpm store to start from: cur-r23-v1 has none of its own, and the one its upload\'s names file names (none) is gone (its release archived?): ask');
+  });
+
+  it('SB15 never archives the release whose folder holds the store the next upload starts from', () => {
+    const sb15 = scriptOf('SB15').lines;
+    const guard = sb15.find(line => line.startsWith('[ -d "$STORE/v11" ] || case "$OSTORE" in'))!;
+    expect(sb15.indexOf(guard)).toBeLessThan(sb15.findIndex(line => line.startsWith('AR=$(lc release-archive.mjs archive')));
+    const check = (o: { own: boolean; storeOf: string }) => {
+      const dir = mkdtempSync(join(tmpdir(), 'guide-sb15-store-'));
+      try {
+        if (o.own) mkdirSync(join(dir, 'store', 'v11'), { recursive: true });
+        return run(['set -euo pipefail', `STORE='${dir}/store'; LABEL=new-r24-v1; PREV=old1-r20-v1; OSTORE='/opt/debateai-v3-preview/artifacts/auth-dev-${o.storeOf}/pnpm-store'`, guard, 'echo ARCHIVE_GOES_ON']);
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    };
+    expect(check({ own: true, storeOf: 'old1-r20-v1' })).toBe('ARCHIVE_GOES_ON');
+    expect(check({ own: false, storeOf: 'old2-r21-v1' })).toBe('ARCHIVE_GOES_ON');
+    expect(check({ own: false, storeOf: 'old1-r20-v1' })).toMatch(/^SB15_NOT_DONE: new-r24-v1 has no pnpm store of its own and installed from the one in old1-r20-v1's folder /);
+  });
+
+  it('A4, A6 and A7 are scripts of the runbook\'s form, and their tool calls are the tool\'s real command lines', async () => {
+    const section = sectionOf(guide, '### A4-A7. Manifests, build values, UI builds, verify');
+    const named = (step: string) => {
+      const found = blocksOf(section).filter(block => block.lines.some(line => line.startsWith(`# ${step}: `)));
+      expect(found, step).toHaveLength(1);
+      return found[0]!;
+    };
+    for (const step of ['A4', 'A5', 'A6', 'A7']) {
+      const { lines } = named(step);
+      expect(lines.slice(0, 2), step).toEqual(['set -euo pipefail', NAMES_LINE]);
+      expect(lines.at(-1), step).toBe(`echo ${step}_DONE`);
+      for (const line of lines) {
+        for (const match of line.matchAll(/([A-Z][A-Z0-9_]*)_NOT_DONE/g)) expect(match[1], `${step}: ${line}`).toBe(step);
+        if (line.includes('_NOT_DONE')) expect(line, `${step}: ${line}`).toMatch(/exit 1/);
+      }
+      expect(spawnSync('bash', ['-n'], { input: lines.join('\n') }).status, step).toBe(0);
+    }
+    const wrong: string[] = [];
+    const calls = invocations(['A4', 'A6', 'A7'].map(named));
+    expect(calls.map(call => call.argv[0])).toEqual(['source-manifest', 'ui-build', 'verify', 'verify', 'verify', 'operator-digest']);
+    for (const call of calls) { const reason = await parserReason(call); if (reason !== 'ACTOR_REFUSED') wrong.push(`${call.script}: ${reason}: ${call.line.trim()}`); }
+    expect(wrong).toEqual([]);
+    // A6 takes the names file's key on the template layout, and works it out as A5 does on the old one.
+    const key = named('A6').lines.find(line => line.startsWith('[ -n "${KEY:-}" ] || KEY='))!;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-a6-key-'));
+    try {
+      writeFileSync(join(dir, 'register-before'), '23\n');
+      const rev = '0123456789ab'.padEnd(40, 'c');
+      expect(run(['set -euo pipefail', `S='${dir}'; REV=${rev}`, key, 'echo "$KEY"'])).toBe('r24-0123456789ab');
+      expect(run(['set -euo pipefail', `S='${dir}'; REV=${rev}; KEY=r30-0123456789ab`, key, 'echo "$KEY"'])).toBe('r30-0123456789ab');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+    // The order on the template layout, in the guide and in the owner's runbook.
+    expect(section.replace(/\s+/g, ' ')).toContain('so the order there is A4, SB1b, A6, A7');
+    expect(read('deploy/preview-auth-dev/v1/MAIN-SITE.md').replace(/\s+/g, ' ')).toContain('A3, A4, SB1b (in place of A5), A6 and A7');
   });
 });

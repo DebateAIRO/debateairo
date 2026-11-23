@@ -67,6 +67,41 @@ describe('check 2: the release install and the website build', () => {
     expect(result.lines).toContain('website build: built with the release tool\'s own environment');
   }, 60_000);
 
+  // The server's ui-build refuses a build that rewrote a committed file (PREVIEW_SOURCE_INVENTORY_REFUSED), as Next did
+  // with apps/ui/next-env.d.ts; the Mac check compares the committed files before and after the build the same way.
+  function fakeBuildWithCommitted({ rewrites }: { rewrites: boolean }) {
+    const { root, fakePnpmDir } = fakeBuild({ writesBuildId: true });
+    const committed = ['dialectical-engine/apps/ui/next-env.d.ts', 'dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs'];
+    mkdirSync(join(root, 'dialectical-engine/apps/ui'), { recursive: true });
+    writeFileSync(join(root, committed[0]!), '/// <reference types="next" />\n');
+    writeFileSync(join(fakePnpmDir, 'pnpm'), `#!/bin/sh\nmkdir -p apps/ui/.next && echo fake > apps/ui/.next/BUILD_ID\n${rewrites ? "printf 'rewritten\\n' > apps/ui/next-env.d.ts\n" : ''}`, { mode: 0o755 });
+    return { root, fakePnpmDir, committed };
+  }
+
+  it('a build that rewrote a committed file is refused, and the file is named', async () => {
+    const { root, fakePnpmDir, committed } = fakeBuildWithCommitted({ rewrites: true });
+    const result = await website.buildWebsiteIn({ root, node: process.execPath, pnpmDir: fakePnpmDir, committed });
+    expect(result.status).toBe('refused');
+    expect(result.lines).toContain('UPLOAD_CHECK_WEBSITE_BUILD_CHANGED_COMMITTED_FILES');
+    expect(result.lines).toContain('website build: the build changed 1 committed file(s), which the server\'s release tool refuses');
+    expect(result.lines).toContain('  dialectical-engine/apps/ui/next-env.d.ts');
+  }, 60_000);
+
+  it('a build that left the committed files as they were passes, and says how many it compared', async () => {
+    const { root, fakePnpmDir, committed } = fakeBuildWithCommitted({ rewrites: false });
+    const result = await website.buildWebsiteIn({ root, node: process.execPath, pnpmDir: fakePnpmDir, committed });
+    expect(result.status, result.lines.join('\n')).toBe('passed');
+    expect(result.lines).toContain('committed files: the build changed none of the 2 compared');
+  }, 60_000);
+
+  it('the committed files are the commit\'s own under dialectical-engine/, next-env.d.ts among them', () => {
+    const files: string[] = website.committedFilesOf(repo, 'HEAD');
+    expect(files).toContain('dialectical-engine/apps/ui/next-env.d.ts');
+    expect(files.every((path) => path.startsWith('dialectical-engine/'))).toBe(true);
+    // Thousands of paths, close to execFileSync's default 1 MiB output limit: the whole list comes back.
+    expect(files.length).toBeGreaterThan(5000);
+  });
+
   it('a failed online fill is refused, not thrown', async () => {
     const { result, root } = await website.checkWebsiteBuild({
       // No retries: each download fails at once, so the test does not wait out pnpm's retry pauses.
