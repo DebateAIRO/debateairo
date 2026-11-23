@@ -803,13 +803,14 @@ range of pots (on your screen only), the line `four calls at once fit the Anthro
 Write nothing of the range down outside the server: you type the Amazon gate's figures in part 2, step 3, on the
 server only.
 
-POTS answers only what it says: whether the Anthropic gate can hold four calls at once inside its pot. It does not
-price a debate. Whether one debate at the widest choice (for example a paid plan's dig, seven paths wide, with web
-search) fits each gate's daily pot is first asked by STEPCHECK, after the downtime (part 2, step 24): no step before
-the downtime can ask it, because that check needs the new settings version published and the new release pinned,
-and both happen at DR5. So `yes` here does not promise STEPCHECK's pass. POTS weighs money only: a gate's daily number
-of calls is `max_paid_posts_per_day` in its GO file, and it is weighed only when someone asks a question, against the
-calls the gate says are left today.
+POTS answers only what it says: whether the Anthropic gate can hold four calls at once inside its pot, and which
+Amazon pots fit. It does not price a debate. Whether one debate at the widest choice (for example a paid plan's dig at
+its widest How wide, with web search) fits each gate's daily pot is first asked by STEPCHECK, after the downtime
+(part 2, step 24): no step before the downtime can ask it, because that check needs the new settings version
+published and the new release pinned, and both happen at DR5. So `yes` here does not promise STEPCHECK's pass. POTS
+weighs money only. A gate's daily number of calls is `max_paid_posts_per_day` in its GO file: the API weighs it when
+someone asks a question, against the calls the gate says are left today, and the gate itself refuses every call past
+it (`DAILY_CALL_LIMIT_REACHED`).
 
 **10. MAILTIME: how long this release's mail program takes to load.** From this release on, each mail's program loads
 its code afresh, inside the 4.5 seconds each mail has. This times the load on this server, in the staged release
@@ -1041,12 +1042,20 @@ Two other stops can come in either run:
   `SB4_NOT_DONE: the release lock is full (…): archive <label> first with SB15 (PREV='<label>', …), then run SB4
   again`. Run the release guide's SB15 with that label, on your yes (the site stays up), then SB4 again. It never
   names the release you would go back to, the one the Turnstile relay runs from, or the one that holds the package
-  store; if none is left, its line says so: ask.
+  store this upload started from; if none is left, its line says so: ask.
 - **`NO_MAINTENANCE` with `reboot required`.** A system update on the server wants a restart. Only SB4's release check
   reads that flag: nothing else in the upload, and not the switch, reads it, so every step works the same with it.
   Whether you go on with the restart still owed, or restart the server first, on a day of its own, and run SB4 again,
   is your decision (step 4: no restart between piece 2 and your yes). SB4's last line then names `NO_MAINTENANCE` and
-  ends with a sentence that says so. `maintenance pending` instead, or any other new name: stop and ask.
+  ends with a sentence that says so, but only when the other names on it are `GATE_ROWS_N1` and `LIFECYCLE_FILES`;
+  with any other name there, that name is the stop: ask. To go on, type `later` between the quotes of `REBOOT=''` at
+  the top of SB4 and run it again: it prints `NO_MAINTENANCE: reboot required is not counted …`, and its last line is
+  the expected one, with `but NO_MAINTENANCE (reboot required), not counted (REBOOT=later)` before `: use`. To restart
+  first: ask (no step here restarts the server, and after a restart some services must be started by hand). Before you
+  choose, read whether the server restarts by itself after its daily upgrade: in a root shell,
+  `apt-config shell AR Unattended-Upgrade::Automatic-Reboot` (it changes nothing) prints `AR='true'` when it does, and
+  then it may restart on its own with the restart owed: ask. `maintenance pending` instead, or any other new name: stop
+  and ask.
 
 Two notes on the files: the restore fence's drop-in is installed by FENCEDIR (step 10), not by the tools-folder swap;
 and the swap (SWAP, step 21) changes nothing in Caddy.
@@ -1232,9 +1241,9 @@ no Luna), the database step of the charges before Start, then runs the settings 
   - `GATE_POT_BELOW_ONE_DEBATE:<gate>:…` or `GATE_POT_UNANSWERED:<gate>`: the step is on, and one widest debate does
     not fit that gate's daily pot, or that gate did not answer: ask. After the gate, the code names the choice that
     does not fit: the plan, `question` or `dig`, the depth, the paths, and `web` when it searches (for example
-    `…:dig:d2:p7:web`, a paid plan's dig at depth 2, seven paths wide, with web search). The hint under it gives the
-    two ways out, both your decision and both after the upload: raise that gate's pot, or narrow How wide for that
-    plan. POTS (1.8, step 9) could not have seen this: it never prices a debate.
+    `…:dig:d2:p<paths>:web`, a paid plan's dig at depth 2, at its widest How wide, with web search). The hint under
+    it gives the two ways out, both your decision and both after the upload: raise that gate's pot, or narrow How wide
+    for that plan. POTS (1.8, step 9) could not have seen this: it never prices a debate.
 - If the step is on but its calls fail on the site (the paths never come, or the card shows errors), its own way back
   is a later settings version with the old row (`shape-base.json`), as that section says. Ask first.
 
@@ -1362,21 +1371,32 @@ hours later. If you ever go back with rbD-B, part 9 says what happens to these s
 
 ## 3. After the upload: your sandbox test, on the test name, behind the password
 
-### 3.0 The locks' names file (once)
+### 3.0 The locks' names file
 
 Every script from here on reads one file: `/root/preview-archive/main-site/names.sh`. It reads the upload's names file,
 checks that its release is the one current release, and defines the names and small helpers the scripts use. All the
 copies these steps keep go into `/root/preview-archive/main-site`, so they survive a later upload.
 
-Fill in `rNN` (the upload you just did), then run:
+Fill in `rNN` (the upload you just did; to run it again, read "LOCKS0 again" below first), then run:
 
 ```sh
 set -euo pipefail
-# LOCKS0: the locks' names file and their folder. Nothing live changes.
-NAMES=/root/preview-archive/rNN-names.sh                  # the upload's names file (after a later upload: that one's)
+# LOCKS0: the locks' names file and their folder; run again, the file is written anew from this guide and the file before is kept. Nothing live changes.
+NAMES=/root/preview-archive/rNN-names.sh                  # the upload's names file (after a later upload: that one's); left as rNN when the names file exists: its first line stays
 M=/root/preview-archive/main-site
+if [ -e "$M/names.sh" ]; then
+  FIRST=$(head -n 1 "$M/names.sh")
+  if [ "$NAMES" = /root/preview-archive/rNN-names.sh ]; then
+    printf '%s\n' "$FIRST" | grep -qxE '\. /root/preview-archive/r[0-9][0-9a-z-]*-names\.sh' || { echo "LOCKS0_NOT_DONE: the first line of $M/names.sh does not read an upload's names file (nothing changed): fill in rNN, or look"; exit 1; }
+    NAMES=${FIRST#. }
+  fi
+  [ -f "$NAMES" ] || { echo "LOCKS0_NOT_DONE: $NAMES is missing (nothing changed): fill in rNN"; exit 1; }
+  KB=$M/names.sh.before-$(date -u +%Y%m%dT%H%M%SZ)
+  [ ! -e "$KB" ] || { echo "LOCKS0_NOT_DONE: $KB exists (nothing changed): run LOCKS0 again a second later"; exit 1; }
+  cp -p "$M/names.sh" "$KB" || { echo "LOCKS0_NOT_DONE: the names file before was not kept (nothing changed): ask"; exit 1; }
+  echo "the names file is written anew from this guide; its first line reads $NAMES, and the file before is kept beside it"
+fi
 [ -f "$NAMES" ] || { echo "LOCKS0_NOT_DONE: $NAMES is missing (fill in rNN)"; exit 1; }
-[ ! -e "$M/names.sh" ] || { echo "LOCKS0_NOT_DONE: $M/names.sh exists (look first)"; exit 1; }
 install -d -o root -g root -m 0700 "$M"
 for D in name mail asks pay password; do install -d -o root -g root -m 0700 "$M/$D"; done
 umask 077
@@ -1398,16 +1418,17 @@ case "$HOST" in v3-preview.dezbatere.ro|dezbatere.ro) ;; *) echo "NAMES_NOT_DONE
 KEYS='^(NETOPIA_API_BASE_URL|NETOPIA_POS_SIGNATURE|NETOPIA_API_KEY_PATH|NETOPIA_IPN_KEYS_PATH|QUADERNO_API_BASE_URL|QUADERNO_API_KEY_PATH|SMARTBILL_API_BASE_URL|SMARTBILL_CREDENTIALS_PATH|SMARTBILL_SERIES|OWNER_REPORT_EMAIL_PATH|PREVIEW_LIVE_PAYMENTS)='
 inv() { journalctl -o cat --no-pager _SYSTEMD_INVOCATION_ID="$(systemctl show -p InvocationID --value "$1")"; }
 said() { [ "$(inv "$API" | grep -c "$@" || true)" -gt 0 ]; }
-apiup() { local t i c=000; sleep 1; t=$(date +%s); systemctl reset-failed "$API" 2>/dev/null || true; systemctl reset-failed "$WEB" 2>/dev/null || true; systemctl restart "$API" || echo 'systemctl restart of the API returned non-zero'
+apistart() { local t i; sleep 1; t=$(date +%s); systemctl reset-failed "$API" 2>/dev/null || true; systemctl reset-failed "$WEB" 2>/dev/null || true; systemctl restart "$API" || echo 'systemctl restart of the API returned non-zero'
   for i in $(seq 1 80); do [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTED|PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; [ "$(systemctl is-active "$API" || true)" = failed ] && break; sleep 3; done
   journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -E 'PREVIEW_LIFECYCLE_PRESTART_REFUSED|PREVIEW_MAIL_MODE|api\.boot\.failed|api\.preview\.asks_open|PREVIEW_API_STARTED|PREVIEW_API_STARTUP_REFUSED' | cut -c1-300 || true
-  [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" = 0 ] && [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -c '^PREVIEW_API_STARTED ' || true)" -gt 0 ] && [ "$(systemctl is-active "$API" || true)" = active ] || return 1
+  [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" = 0 ] && [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -c '^PREVIEW_API_STARTED ' || true)" -gt 0 ] && [ "$(systemctl is-active "$API" || true)" = active ] || { echo "the API did not start (systemctl is-active of the API: $(systemctl is-active "$API" || true))"; return 1; }; }
+apiup() { local i c=000; apistart || return 1
   for i in $(seq 1 40); do c=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$UIP/login" || true); [ "$c" = 200 ] && break; [ "$(systemctl is-active "$WEB" || true)" = failed ] && break; sleep 3; done
   [ "$c" = 200 ] || { echo "the API started, but the website does not answer its Log in page (systemctl is-active of the website: $(systemctl is-active "$WEB" || true))"; return 1; }; }
 webup() { local t i c=000; sleep 1; t=$(date +%s); systemctl reset-failed "$WEB" 2>/dev/null || true; systemctl restart "$WEB" || echo 'systemctl restart of the website returned non-zero'
   for i in $(seq 1 40); do c=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$UIP/login" || true); [ "$c" = 200 ] && break; [ "$(systemctl is-active "$WEB" || true)" = failed ] && break; sleep 3; done
   journalctl -u "$WEB" --since "@$t" -o cat --no-pager | grep -E 'PREVIEW_LIFECYCLE_PRESTART_REFUSED|PREVIEW_UI_STARTUP_REFUSED' | cut -c1-300 || true
-  [ "$c" = 200 ] && [ "$(journalctl -u "$WEB" --since "@$t" -o cat --no-pager | grep -cE 'PREVIEW_UI_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" = 0 ] && [ "$(systemctl is-active "$WEB" || true)" = active ]; }
+  [ "$c" = 200 ] && [ "$(journalctl -u "$WEB" --since "@$t" -o cat --no-pager | grep -cE 'PREVIEW_UI_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" = 0 ] && [ "$(systemctl is-active "$WEB" || true)" = active ] || { echo "the website did not start (its Log in page answered $c; systemctl is-active of the website: $(systemctl is-active "$WEB" || true))"; return 1; }; }
 relay() { local p; p=$(systemctl show -p MainPID --value debateai-preview-turnstile); [ "${p:-0}" != 0 ] && tr '\0' '\n' < "/proc/$p/environ" | grep '^PUBLIC_APP_URL=' || true; }
 loc() { curl -sI "$1" | tr -d '\r' | tr 'A-Z' 'a-z' | grep '^location:' || true; }
 notify() { curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' "https://$1/api/v1/billing/netopia/notify" || true; }
@@ -1423,8 +1444,9 @@ swap() { ( set -euo pipefail; umask 077; { grep -vE "$KEYS" "$A"; cat "$1"; } > 
 livedrop() { install -d -o root -g root -m 0755 /etc/systemd/system/debateai-preview-egress.service.d; printf '[Service]\nExecStart=\nExecStart=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node %s/egress-proxy.mjs --quaderno-live-account %s\n' "$EG" "$1" > "$EDROP"; chmod 0644 "$EDROP"; systemctl daemon-reload; systemctl restart "$EGU" || echo 'systemctl restart of the egress proxy returned non-zero'; sleep 2; }
 sandboxdrop() { rm -f "$EDROP"; systemctl daemon-reload; systemctl restart "$EGU" || echo 'systemctl restart of the egress proxy returned non-zero'; sleep 2; }
 EOF
-} > "$M/names.sh"
-chmod 0600 "$M/names.sh"
+} > "$M/names.sh.new"
+chmod 0600 "$M/names.sh.new"
+mv -f "$M/names.sh.new" "$M/names.sh"
 . "$M/names.sh"
 echo "release $LABEL (key $KEY, slot $SLOT); the API answers as $HOST"
 echo LOCKS0_DONE
@@ -1432,21 +1454,35 @@ exit 0
 ```
 
 Expect the release line, then `LOCKS0_DONE`. **After a later upload**, edit only the first line of
-`/root/preview-archive/main-site/names.sh` to name that upload's names file (`nano` that file; do not run LOCKS0
-again: it refuses while the file exists). If any later script says `NAMES_NOT_DONE`, that first line is the usual
-cause.
+`/root/preview-archive/main-site/names.sh` to name that upload's names file (`nano` that file), or run LOCKS0 again
+with that upload's `rNN` filled in. If any later script says `NAMES_NOT_DONE`, that first line is the usual cause.
 
-If LOCKS0's last line is `NAMES_NOT_DONE`, the file was written already, and LOCKS0 refuses a second run. Fix what the
-line names (when it names the release, the first line of the file, with `nano`), then run CLOSED (3.1), not LOCKS0. A
+**LOCKS0 again.** When the names file exists already, LOCKS0 keeps a copy of it beside it
+(`names.sh.before-<time>`) and writes it anew from this guide: with `rNN` left as it is, the first line stays the one
+the file had; with `rNN` filled in, it names that upload. Nothing live changes. Run it when a step says the names file
+is from an earlier version of this guide: NAME3 and NAME5 (5.3, 5.5) need its `apistart`, and stop before they stop
+anything when the file has none. On a server whose names file was written before `apistart` came, run LOCKS0 once,
+with `rNN` left as it is, before the next NAME3 or NAME5.
+
+If LOCKS0's last line is `NAMES_NOT_DONE`, the file was written already. Fix what the line names (when it names the
+release: the first line of the file, with `nano`, or LOCKS0 again with the right `rNN`), then run CLOSED (3.1). A
 `NAMES_NOT_DONE: a release is staged or draining` right after this upload means DR6's last lines did not all run
 (after WB4, DR6TAIL): ask.
 
 What the helpers do, in short:
-- `apiup` restarts the API and waits for its start line (or its refusal); then, because the website restarts with its
+- `apistart` restarts the API and waits for its start line (or its refusal), and nothing more; when the API did not
+  start, it says so (`the API did not start …`). `apiup` is `apistart`, then, because the website restarts with its
   API, it waits for the website's Log in page too, and fails if the website does not answer it within about two
-  minutes (the line above the step's own says so). `webup` restarts the website alone and waits for the same page.
-  Each first clears systemd's count of recent starts, of both the API and the website: systemd refuses a fifth start
-  of either within 15 minutes, and a way back must never be refused for that.
+  minutes (`the API started, but the website does not answer its Log in page …`). `webup` restarts the website alone
+  and waits for the same page (`the website did not start …` when it does not answer). Each first clears systemd's
+  count of recent starts, of both the API and the website: systemd refuses a fifth start of either within 15 minutes,
+  and a way back must never be refused for that.
+- Why both: the website's unit is bound to its API (`BindsTo=` and `After=` the API, in
+  `deploy/preview-lifecycle/v1/systemd/debateai-preview-ui@.service.d/50-lifecycle.conf`). Restarting the API restarts
+  a website that runs, but a website that was stopped stays stopped: systemd passes a restart on only to a unit that
+  is running. So a step that restarts only the API, while the website runs, uses `apiup`. A step that stops the
+  website and the API first (NAME3 and NAME5) uses `apistart`, then `webup`: `apiup` would wait for a website nothing
+  starts, and fail although the API had started.
 - `inv` shows a service's journal since its last start; `said` asks whether the API's journal since its last start
   holds a line.
 - `gates` shows the four spending gates (DeepInfra, Anthropic, Perplexity, Amazon Bedrock); `gatesok` says whether all
@@ -1609,7 +1645,7 @@ CG=$(jq -r .recipientPolicy.clientGid "$MP")
 [ "$(stat -c '%U %g %a %h' "$MR")" = "root $CG 640 1" ] && [ "$(stat -c %s "$MR")" -le 1024 ] || { echo "MAIL_ALLOW_NOT_DONE: $MR is not root:<clientGid> 0640 with one link and at most 1 KiB"; exit 1; }
 ( umask 022; jq -c --arg o "https://$HOST" '.schema="preview-auth-dev-mail-v2" | .recipients="allow-list" | .publicAppUrl=$o' "$M/mail/mail-plan.v1.json" > "$M/mail/mail-plan.v2-allow-list.json" )
 { install -o root -g root -m 0644 "$M/mail/mail-plan.v2-allow-list.json" "$MP.new" && mv -f "$MP.new" "$MP" && cmp -s "$M/mail/mail-plan.v2-allow-list.json" "$MP"; } || { echo "MAIL_ALLOW_NOT_DONE: the allow-list plan was not put in place (nothing restarted): ask"; exit 1; }
-if ! apiup; then { install -o root -g root -m 0644 "$M/mail/mail-plan.v1.json" "$MP.new" && mv -f "$MP.new" "$MP"; } || { echo "MAIL_ALLOW_NOT_DONE: the API refused the allow-list plan, and the v1 file could not be put back: ask at once"; exit 1; }; apiup || { echo "MAIL_ALLOW_NOT_DONE: the API refused the allow-list plan; the v1 file is back, but the API did not start on it either: the site is DOWN: ask at once"; exit 1; }; echo "MAIL_ALLOW_NOT_DONE: the API refused the allow-list plan (code above); the v1 file is back and the API restarted on it"; exit 1; fi
+if ! apiup; then { install -o root -g root -m 0644 "$M/mail/mail-plan.v1.json" "$MP.new" && mv -f "$MP.new" "$MP"; } || { echo "MAIL_ALLOW_NOT_DONE: the API refused the allow-list plan, and the v1 file could not be put back: ask at once"; exit 1; }; apiup || { echo "MAIL_ALLOW_NOT_DONE: the API refused the allow-list plan; the v1 file is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "MAIL_ALLOW_NOT_DONE: the API refused the allow-list plan (code above); the v1 file is back and the API restarted on it"; exit 1; fi
 said -xF "PREVIEW_MAIL_MODE {\"mode\":\"allow-list\",\"origin\":\"https://$HOST\"}" || { echo "MAIL_ALLOW_NOT_DONE: no allow-list mode line: ask"; exit 1; }
 echo MAIL_ALLOW_DONE
 exit 0
@@ -1642,7 +1678,7 @@ said '^PREVIEW_MAIL_MODE {"mode":"allow-list",' || { echo "MAIL_OPEN_NOT_DONE: t
 cp -p "$MP" "$M/mail/mail-plan.before-open.json"
 ( umask 022; jq -c --arg o "https://$HOST" '.schema="preview-auth-dev-mail-v2" | .recipients="open" | del(.recipientPolicy) | .publicAppUrl=$o' "$M/mail/mail-plan.v1.json" > "$M/mail/mail-plan.v2-open.json" )
 { install -o root -g root -m 0644 "$M/mail/mail-plan.v2-open.json" "$MP.new" && mv -f "$MP.new" "$MP" && cmp -s "$M/mail/mail-plan.v2-open.json" "$MP"; } || { echo "MAIL_OPEN_NOT_DONE: the open plan was not put in place (nothing restarted): ask"; exit 1; }
-if ! apiup; then { install -o root -g root -m 0644 "$M/mail/mail-plan.before-open.json" "$MP.new" && mv -f "$MP.new" "$MP"; } || { echo "MAIL_OPEN_NOT_DONE: the API refused the open plan, and the allow-list file could not be put back: ask at once"; exit 1; }; apiup || { echo "MAIL_OPEN_NOT_DONE: the API refused the open plan; the allow-list file is back, but the API did not start on it either: the site is DOWN: ask at once"; exit 1; }; echo "MAIL_OPEN_NOT_DONE: the API refused the open plan (code above); the allow-list file is back and the API restarted on it"; exit 1; fi
+if ! apiup; then { install -o root -g root -m 0644 "$M/mail/mail-plan.before-open.json" "$MP.new" && mv -f "$MP.new" "$MP"; } || { echo "MAIL_OPEN_NOT_DONE: the API refused the open plan, and the allow-list file could not be put back: ask at once"; exit 1; }; apiup || { echo "MAIL_OPEN_NOT_DONE: the API refused the open plan; the allow-list file is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "MAIL_OPEN_NOT_DONE: the API refused the open plan (code above); the allow-list file is back and the API restarted on it"; exit 1; fi
 said -xF "PREVIEW_MAIL_MODE {\"mode\":\"open\",\"origin\":\"https://$HOST\"}" || { echo "MAIL_OPEN_NOT_DONE: no open mode line: ask"; exit 1; }
 echo MAIL_OPEN_DONE
 exit 0
@@ -1675,7 +1711,7 @@ cp -p "$MP" "$M/mail/mail-plan.before-close.json"
 if [ "$HOST" = v3-preview.dezbatere.ro ]; then W=$M/mail/mail-plan.v1.json; WANT='PREVIEW_MAIL_MODE {"mode":"legacy","origin":"https://v3-preview.dezbatere.ro"}'
 else ( umask 022; jq -c --arg o "https://$HOST" '.schema="preview-auth-dev-mail-v2" | .recipients="allow-list" | .publicAppUrl=$o' "$M/mail/mail-plan.v1.json" > "$M/mail/mail-plan.v2-allow-list-main.json" ); W=$M/mail/mail-plan.v2-allow-list-main.json; WANT="PREVIEW_MAIL_MODE {\"mode\":\"allow-list\",\"origin\":\"https://$HOST\"}"; fi
 { install -o root -g root -m 0644 "$W" "$MP.new" && mv -f "$MP.new" "$MP" && cmp -s "$W" "$MP"; } || { echo "MAIL_CLOSE_NOT_DONE: the closed plan was not put in place (nothing restarted): ask"; exit 1; }
-if ! apiup; then { install -o root -g root -m 0644 "$M/mail/mail-plan.before-close.json" "$MP.new" && mv -f "$MP.new" "$MP"; } || { echo "MAIL_CLOSE_NOT_DONE: the API refused the closed plan, and the plan before could not be put back: ask at once"; exit 1; }; apiup || { echo "MAIL_CLOSE_NOT_DONE: the API refused the closed plan; the plan before is back, but the API did not start on it either: the site is DOWN: ask at once"; exit 1; }; echo "MAIL_CLOSE_NOT_DONE: the API refused the closed plan (code above); the plan before is back: ask"; exit 1; fi
+if ! apiup; then { install -o root -g root -m 0644 "$M/mail/mail-plan.before-close.json" "$MP.new" && mv -f "$MP.new" "$MP"; } || { echo "MAIL_CLOSE_NOT_DONE: the API refused the closed plan, and the plan before could not be put back: ask at once"; exit 1; }; apiup || { echo "MAIL_CLOSE_NOT_DONE: the API refused the closed plan; the plan before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "MAIL_CLOSE_NOT_DONE: the API refused the closed plan (code above); the plan before is back: ask"; exit 1; fi
 said -xF "$WANT" || { echo "MAIL_CLOSE_NOT_DONE: the mode line is not the closed one: ask"; exit 1; }
 echo MAIL_CLOSE_DONE
 exit 0
@@ -1691,7 +1727,8 @@ MAIL_CLOSE runs only with the site password on (PWON first): a buyer outside the
 Before you start: the upload is finished and proven (DR6 and SB13b done, the old release retired), the release guide's
 LOGOCHECK ended with `LOGOCHECK_DONE`, **mail is on the v2 plan** (part 4.2 or 4.3), and social sign-in is not set up
 (NAME2 stops if the API file has `SOCIAL_SOCKET_PATH`: its relay's callbacks name the test name). If you did not do
-1.3 (b) to (e), do them now.
+1.3 (b) to (e), do them now. If the names file was written before it had `apistart`, run LOCKS0 again first (3.0,
+"LOCKS0 again"): NAME3 and NAME5 stop, with nothing stopped, until it has.
 
 This upload does not change Caddy. Its two-slot health check is still the transition's (the edge secret in the probe, a
 1-second limit, out after one miss); nothing is worse than before. It changes only with its own reviewed step, written
@@ -1879,7 +1916,7 @@ cp -p "$A" "$K" || { rm -f "$K"; echo "STAFFOFF_NOT_DONE: the copy $K was not ke
 [ "$(diff "$A" "$A.new" | grep -c '^[<>]' || true)" = 1 ] && [ "$(diff "$A" "$A.new" | grep -cx '< STAFF_ACCESS_POLICY_VERSION=2' || true)" = 1 ] || { rm -f "$A.new" "$K"; echo "STAFFOFF_NOT_DONE: not a one-line removal; nothing changed: ask"; exit 1; }
 mv "$A.new" "$A" || { rm -f "$A.new" "$K"; echo "STAFFOFF_NOT_DONE: the new file was not put in place; nothing changed: ask"; exit 1; }
 echo "taken out: STAFF_ACCESS_POLICY_VERSION=2 (the file before is $K); the API restarts without it"
-if ! apiup; then { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFOFF_NOT_DONE: the API did not start without the line, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; apiup || { echo "STAFFOFF_NOT_DONE: the API did not start without the line; the file before is back, but the API did not start on it either: the site is DOWN: ask at once"; exit 1; }; echo "STAFFOFF_NOT_DONE: the API did not start without the line (code above); the file before is back and the API restarted on it, with the staff screens on: ask"; exit 1; fi
+if ! apiup; then { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFOFF_NOT_DONE: the API or the website did not start without the line (the line above says which), and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; apiup || { echo "STAFFOFF_NOT_DONE: the API or the website did not start without the line; the file before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "STAFFOFF_NOT_DONE: the API or the website did not start without the line (the lines above say which, and why); the file before is back and the API restarted on it, with the staff screens on: ask"; exit 1; fi
 echo STAFFOFF_DONE
 exit 0
 ```
@@ -1959,7 +1996,9 @@ done
 RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=$(readlink -f "$RP" 2>/dev/null || true)
 [ -n "$RP" ] && [ -n "$RR" ] && [ "$(stat -c '%U %F' "$RR" 2>/dev/null || true)" = 'root regular file' ] && [ $(( 0$(stat -c %a "$RR") & 022 )) = 0 ] || { echo "NAME2_NOT_DONE: the relay's program (${RP:-not named in its unit}) is missing, not root's regular file, or writable by others; NAME3 and NAME5 restart the relay: ask"; exit 1; }
 [ "$RR" = "$RP" ] || case "$RR" in /opt/debateai-v3-preview/releases/*) echo "NAME2_NOT_DONE: the relay reaches its program through a link into a release folder ($RR): ask"; exit 1;; esac
-echo "the Turnstile relay runs $RR: never archive or remove the folder that holds it"
+RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RWR=$(readlink -f "${RW#!}" 2>/dev/null || true)
+[ -z "$RW" ] || { [ -n "$RWR" ] && [ -d "$RWR" ]; } || { echo "NAME2_NOT_DONE: the relay's working folder ($RW) is missing; NAME3 and NAME5 restart the relay: ask"; exit 1; }
+echo "the Turnstile relay runs $RR${RWR:+, in $RWR}: never archive or remove the folders that hold them"
 ( umask 022; printf '[Service]\nEnvironment=PUBLIC_APP_URL=https://dezbatere.ro\n' > "$M/name/20-public-origin.conf" )
 [ "$(grep -cE '^[[:space:]]*@netopia_notify \{$' "$M/name/Caddyfile.before-dezbatere" || true)" = 1 ] || { echo "NAME2_NOT_DONE: not one notify handle"; exit 1; }
 ( umask 022; sed 's/v3-preview\.dezbatere\.ro/dezbatere.ro/g' "$M/name/Caddyfile.before-dezbatere" > "$M/name/Caddyfile.renamed"; cat >> "$M/name/Caddyfile.renamed" <<'EOF'
@@ -2019,10 +2058,10 @@ echo NAME2_DONE
 exit 0
 ```
 
-NAME2 also prints where the Turnstile relay runs its program from (`the Turnstile relay runs …`). NAME3 and NAME5
-restart that relay, so the file must stay there. If the path is inside a release folder under
-`/opt/debateai-v3-preview/releases/`, that release folder must stay as it is: never archive it (the release guide's
-SB15) and never remove it by hand. Moving the relay out of the release folders is a later day's reviewed step.
+NAME2 also prints where the Turnstile relay runs its program from, and its working folder (`the Turnstile relay runs
+…, in …`). NAME3 and NAME5 restart that relay, so both must stay there. If either path is inside a release folder
+under `/opt/debateai-v3-preview/releases/`, that release folder must stay as it is: never archive it (the release
+guide's SB15) and never remove it by hand. Moving the relay out of the release folders is a later day's reviewed step.
 
 **Read the last diff before you go on.** Only host names, the four HTTPS-header lines and the blocks added at the end
 may differ. Anything else: stop and ask. The rename changes the site address, `@wrongHost`, the `@wrongOrigin` check,
@@ -2044,6 +2083,7 @@ for SVC in api ui; do W=2; [ "$SVC" != api ] || W=$((2 + 2 * SN)); [ "$(diff "$E
 cmp -s "$MP" "$M/name/mail-plan.before-main.json" || { echo "NAME3_NOT_DONE: mail-plan.json changed since NAME2 (nothing was stopped): run NAME2 again"; exit 1; }
 MMODE=$(jq -r .recipients "$M/name/mail-plan.before-main.json" 2>/dev/null || true)
 case "$MMODE" in allow-list|open) ;; *) echo "NAME3_NOT_DONE: the kept mail plan has no v2 mode (nothing was stopped): run NAME2 again"; exit 1;; esac
+declare -F apistart >/dev/null || { echo "NAME3_NOT_DONE: the names file is from an earlier version of this guide (no apistart; nothing was stopped): run LOCKS0 (3.0) again, then NAME3"; exit 1; }
 systemctl stop "$WEB" "$API" || { echo "NAME3_NOT_DONE: systemctl stop of the website and API failed: run NAME5 now"; exit 1; }
 for SVC in api ui; do F=$E/$SVC-$LABEL.env; { cp "$M/name/$SVC-$LABEL.env.main" "$F.new" && chown --reference="$F" "$F.new" && chmod --reference="$F" "$F.new" && mv "$F.new" "$F"; } || { echo "NAME3_NOT_DONE: $SVC-$LABEL.env was not replaced: the site is DOWN: run NAME5 now"; exit 1; }; done
 lc release-env.mjs same --labels "$LABEL" --slots "$SLOT" || { echo "NAME3_NOT_DONE: a SAME check is BAD (above): the site is DOWN: run NAME5 now"; exit 1; }
@@ -2053,8 +2093,9 @@ systemctl daemon-reload || true; systemctl restart debateai-preview-turnstile ||
 { install -o root -g root -m 0644 "$M/name/Caddyfile.main" "$C.new" && mv "$C.new" "$C" && cmp -s "$M/name/Caddyfile.main" "$C"; } || { echo "NAME3_NOT_DONE: the main Caddyfile was not put in place: the site is DOWN: run NAME5 now"; exit 1; }
 systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; sleep 3; [ "$(systemctl is-active caddy || true)" = active ] || { echo "NAME3_NOT_DONE: Caddy did not come back: the site is DOWN: run NAME5 now"; exit 1; }
 { install -o root -g root -m 0644 "$M/name/mail-plan.main.json" "$MP.new" && mv -f "$MP.new" "$MP" && cmp -s "$M/name/mail-plan.main.json" "$MP"; } || { echo "NAME3_NOT_DONE: the main mail plan was not put in place: the site is DOWN: run NAME5 now"; exit 1; }
-apiup || { echo "NAME3_NOT_DONE: the API did not start (the line above names the setting): the site is DOWN: run NAME5 now"; exit 1; }
-webup || { echo "NAME3_NOT_DONE: the website did not start (the line above names the setting): the site is DOWN: run NAME5 now"; exit 1; }
+# Both were stopped, and a restart of the API does not start a stopped website: the API alone first, then the website.
+apistart || { echo "NAME3_NOT_DONE: the API did not start (the line above names the setting): the site is DOWN: run NAME5 now"; exit 1; }
+webup || { echo "NAME3_NOT_DONE: the API started, but the website did not (the line above names the setting): the site is DOWN: run NAME5 now"; exit 1; }
 said -xF "PREVIEW_MAIL_MODE {\"mode\":\"$MMODE\",\"origin\":\"https://dezbatere.ro\"}" || { echo "NAME3_NOT_DONE: the API's mail line is not mode $MMODE on dezbatere.ro: run NAME5 now"; exit 1; }
 echo NAME3_DONE
 exit 0
@@ -2062,7 +2103,13 @@ exit 0
 
 Expect the SAME list (all `OK`, with `OK SAME_UI_API_PUBLIC_APP_URL:<LABEL>`), the API's lines (`PREVIEW_MAIL_MODE
 {…"origin":"https://dezbatere.ro"}` with the same mode as before, `PREVIEW_API_STARTED …`), then `NAME3_DONE`. The
-runner reads no public name and is not restarted.
+runner reads no public name and is not restarted. NAME3 starts the API alone (`apistart`), then the website (`webup`):
+both were stopped, and restarting the API does not start a stopped website (3.0, "Why both"). So `NAME3_NOT_DONE: the
+API did not start` means the API itself did not start, and `NAME3_NOT_DONE: the API started, but the website did not`
+means the website did not.
+
+`NAME3_NOT_DONE: the names file is from an earlier version of this guide` comes before anything is stopped: the site
+is as it was. Run LOCKS0 (3.0) again, with `rNN` left as it is, then NAME3.
 
 If a refusal line shows, part 10 says what it means. Whatever it says: run NAME5 at once, then read it calmly. While
 the API is refused, systemd tries it again every 30 seconds; NAME5 stops that.
@@ -2119,8 +2166,10 @@ Then, by hand:
 A few minutes down, like the switch (the API's start alone takes a minute or more). It works from any state NAME3
 left. It starts nothing until both env files name the test name and every SAME check is OK. It refuses, with nothing
 stopped, while the site is open to everyone (PWON first), while the NETOPIA review window is open (REVIEW_CLOSE or
-PWON first, 5.8) or while payments are real (PAY_BACK first): part 9's order. Once it has stopped the website and
-the API, every `NAME5_NOT_DONE` up to the API's start means the site is down: ask at once.
+PWON first, 5.8) or while payments are real (PAY_BACK first): part 9's order. It also refuses, with nothing stopped,
+when the names file is from an earlier version of this guide: run LOCKS0 (3.0) again, with `rNN` left as it is, then
+NAME5. Once it has stopped the website and the API, every `NAME5_NOT_DONE` up to the website's start means the site is
+down: ask at once. Like NAME3, it starts the API alone, then the website, and its last lines say which did not start.
 
 ```sh
 set -euo pipefail
@@ -2134,6 +2183,7 @@ MMODE=$(jq -r 'if .schema == "preview-auth-dev-mail-v1" then "legacy" else .reci
 case "$MMODE" in legacy|allow-list|open) ;; *) echo "NAME5_NOT_DONE: mail-plan.json does not read as a mail plan; nothing was stopped: ask"; exit 1;; esac
 SOK=no; [ "$(grep -cE '^STAFF_WEBAUTHN_(ORIGIN|RP_ID)=' "$A" || true)" = 2 ] && [ "$(grep -cxE 'STAFF_WEBAUTHN_ORIGIN=https://(v3-preview\.)?dezbatere\.ro' "$A" || true)" = 1 ] && [ "$(grep -cxE 'STAFF_WEBAUTHN_RP_ID=(v3-preview\.)?dezbatere\.ro' "$A" || true)" = 1 ] && SOK=yes
 [ "$SOK" = yes ] || ! grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { echo "NAME5_NOT_DONE: the staff screens are on, but the API file's two staff name lines do not each name one of the two names exactly once; nothing was stopped: ask"; exit 1; }
+declare -F apistart >/dev/null || { echo "NAME5_NOT_DONE: the names file is from an earlier version of this guide (no apistart; nothing was stopped): run LOCKS0 (3.0) again, then NAME5"; exit 1; }
 systemctl stop "$WEB" "$API" || { echo "NAME5_NOT_DONE: systemctl stop of the website and API failed: the site may be DOWN: ask at once"; exit 1; }
 for SVC in api ui; do F=$E/$SVC-$LABEL.env
   { ( umask 077; sed -e 's|^PUBLIC_APP_URL=https://dezbatere\.ro$|PUBLIC_APP_URL=https://v3-preview.dezbatere.ro|' -e 's|^STAFF_WEBAUTHN_ORIGIN=https://dezbatere\.ro$|STAFF_WEBAUTHN_ORIGIN=https://v3-preview.dezbatere.ro|' -e 's|^STAFF_WEBAUTHN_RP_ID=dezbatere\.ro$|STAFF_WEBAUTHN_RP_ID=v3-preview.dezbatere.ro|' "$F" > "$F.new" ) && chown --reference="$F" "$F.new" && chmod --reference="$F" "$F.new" && mv "$F.new" "$F"; } || { echo "NAME5_NOT_DONE: $SVC-$LABEL.env was not rewritten: the site is DOWN: ask at once"; exit 1; }
@@ -2150,8 +2200,9 @@ if [ "$(jq -r .publicAppUrl "$MP")" = https://dezbatere.ro ]; then
   ( umask 022; jq -c '.publicAppUrl="https://v3-preview.dezbatere.ro"' "$MP" > "$M/name/mail-plan.back.json" )
   { install -o root -g root -m 0644 "$M/name/mail-plan.back.json" "$MP.new" && mv -f "$MP.new" "$MP" && cmp -s "$M/name/mail-plan.back.json" "$MP"; } || { echo "NAME5_NOT_DONE: the mail plan for the test name was not put in place: the site is DOWN: ask at once"; exit 1; }
 fi
-apiup || { echo "NAME5_NOT_DONE: the API did not start (the line above names the setting): the site is DOWN: ask at once"; exit 1; }
-webup || { echo "NAME5_NOT_DONE: the website did not start (the line above names the setting): the site is DOWN: ask at once"; exit 1; }
+# Both were stopped, and a restart of the API does not start a stopped website: the API alone first, then the website.
+apistart || { echo "NAME5_NOT_DONE: the API did not start (the line above names the setting): the site is DOWN: ask at once"; exit 1; }
+webup || { echo "NAME5_NOT_DONE: the API started, but the website did not (the line above names the setting): the site is DOWN: ask at once"; exit 1; }
 said -xF "PREVIEW_MAIL_MODE {\"mode\":\"$MMODE\",\"origin\":\"https://v3-preview.dezbatere.ro\"}" || { echo "NAME5_NOT_DONE: the API's mail line is not mode $MMODE on the test name: ask"; exit 1; }
 N0=$(cat "$M/name/notify-code.before-dezbatere"); [ "$(notify v3-preview.dezbatere.ro)" = "$N0" ] && [ "$(notify dezbatere.ro)" = "$N0" ] || { echo "NAME5_NOT_DONE: a NETOPIA notice is not passed through on both names: look at the Caddyfile"; exit 1; }
 [ "$(loc 'https://dezbatere.ro/x?y=1')" = 'location: https://v3-preview.dezbatere.ro/x?y=1' ] || { echo "NAME5_NOT_DONE: dezbatere.ro does not redirect to the test name"; exit 1; }
@@ -2198,7 +2249,7 @@ cp -p "$A" "$K" || { rm -f "$K"; echo "STAFFON_NOT_DONE: the copy $K was not kep
 { ( umask 077; { cat "$A"; printf 'STAFF_ACCESS_POLICY_VERSION=2\n'; } > "$A.new" ) && chown --reference="$A" "$A.new" && chmod --reference="$A" "$A.new"; } || { rm -f "$A.new"; echo "STAFFON_NOT_DONE: the new file was not written; nothing changed: ask"; exit 1; }
 [ "$(diff "$A" "$A.new" | grep -c '^[<>]' || true)" = 1 ] && [ "$(diff "$A" "$A.new" | grep -cx '> STAFF_ACCESS_POLICY_VERSION=2' || true)" = 1 ] || { rm -f "$A.new"; echo "STAFFON_NOT_DONE: not a one-line addition; nothing changed: ask"; exit 1; }
 mv "$A.new" "$A" || { rm -f "$A.new"; echo "STAFFON_NOT_DONE: the new file was not put in place; nothing changed: ask"; exit 1; }
-if ! apiup; then { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFON_NOT_DONE: the API refused the staff screens, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; apiup || { echo "STAFFON_NOT_DONE: the API refused the staff screens; the file before is back, but the API did not start on it either: the site is DOWN: ask at once"; exit 1; }; echo "STAFFON_NOT_DONE: the API refused the staff screens (code above); the file before is back and the API restarted on it: ask"; exit 1; fi
+if ! apiup; then { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFON_NOT_DONE: the API refused the staff screens, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; apiup || { echo "STAFFON_NOT_DONE: the API refused the staff screens; the file before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "STAFFON_NOT_DONE: the API refused the staff screens (code above); the file before is back and the API restarted on it: ask"; exit 1; fi
 echo STAFFON_DONE
 exit 0
 ```
@@ -2326,7 +2377,7 @@ D=$(diff "$A" "$A.new" | grep -c '^[<>]' || true)
 { [ "$D" = 1 ] || [ "$D" = 5 ]; } && [ "$(diff "$A" "$A.new" | grep -cx '> STAFF_ACCESS_POLICY_VERSION=2' || true)" = 1 ] && [ "$(diff "$A" "$A.new" | grep '^<' | grep -cvE '^< STAFF_WEBAUTHN_(ORIGIN|RP_ID)=' || true)" = 0 ] && [ "$(grep -cx 'STAFF_WEBAUTHN_ORIGIN=https://dezbatere.ro' "$A.new" || true)" = 1 ] && [ "$(grep -cx 'STAFF_WEBAUTHN_RP_ID=dezbatere.ro' "$A.new" || true)" = 1 ] || { rm -f "$A.new"; echo "STAFFMAIN_NOT_DONE: the new file is not the policy line added and, at most, the two staff name lines moved; nothing changed: ask"; exit 1; }
 mv "$A.new" "$A" || { rm -f "$A.new"; echo "STAFFMAIN_NOT_DONE: the new file was not put in place; nothing changed: ask"; exit 1; }
 echo "in the API file: the staff name lines name dezbatere.ro and STAFF_ACCESS_POLICY_VERSION=2 is back (the file before is $K); the API restarts"
-if ! apiup; then { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFMAIN_NOT_DONE: the API refused the staff screens, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; apiup || { echo "STAFFMAIN_NOT_DONE: the API refused the staff screens; the file before is back, but the API did not start on it either: the site is DOWN: ask at once"; exit 1; }; echo "STAFFMAIN_NOT_DONE: the API refused the staff screens (code above); the file before is back and the API restarted on it: ask"; exit 1; fi
+if ! apiup; then { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFMAIN_NOT_DONE: the API refused the staff screens, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; apiup || { echo "STAFFMAIN_NOT_DONE: the API refused the staff screens; the file before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "STAFFMAIN_NOT_DONE: the API refused the staff screens (code above); the file before is back and the API restarted on it: ask"; exit 1; fi
 echo STAFFMAIN_DONE
 exit 0
 ```
@@ -3031,7 +3082,7 @@ back() { for F in "$A" "$RF"; do cp -p "$AS/$(basename "$F").before-open" "$F"; 
 for F in "$A" "$RF"; do ( umask 077; grep -v '^PREVIEW_TEAM_USER_IDS_JSON=' "$F" > "$F.new"; printf 'PREVIEW_ASKS_OPEN_TO=%s\n' "$V" >> "$F.new" ); chown --reference="$F" "$F.new"; chmod --reference="$F" "$F.new"; mv "$F.new" "$F"; done
 lc release-env.mjs same --labels "$LABEL" --slots "$SLOT" || { back; echo "ASKS_OPEN_NOT_DONE: a SAME check is BAD (above); both files are back, nothing restarted"; exit 1; }
 [ "$(grep -cx "PREVIEW_ASKS_OPEN_TO=$V" "$A")" = 1 ] && [ "$(grep -cx "PREVIEW_ASKS_OPEN_TO=$V" "$RF")" = 1 ] && ! grep -q '^PREVIEW_TEAM_USER_IDS_JSON=' "$A" "$RF" || { back; echo "ASKS_OPEN_NOT_DONE: the two files do not both say the value without a team line; both are back"; exit 1; }
-if ! apiup; then back; apiup || { echo "ASKS_OPEN_NOT_DONE: the API refused the open start; both files are back, but the API did not start on them either: the site is DOWN: ask at once"; exit 1; }; echo "ASKS_OPEN_NOT_DONE: the API refused the open start (code above); both files are back and the API restarted on them"; exit 1; fi
+if ! apiup; then back; apiup || { echo "ASKS_OPEN_NOT_DONE: the API refused the open start; both files are back, but the API or the website did not start on them either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "ASKS_OPEN_NOT_DONE: the API refused the open start (code above); both files are back and the API restarted on them"; exit 1; fi
 said -xF "{\"event\":\"api.preview.asks_open\",\"to\":\"$V\"}" || { echo "ASKS_OPEN_NOT_DONE: no asks_open line: ask"; exit 1; }
 echo ASKS_OPEN_DONE
 exit 0
@@ -3081,7 +3132,7 @@ back() { for F in "$A" "$RF"; do cp -p "$AC/$(basename "$F").before-close" "$F";
 for F in "$A" "$RF"; do ( umask 077; grep -v -e '^PREVIEW_ASKS_OPEN_TO=' -e '^PREVIEW_TEAM_USER_IDS_JSON=' "$F" > "$F.new"; printf '%s\n' "$TL" >> "$F.new" ); chown --reference="$F" "$F.new"; chmod --reference="$F" "$F.new"; mv "$F.new" "$F"; done
 lc release-env.mjs same --labels "$LABEL" --slots "$SLOT" || { back; echo "ASKS_CLOSE_NOT_DONE: a SAME check is BAD (above); both files are back, nothing restarted"; exit 1; }
 ! grep -q '^PREVIEW_ASKS_OPEN_TO=' "$A" "$RF" && [ "$(grep -c '^PREVIEW_TEAM_USER_IDS_JSON=' "$A")" = 1 ] && [ "$(grep -c '^PREVIEW_TEAM_USER_IDS_JSON=' "$RF")" = 1 ] || { back; echo "ASKS_CLOSE_NOT_DONE: the two files do not both hold the team line without the open line; both are back"; exit 1; }
-if ! apiup; then back; apiup || { echo "ASKS_CLOSE_NOT_DONE: the API refused the start; both files are back, but the API did not start on them either: the site is DOWN: ask at once"; exit 1; }; echo "ASKS_CLOSE_NOT_DONE: the API refused the start (code above); both files are back and the API restarted on them"; exit 1; fi
+if ! apiup; then back; apiup || { echo "ASKS_CLOSE_NOT_DONE: the API refused the start; both files are back, but the API or the website did not start on them either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "ASKS_CLOSE_NOT_DONE: the API refused the start (code above); both files are back and the API restarted on them"; exit 1; fi
 ! said '"event":"api.preview.asks_open"' || { echo "ASKS_CLOSE_NOT_DONE: the API still says open: ask"; exit 1; }
 echo "open work now: $(psqlq "SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')")"
 echo ASKS_CLOSE_DONE
@@ -3466,7 +3517,7 @@ QL=$(grep -oE '^QUADERNO_API_BASE_URL=https://[a-z0-9-]+' "$M/pay/live.lines" | 
 cmp -s "$M/pay/sandbox.lines" <(grep -E "$KEYS" "$A") || { echo "PAY_SWITCH_NOT_DONE: the API file's payment lines changed since PAY_LINES: ask"; exit 1; }
 [ "$(swap "$M/pay/live.lines")" = swapped ] || { echo "PAY_SWITCH_NOT_DONE: the swap did not finish (compare the API file with $M/pay/api-$LABEL.env.before-live); nothing restarted: ask"; exit 1; }
 [ "$(grep -cE "$KEYS" "$A")" = 11 ] || { swap "$M/pay/sandbox.lines"; echo "PAY_SWITCH_NOT_DONE: the swap did not leave 11 payment lines; the sandbox lines are back, nothing restarted"; exit 1; }
-if ! apiup; then swap "$M/pay/sandbox.lines"; sandboxdrop; apiup || { echo "PAY_SWITCH_NOT_DONE: the live start was refused; the sandbox lines and the proxy's sandbox form are back, but the API did not start on them either: the site is DOWN: ask at once"; exit 1; }; echo "PAY_SWITCH_NOT_DONE: the live start was refused (code above; part 10); the sandbox lines and the proxy's sandbox form are back and the API restarted on them"; exit 1; fi
+if ! apiup; then swap "$M/pay/sandbox.lines"; sandboxdrop; apiup || { echo "PAY_SWITCH_NOT_DONE: the live start was refused; the sandbox lines and the proxy's sandbox form are back, but the API or the website did not start on them either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "PAY_SWITCH_NOT_DONE: the live start was refused (code above; part 10); the sandbox lines and the proxy's sandbox form are back and the API restarted on them"; exit 1; fi
 echo PAY_SWITCH_DONE
 exit 0
 ```
@@ -3640,7 +3691,7 @@ echo "live plans not over $W1; live payments not final $W2; live refunds not rec
 sandboxdrop
 journalctl -u "$EGU" -n 3 -o cat --no-pager
 [ "$(systemctl is-active "$EGU" || true)" = active ] && [ "$(modecheck "$QL")" = 'egress: PREVIEW_LIVE_PAYMENTS_REFUSED:egress' ] || { swap "$M/pay/live.lines"; livedrop "$QL"; MC=$(modecheck "$QL"); echo "$MC"; [ "$MC" = 'egress: live' ] || { echo "PAY_BACK_NOT_DONE: the proxy did not take its sandbox form, and it is not live again either, so no real payment can go through; the API file is live again, and the API was not restarted: ask at once"; exit 1; }; echo "PAY_BACK_NOT_DONE: the proxy did not take its sandbox form; the live lines and the proxy's live form are back, and the API kept running on them (it was not restarted): ask"; exit 1; }
-if ! apiup; then swap "$M/pay/live.lines"; livedrop "$QL"; modecheck "$QL"; apiup || { echo "PAY_BACK_NOT_DONE: the sandbox start was refused; the live lines and form are back, but the API did not start on them either: the site is DOWN: ask at once"; exit 1; }; echo "PAY_BACK_NOT_DONE: the sandbox start was refused (code above); the live lines and form are back and the API restarted on them: wait, then run this again"; exit 1; fi
+if ! apiup; then swap "$M/pay/live.lines"; livedrop "$QL"; modecheck "$QL"; apiup || { echo "PAY_BACK_NOT_DONE: the sandbox start was refused; the live lines and form are back, but the API or the website did not start on them either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "PAY_BACK_NOT_DONE: the sandbox start was refused (code above); the live lines and form are back and the API restarted on them: wait, then run this again"; exit 1; fi
 RUNAPI apps/api/src/billing/check-cli.ts || true
 echo PAY_BACK_DONE
 exit 0

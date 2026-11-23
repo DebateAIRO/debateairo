@@ -2227,23 +2227,60 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
       expect(moved, file).toContain(file);
   });
 
-  it('SB4 on the drained path names every other BAD check, so its one expected stop of the day is read right', () => {
+  it('SB4 names every other BAD check on both paths, so its one expected stop of the day is read right, and a restart still owed is the owner\'s choice', () => {
     const sb4 = scriptOf('SB4').lines;
-    // From the line that reads NO_MAINTENANCE's detail, which the two stops below use, to the end of the verdict.
-    const from = sb4.findIndex(line => line.startsWith('RB=')), to = sb4.indexOf('esac', from);
-    expect(from).toBe(sb4.findIndex(line => line.startsWith('case "$(jq -r .verdict <<<"$OUT")" in')) - 1);
-    const verdict = (checks: Array<[string, boolean, string?]>, name = 'DRAINED_PATH') => bash(['set -euo pipefail',
-      `OUT='${JSON.stringify({ event: 'PREVIEW_RELEASE_CHECK', verdict: name, checks: checks.map(([check, ok, detail]) => ({ name: check, ok, detail: detail ?? '' })) })}'`, ...sb4.slice(from, to + 1), 'echo PASSED_ON']);
-    expect(verdict([['N1_HEADERS', false], ['CURRENT_PINNED', true]])).toBe('SB4_NOT_DONE: DRAINED_PATH (expected on a drained upload): no other check is BAD: use "Drained upload on the template layout"');
-    expect(verdict([['N1_HEADERS', false], ['GATE_ROWS_N1', false], ['LIFECYCLE_FILES', false]])).toMatch(/^SB4_NOT_DONE: DRAINED_PATH, and BAD too: GATE_ROWS_N1 LIFECYCLE_FILES: on the first run .*stop and ask$/);
-    expect(verdict([['N1_HEADERS', true]], 'SIDE_BY_SIDE')).toBe('PASSED_ON');
-    // A restart a system update still wants: the last line says what it is, and that the owner decides; on both paths.
-    const restart = " (NO_MAINTENANCE: reboot required only says a system update still wants a restart, and nothing else in the upload reads it: going on, or restarting first, is the owner's decision)";
-    expect(verdict([['N1_HEADERS', false], ['NO_MAINTENANCE', false, 'reboot required']])).toBe(`SB4_NOT_DONE: DRAINED_PATH, and BAD too: NO_MAINTENANCE: on the first run GATE_ROWS_N1 and LIFECYCLE_FILES wait for GRR and LIFE (above); anything else: stop and ask${restart}`);
-    expect(verdict([['N1_HEADERS', true], ['NO_MAINTENANCE', false, 'reboot required']], 'NOT_READY')).toBe(`SB4_NOT_DONE: NOT_READY: a check is BAD (above): stop and ask${restart}`);
-    // MT1's flag is not a restart: no such sentence, the plain stop.
-    expect(verdict([['N1_HEADERS', true], ['NO_MAINTENANCE', false, 'maintenance pending, reboot required']], 'NOT_READY')).toBe('SB4_NOT_DONE: NOT_READY: a check is BAD (above): stop and ask');
-    expect(verdict([['N1_HEADERS', true], ['NO_MAINTENANCE', true, 'none']], 'SIDE_BY_SIDE')).toBe('PASSED_ON');
+    // From the line that reads NO_MAINTENANCE's detail, which the stops below use, to the end of the verdict.
+    const from = sb4.findIndex(line => line.startsWith('NM=')), to = sb4.indexOf('esac', from);
+    expect(from).toBeGreaterThan(sb4.findIndex(line => line.startsWith('jq -r \'.checks[] | select(.name == "LIFECYCLE_FILES")')));
+    expect(sb4[to + 1]).toBe('echo SB4_DONE');
+    // The owner's choice on a restart still owed is a setting at the top, beside the two reviews.
+    expect(sb4.filter(line => /^(GRR|LIFE|REBOOT)=''/.test(line)).map(line => line.split('=')[0])).toEqual(['GRR', 'LIFE', 'REBOOT']);
+    const verdict = (checks: Array<[string, boolean, string?]>, name = 'DRAINED_PATH', reboot = '') => bash(['set -euo pipefail', `REBOOT='${reboot}'`,
+      `OUT='${JSON.stringify({ event: 'PREVIEW_RELEASE_CHECK', verdict: name, checks: checks.map(([check, ok, detail]) => ({ name: check, ok, detail: detail ?? '' })) })}'`, ...sb4.slice(from, to + 1), 'echo SB4_DONE_REACHED']);
+    const waits = 'on the first run GATE_ROWS_N1 and LIFECYCLE_FILES wait for GRR and LIFE (above); anything else: stop and ask';
+    const drained = 'SB4_NOT_DONE: DRAINED_PATH (expected on a drained upload): no other check is BAD: use "Drained upload on the template layout"';
+    expect(verdict([['N1_HEADERS', false], ['CURRENT_PINNED', true]])).toBe(drained);
+    expect(verdict([['N1_HEADERS', false], ['GATE_ROWS_N1', false], ['LIFECYCLE_FILES', false]])).toBe(`SB4_NOT_DONE: DRAINED_PATH, and BAD too: GATE_ROWS_N1 LIFECYCLE_FILES: ${waits}`);
+    expect(verdict([['N1_HEADERS', true]], 'SIDE_BY_SIDE')).toBe('SB4_DONE_REACHED');
+    // NOT_READY names its BAD checks as DRAINED_PATH does; a verdict SB4 does not know is a stop of its own.
+    expect(verdict([['N1_HEADERS', true], ['DISK', false], ['SLOT_FREE', false]], 'NOT_READY')).toBe(`SB4_NOT_DONE: NOT_READY, BAD: DISK SLOT_FREE: ${waits}`);
+    expect(verdict([['N1_HEADERS', true]], 'NEW_VERDICT')).toBe('SB4_NOT_DONE: the release check gave no verdict (the lines above): ask');
+    // A restart a system update still wants: the last line says what it is, that the owner decides, and how to go on;
+    // on both paths, and only when every other BAD check waits for GRR or LIFE.
+    const restart = " (NO_MAINTENANCE: reboot required only says a system update still wants a restart, and nothing else in the upload reads it: going on, or restarting first, is the owner's decision; to go on, run SB4 again with REBOOT='later')";
+    expect(verdict([['N1_HEADERS', false], ['NO_MAINTENANCE', false, 'reboot required']])).toBe(`SB4_NOT_DONE: DRAINED_PATH, and BAD too: NO_MAINTENANCE: ${waits}${restart}`);
+    expect(verdict([['N1_HEADERS', false], ['GATE_ROWS_N1', false], ['NO_MAINTENANCE', false, 'reboot required'], ['LIFECYCLE_FILES', false]]))
+      .toBe(`SB4_NOT_DONE: DRAINED_PATH, and BAD too: GATE_ROWS_N1 NO_MAINTENANCE LIFECYCLE_FILES: ${waits}${restart}`);
+    expect(verdict([['N1_HEADERS', true], ['NO_MAINTENANCE', false, 'reboot required']], 'NOT_READY')).toBe(`SB4_NOT_DONE: NOT_READY, BAD: NO_MAINTENANCE: ${waits}${restart}`);
+    // Beside a real stop (DISK, MEMORY) there is no such sentence: that stop is read as a stop.
+    expect(verdict([['N1_HEADERS', true], ['DISK', false], ['NO_MAINTENANCE', false, 'reboot required']], 'NOT_READY')).toBe(`SB4_NOT_DONE: NOT_READY, BAD: DISK NO_MAINTENANCE: ${waits}`);
+    expect(verdict([['N1_HEADERS', false], ['MEMORY', false], ['NO_MAINTENANCE', false, 'reboot required']])).toBe(`SB4_NOT_DONE: DRAINED_PATH, and BAD too: MEMORY NO_MAINTENANCE: ${waits}`);
+    // MT1's flag is not a restart: no sentence, and REBOOT=later does not pass it.
+    for (const reboot of ['', 'later']) {
+      expect(verdict([['N1_HEADERS', true], ['NO_MAINTENANCE', false, 'maintenance pending, reboot required']], 'NOT_READY', reboot)).toBe(`SB4_NOT_DONE: NOT_READY, BAD: NO_MAINTENANCE: ${waits}`);
+      expect(verdict([['N1_HEADERS', true], ['NO_MAINTENANCE', false, 'maintenance pending']], 'NOT_READY', reboot)).toBe(`SB4_NOT_DONE: NOT_READY, BAD: NO_MAINTENANCE: ${waits}`);
+    }
+    // With REBOOT=later the restart flag alone is not counted, and SB4 says so: SB4_DONE on the side-by-side path, the
+    // expected line on the drained path (naming what it did not count); any other BAD check still stops.
+    const notCounted = 'NO_MAINTENANCE: reboot required is not counted (REBOOT=later: the owner goes on with the restart still owed)';
+    expect(verdict([['N1_HEADERS', true], ['NO_MAINTENANCE', false, 'reboot required']], 'NOT_READY', 'later')).toBe(`${notCounted}\nSB4_DONE_REACHED`);
+    expect(verdict([['N1_HEADERS', false], ['NO_MAINTENANCE', false, 'reboot required']], 'DRAINED_PATH', 'later'))
+      .toBe(`${notCounted}\nSB4_NOT_DONE: DRAINED_PATH (expected on a drained upload): no other check is BAD but NO_MAINTENANCE (reboot required), not counted (REBOOT=later): use "Drained upload on the template layout"`);
+    expect(verdict([['N1_HEADERS', true], ['DISK', false], ['NO_MAINTENANCE', false, 'reboot required']], 'NOT_READY', 'later')).toBe(`${notCounted}\nSB4_NOT_DONE: NOT_READY, BAD: DISK: ${waits}`);
+    expect(verdict([['N1_HEADERS', false], ['GATE_ROWS_N1', false], ['NO_MAINTENANCE', false, 'reboot required']], 'DRAINED_PATH', 'later')).toBe(`${notCounted}\nSB4_NOT_DONE: DRAINED_PATH, and BAD too: GATE_ROWS_N1: ${waits}`);
+    // Without the flag, REBOOT=later changes nothing.
+    expect(verdict([['N1_HEADERS', false], ['CURRENT_PINNED', true]], 'DRAINED_PATH', 'later')).toBe(drained);
+    expect(verdict([['N1_HEADERS', true], ['NO_MAINTENANCE', true, 'none']], 'SIDE_BY_SIDE')).toBe('SB4_DONE_REACHED');
+    // The guide and the owner's runbook say how to go on, how to restart first, and where to read whether the server restarts by itself.
+    const sb4Text = sectionOf(guide, guide.split('\n').find(line => line.startsWith('### SB4. '))!).replace(/\s+/g, ' ');
+    expect(sb4Text).toContain("**To go on**, run SB4 again with `REBOOT='later'` at its top.");
+    expect(sb4Text).toContain('`SB4_DONE` on the side-by-side path (then SB5)');
+    expect(sb4Text).toContain('the lifecycle guide\'s "Boot sequence" (`deploy/preview-lifecycle/v1/README.md`): no runner starts by itself, during a drain SB14b starts the runners again');
+    expect(sb4Text).toContain('`apt-config shell AR Unattended-Upgrade::Automatic-Reboot` (read-only)');
+    expect(read('deploy/preview-lifecycle/v1/README.md')).toContain('4. **No runner starts at boot.**');
+    const ms = read('deploy/preview-auth-dev/v1/MAIN-SITE.md').replace(/\s+/g, ' ');
+    expect(ms).toContain("To go on, type `later` between the quotes of `REBOOT=''` at the top of SB4 and run it again");
+    expect(ms).toContain('`apt-config shell AR Unattended-Upgrade::Automatic-Reboot` (it changes nothing)');
     // The flag is read by the release check alone: the switch reads only MT1's flag.
     expect(read('deploy/preview-lifecycle/v1/release-switch.mjs')).not.toContain('reboot-required');
     expect(read('deploy/preview-lifecycle/v1/release-check.mjs')).toContain("export const REBOOT_REQUIRED_PATH = '/run/reboot-required';");
@@ -2485,7 +2522,8 @@ describe('before the downtime: room in the release lock, the package store, and 
     expect(read('deploy/preview-lifecycle/v1/prestart.mjs')).toMatch(/^const MAX_RELEASES = 4;/m);
     const releases = { 'old1-r20-v1': '2026-10-01', 'old2-r21-v1': '2026-10-08', 'old3-r22-v1': '2026-10-15', 'cur-r23-v1': '2026-10-22' } as Record<string, string>;
     const relayOf = (label: string) => `{ path=/usr/bin/node ; argv[]=/usr/bin/node /opt/debateai-v3-preview/releases/auth-dev-candidate-${label}-api/dialectical-engine/deploy/turnstile/siteverify-relay.mjs ; ignore_errors=no }`;
-    const lockRoom = (o: { lock?: Record<string, string>; label?: string; relay?: string; ownStore?: boolean; storeOf?: string; retired?: string[] }) => {
+    const folderOf = (label: string) => `/opt/debateai-v3-preview/releases/auth-dev-candidate-${label}-api/dialectical-engine`;
+    const lockRoom = (o: { lock?: Record<string, string>; label?: string; relay?: string; workdir?: string; ownStore?: boolean; storeOf?: string; retired?: string[] }) => {
       const dir = mkdtempSync(join(tmpdir(), 'guide-lockroom-'));
       try {
         const lock = o.lock ?? releases;
@@ -2498,7 +2536,9 @@ describe('before the downtime: room in the release lock, the package store, and 
         const status = JSON.stringify({ releases: Object.keys(lock).map(label => ({ label, state: label === 'cur-r23-v1' ? 'CURRENT' : retired.includes(label) ? 'RETIRED' : 'DRAINING' })) });
         return run(['set -euo pipefail', `LOCK='${dir}/lock.json'; CAPI='${dir}/capi'; LABEL='${o.label ?? 'new-r24-v1'}'; OLABEL=cur-r23-v1; STORE='${dir}/store'`,
           `OSTORE='/opt/debateai-v3-preview/artifacts/auth-dev-${o.storeOf ?? 'cur-r23-v1'}/pnpm-store'`,
-          `lc() { [ "$1 $2" = 'release-check.mjs status' ] && printf '%s\\n' '${status}'; }`, `systemctl() { printf '%s\\n' '${o.relay ?? relayOf('old3-r22-v1')}'; }`,
+          `lc() { [ "$1 $2" = 'release-check.mjs status' ] && printf '%s\\n' '${status}'; }`,
+          // systemctl show -p <property> --value: the relay unit's ExecStart, or its WorkingDirectory (the unit's own is the current API's folder).
+          `systemctl() { case "$3" in ExecStart) printf '%s\\n' '${o.relay ?? relayOf('old3-r22-v1')}';; WorkingDirectory) printf '%s\\n' '${o.workdir ?? '/opt/debateai-v3-preview/current-api/dialectical-engine'}';; esac; }`,
           'readlink() { printf \'%s\\n\' "$2"; }', ...room]);
       } finally { rmSync(dir, { recursive: true, force: true }); }
     };
@@ -2511,13 +2551,35 @@ describe('before the downtime: room in the release lock, the package store, and 
     expect(lockRoom({})).toBe(archive('old1-r20-v1'));
     expect(lockRoom({ relay: relayOf('old1-r20-v1') })).toBe(archive('old2-r21-v1'));
     expect(lockRoom({ relay: relayOf('old1-r20-v1'), ownStore: false, storeOf: 'old2-r21-v1' })).toBe(archive('old3-r22-v1'));
-    expect(lockRoom({ ownStore: true, storeOf: 'old1-r20-v1' })).toBe(archive('old1-r20-v1'));
+    // The store this upload started from stays even when this upload made its own: a staging again from the old release needs it.
+    expect(lockRoom({ ownStore: true, storeOf: 'old1-r20-v1' })).toBe(archive('old2-r21-v1'));
+    // The relay's working folder holds its release back too, written as the unit writes it or with systemd's optional mark.
+    expect(lockRoom({ workdir: folderOf('old1-r20-v1') })).toBe(archive('old2-r21-v1'));
+    expect(lockRoom({ workdir: `!${folderOf('old1-r20-v1')}` })).toBe(archive('old2-r21-v1'));
+    expect(lockRoom({ relay: relayOf('old1-r20-v1'), workdir: folderOf('old2-r21-v1') })).toBe(archive('old3-r22-v1'));
+    expect(lockRoom({ workdir: '' })).toBe(archive('old1-r20-v1'));
     expect(lockRoom({ retired: ['old2-r21-v1', 'old3-r22-v1'] })).toBe(archive('old2-r21-v1'));
     expect(lockRoom({ relay: relayOf('old1-r20-v1'), ownStore: false, storeOf: 'old2-r21-v1', retired: ['old1-r20-v1', 'old2-r21-v1'] }))
       .toBe("SB4_NOT_DONE: the release lock is full (4 of 4 releases), so this release's pin would be refused, and no retired release can be archived: the old release is the way back, and the Turnstile relay's and the package store's releases stay: ask");
     // A relay outside the release folders holds none of them back; an unread one names nothing.
     expect(lockRoom({ relay: '{ path=/usr/bin/node ; argv[]=/usr/bin/node /opt/debateai-v3-preview/turnstile/siteverify-relay.mjs ; }' })).toBe(archive('old1-r20-v1'));
     expect(lockRoom({ relay: '' })).toBe("SB4_NOT_DONE: the release lock is full (4 of 4 releases), and the Turnstile relay's program path is unread, so no release can be named for SB15: ask");
+    // PRECHECK, right before the yes, reads the same room again, and a full lock is one of its BAD subjects.
+    const precheck = scriptOf('PRECHECK').lines;
+    const again = between(precheck, line => line.startsWith('# Room in the release lock for DR5'), line => line.includes('bad release-lock '));
+    const roomAgain = (count: number, label = 'new-r24-v1') => {
+      const dir = mkdtempSync(join(tmpdir(), 'guide-precheck-room-'));
+      try {
+        writeFileSync(join(dir, 'lock.json'), JSON.stringify({ releases: Object.fromEntries(Object.keys(releases).slice(0, count).map(name => [name, {}])) }));
+        mkdirSync(join(dir, 'capi'));
+        symlinkSync(ROOT, join(dir, 'capi', 'dialectical-engine'));
+        return spawnSync('bash', ['-c', ['set -euo pipefail', `LOCK='${dir}/lock.json'; CAPI='${dir}/capi'; LABEL='${label}'`,
+          "BAD=''; bad() { echo \"BAD ($1): $2\"; BAD=\"$BAD $1\"; }", ...again, 'echo "BAD=$BAD"'].join('\n')], { encoding: 'utf8' }).stdout.trim().split('\n');
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    };
+    expect(roomAgain(3)).toEqual(['release lock: 3 of 4 releases', 'BAD=']);
+    expect(roomAgain(4, 'old1-r20-v1')).toEqual(['release lock: 4 of 4 releases', 'BAD=']);
+    expect(roomAgain(4)).toEqual(['release lock: 4 of 4 releases', "BAD (release-lock): the release lock has no room for this release's pin at DR5: SB4 names the retired release SB15 may archive first", 'BAD= release-lock']);
   });
 
   it('SB1 takes the old release\'s own store, else the one its upload\'s names file names, and stops when that one is gone', () => {
@@ -2559,6 +2621,15 @@ describe('before the downtime: room in the release lock, the package store, and 
     expect(check({ own: true, storeOf: 'old1-r20-v1' })).toBe('ARCHIVE_GOES_ON');
     expect(check({ own: false, storeOf: 'old2-r21-v1' })).toBe('ARCHIVE_GOES_ON');
     expect(check({ own: false, storeOf: 'old1-r20-v1' })).toMatch(/^SB15_NOT_DONE: new-r24-v1 has no pnpm store of its own and installed from the one in old1-r20-v1's folder /);
+    // SB15 takes the label SB4 named; its text and NAME2 read the relay's working folder as well as its program.
+    expect(sb15).toContain("PREV='<the label SB4 named, or else the release that was current before OLABEL>'");
+    const text = sectionOf(guide, '### SB15. Later, on the owner\'s yes: the archive').replace(/\s+/g, ' ');
+    expect(text).toContain('`systemctl show -p WorkingDirectory --value debateai-preview-turnstile`');
+    const name2 = read('deploy/preview-auth-dev/v1/MAIN-SITE.md');
+    expect(name2).toContain('RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RWR=$(readlink -f "${RW#!}" 2>/dev/null || true)');
+    // A full lock found at DR5 after all: the text names the way on.
+    expect(sectionOf(guide, '#### DR5. Publish, verify plan, first proof, launch plans, pins, drop-ins, stage').replace(/\s+/g, ' '))
+      .toContain('A pin refused with `RELEASE_LOCK_INVALID` (and nothing pinned) means the lock was full after all');
   });
 
   it('A4, A6 and A7 are scripts of the runbook\'s form, and their tool calls are the tool\'s real command lines', async () => {

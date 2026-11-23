@@ -7,12 +7,13 @@
 // The build runs `pnpm --filter dialectical-engine-v2ui build` with the environment the release tool itself gives its
 // build: the release root's own uiBuildEnvironment. On 2 Nov the server's build refused, because its environment lacked
 // the owner's early-use package exemption; the same environment here meets the same fault on the Mac. After the build,
-// every committed file of the release root must be as it was just before it: the release tool's ui-build refuses a
-// build that rewrote one (PREVIEW_SOURCE_INVENTORY_REFUSED), as it did when Next rewrote apps/ui/next-env.d.ts.
+// the release root's files must be as they were just before it, read the way the release tool's source inventory reads
+// them: the release tool's ui-build refuses a build that added, removed or changed one, or changed its mode
+// (PREVIEW_SOURCE_INVENTORY_REFUSED), as it did when Next rewrote apps/ui/next-env.d.ts.
 //
 //   installRelease({ repo, rev, workdir, node, pnpmDir })      the A3 install under <workdir>; { root } or a refusal
-//   committedFilesOf(repo, rev)                                the commit's files under dialectical-engine/, as root-relative paths
-//   buildWebsiteIn({ root, node, pnpmDir, committed? })        the build, the committed files compared, the release-folder tools: a CheckResult
+//   inventoryOf(root)                                          the release root's files as the source inventory reads them, by path
+//   buildWebsiteIn({ root, node, pnpmDir })                    the build, the inventory compared, the release-folder tools: a CheckResult
 //   checkWebsiteBuild({ repo, rev, workdir, node, pnpmDir })   the check: { result, root }, root null when not installed
 //   runChild(command, args, { cwd, env, log, limitMs? })       one child in its own process group; a timeout, stopRunning()
 //                                                              or this process exiting stops the whole group, pnpm's children included
@@ -24,7 +25,7 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, rmSync } from "node:fs";
+import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { RELEASE_FOLDER_TOOLS, loadEachTool } from "./tools-folder.mjs";
@@ -179,38 +180,52 @@ function firstLine(error) {
 }
 
 /**
- * Every file <rev> commits under dialectical-engine/, as paths relative to a release root (which holds dialectical-engine/).
- * The list is close to execFileSync's default 1 MiB output limit, so the limit here is larger.
+ * The folders the server's source inventory leaves out of a website release root (source-manifest.mjs, generatedPaths
+ * for the ui role): the generated contract, which it checks on its own, and the build itself. It also leaves out every
+ * node_modules folder, wherever it is, and names each one as a dependency root.
  */
-export function committedFilesOf(repo, rev) {
-  const listed = execFileSync("git", ["-C", repo, "ls-tree", "-r", "-z", "--name-only", rev, "--", ENGINE], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
-  return listed.split("\0").filter((path) => path !== "");
+const NOT_INVENTORIED = new Set([`${ENGINE}/packages/contract/generated`, `${ENGINE}/apps/ui/.next`]);
+
+/**
+ * The release root's files below dialectical-engine/ as the server's source inventory reads them (source-manifest.mjs,
+ * scanInventory), by root-relative path: a file as its sha256 and mode, a link as its target, a node_modules folder as
+ * one entry. Folders are walked, not listed. The Mac's root holds only dialectical-engine/ and this check's own log
+ * beside it, so the walk starts there; on the server the release root also holds the rest of the commit, which no
+ * build writes to. The server also reads every file inside each node_modules folder again; this walk does not.
+ */
+export function inventoryOf(root) {
+  const entries = new Map();
+  const walk = (relative) => {
+    for (const name of readdirSync(join(root, relative)).sort()) {
+      const path = `${relative}/${name}`;
+      const stat = lstatSync(join(root, path));
+      if (stat.isDirectory() && name === "node_modules") entries.set(path, "dependency root");
+      else if (stat.isDirectory() && NOT_INVENTORIED.has(path)) continue;
+      else if (stat.isDirectory()) walk(path);
+      else if (stat.isSymbolicLink()) entries.set(path, `link ${readlinkSync(join(root, path))}`);
+      else entries.set(path, `file ${createHash("sha256").update(readFileSync(join(root, path))).digest("hex")} mode ${(stat.mode & 0o777).toString(8)}`);
+    }
+  };
+  walk(ENGINE);
+  return entries;
 }
 
-/** Each committed path's sha256 in <root> (a link: of its target), by path; a path that is not a file or link there is left out. */
-function fingerprintsOf(root, paths) {
-  const prints = new Map();
-  for (const path of paths) {
-    let stat;
-    try { stat = lstatSync(join(root, path)); } catch { continue; }
-    const bytes = stat.isSymbolicLink() ? readlinkSync(join(root, path)) : stat.isFile() ? readFileSync(join(root, path)) : null;
-    if (bytes !== null) prints.set(path, createHash("sha256").update(bytes).digest("hex"));
-  }
-  return prints;
-}
-
-/** The paths of <before> whose bytes differ now, or that are gone, sorted. */
-function changedSince(root, before) {
-  const after = fingerprintsOf(root, [...before.keys()]);
-  return [...before].filter(([path, print]) => after.get(path) !== print).map(([path]) => path).sort();
+/** What differs between two inventories: each path added, removed or changed, sorted by path. */
+function differences(before, after) {
+  const paths = [...new Set([...before.keys(), ...after.keys()])].sort();
+  return paths.flatMap((path) => {
+    if (!after.has(path)) return [`removed: ${path}`];
+    if (!before.has(path)) return [`added: ${path}`];
+    return before.get(path) === after.get(path) ? [] : [`changed: ${path}`];
+  });
 }
 
 /**
- * Builds the website in an installed release root, then loads the release-folder tools there. A CheckResult. With
- * <committed> (root-relative paths, committedFilesOf), each of those files must be the same after the build as just
- * before it, as the release tool's ui-build checks on the server.
+ * Builds the website in an installed release root, then loads the release-folder tools there. A CheckResult. The
+ * root's inventory (inventoryOf) must be the same after the build as just before it, as the release tool's ui-build
+ * checks on the server: no file added, removed or changed, no mode changed.
  */
-export async function buildWebsiteIn({ root, node, pnpmDir, committed, extraEnv = {} }) {
+export async function buildWebsiteIn({ root, node, pnpmDir, extraEnv = {} }) {
   const started = Date.now();
   const done = (status, lines) => ({ name: "website-build", status, lines, seconds: (Date.now() - started) / 1000 });
   let releaseTool;
@@ -231,7 +246,7 @@ export async function buildWebsiteIn({ root, node, pnpmDir, committed, extraEnv 
   // The running Node's folder stays first, so pnpm and next run on the Node the check was given.
   const env = { ...environment, PATH: `${dirname(node)}:${pnpmDir}:${environment.PATH}`, ...extraEnv };
   const buildLog = join(root, "website-build.log");
-  const before = committed === undefined ? null : fingerprintsOf(root, committed);
+  const before = inventoryOf(root);
   if (await runChild(join(pnpmDir, "pnpm"), ["--filter", "dialectical-engine-v2ui", "build"], { cwd: join(root, ENGINE), env, log: buildLog }) !== 0) {
     return done("refused", ["website build: the build failed", "UPLOAD_CHECK_WEBSITE_BUILD_FAILED", ...tailOf(buildLog), allowances]);
   }
@@ -240,11 +255,11 @@ export async function buildWebsiteIn({ root, node, pnpmDir, committed, extraEnv 
   if (!existsSync(join(root, BUILD_ID))) {
     return done("refused", [`website build: the build exited 0 but left no ${BUILD_ID}`, "UPLOAD_CHECK_WEBSITE_BUILD_NO_OUTPUT", ...tailOf(buildLog), allowances]);
   }
-  // The server's ui-build refuses a build that changed a committed file (PREVIEW_SOURCE_INVENTORY_REFUSED): so does this.
-  const changed = before === null ? [] : changedSince(root, before);
+  // The server's ui-build refuses a build that changed what the source inventory reads (PREVIEW_SOURCE_INVENTORY_REFUSED): so does this.
+  const changed = differences(before, inventoryOf(root));
   if (changed.length > 0) {
-    return done("refused", [`website build: the build changed ${changed.length} committed file(s), which the server's release tool refuses`, "UPLOAD_CHECK_WEBSITE_BUILD_CHANGED_COMMITTED_FILES",
-      ...changed.slice(0, LOG_TAIL).map((path) => `  ${path}`), allowances]);
+    return done("refused", [`website build: the build added, removed or changed ${changed.length} file(s) outside .next, node_modules and the generated contract, which the server's release tool refuses`,
+      "UPLOAD_CHECK_WEBSITE_BUILD_CHANGED_SOURCE", ...changed.slice(0, LOG_TAIL).map((line) => `  ${line}`), ...(changed.length > LOG_TAIL ? [`  and ${changed.length - LOG_TAIL} more`] : []), allowances]);
   }
   // The tools that run from a release folder load there, with its packages, each on its own.
   const results = await loadEachTool({ folder: root, node, only: RELEASE_FOLDER_TOOLS });
@@ -252,7 +267,7 @@ export async function buildWebsiteIn({ root, node, pnpmDir, committed, extraEnv 
   const absent = RELEASE_FOLDER_TOOLS.filter((tool) => !results.some((result) => result.tool === tool));
   const lines = [
     "website build: built with the release tool's own environment",
-    ...(before === null ? [] : [`committed files: the build changed none of the ${before.size} compared`]),
+    `release folder: the build changed none of the ${before.size} entries the source inventory reads`,
     `release-folder tools: ${results.length - failed.length} of ${results.length} loaded`,
     ...failed.map((result) => `${result.tool}: ${result.code ?? "failed with no error code"}`),
     ...absent.map((tool) => `${tool}: not in this commit, so not loaded`),
@@ -278,7 +293,7 @@ export async function checkWebsiteBuild({ repo, rev, workdir, node, pnpmDir, ext
   }
   let result;
   try {
-    result = await buildWebsiteIn({ root, node, pnpmDir, committed: committedFilesOf(repo, rev), extraEnv });
+    result = await buildWebsiteIn({ root, node, pnpmDir, extraEnv });
   } catch (error) {
     result = { name: "website-build", status: "not-checked", lines: [`the check could not finish: ${firstLine(error)}`] };
   }

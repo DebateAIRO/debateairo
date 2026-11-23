@@ -4,11 +4,13 @@
 // text and run in bash: the lines they share are the same in every copy; the address pattern opens every public page
 // the website links (a new public page fails here until the window opens it, or the test names it as closed on purpose)
 // and nothing else; every step that asks whether the password is on asks at /login, which the window never opens; the
-// window's lines go in and come out again byte for byte; and every script parses.
+// window's lines go in and come out again byte for byte; and every script parses. Last, the names file's start helpers
+// (3.0) run against a small model of how systemd starts the website and its API, with the steps that use them.
 import { describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { LEGAL_PAGES, TERMS_VERSIONS } from '../../apps/ui/lib/legal/pages.js';
 
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -302,5 +304,164 @@ describe('the probes and the scripts', () => {
       'done', 'echo WINDOW_LINES_OK'
     ].join('\n');
     expect(bash(harness).trim()).toBe('WINDOW_LINES_OK');
+  });
+});
+
+// The website's unit is bound to its API (BindsTo= and After=, in the lifecycle's ui drop-in): systemd passes a restart of
+// the API on to the website only while the website runs, and nothing starts a stopped website when the API starts. So a
+// step that restarts only the API, with the website running, waits for both (apiup); a step that stopped both starts the
+// API alone (apistart), then the website (webup), and says which of the two did not start.
+describe("the names file's start helpers, and the steps that stop the website", () => {
+  const LOCKS0 = script('LOCKS0');
+  const locks0 = LOCKS0.split('\n');
+  /** The names file after its first line, as LOCKS0 writes it. */
+  const body = locks0.slice(locks0.indexOf(`{ printf '. %s\\n' "$NAMES"; cat <<'EOF'`) + 1, locks0.indexOf('EOF'));
+  const helpers = body.slice(body.findIndex(line => line.startsWith('apistart() {')), body.findIndex(line => line.startsWith('relay() {')));
+
+  /**
+   * systemd as the units relate the two: stopping the API stops the website; restarting the API restarts the website
+   * only when it runs; starting the website starts its API first. <api-refuses> and <web-fails> in the folder make the
+   * next start of that one fail. The website answers its Log in page only while it is active.
+   */
+  const MODEL = [
+    'API=debateai-preview-api@cur-r30-v1; WEB=debateai-preview-ui@cur-r30-v1; UIP=3100',
+    'st() { cat "$D/$1" 2>/dev/null || echo inactive; }',
+    `apigo() { : > "$D/journal"; if [ -e "$D/api-refuses" ]; then echo failed > "$D/$API"; echo 'PREVIEW_API_STARTUP_REFUSED {"code":"PREVIEW_STAFF_ORIGIN_MISMATCH"}' >> "$D/journal"; else echo active > "$D/$API"; echo 'PREVIEW_API_STARTED {}' >> "$D/journal"; fi; }`,
+    'webgo() { if [ -e "$D/web-fails" ]; then echo failed > "$D/$WEB"; else echo active > "$D/$WEB"; fi; }',
+    'systemctl() { case "$1" in',
+    '  is-active) st "$2"; [ "$(st "$2")" = active ];;',
+    '  stop) shift; for u in "$@"; do echo inactive > "$D/$u"; done; [ "$(st "$API")" = active ] || echo inactive > "$D/$WEB";;',
+    '  restart|start) if [ "$2" = "$API" ]; then w=$(st "$WEB"); apigo; if [ "$1" = restart ] && [ "$w" = active ]; then if [ "$(st "$API")" = active ]; then webgo; else echo inactive > "$D/$WEB"; fi; fi',
+    '    else [ "$(st "$API")" = active ] || apigo; if [ "$(st "$API")" = active ]; then webgo; else echo inactive > "$D/$WEB"; fi; fi;;',
+    '  *) ;; esac; }',
+    'journalctl() { case " $* " in *" -u $API "*) cat "$D/journal";; esac; }',
+    'curl() { if [ "$(st "$WEB")" = active ]; then printf 200; else printf 000; fi; }',
+    'sleep() { :; }'
+  ];
+  const world = (state: { api: string; web: string; apiRefuses?: boolean; webFails?: boolean }, lines: string[]) => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'main-site-start-')));
+    try {
+      writeFileSync(join(dir, 'debateai-preview-api@cur-r30-v1'), `${state.api}\n`);
+      writeFileSync(join(dir, 'debateai-preview-ui@cur-r30-v1'), `${state.web}\n`);
+      if (state.apiRefuses) writeFileSync(join(dir, 'api-refuses'), '');
+      if (state.webFails) writeFileSync(join(dir, 'web-fails'), '');
+      const out = spawnSync('bash', ['-c', [`D='${dir}'`, ...MODEL, ...helpers, ...lines].join('\n')], { encoding: 'utf8' });
+      const after = `api ${readFileSync(join(dir, 'debateai-preview-api@cur-r30-v1'), 'utf8').trim()}, website ${readFileSync(join(dir, 'debateai-preview-ui@cur-r30-v1'), 'utf8').trim()}`;
+      return { lines: out.stdout.trim().split('\n'), after };
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  };
+  const call = (helper: string) => [`if ${helper}; then echo UP; else echo DOWN; fi`];
+
+  it('the helpers parse, and the units relate the website to its API as the model does', () => {
+    expect(spawnSync('bash', ['-n'], { input: body.join('\n') }).status).toBe(0);
+    expect(helpers.map(line => line.split('(')[0]).filter(name => /^[a-z]+$/.test(name!))).toEqual(['apistart', 'apiup', 'webup']);
+    const ui = read('deploy/preview-lifecycle/v1/systemd/debateai-preview-ui@.service.d/50-lifecycle.conf');
+    expect(ui).toContain('\nBindsTo=debateai-preview-api@%i.service\n');
+    expect(ui).toContain('\nAfter=debateai-preview-api@%i.service\n');
+    expect(ui).not.toMatch(/^(PartOf|Requires|Wants)=/m);
+    // Nothing on the API's side pulls the website in.
+    for (const file of readdirSync(resolve(ROOT, 'deploy/preview-lifecycle/v1/systemd/debateai-preview-api@.service.d')))
+      expect(read(`deploy/preview-lifecycle/v1/systemd/debateai-preview-api@.service.d/${file}`), file).not.toContain('debateai-preview-ui');
+  });
+
+  it('with the website running, apiup restarts both and waits for both, as the steps that restart only the API need', () => {
+    expect(world({ api: 'active', web: 'active' }, call('apiup'))).toEqual({ lines: ['PREVIEW_API_STARTED {}', 'UP'], after: 'api active, website active' });
+    // A website that does not come back is still a failure of the step, which then puts its file back.
+    expect(world({ api: 'active', web: 'active', webFails: true }, call('apiup')).lines.slice(-2))
+      .toEqual(['the API started, but the website does not answer its Log in page (systemctl is-active of the website: failed)', 'DOWN']);
+    expect(world({ api: 'active', web: 'active', apiRefuses: true }, call('apiup')).lines.slice(-2))
+      .toEqual(['the API did not start (systemctl is-active of the API: failed)', 'DOWN']);
+  });
+
+  it('with both stopped, apiup fails although the API started; apistart then webup start both and say which did not', () => {
+    // The fault: the website stays stopped, so apiup waits for a page nothing starts.
+    const stuck = world({ api: 'inactive', web: 'inactive' }, call('apiup'));
+    expect(stuck.lines).toEqual(['PREVIEW_API_STARTED {}', 'the API started, but the website does not answer its Log in page (systemctl is-active of the website: inactive)', 'DOWN']);
+    expect(stuck.after).toBe('api active, website inactive');
+    expect(world({ api: 'inactive', web: 'inactive' }, [...call('apistart'), ...call('webup')])).toEqual({ lines: ['PREVIEW_API_STARTED {}', 'UP', 'UP'], after: 'api active, website active' });
+    expect(world({ api: 'inactive', web: 'inactive', apiRefuses: true }, call('apistart')).lines.slice(-2)).toEqual(['the API did not start (systemctl is-active of the API: failed)', 'DOWN']);
+    expect(world({ api: 'inactive', web: 'inactive', webFails: true }, [...call('apistart'), ...call('webup')]).lines.slice(-2))
+      .toEqual(['the website did not start (its Log in page answered 000; systemctl is-active of the website: failed)', 'DOWN']);
+  });
+
+  it('NAME3 and NAME5 stop both, then start the API alone and then the website, and end truthfully', () => {
+    for (const step of ['NAME3', 'NAME5']) {
+      const lines = script(step).split('\n');
+      const stop = lines.findIndex(line => line.startsWith('systemctl stop "$WEB" "$API" || '));
+      const first = lines.findIndex(line => /^(apistart|apiup) \|\| /.test(line));
+      const said = lines.findIndex(line => line.startsWith('said -xF '));
+      expect(stop, step).toBeGreaterThan(0);
+      expect(first, step).toBeGreaterThan(stop);
+      expect(said, step).toBe(first + 2);
+      // Before it stops anything: a names file without apistart (an earlier version of this guide) is a stop.
+      const guard = lines.findIndex(line => line.startsWith('declare -F apistart >/dev/null || '));
+      expect(guard, step).toBe(stop - 1);
+      expect(spawnSync('bash', ['-c', ['set -euo pipefail', lines[guard]!, 'echo GOES_ON'].join('\n')], { encoding: 'utf8' }).stdout.trim())
+        .toBe(`${step}_NOT_DONE: the names file is from an earlier version of this guide (no apistart; nothing was stopped): run LOCKS0 (3.0) again, then ${step}`);
+      const run = (state: { apiRefuses?: boolean; webFails?: boolean }) => world({ api: 'active', web: 'active', ...state },
+        ['set -euo pipefail', 'said() { :; }', 'MMODE=allow-list', lines[guard]!, lines[stop]!, ...lines.slice(first, said + 1), 'echo STARTED_AND_CHECKED']);
+      expect(run({}), step).toEqual({ lines: ['PREVIEW_API_STARTED {}', 'STARTED_AND_CHECKED'], after: 'api active, website active' });
+      const way = step === 'NAME3' ? 'run NAME5 now' : 'ask at once';
+      expect(run({ apiRefuses: true }).lines.at(-1), step).toBe(`${step}_NOT_DONE: the API did not start (the line above names the setting): the site is DOWN: ${way}`);
+      expect(run({ webFails: true }).lines.slice(-2), step).toEqual(['the website did not start (its Log in page answered 000; systemctl is-active of the website: failed)',
+        `${step}_NOT_DONE: the API started, but the website did not (the line above names the setting): the site is DOWN: ${way}`]);
+    }
+  });
+
+  it('no step calls apiup after it stopped the website, and "the API did not start" comes only from apistart', () => {
+    for (const block of blocks) {
+      const lines = block.split('\n');
+      const stop = lines.findIndex(line => /systemctl stop [^|]*"\$WEB"/.test(line));
+      if (stop >= 0) expect(lines.slice(stop + 1).filter(line => /\bapiup\b/.test(line)), lines[1]).toEqual([]);
+    }
+    const said = runbook.split('\n').filter(line => line.includes('_NOT_DONE: ') && line.includes('the API did not start'));
+    expect(said.length).toBe(2);
+    for (const line of said) expect(line).toMatch(/^apistart \|\| \{ echo "NAME[35]_NOT_DONE: the API did not start /);
+    // The guide says why, and how a server with the old names file gets these helpers.
+    const flat = runbook.replace(/\s+/g, ' ');
+    expect(flat).toContain('systemd passes a restart on only to a unit that is running');
+    expect(flat).toContain('On a server whose names file was written before `apistart` came, run LOCKS0 once, with `rNN` left as it is, before the next NAME3 or NAME5.');
+  });
+
+  it('LOCKS0 writes the names file, and run again writes it anew from this guide, keeping its first line and the file before', () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'main-site-locks0-')));
+    try {
+      mkdirSync(join(dir, 'etc'));
+      writeFileSync(join(dir, 'etc', 'api-cur-r30-v1.env'), 'PUBLIC_APP_URL=https://v3-preview.dezbatere.ro\n');
+      for (const nn of ['r30', 'r31']) writeFileSync(join(dir, `${nn}-names.sh`), [`LABEL=cur-r30-v1; KEY=r5-000000000000; SLOT=A; UIP=3100; E='${dir}/etc'`,
+        `lc() { printf '%s\\n' '{"releases":[{"label":"cur-r30-v1","state":"CURRENT"}]}'; }`, ''].join('\n'));
+      const locks = (nn: string | null) => {
+        const text = locks0.map(line => line.startsWith('NAMES=') && nn !== null ? line.replace('rNN-names.sh', `${nn}-names.sh`) : line)
+          .join('\n').replaceAll('/root/preview-archive/', `${dir}/`);
+        const out = spawnSync('bash', ['-c', ['install() { local a; for a; do :; done; mkdir -p "$a"; }', text].join('\n')], { encoding: 'utf8' });
+        return out.stdout.trim().split('\n').at(-1);
+      };
+      const names = join(dir, 'main-site', 'names.sh');
+      const kept = () => readdirSync(join(dir, 'main-site')).filter(name => name.startsWith('names.sh.before-'));
+      // The first time: rNN filled in.
+      expect(locks(null)).toBe(`LOCKS0_NOT_DONE: ${dir}/rNN-names.sh is missing (fill in rNN)`);
+      expect(locks('r30')).toBe('LOCKS0_DONE');
+      expect(readFileSync(names, 'utf8').split('\n')[0]).toBe(`. ${dir}/r30-names.sh`);
+      expect(kept()).toEqual([]);
+      // A names file from an earlier version of this guide: no apistart. Run again with rNN left as it is: the first line
+      // stays, the file before is kept beside it, and the new one has the helpers.
+      const old = `. ${dir}/r30-names.sh\nM=${dir}/main-site\napiup() { :; }\n`;
+      writeFileSync(names, old);
+      expect(locks(null)).toBe('LOCKS0_DONE');
+      const now = readFileSync(names, 'utf8');
+      expect(now.split('\n')[0]).toBe(`. ${dir}/r30-names.sh`);
+      expect(now).toContain('\napistart() {');
+      expect(kept()).toHaveLength(1);
+      expect(readFileSync(join(dir, 'main-site', kept()[0]!), 'utf8')).toBe(old);
+      // Never over a copy kept before (two runs in one second): the copy goes aside here so the next run can keep its own.
+      rmSync(join(dir, 'main-site', kept()[0]!));
+      // With rNN filled in, the first line names that upload.
+      expect(locks('r31')).toBe('LOCKS0_DONE');
+      expect(readFileSync(names, 'utf8').split('\n')[0]).toBe(`. ${dir}/r31-names.sh`);
+      // A first line that reads no upload's names file: nothing changes.
+      writeFileSync(names, 'echo hello\n');
+      expect(locks(null)).toBe(`LOCKS0_NOT_DONE: the first line of ${dir}/main-site/names.sh does not read an upload's names file (nothing changed): fill in rNN, or look`);
+      expect(readFileSync(names, 'utf8')).toBe('echo hello\n');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
