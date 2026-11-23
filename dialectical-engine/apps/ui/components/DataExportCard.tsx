@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { ContractHttpError, type ContractClient, type DataExportStatus } from "@debateai/contract";
-import { contractClient } from "@/lib/api";
+import { contractClient, holdsNoSession } from "@/lib/api";
 import { useSelectedAuthCatalog } from "@/components/AuthShell";
 import { SecurityConfirmation } from "@/components/auth/SecurityConfirmation";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -61,13 +61,28 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
 
   useEffect(() => {
     let active = true;
-    const refresh = () => client.readDataExportStatus().then(
-      (next) => { if (active) { setStatus(next); setStatusUnavailable(false); } },
-      () => { if (active) setStatusUnavailable(true); }
-    );
-    void refresh();
-    const timer = window.setInterval(() => { void refresh(); }, 5_000);
-    return () => { active = false; window.clearInterval(timer); };
+    let stopped = false;
+    let timer: number | undefined;
+    const stop = () => { stopped = true; window.clearInterval(timer); };
+    const refresh = () => {
+      // Signed out in another tab, or a session the server has ended: the read could only be refused, and each refusal
+      // makes the browser forget the site password. The card stops asking and says the status cannot be read.
+      if (holdsNoSession()) { stop(); setStatusUnavailable(true); return; }
+      void client.readDataExportStatus().then(
+        (next) => { if (active) { setStatus(next); setStatusUnavailable(false); } },
+        (failure: unknown) => {
+          if (!active) return;
+          setStatusUnavailable(true);
+          // A 401 stops the card only when the browser holds no session by then: the site's client has already removed
+          // the readable cookie when the API said the session ended. With a session still held, the read left with the
+          // old session cookie just before a security check replaced it, and the next read sends the new one.
+          if (failure instanceof ContractHttpError && failure.status === 401 && holdsNoSession()) stop();
+        }
+      );
+    };
+    refresh();
+    if (!stopped) timer = window.setInterval(refresh, 5_000);
+    return () => { active = false; stop(); };
   }, [client]);
 
   async function beginConfirmation(fromLink = false): Promise<void> {

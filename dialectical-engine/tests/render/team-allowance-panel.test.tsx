@@ -6,6 +6,10 @@ import { TeamAllowancePanel } from "../../apps/ui/components/TeamAllowancePanel.
 import { createTeamAllowanceClient } from "../../apps/ui/lib/teamAllowanceApi.js";
 import english from "../../apps/ui/messages/en/staff.json";
 import romanian from "../../apps/ui/messages/ro/staff.json";
+import { CSRF_COOKIE, holdReadableCookies, STAFF_CSRF_COOKIE } from "../support/sessionCookie.js";
+
+// The team panels read once the team sign-in is done: each test starts in a browser that holds its cookies.
+beforeEach(() => holdReadableCookies(CSRF_COOKIE, STAFF_CSRF_COOKIE).drop);
 
 /**
  * Plan 2026-10-31-r22-owner-changes decision 32: the Owner's panel. Everything runs through the real client over a fake server, so each row reads

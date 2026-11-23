@@ -7,6 +7,7 @@ import { PasswordResetFlow } from "../../apps/ui/components/PasswordResetFlow.js
 import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
 import en from "../../apps/ui/messages/en/password-reset.json";
 import ro from "../../apps/ui/messages/ro/password-reset.json";
+import { holdReadableCookies, PASSWORD_RESET_CSRF_COOKIE } from "../support/sessionCookie.js";
 
 let host: HTMLDivElement, root: Root;
 const state = { status: "password_required", expires_at: "2030-01-01T00:00:00Z", password_min_length: 12, password_max_length: 1024 };
@@ -15,6 +16,8 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi
 function fixture(options: { dropped?: boolean; proofRejected?: boolean; resume?: boolean; exchangeDropped?: boolean; cancelDropped?: boolean; statusUnavailable?: boolean; missingAfterCancel?: boolean } = {}) {
   const requests: { path: string; body: unknown }[] = [];
   let exchanged = Boolean(options.resume), completed = false, cancelled = false;
+  // A reset resumed on this page was exchanged earlier in this browser, which therefore holds the reset's cookies.
+  if (options.resume) holdReadableCookies(PASSWORD_RESET_CSRF_COOKIE);
   const client = createPasswordResetClient(async (url, init) => {
     const path = String(url).split("/").at(-1)!;
     const body: unknown = init?.body ? JSON.parse(String(init.body)) : null;

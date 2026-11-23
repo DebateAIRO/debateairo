@@ -6,13 +6,13 @@ import { AuthShell } from "@/components/AuthShell";
 import { focusIsLost } from "@/lib/focusGuard";
 import { useFormAnnouncer } from "@/components/auth/InlineFieldMessage";
 import { useAlertRegion, useDeadlineWarning, useStepFocus } from "@/components/auth/timedStep";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, createRecoveryFetch, holdsNoPasswordReset } from "@/lib/api";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import english from "@/messages/en/password-reset.json";
 import mfaEnglish from "@/messages/en/mfa-recovery.json";
 import mfaRomanian from "@/messages/ro/mfa-recovery.json";
 
-const browserClient = createPasswordResetClient(fetch, API_BASE);
+const browserClient = createPasswordResetClient(createRecoveryFetch(API_BASE), API_BASE);
 type Phase = "request" | "sent" | "email_link" | "cancel_link" | "password_required" | "completed" | "cancelled" | "refused" | "expired";
 const navigateToRecovery = () => { window.location.assign("/recover"); };
 const navigateToAuthenticatorRecovery = () => { window.location.assign("/recover-authenticator"); };
@@ -108,7 +108,10 @@ export function PasswordResetFlow({ catalog = english, locale = "en", client = b
         else if (name === "cancel") { cancellation.current = value; setPhase("cancel_link"); }
         else setPhase("expired");
       } else setPhase("expired");
-    } else if (link.current === null && cancellation.current === null) {
+    } else if (link.current === null && cancellation.current === null && !holdsNoPasswordReset()) {
+      // Only a browser that holds a reset asks for its step (a reload, another tab, a reset that has ended). Without one
+      // the API could only answer 401, which makes the browser forget the site password, and the page would stay on
+      // the request form anyway. Check reset status asks the server only when a reset is held (createRecoveryFetch).
       void client.status().then(state => { if (mounted.current) apply(state); }).catch(() => {});
     }
     return () => {

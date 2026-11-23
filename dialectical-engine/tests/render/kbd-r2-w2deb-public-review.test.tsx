@@ -9,6 +9,10 @@ import type { PublicReviewClient } from "../../apps/ui/lib/publicReviewApi.js";
 import staff from "../../apps/ui/messages/en/staff.json" with { type: "json" };
 import { installFocusFixup } from "./kbd-focus-fixup";
 import { guardSettled, pressByKeyboard, startFocusGuard, submitByKeyboard } from "./kbd-guard-harness";
+import { CSRF_COOKIE, holdReadableCookies, STAFF_CSRF_COOKIE } from "../support/sessionCookie.js";
+
+// The team panels read once the team sign-in is done: each test starts in a browser that holds its cookies.
+beforeEach(() => holdReadableCookies(CSRF_COOKIE, STAFF_CSRF_COOKIE).drop);
 
 /*
  * Keyboard audit, 12 Nov 2026, wave 2 (DEB2-8, DEB2-17): the team's public-review panel under the site's focus guard.

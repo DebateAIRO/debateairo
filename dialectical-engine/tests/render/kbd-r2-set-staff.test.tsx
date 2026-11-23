@@ -11,6 +11,10 @@ import { TeamAllowancePanel } from "../../apps/ui/components/TeamAllowancePanel.
 import { createStaffApiClient } from "../../apps/ui/lib/staffApi.js";
 import { button, expectFocusOn, expectParkedOn, guardWait, keyboardOn, mountPage, nextTabStop, press, typeInto, unmountPage } from "./kbd-r2-set-harness.js";
 import { submitByKeyboard } from "./kbd-guard-harness.js";
+import { CSRF_COOKIE, holdReadableCookies, STAFF_CSRF_COOKIE } from "../support/sessionCookie.js";
+
+// The team panels read once the team sign-in is done: each test starts in a browser that holds its cookies.
+beforeEach(() => holdReadableCookies(CSRF_COOKIE, STAFF_CSRF_COOKIE).drop);
 
 const S = staff as Readonly<Record<string, string>>;
 afterEach(unmountPage);
