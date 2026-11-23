@@ -1,4 +1,4 @@
-import { previewGateSocket, validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewAskAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, PREVIEW_ACCOUNT_RUNS_SQL, type PreviewProviderTestConfig } from "@debateai/providers";
+import { previewGateSocket, validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewAskAdmits, previewBuyerAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, PREVIEW_ACCOUNT_RUNS_SQL, type PreviewAsksOpenTo, type PreviewProviderTestConfig } from "@debateai/providers";
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
@@ -2004,8 +2004,14 @@ export interface ApiOptions {
    * preview. Read only with `previewProviderTestConfig`; absent there, nobody may.
    */
   readonly previewTeamUserIds?: readonly string[];
-  /** PREVIEW_ASKS_OPEN_TO set: on the preview any signed-in account may start debates; the team list is not read. */
+  /** PREVIEW_ASKS_OPEN_TO set: on the preview any signed-in account may start debates; the asks rule does not read the team list. */
   readonly previewAsksOpen?: true;
+  /**
+   * PREVIEW_ASKS_OPEN_TO's value, handed whenever `previewAsksOpen` is: read only by the buyer rule (previewBuyerAdmits),
+   * which lets any signed-in account buy under "everyone" with real payments or "everyone-with-test-payments" on the
+   * sandbox, and keeps buying to the team list otherwise. Absent, buying is the team list's on the preview.
+   */
+  readonly previewAsksOpenTo?: PreviewAsksOpenTo;
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
   /** Mandatory for signup and resend; absent configuration fails closed. */
@@ -5994,10 +6000,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // SessionService reads its repository through `this` (apps/api/src/sessions.ts:561-564).
   const billingSessions = options.sessions;
   const billingAgeConfirmation = billingSessions?.readAgeConfirmation?.bind(billingSessions);
-  // On the preview while payments are real, only an account the asks rule admits may buy or upgrade a plan: anyone else
-  // would be charged and then refused every question. On the sandbox, and off the preview, nothing changes.
-  const previewBuyerAdmits = previewConfig === undefined || options.billing?.paymentEnvironment !== "live" ? undefined
-    : (session: AuthenticatedSession) => previewAskAdmits(previewConfig, options.previewTeamUserIds, options.previewAsksOpen, session.userId);
+  // Who may start a purchase (a checkout or a plan upgrade) on the preview, by previewBuyerAdmits: any signed-in account
+  // only with real payments and asks open to everyone, or in the friends' test on the sandbox (everyone-with-test-payments);
+  // otherwise only the team list. The price requests and the card change carry no rule. Off the preview nothing changes.
+  const previewBuyerRule = previewConfig === undefined ? undefined
+    : (session: AuthenticatedSession) => previewBuyerAdmits(previewConfig, options.previewTeamUserIds, options.previewAsksOpenTo,
+      options.billing?.paymentEnvironment === "live", session.userId);
   installBillingRoutes(api, {
     ...(options.billing ?? {}),
     policy: (route: BillingRoutePath) => routePolicy(route),
@@ -6009,7 +6017,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return Object.freeze({ ip, userAgent });
     },
     ...(billingAgeConfirmation === undefined ? {} : { ageConfirmation: billingAgeConfirmation }),
-    ...(previewBuyerAdmits === undefined ? {} : { buyerAdmits: previewBuyerAdmits })
+    ...(previewBuyerRule === undefined ? {} : { buyerAdmits: previewBuyerRule })
   });
   if (options.staffPolicyVersion === 2) registerStaffRoutes(api, options.staff,
     route => routePolicy(route as AuthorizationRoute), {sourceFor, refreshedCookies});

@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Accepter først de opdaterede vilkår, og vend derefter tilbage til denne side.",
   "billing.checkout.pageOutdated": "Denne side er forældet. Genindlæs den.",
   "billing.checkout.erasurePending": "Din konto er planlagt til sletning. Annuller sletningen under Indstillinger for at abonnere eller ændre din plan.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "For mange forsøg inden for den seneste time. Prøv igen senere.",
   "billing.checkout.genericError": "Noget gik galt. Prøv igen.",
   "billing.checkout.formUnavailable": "Betalingssiden kunne ikke åbnes. Prøv igen om et minut.",

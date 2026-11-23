@@ -2,7 +2,8 @@
 // rule (stage preview-live-payments) and then the asks rule (stage preview-asks-open), each over the payment system its
 // own way: the first reads the billing connectors or the provider-only ones, the second the billing connectors only.
 // Together they must mean: asks open to everyone only with billing on, NETOPIA's live system and the owner's switch;
-// asks open with test payments only with billing on and NETOPIA's sandbox, and never with the switch.
+// asks open with test payments, or with listed buyers, only with billing on and NETOPIA's sandbox, and never with the
+// switch.
 import { describe, expect, it } from "vitest";
 import { assertPreviewLivePayments } from "../../apps/api/src/billing/stage-clock.js";
 import { assertPreviewAsksOpenBoot } from "../../apps/api/src/preview-asks-open.js";
@@ -15,7 +16,7 @@ const BILLING = {
   "billing on, sandbox": { billingConnectors: "sandbox", providerOnlyConnectors: null, billingOn: true },
   "billing on, live": { billingConnectors: "live", providerOnlyConnectors: null, billingOn: true }
 } as const;
-const ASKS = [undefined, "everyone", "everyone-with-test-payments"] as const;
+const ASKS = [undefined, "everyone", "everyone-with-test-payments", "everyone-with-listed-buyers"] as const;
 const FLAGS = [null, "real-money"] as const;
 
 /** The two stages in boot order, with main.ts's own inputs; the first refusal's code, or null when the API starts. */
@@ -40,7 +41,7 @@ describe("the asks and live payments boot rules together, on the hosted preview"
     const verdict = boot(billing, asksOpen, flag);
     if (asksOpen === "everyone") {
       expect(verdict === null).toBe(billing === "billing on, live" && flag === "real-money");
-    } else if (asksOpen === "everyone-with-test-payments") {
+    } else if (asksOpen === "everyone-with-test-payments" || asksOpen === "everyone-with-listed-buyers") {
       expect(verdict === null).toBe(billing === "billing on, sandbox" && flag === null);
     } else {
       // The team rule: only the payments rule can refuse, exactly as without the asks lock.
@@ -58,5 +59,13 @@ describe("the asks and live payments boot rules together, on the hosted preview"
     expect(boot("billing on, live", "everyone", null)).toBe("PREVIEW_LIVE_PAYMENTS_UNSET");
     expect(boot("billing on, live", "everyone-with-test-payments", "real-money")).toBe("PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX");
     expect(boot("provider-only, live", "everyone", "real-money")).toBe("PREVIEW_LIVE_PAYMENTS_BILLING_OFF");
+  });
+
+  it("names the refusal the listed buyers' value meets away from the sandbox", () => {
+    expect(boot("billing on, sandbox", "everyone-with-listed-buyers", null)).toBeNull();
+    expect(boot("billing on, live", "everyone-with-listed-buyers", "real-money")).toBe("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX");
+    expect(boot("billing off", "everyone-with-listed-buyers", null)).toBe("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX");
+    expect(boot("provider-only, sandbox", "everyone-with-listed-buyers", null)).toBe("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX");
+    expect(boot("billing on, sandbox", "everyone-with-listed-buyers", "real-money")).toBe("PREVIEW_LIVE_PAYMENTS_MISMATCH");
   });
 });

@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Please accept the updated Terms first, then come back to this page.",
   "billing.checkout.pageOutdated": "This page is out of date. Please reload it.",
   "billing.checkout.erasurePending": "Your account is scheduled for deletion. Cancel the deletion in Settings to subscribe or change your plan.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Too many tries in the last hour. Please try again later.",
   "billing.checkout.genericError": "Something went wrong. Please try again.",
   "billing.checkout.formUnavailable": "The payment page could not be opened. Please try again in a minute.",

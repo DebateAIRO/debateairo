@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Acepte primero los Términos actualizados y luego vuelva a esta página.",
   "billing.checkout.pageOutdated": "Esta página está desactualizada. Vuelva a cargarla.",
   "billing.checkout.erasurePending": "Su cuenta está programada para eliminarse. Cancele la eliminación en Configuración para suscribirse o cambiar de plan.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Demasiados intentos en la última hora. Inténtelo de nuevo más tarde.",
   "billing.checkout.genericError": "Algo salió mal. Inténtelo de nuevo.",
   "billing.checkout.formUnavailable": "No se pudo abrir la página de pago. Vuelva a intentarlo dentro de un minuto.",

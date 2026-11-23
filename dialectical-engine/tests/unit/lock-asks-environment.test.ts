@@ -1,7 +1,8 @@
 // PREVIEW_ASKS_OPEN_TO: who may start debates on the preview instead of the team. Absent, the team rule is unchanged.
-// "everyone" and "everyone-with-test-payments" let any signed-in account ask; a session without a user id is still
-// refused. The API and the runner parse it with the same shared parser, so both decide alike, and every refusal is a
-// TypeError whose message is its code, which the launchers print by name.
+// "everyone", "everyone-with-test-payments" and "everyone-with-listed-buyers" let any signed-in account ask; a session
+// without a user id is still refused. The first two refuse a team line beside them; the third requires one, which then
+// names only who may buy. The API and the runner parse it with the same shared parser, so both decide alike, and every
+// refusal is a TypeError whose message is its code, which the launchers print by name.
 import { describe, expect, it } from "vitest";
 import {
   parsePreviewAsksOpenTo, parsePreviewProviderTestConfig, previewAskAdmits, previewTeamAdmits, PREVIEW_ASKS_OPEN_TO_VALUES
@@ -78,9 +79,9 @@ describe("PREVIEW_ASKS_OPEN_TO in both environment shapes", () => {
     }
   });
 
-  it("the shared parser, alone: the order of its rules and its two values", () => {
+  it("the shared parser, alone: the order of its rules and its three values", () => {
     const open = { previewConfigured: true, teamKeyPresent: false, hosted: true };
-    expect(PREVIEW_ASKS_OPEN_TO_VALUES).toEqual(["everyone", "everyone-with-test-payments"]);
+    expect(PREVIEW_ASKS_OPEN_TO_VALUES).toEqual(["everyone", "everyone-with-test-payments", "everyone-with-listed-buyers"]);
     expect(parsePreviewAsksOpenTo(undefined, { previewConfigured: false, teamKeyPresent: true, hosted: false })).toBeUndefined();
     expect(parsePreviewAsksOpenTo("everyone", open)).toBe("everyone");
     expect(parsePreviewAsksOpenTo("everyone-with-test-payments", open)).toBe("everyone-with-test-payments");
@@ -89,6 +90,57 @@ describe("PREVIEW_ASKS_OPEN_TO in both environment shapes", () => {
     expect(() => parsePreviewAsksOpenTo("everyone", { previewConfigured: false, teamKeyPresent: true, hosted: false })).toThrow("PREVIEW_ASKS_OPEN_TO_WITHOUT_PREVIEW");
     expect(() => parsePreviewAsksOpenTo("everyone", { ...open, teamKeyPresent: true, hosted: false })).toThrow("PREVIEW_ASKS_OPEN_TO_WITH_TEAM");
     expect(() => parsePreviewAsksOpenTo("everyone", { ...open, hosted: false })).toThrow("PREVIEW_ASKS_OPEN_TO_NOT_HOSTED");
+  });
+});
+
+describe("PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers: asks open, and the team line names who may buy", () => {
+  const OTHER = "9f8e7d6c-5b4a-4321-9876-543210fedcba";
+  const LISTED = { PREVIEW_PROVIDER_TEST_CONFIG_JSON: PREVIEW, PREVIEW_ASKS_OPEN_TO: "everyone-with-listed-buyers" } as const;
+
+  it.each(parsers)("%s: with the team line it opens asks and keeps the team, listed or empty", (_name, parse) => {
+    const parsed = parse({ ...LISTED, PREVIEW_TEAM_USER_IDS_JSON: JSON.stringify([ALICE, OTHER]) });
+    expect(parsed.PREVIEW_ASKS_OPEN).toBe("everyone-with-listed-buyers");
+    expect(parsed.PREVIEW_TEAM_USER_IDS).toEqual([ALICE, OTHER]);
+    // An empty list is a list: nobody may buy.
+    const empty = parse({ ...LISTED, PREVIEW_TEAM_USER_IDS_JSON: "[]" });
+    expect(empty.PREVIEW_ASKS_OPEN).toBe("everyone-with-listed-buyers");
+    expect(empty.PREVIEW_TEAM_USER_IDS).toEqual([]);
+  });
+
+  it.each(parsers)("%s: without the team line it refuses to boot, naming its own code; the other rules still apply", (_name, parse) => {
+    for (const [label, extra, hosted, code] of [
+      ["no team line", LISTED, true, "PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_WITHOUT_TEAM"],
+      // The team line's own rule names the missing preview first, as it does for the team rule.
+      ["no preview configuration", { PREVIEW_ASKS_OPEN_TO: "everyone-with-listed-buyers", PREVIEW_TEAM_USER_IDS_JSON: JSON.stringify([ALICE]) }, true,
+        "PREVIEW_TEAM_USER_IDS_WITHOUT_PREVIEW"],
+      ["no preview configuration and no team line", { PREVIEW_ASKS_OPEN_TO: "everyone-with-listed-buyers" }, true, "PREVIEW_ASKS_OPEN_TO_WITHOUT_PREVIEW"],
+      ["local mode", { ...LISTED, PREVIEW_TEAM_USER_IDS_JSON: JSON.stringify([ALICE]) }, false, "PREVIEW_ASKS_OPEN_TO_NOT_HOSTED"],
+      ["a malformed team line", { ...LISTED, PREVIEW_TEAM_USER_IDS_JSON: "[\"not-an-id\"]" }, true, "PREVIEW_TEAM_USER_IDS_INVALID"]
+    ] as const) {
+      expect(() => parse(extra, hosted), label).toThrow(new RegExp(`^${code}$`));
+    }
+  });
+
+  it("the shared parser, alone: the team key is required with this value and refused with the other two", () => {
+    const context = { previewConfigured: true, teamKeyPresent: true, hosted: true };
+    expect(parsePreviewAsksOpenTo("everyone-with-listed-buyers", context)).toBe("everyone-with-listed-buyers");
+    expect(() => parsePreviewAsksOpenTo("everyone-with-listed-buyers", { ...context, teamKeyPresent: false }))
+      .toThrow("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_WITHOUT_TEAM");
+    for (const value of ["everyone", "everyone-with-test-payments"]) {
+      expect(() => parsePreviewAsksOpenTo(value, context), value).toThrow("PREVIEW_ASKS_OPEN_TO_WITH_TEAM");
+    }
+    // A bad value and a missing preview are named first, as for the other values; hosted mode is checked last.
+    expect(() => parsePreviewAsksOpenTo("everyone-with-listed-buyers", { previewConfigured: false, teamKeyPresent: false, hosted: false }))
+      .toThrow("PREVIEW_ASKS_OPEN_TO_WITHOUT_PREVIEW");
+    expect(() => parsePreviewAsksOpenTo("everyone-with-listed-buyers", { ...context, teamKeyPresent: false, hosted: false }))
+      .toThrow("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_WITHOUT_TEAM");
+    expect(() => parsePreviewAsksOpenTo("everyone-with-listed-buyers", { ...context, hosted: false })).toThrow("PREVIEW_ASKS_OPEN_TO_NOT_HOSTED");
+  });
+
+  it("its two new start refusals are named refusals the launchers print", () => {
+    for (const code of ["PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_WITHOUT_TEAM", "PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX"]) {
+      expect(refusals.isNamedRefusal(code), code).toBe(true);
+    }
   });
 });
 
@@ -143,8 +195,17 @@ describe("the launchers name a refused value of PREVIEW_ASKS_OPEN_TO and pass an
     expect(narrowed("api", api({ PREVIEW_ASKS_OPEN_TO: value })).environment.PREVIEW_ASKS_OPEN_TO).toBe(value);
     expect(narrowed("runner", runner({ PREVIEW_ASKS_OPEN_TO: value })).environment.PREVIEW_ASKS_OPEN_TO).toBe(value);
   });
+  it("admits everyone-with-listed-buyers beside the team line, in both services", () => {
+    const extra = { PREVIEW_ASKS_OPEN_TO: "everyone-with-listed-buyers", PREVIEW_TEAM_USER_IDS_JSON: JSON.stringify([ALICE]) };
+    for (const service of ["api", "runner"] as const) {
+      const environment = narrowed(service, service === "api" ? api(extra) : runner(extra)).environment;
+      expect(environment.PREVIEW_ASKS_OPEN_TO, service).toBe("everyone-with-listed-buyers");
+      expect(environment.PREVIEW_TEAM_USER_IDS_JSON, service).toBe(JSON.stringify([ALICE]));
+    }
+  });
   it.each([
     ["a value of neither form", { PREVIEW_ASKS_OPEN_TO: "yes" }, "PREVIEW_ASKS_OPEN_TO_INVALID"],
+    ["everyone-with-listed-buyers without the team line", { PREVIEW_ASKS_OPEN_TO: "everyone-with-listed-buyers" }, "PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_WITHOUT_TEAM"],
     ["a team beside it", { PREVIEW_ASKS_OPEN_TO: "everyone", PREVIEW_TEAM_USER_IDS_JSON: JSON.stringify([ALICE]) }, "PREVIEW_ASKS_OPEN_TO_WITH_TEAM"]
   ])("refuses %s with the code on the launcher's line, and never the value", (_name, extra, code) => {
     for (const service of ["api", "runner"] as const) {

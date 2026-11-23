@@ -15,7 +15,9 @@ export type PreviewAsksOpenBootInput = Readonly<{
  * payments: on the sandbox anyone could pay for a plan with the provider's public test card and get real AI credit, and
  * with billing off an account has no plan window of its own, so a couple of accounts could use up the site's whole day.
  * "everyone-with-test-payments" names exactly the sandbox test, so it is refused on any other payment system, and the
- * boot line always says which one strangers meet.
+ * boot line always says which one strangers meet. "everyone-with-listed-buyers" names a sandbox test too, where anyone
+ * may ask and only the listed accounts may buy, so it is refused on any other payment system as well: with billing off
+ * no account has a plan window of its own, and real payments are opened to strangers only by "everyone".
  */
 export function assertPreviewAsksOpenBoot(input: PreviewAsksOpenBootInput): void {
   if (input.asksOpen === undefined) return;
@@ -29,9 +31,23 @@ export function assertPreviewAsksOpenBoot(input: PreviewAsksOpenBootInput): void
   if (input.asksOpen === "everyone-with-test-payments" && input.paymentEnvironment !== "sandbox") {
     throw new TypeError("PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX");
   }
+  if (input.asksOpen === "everyone-with-listed-buyers" && input.paymentEnvironment !== "sandbox") {
+    throw new TypeError("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX");
+  }
 }
 
 /** The one content-free boot line naming which opening runs; null with the team rule. */
 export function previewAsksOpenBootLine(asksOpen: PreviewAsksOpenTo | undefined): string | null {
   return asksOpen === undefined ? null : JSON.stringify({ event: "api.preview.asks_open", to: asksOpen });
+}
+
+/**
+ * With "everyone-with-listed-buyers", a second content-free line: how many accounts the team line lists, which are the
+ * accounts that may buy. A count only, never an id. Null with any other value.
+ */
+export function previewListedBuyersBootLine(
+  asksOpen: PreviewAsksOpenTo | undefined, teamUserIds: readonly string[] | undefined
+): string | null {
+  return asksOpen !== "everyone-with-listed-buyers" ? null
+    : JSON.stringify({ event: "api.preview.listed_buyers", count: teamUserIds?.length ?? 0 });
 }

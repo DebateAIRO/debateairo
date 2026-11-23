@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "אשרו קודם את התנאים המעודכנים, ואז חזרו לדף הזה.",
   "billing.checkout.pageOutdated": "הדף הזה אינו מעודכן. טענו אותו מחדש.",
   "billing.checkout.erasurePending": "החשבון שלכם מתוזמן למחיקה. בטלו את המחיקה בהגדרות כדי להירשם או לשנות את התוכנית.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "יותר מדי ניסיונות בשעה האחרונה. נסו שוב מאוחר יותר.",
   "billing.checkout.genericError": "משהו השתבש. נסו שוב.",
   "billing.checkout.formUnavailable": "לא ניתן היה לפתוח את דף התשלום. נסו שוב בעוד דקה.",

@@ -251,6 +251,17 @@ test("each refusal D6b's routes answer is worded as the server means it, in Engl
   for (const key of Object.keys(expected)) assert.doesNotMatch(english[key], /password|code/iu, key);
 });
 
+test("the preview's buyer rule (403 PREVIEW_TEAM_ONLY) has its own sentence, in English exactly, on the order page and in Settings", () => {
+  const english = catalogue("en");
+  assert.equal(english["billing.checkout.invitedBuyersOnly"],
+    "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.");
+  // The order page maps the code through checkoutFailure.ts; Settings' upgrade through its own refusal table.
+  assert.match(source("lib/billing/checkoutFailure.ts"), /PREVIEW_TEAM_ONLY: "billing\.checkout\.invitedBuyersOnly"/u);
+  assert.match(source("components/billing/SubscriptionControls.tsx"), /PREVIEW_TEAM_ONLY: Object\.freeze\(\{ key: "billing\.checkout\.invitedBuyersOnly", reload: false \}\)/u);
+  // Nothing was charged: the sentence blames neither the card nor the person, and names no password.
+  assert.doesNotMatch(english["billing.checkout.invitedBuyersOnly"], /card|password|refused|declined/iu);
+});
+
 test("the withdrawal sentences give everyone the 14 days and one refund rule, in English exactly (owner's decision of 16 November 2026)", () => {
   const english = catalogue("en");
   // Who: everyone the site serves, wherever they live. No country or region is named.

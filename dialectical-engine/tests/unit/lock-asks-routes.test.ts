@@ -1,6 +1,8 @@
-// PREVIEW_ASKS_OPEN_TO on the API's five front doors and submit: with asks open, a signed-in account outside the (empty)
-// team passes the team rule everywhere it applies; a principal with no user id is still refused. Each case is a pair:
-// the same request with the setting absent gets today's team refusal.
+// PREVIEW_ASKS_OPEN_TO on the API's five front doors and submit: with asks open, a signed-in account outside the team
+// passes the team rule everywhere it applies; a principal with no user id is still refused. Each case is a set: the same
+// request with the setting absent gets today's team refusal. Under everyone-with-listed-buyers the team line is in the
+// file and lists someone else: it names who may buy and never narrows who may ask; that mode is composed from the API
+// file through the API's own parser, as main.ts composes it.
 import { describe, expect, it } from "vitest";
 import { buildApi, evaluateAskAdmission, PostgresAskApplication, type AskApplication, type RunCreationSettings } from "@debateai/api";
 import type { AskRequest, StartListsEvent } from "@debateai/contract";
@@ -12,14 +14,18 @@ import { newStartStepKey } from "../../apps/api/src/start-step/signing.js";
 import type { StartListsInput, StartStepPort } from "../../apps/api/src/start-step/step.js";
 import { parseStartStepFrames } from "@debateai/contract";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders, type TestHttpIdentity } from "../support/httpSession.js";
+import { parsedPreviewApiEnvironment, previewApiOptionsOf } from "../support/previewAsksComposition.js";
 import { questionCheckPass } from "../support/questionCheckPass.js";
 import { testReleaseKey } from "../support/releaseKey.js";
 
 const MODEL = "zai-org/GLM-5.3-Flash";
-const PREVIEW = parsePreviewProviderTestConfig(JSON.stringify({
+const PREVIEW_JSON = JSON.stringify({
   deployment: "v3-preview", free_model_ids: [MODEL], requested_thinking_level: "high",
   budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture"
-}))!;
+});
+const PREVIEW = parsePreviewProviderTestConfig(PREVIEW_JSON)!;
+/** The one account the team line lists under everyone-with-listed-buyers: never the person asking below. */
+const LISTED_BUYER = "0b7c6f1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e";
 const ASK = Object.freeze({
   question_line: "Should cities price congestion on central roads?", risk_tier: "casual", tier_source: "ASKER",
   tier_provenance_ref: "asker-declaration:test", composition_budget_tier: "low", plan_tier: "free", depth_params: { depth: 1 },
@@ -27,10 +33,16 @@ const ASK = Object.freeze({
 });
 const QUESTION = "Should the town build a second pier?";
 const PURPOSE = { text: "What do you want the answer for?", answers: ["To vote on it", "To write to the council"] };
-/** Both modes of the same preview: asks open to everyone (with an empty team, as the parser demands) or today's team rule. */
-const MODES = [["open", true], ["absent", false]] as const;
-const previewOptions = (open: boolean) => ({ previewProviderTestConfig: PREVIEW, previewTeamUserIds: [] as readonly string[],
-  ...(open ? { previewAsksOpen: true as const } : {}) });
+/**
+ * The modes of the same preview: asks open to everyone (with an empty team, as the parser demands), asks open with the
+ * team line naming the buyers, or today's team rule. `open`: whether a signed-in account outside the team may ask.
+ */
+const MODES = [["open", true], ["listed buyers", true], ["absent", false]] as const;
+type Mode = typeof MODES[number][0];
+const previewOptions = (mode: Mode) => mode === "listed buyers"
+  ? previewApiOptionsOf(PREVIEW, parsedPreviewApiEnvironment(PREVIEW_JSON, {
+    PREVIEW_ASKS_OPEN_TO: "everyone-with-listed-buyers", PREVIEW_TEAM_USER_IDS_JSON: JSON.stringify([LISTED_BUYER]) }))
+  : { previewProviderTestConfig: PREVIEW, previewTeamUserIds: [] as readonly string[], ...(mode === "open" ? { previewAsksOpen: true as const } : {}) };
 
 type Counters = { submitted: number; probes: number; quota: number };
 function askApplication(counters: Counters): AskApplication {
@@ -67,7 +79,7 @@ describe("POST /v1/asks: the pre-flight team check", () => {
     const admission = { decide: () => { counters.quota += 1; return { allowed: true }; } } as unknown as AdmissionLimiter;
     const countryGate = { recordedCountry: () => null, ask: () => null } as unknown as CountryGate;
     const sessions = { ...testSessionApplication([stranger]), readSensitiveDataConsent: async () => "given" as const };
-    const api = buildApi({ ...previewOptions(open), application: askApplication(counters), questionCheck: questionCheckPass, sessions, admission,
+    const api = buildApi({ ...previewOptions(mode), application: askApplication(counters), questionCheck: questionCheckPass, sessions, admission,
       countryGate, allowedOrigin: TEST_APP_ORIGIN });
     try {
       const response = await api.inject({ method: "POST", url: "/v1/asks", headers: testSessionHeaders(stranger, true), payload: ASK });
@@ -92,7 +104,7 @@ describe("POST /v1/asks/clarify", () => {
     const seen: string[] = [];
     const sessions = { ...testSessionApplication([stranger]), readSensitiveDataConsent: async () => "given" };
     const application = { submit: async () => { throw new Error("not reached"); } } as unknown as AskApplication;
-    const api = buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN, ...previewOptions(open),
+    const api = buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN, ...previewOptions(mode),
       askClarify: { read: async (_ownerRef: string, question: string) => { seen.push(question); return { source: "AI" as const, questions: [], purpose: PURPOSE }; } }
     } as never);
     try {
@@ -120,7 +132,7 @@ describe("POST /v1/asks/paths/lists (the calls before Start)", () => {
     const sessions = { ...testSessionApplication([stranger]), readSensitiveDataConsent: async () => "given" as const };
     const application = { readRun: async () => null } as unknown as AskApplication;
     const api = buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN, startStep: port, startStepKey: key,
-      admissionView: async () => Object.freeze({ registerVersion: 31, modelScorecardInForce: false }), ...previewOptions(open) });
+      admissionView: async () => Object.freeze({ registerVersion: 31, modelScorecardInForce: false }), ...previewOptions(mode) });
     try {
       const response = await api.inject({ method: "POST", url: "/v1/asks/paths/lists", headers: testSessionHeaders(stranger, true),
         payload: { question_line: "Should the town build a second ferry pier before next summer?", reading_level: "plain" } });
@@ -148,7 +160,7 @@ describe("the saved questions' routes", () => {
     } as unknown as SavedQuestionService;
     const sessions = { ...testSessionApplication([stranger]), readSensitiveDataConsent: async () => "given" as const };
     const application = { submit: async () => { throw new Error("not reached"); } } as unknown as AskApplication;
-    const api = buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN, savedQuestions: service, ...previewOptions(open) });
+    const api = buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN, savedQuestions: service, ...previewOptions(mode) });
     try {
       const response = await api.inject({ method: "GET", url: "/v1/account/saved-questions", headers: testSessionHeaders(stranger, true) });
       expect(response.statusCode).toBe(409);
@@ -169,37 +181,35 @@ describe("PostgresAskApplication.submit (the second check)", () => {
   const submit = (that: unknown, session: unknown, principal: unknown) =>
     PostgresAskApplication.prototype.submit.call(that as never, ASK as unknown as AskRequest, session as never, principal as never);
 
-  it.each(MODES)("%s: a server principal outside the team", async (_mode, open) => {
+  it.each(MODES)("%s: a server principal outside the team", async (mode, open) => {
     const reads = { billing: 0 };
-    const that = self(previewOptions(open) as Partial<RunCreationSettings>, reads);
+    const that = self(previewOptions(mode) as Partial<RunCreationSettings>, reads);
     if (open) await expect(submit(that, stranger.authenticated.session, server(stranger))).rejects.toThrow(PAST_GATE);
     else await expect(submit(that, stranger.authenticated.session, server(stranger))).rejects.toMatchObject({ name: "AskRefusal", code: "PREVIEW_TEAM_ONLY" });
     expect(reads.billing).toBe(open ? 1 : 0);
   });
 
-  it("open: a legacy principal, which has no user id, is still refused PREVIEW_TEAM_ONLY", async () => {
+  it.each(MODES.filter(([, open]) => open))("%s: a legacy principal, which has no user id, is still refused PREVIEW_TEAM_ONLY", async (mode) => {
     const reads = { billing: 0 };
     const legacySession = Object.freeze({ ...stranger.authenticated.session, ownership_provenance: "legacy_cookie", asker_id: "legacy-asker" });
-    await expect(submit(self(previewOptions(true) as Partial<RunCreationSettings>, reads), legacySession, { kind: "legacy", legacyAskerId: "legacy-asker" }))
+    await expect(submit(self(previewOptions(mode) as Partial<RunCreationSettings>, reads), legacySession, { kind: "legacy", legacyAskerId: "legacy-asker" }))
       .rejects.toMatchObject({ name: "AskRefusal", code: "PREVIEW_TEAM_ONLY" });
     expect(reads.billing).toBe(0);
   });
 });
 
 describe("open asks still need a signed-in account", () => {
-  it("POST /v1/asks with no session is refused, open or not", async () => {
-    for (const [, open] of MODES) {
-      const counters: Counters = { submitted: 0, probes: 0, quota: 0 };
-      const api = buildApi({ ...previewOptions(open), application: askApplication(counters), questionCheck: questionCheckPass,
-        sessions: testSessionApplication([]), allowedOrigin: TEST_APP_ORIGIN });
-      try {
-        const response = await api.inject({ method: "POST", url: "/v1/asks", headers: { origin: TEST_APP_ORIGIN }, payload: ASK });
-        expect(response.statusCode).toBeGreaterThanOrEqual(400);
-        expect(response.statusCode).toBeLessThan(500);
-        expect(counters.submitted).toBe(0);
-      } finally {
-        await api.close();
-      }
+  it.each(MODES)("%s: POST /v1/asks with no session is refused", async (mode) => {
+    const counters: Counters = { submitted: 0, probes: 0, quota: 0 };
+    const api = buildApi({ ...previewOptions(mode), application: askApplication(counters), questionCheck: questionCheckPass,
+      sessions: testSessionApplication([]), allowedOrigin: TEST_APP_ORIGIN });
+    try {
+      const response = await api.inject({ method: "POST", url: "/v1/asks", headers: { origin: TEST_APP_ORIGIN }, payload: ASK });
+      expect(response.statusCode).toBeGreaterThanOrEqual(400);
+      expect(response.statusCode).toBeLessThan(500);
+      expect(counters.submitted).toBe(0);
+    } finally {
+      await api.close();
     }
   });
 });

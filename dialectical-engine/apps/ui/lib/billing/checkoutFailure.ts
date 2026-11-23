@@ -31,6 +31,8 @@ const KEY_BY_SERVER_CODE: Readonly<Record<string, string>> = Object.freeze({
   BILLING_PHONE_INVALID: "billing.checkout.phoneInvalid",
   // D6b P15 (409): an account deletion is pending, so the quote and the checkout take no new money.
   ACCOUNT_ERASURE_PENDING: "billing.checkout.erasurePending",
+  // The preview's buyer rule (403): only invited accounts may buy for now. The price was shown; nothing was written.
+  PREVIEW_TEAM_ONLY: "billing.checkout.invitedBuyersOnly",
   // P8c's age guard (R3-2, 503): the server could not read the one-time age check, so it took nothing. Try again.
   AGE_CHECK_UNAVAILABLE: "billing.checkout.genericError",
   // P8c's age guard (R3-2, 403): CheckoutFlow sends the person to the age gate's interstitial instead of a sentence;

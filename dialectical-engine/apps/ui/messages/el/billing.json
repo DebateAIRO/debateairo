@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Αποδεχτείτε πρώτα τους ενημερωμένους Όρους και, στη συνέχεια, επιστρέψτε σε αυτή τη σελίδα.",
   "billing.checkout.pageOutdated": "Αυτή η σελίδα δεν είναι ενημερωμένη. Φορτώστε την ξανά.",
   "billing.checkout.erasurePending": "Ο λογαριασμός σας έχει προγραμματιστεί για διαγραφή. Ακυρώστε τη διαγραφή στις Ρυθμίσεις για να εγγραφείτε συνδρομητής ή να αλλάξετε πρόγραμμα.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Πάρα πολλές προσπάθειες την τελευταία ώρα. Δοκιμάστε ξανά αργότερα.",
   "billing.checkout.genericError": "Κάτι πήγε στραβά. Δοκιμάστε ξανά.",
   "billing.checkout.formUnavailable": "Δεν ήταν δυνατό να ανοίξει η σελίδα πληρωμής. Δοκιμάστε ξανά σε ένα λεπτό.",
