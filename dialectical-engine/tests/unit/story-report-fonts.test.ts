@@ -6,17 +6,21 @@ import { reportLayout } from "../../apps/ui/lib/report/reportLayout.js";
 
 const NON_LATIN = ["bg", "ru", "uk", "el", "he", "ar", "hi", "zh", "ja", "ko"];
 const LATIN = LOCALES.map(({ code }) => code).filter((code) => !NON_LATIN.includes(code));
-const { sans, serif, notoSans, hebrew, devanagari, simplifiedChinese, japanese, korean } = REPORT_FONT_FAMILIES;
+const { text, display, sans, notoSans, hebrew, devanagari, simplifiedChinese, japanese, korean } = REPORT_FONT_FAMILIES;
 
 describe("the report's faces, chosen from its language (lib/report/reportFonts.ts)", () => {
-  it("keeps today's look for every Latin-script locale: Plus Jakarta Sans for the text, Fraunces for the part titles", () => {
+  // Design Document v2 (owner, 18 November 2026): the PDF prints in the site's own faces. Vietnamese keeps Plus
+  // Jakarta Sans for its text, because Instrument Sans lacks most Vietnamese letters (fonts.test.mjs checks it).
+  it("prints every Latin-script locale in the site's faces: Instrument Sans for the text, Bricolage Grotesque for the part titles", () => {
     expect(LATIN).toHaveLength(25);
     for (const locale of LATIN) {
       expect(reportScript(locale), locale).toBe("latin");
       const faces = reportFaces(locale, "Răspunsul nostru");
-      expect(faces.body[0], locale).toBe(sans);
-      expect(faces.heading.slice(0, 2), locale).toEqual([serif, sans]);
-      expect(faces.headingWeight, locale).toBe(600);
+      const own = locale === "vi" ? sans : text;
+      expect(faces.body[0], locale).toBe(own);
+      expect(faces.body, locale).toEqual(locale === "vi" ? [sans, notoSans] : [text, notoSans, sans]);
+      expect(faces.heading.slice(0, 2), locale).toEqual([display, own]);
+      expect(faces.headingWeight, locale).toBe(700);
     }
   });
 
@@ -34,8 +38,9 @@ describe("the report's faces, chosen from its language (lib/report/reportFonts.t
       if (second) expect(faces.body[0], locale).toBe(notoSans);
       expect(faces.heading, locale).toEqual(faces.body);
       expect(faces.headingWeight, locale).toBe(700);
-      // Fraunces is a Latin display face: never outside a Latin report.
-      expect(faces.heading, locale).not.toContain(serif);
+      // Bricolage Grotesque and Instrument Sans are Latin faces: never outside a Latin report.
+      expect(faces.heading, locale).not.toContain(display);
+      expect(faces.body, locale).not.toContain(text);
     }
   });
 
@@ -48,10 +53,10 @@ describe("the report's faces, chosen from its language (lib/report/reportFonts.t
   });
 
   it("adds a face for another script only when the report's text holds it, so a Latin report never loads the CJK files", () => {
-    expect(reportFaces("ro", "Răspunsul nostru: mutați-vă treptat, cu Zoom și α").body).toEqual([sans, notoSans]);
-    expect(reportFaces("ro", "Citat: 日本語のテキスト").body).toEqual([sans, notoSans, japanese, simplifiedChinese]);
-    expect(reportFaces("ro", "Citat: 中文").body).toEqual([sans, notoSans, simplifiedChinese]);
-    expect(reportFaces("en", "Quote: 한국어").body).toEqual([sans, notoSans, korean]);
+    expect(reportFaces("ro", "Răspunsul nostru: mutați-vă treptat, cu Zoom și α").body).toEqual([text, notoSans, sans]);
+    expect(reportFaces("ro", "Citat: 日本語のテキスト").body).toEqual([text, notoSans, sans, japanese, simplifiedChinese]);
+    expect(reportFaces("ro", "Citat: 中文").body).toEqual([text, notoSans, sans, simplifiedChinese]);
+    expect(reportFaces("en", "Quote: 한국어").body).toEqual([text, notoSans, sans, korean]);
     expect(reportFaces("ru", "Цитата: שלום и नमस्ते").body).toEqual([notoSans, sans, hebrew, devanagari]);
     expect(reportFaces("he", "").body).toEqual([notoSans, hebrew, sans]);
     expect(reportFaces("hi", "").body).toEqual([notoSans, devanagari, sans]);
@@ -67,14 +72,14 @@ describe("the report's faces, chosen from its language (lib/report/reportFonts.t
 
   it("registers only regular, bold, and italic where the script has one; a script without an italic prints it upright", () => {
     for (const [family, faces] of Object.entries(REPORT_FONT_FACES)) {
-      if (family === serif) {
-        expect(faces.map(({ fontWeight, fontStyle }) => `${fontWeight} ${fontStyle}`)).toEqual(["600 normal"]);
+      if (family === display) {
+        expect(faces.map(({ fontWeight, fontStyle }) => `${fontWeight} ${fontStyle}`)).toEqual(["700 normal"]);
         continue;
       }
       expect(faces.map(({ fontWeight, fontStyle }) => `${fontWeight} ${fontStyle}`), family).toEqual(["400 normal", "400 italic", "700 normal"]);
       const regular = faces[0]!.file;
       const italic = faces[1]!.file;
-      if (family === sans || family === notoSans) expect(italic, family).toMatch(/-Italic\.ttf$/u);
+      if (family === text || family === sans || family === notoSans) expect(italic, family).toMatch(/-Italic\.ttf$/u);
       else expect(italic, family).toBe(regular);
     }
   });

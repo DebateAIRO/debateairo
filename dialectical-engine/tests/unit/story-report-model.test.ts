@@ -566,9 +566,9 @@ describe("the PDF's text styles (apps/ui/lib/report/ReportDocument.tsx)", () => 
     expect(source).toMatch(/language=\{model\.language\}/u);
   });
 
-  it("uses the serif family for the fixed headings only", () => {
-    expect([...styles].filter(([, body]) => body.includes("REPORT_FONT_SERIF")).map(([name]) => name)).toEqual(["heading"]);
-    // The report's language adds its own faces (lib/report/reportFonts.ts): Fraunces first only in a Latin report.
+  it("uses the display family for the fixed headings only", () => {
+    expect([...styles].filter(([, body]) => body.includes("REPORT_FONT_DISPLAY")).map(([name]) => name)).toEqual(["heading"]);
+    // The report's language adds its own faces (lib/report/reportFonts.ts): Bricolage Grotesque first only in a Latin report.
     expect(source.match(/style=\{\[styles\.heading, look\.heading\]\}/gu)).toHaveLength(1);
     expect(source.match(/styles\.heading\b/gu)).toHaveLength(1);
   });

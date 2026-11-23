@@ -175,9 +175,9 @@ describe("Privacy Policy: what happens when you press Next, and the questions no
     expect(Object.keys(SITE_UPDATE_CLAUSE).sort()).toEqual(LOCALES.map(({ code }) => code).sort());
   });
 
-  it("leaves out of the first-translation checks only the translations brought up to date for the release", () => {
+  it("leaves out of the first-translation checks only the translations brought up to date from the current English", () => {
     const left = LOCALES.map(({ code }) => code).filter((code) => !FIRST_TRANSLATION.includes(code));
-    expect([...left].sort()).toEqual(["fr", "ro"]);
+    expect([...left].sort()).toEqual(["fr", "ja", "ko", "ro"]);
     for (const code of left) expect(translatedFrom[code]?.sha256, code).toBe(englishNow);
   });
 

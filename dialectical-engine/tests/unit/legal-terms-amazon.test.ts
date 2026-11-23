@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -19,6 +20,13 @@ const section = (text: string, no: number): string => {
 };
 const paragraphs = (body: string): string[] => body.split("\n").filter((line) => line.trim() !== "");
 const RELEASED = ["en", "ro", "fr"];
+/** Not offered yet, but recorded in translated-from.json as translated from the current English: they carry the paragraph too. */
+const englishNow = createHash("sha256").update(draft("en"), "utf8").digest("hex");
+const translatedFrom = (JSON.parse(readFileSync(resolve(process.cwd(), "apps/ui/legal/translated-from.json"), "utf8")) as {
+  TERMS: Record<string, { sha256: string }>;
+}).TERMS;
+const CURRENT_NOT_OFFERED = LOCALES.map(({ code }) => code)
+  .filter((code) => !RELEASED.includes(code) && translatedFrom[code]?.sha256 === englishNow);
 
 /** English, word for word: section 8's paragraph on Amazon, the Privacy Policy's shortened. */
 const AMAZON =
@@ -72,8 +80,22 @@ describe("Terms of Service: Amazon Web Services serves one of the debate models"
     expect(draft(code), code).not.toMatch(/GPT|Luna|ChatGPT/u);
   });
 
-  it("the languages the release does not offer yet carry no paragraph on Amazon Bedrock", () => {
-    for (const { code } of LOCALES.filter(({ code }) => !RELEASED.includes(code))) {
+  it("the not-offered translations brought up to date are ja and ko", () => {
+    expect(CURRENT_NOT_OFFERED).toEqual(["ja", "ko"]);
+  });
+
+  it.each(CURRENT_NOT_OFFERED.map((code) => [code]))("%s: one paragraph names Amazon Bedrock, between DeepInfra's and Perplexity's", (code) => {
+    const all = paragraphs(section(draft(code), 8));
+    const added = all.filter((line) => line.includes("Amazon Bedrock"));
+    expect(added, `${code}: one paragraph names Amazon Bedrock`).toHaveLength(1);
+    const at = all.indexOf(added[0]!);
+    expect(all[at - 1], `${code}: after DeepInfra's`).toContain("Deep Infra Inc.");
+    expect(all[at + 1], `${code}: before Perplexity's`).toContain("Perplexity AI, Inc.");
+    expect(added[0]!.split("Amazon Web Services EMEA SARL"), `${code}: the contracting company, once`).toHaveLength(2);
+  });
+
+  it("the languages that follow an older English text carry no paragraph on Amazon Bedrock", () => {
+    for (const { code } of LOCALES.filter(({ code }) => !RELEASED.includes(code) && !CURRENT_NOT_OFFERED.includes(code))) {
       expect(draft(code), code).not.toContain("Amazon Bedrock");
     }
   });

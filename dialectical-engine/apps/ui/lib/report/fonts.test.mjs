@@ -23,14 +23,18 @@ const open = (font) => {
   return opened.get(font);
 };
 
-// A Latin-script report's faces: Fraunces 600 for the fixed headings, Plus
-// Jakarta Sans 400, 400 italic and 700 for everything else.
+// A Latin-script report's faces (Design Document v2): Bricolage Grotesque 700 for the fixed headings, Instrument
+// Sans 400, 400 italic and 700 for the text, and Plus Jakarta Sans in the same three for Vietnamese text and for ≈.
 const LATIN_FACES = [
-  "fraunces/Fraunces9pt-SemiBold.ttf",
+  "bricolage-grotesque/BricolageGrotesque-Bold.ttf",
+  "instrument-sans/InstrumentSans-Regular.ttf",
+  "instrument-sans/InstrumentSans-Italic.ttf",
+  "instrument-sans/InstrumentSans-Bold.ttf",
   "plus-jakarta-sans/PlusJakartaSans-Regular.ttf",
   "plus-jakarta-sans/PlusJakartaSans-Italic.ttf",
   "plus-jakarta-sans/PlusJakartaSans-Bold.ttf"
 ];
+const TEXT = LATIN_FACES.filter((font) => font.startsWith("instrument-sans/"));
 const SANS = LATIN_FACES.filter((font) => font.startsWith("plus-jakarta-sans/"));
 // The standard PDF fonts cannot print ș and ț; every Latin face must.
 const ROMANIAN = [..."șțăîâȘȚĂÎÂ„”"];
@@ -119,13 +123,15 @@ function uncovered(families, text, fontWeight, fontStyle) {
 const STYLES = [[400, "normal"], [700, "normal"], [400, "italic"]];
 
 test("checks each weight in the face react-pdf prints it in: a 600 heading prints in a family's bold when it has no 600", () => {
-  assert.equal(faceFile("ReportSerif", 600, "normal"), "fraunces/Fraunces9pt-SemiBold.ttf");
+  assert.equal(faceFile("ReportDisplay", 700, "normal"), "bricolage-grotesque/BricolageGrotesque-Bold.ttf");
+  assert.equal(faceFile("ReportText", 600, "normal"), "instrument-sans/InstrumentSans-Bold.ttf");
+  assert.equal(faceFile("ReportText", 400, "italic"), "instrument-sans/InstrumentSans-Italic.ttf");
   assert.equal(faceFile("ReportSans", 600, "normal"), "plus-jakarta-sans/PlusJakartaSans-Bold.ttf");
   assert.equal(faceFile("ReportNotoSans", 600, "normal"), "noto-sans/NotoSans-Bold.ttf");
   assert.equal(faceFile("ReportNotoSans", 400, "italic"), "noto-sans/NotoSans-Italic.ttf");
   // A script without an italic prints the italic style in its regular face.
   assert.equal(faceFile("ReportNotoSC", 400, "italic"), "noto-sans-sc/NotoSansSC-Regular.otf");
-  assert.throws(() => faceFile("ReportSerif", 400, "italic"), /Could not resolve font/u);
+  assert.throws(() => faceFile("ReportDisplay", 400, "italic"), /Could not resolve font/u);
 });
 
 // What reportGlyphs.ts (fontkit's glyph cache, the doubled x offset, the dropped y offset, right-to-left shaping),
@@ -158,8 +164,22 @@ test("every Latin face prints Romanian letters and quotes", () => {
   for (const font of LATIN_FACES) assert.deepEqual(missing(font, ROMANIAN), [], font);
 });
 
-test("the sans family prints the report's symbols", () => {
+test("the sans family prints the report's symbols, and the text family all of them but ≈, which the sans family then prints", () => {
   for (const font of SANS) assert.deepEqual(missing(font, ARITHMETIC), [], font);
+  for (const font of TEXT) assert.deepEqual(missing(font, ARITHMETIC), ["≈"], font);
+  for (const [fontWeight, fontStyle] of STYLES) assert.deepEqual(uncovered(reportFaces("en", "").body, ARITHMETIC.join(""), fontWeight, fontStyle), [], `${fontWeight} ${fontStyle}`);
+});
+
+test("no word is set in two faces: a Latin-script language's own letters are all in its first text face", () => {
+  const latin = LOCALES.map(({ code }) => code).filter((code) => reportSupportedForLocale(code) && reportFaces(code, "").heading[0] === "ReportDisplay");
+  assert.equal(latin.length, 25, latin.join(" "));
+  for (const code of latin) {
+    const first = reportFaces(code, "").body[0];
+    assert.equal(first, code === "vi" ? "ReportSans" : "ReportText", code);
+    for (const [fontWeight, fontStyle] of STYLES) assert.deepEqual(uncovered([first], LETTERS[code], fontWeight, fontStyle), [], `${code} ${fontWeight} ${fontStyle}`);
+  }
+  // Why Vietnamese is the exception: Instrument Sans lacks most of its letters.
+  assert.ok(missing(TEXT[0], [...LETTERS.vi]).length > 20);
 });
 
 test("the faces chosen for each language print its letters; Arabic has none, and the report refuses it", () => {

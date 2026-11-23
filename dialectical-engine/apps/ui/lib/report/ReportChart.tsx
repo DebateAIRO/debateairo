@@ -22,11 +22,11 @@ type TextStyle = Style | Style[];
 export type ChartWords = (props: { style: TextStyle; text: string }) => JSX.Element;
 
 // The report's print colours (ReportDocument.tsx): ink, muted, hairline, accent.
-const INK = "#29261F";
-const MUTED = "#6E675C";
-const LINE = "#D9D3C8";
-const GRID = "#ECE7DE";
-const ACCENT = "#C15F3C";
+const INK = "#121826";
+const MUTED = "#5E6779";
+const LINE = "#D3D9E4";
+const GRID = "#E3E7EF";
+const ACCENT = "#2350D8";
 
 /** The page's text width (A4, 62pt margins) less the block's border and padding. */
 const PLOT_WIDTH = 595.28 - 2 * 62 - 2 * 12 - 2;

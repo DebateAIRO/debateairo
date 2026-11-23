@@ -92,12 +92,12 @@ if (!siteCss.includes("/* === verdict-story === */") || !siteCss.includes("/* ==
 }
 
 // Only the faces the panel uses: the sans at 400 and 700 (the browser draws the panel's 600 with the
-// 700 face) and the display serif's 600 for the headline. Every preview carries its own copy, so each
+// 700 face) and the display face's 700 for the headline (Design Document v2: Instrument Sans and Bricolage Grotesque). Every preview carries its own copy, so each
 // extra face would be paid ten times over. JetBrains Mono is not vendored; the system monospace stands in.
 const FONT_FACES = [
-  { family: "Fraunces", weight: 600, style: "normal", file: "assets/fonts/fraunces/Fraunces9pt-SemiBold.ttf" },
-  { family: "Plus Jakarta Sans", weight: 400, style: "normal", file: "assets/fonts/plus-jakarta-sans/PlusJakartaSans-Regular.ttf" },
-  { family: "Plus Jakarta Sans", weight: 700, style: "normal", file: "assets/fonts/plus-jakarta-sans/PlusJakartaSans-Bold.ttf" }
+  { family: "Bricolage Grotesque", weight: 700, style: "normal", file: "assets/fonts/bricolage-grotesque/BricolageGrotesque-Bold.ttf" },
+  { family: "Instrument Sans", weight: 400, style: "normal", file: "assets/fonts/instrument-sans/InstrumentSans-Regular.ttf" },
+  { family: "Instrument Sans", weight: 700, style: "normal", file: "assets/fonts/instrument-sans/InstrumentSans-Bold.ttf" }
 ] as const;
 
 const presentFonts = FONT_FACES.filter((face) => existsSync(resolve(appRoot, face.file)));
@@ -105,8 +105,8 @@ const fontCss = presentFonts
   .map((face) => `@font-face { font-family: "${face.family}"; font-style: ${face.style}; font-weight: ${face.weight}; src: url(data:font/ttf;base64,${readFileSync(resolve(appRoot, face.file)).toString("base64")}) format("truetype"); }`)
   .join("\n");
 
-// The site sets these three from next/font at run time; the mock names the families directly.
-const MOCK_FONT_VARIABLES = ':root { --font-fraunces: "Fraunces"; --font-jakarta: "Plus Jakarta Sans"; --font-mono-src: ui-monospace; }';
+// The site sets these two from next/font at run time; the mock names the families directly.
+const MOCK_FONT_VARIABLES = ':root { --font-bricolage: "Bricolage Grotesque"; --font-instrument: "Instrument Sans"; }';
 
 // Only the stand-in parts of the page are styled here; the panel, the header
 // chrome and the AI notice use the site's own rules.

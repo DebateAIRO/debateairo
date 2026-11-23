@@ -43,8 +43,8 @@ describe("the owner's story mock (look first, then wire)", () => {
     expect(html).toContain("Our best answer:");
     expect(html).toContain("Pentru acest răspuns am avut mai puțin de comparat decât de obicei.");
     expect(html).not.toContain("Components-only");
-    // The vendored fonts are inlined, but only the three faces the panel uses (Plus Jakarta Sans 400 and
-    // 700, Fraunces 600), once in the page and once in each of the 17 previews.
+    // The vendored fonts are inlined, but only the three faces the panel uses (Instrument Sans 400 and
+    // 700, Bricolage Grotesque 700), once in the page and once in each of the 17 previews.
     expect(html).not.toContain("fonts are not bundled yet");
     expect(html.match(/@font-face \{/g)).toHaveLength(54);
     expect(html.match(/data:font\/ttf;base64,/g)).toHaveLength(54);

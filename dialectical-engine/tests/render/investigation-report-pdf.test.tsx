@@ -40,8 +40,8 @@ function versionWith(text: Readonly<{ answer: string; path: string; note: string
 }
 
 const SCRIPTS = Object.freeze([
-  { locale: "en", face: "PlusJakartaSans", question: "Should the city build a second pier?", answer: "The whole debate points to building it for rush hour.", path: "Partly: it helps at rush hour.", note: "Winter ridership falls by half." },
-  { locale: "ro", face: "PlusJakartaSans", question: "Ar trebui să construim un debarcader?", answer: "Întreaga dezbatere arată spre orele de vârf; țărmul rămâne așa.", path: "Parțial: ajută la orele de vârf.", note: "Iarna călătorii scad la jumătate." },
+  { locale: "en", face: "InstrumentSans", question: "Should the city build a second pier?", answer: "The whole debate points to building it for rush hour.", path: "Partly: it helps at rush hour.", note: "Winter ridership falls by half." },
+  { locale: "ro", face: "InstrumentSans", question: "Ar trebui să construim un debarcader?", answer: "Întreaga dezbatere arată spre orele de vârf; țărmul rămâne așa.", path: "Parțial: ajută la orele de vârf.", note: "Iarna călătorii scad la jumătate." },
   { locale: "ru", face: "NotoSans", question: "Нужен ли второй причал?", answer: "Все дебаты указывают на час пик.", path: "Отчасти: помогает в час пик.", note: "Зимой пассажиров вдвое меньше." },
   { locale: "el", face: "NotoSans", question: "Χρειάζεται δεύτερη προβλήτα;", answer: "Όλη η συζήτηση δείχνει τις ώρες αιχμής.", path: "Εν μέρει: βοηθά στις ώρες αιχμής.", note: "Τον χειμώνα οι επιβάτες μειώνονται." },
   { locale: "he", face: "NotoSansHebrew", question: "האם צריך מזח שני?", answer: "הדיון כולו מצביע על שעות העומס. Zoom 35%.", path: "חלקית: עוזר בשעות העומס.", note: "בחורף מספר הנוסעים יורד בחצי." },
