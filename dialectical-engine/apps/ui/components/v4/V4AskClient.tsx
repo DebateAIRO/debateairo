@@ -573,7 +573,9 @@ function V4AskForm({
     mode: step === "ask" ? "quick" : mode,
     readingLevel: level,
     // V4 start step, Task 70b (ask-f8): a declined consent's line sits right under Next, never at the page's bottom.
-    showDeclinedLine: false
+    showDeclinedLine: false,
+    // A signed-out visitor's room read could only be refused; while the session is still checked, it is read as always.
+    roomReads: session !== "OUT"
   });
   // Task 76e (owner answer Q8): the site updated while the page is open (the room read again every 5 minutes, on focus and on
   // becoming visible, Task 70b's refreshRoom); its latest room is the start step's, so the new widths reach the card.
