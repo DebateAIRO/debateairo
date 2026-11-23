@@ -18,6 +18,8 @@ const server = vi.hoisted(() => {
   const state = {
     /** What the server says of the browser's session. */
     signedIn: false,
+    /** A status the session read fails with whatever the session is (a gateway answer while the API restarts); null: none. */
+    sessionBroken: null as number | null,
     calls: [] as string[]
   };
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
@@ -28,6 +30,7 @@ const server = vi.hoisted(() => {
     state.calls.push(url);
     const path = url.split("?")[0];
     if (path === "/api/v1/session") {
+      if (state.sessionBroken !== null) return json({ error: "UPSTREAM_UNAVAILABLE" }, state.sessionBroken);
       return state.signedIn ? json({
         asker_id: "owner:33333333-3333-4333-8333-333333333333",
         session_id: "22222222-2222-4222-8222-222222222222",
@@ -107,6 +110,7 @@ beforeEach(() => {
   // Only the page's 5-minute poll runs on a fake clock; every other timer is real.
   vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
   server.signedIn = false;
+  server.sessionBroken = null;
   server.calls.length = 0;
   window.history.replaceState(null, "", "/v4");
 });
@@ -137,14 +141,32 @@ describe("the signed-out ask page sends no read the API can only refuse", () => 
     await mount();
     expect(sessionReads(), "the session is asked once").toBe(1);
     const roomReadsOnOpening = roomReads();
-    // While the session was still being checked the room was read as always (the read and its one retry, both refused).
-    expect(roomReadsOnOpening).toBeGreaterThanOrEqual(1);
-    expect(roomReadsOnOpening).toBeLessThanOrEqual(2);
+    // While the session was still being checked the room was read once, as always. Its refusal is not tried again:
+    // by then the page knows there is no session.
+    expect(roomReadsOnOpening, "one room read while the session is checked, and no second one after it").toBe(1);
     expect(notice()).toBe(NOTICE);
     await everyRereadTrigger();
     expect(roomReads(), "no room read after focus, visibility or the poll").toBe(roomReadsOnOpening);
     expect(sessionReads()).toBe(1);
     expect(notice()).toBe(NOTICE);
+  });
+
+  it("a signed-in person whose session read only failed keeps the room reads: the plan is known and read again on focus", async () => {
+    holdSessionCookies();
+    server.signedIn = true;
+    server.sessionBroken = 502;
+    await mount();
+    expect(sessionReads()).toBe(1);
+    const opening = roomReads();
+    expect(opening, "the room is read on opening").toBeGreaterThanOrEqual(1);
+    expect(notice(), "the plan was read (a paid one): no Free notice").toBeNull();
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    await settle();
+    expect(roomReads(), "one more read on focus").toBe(opening + 1);
+    await act(async () => { vi.advanceTimersByTime(SITE_VERSION_POLL_MS); });
+    await settle();
+    expect(roomReads(), "one more read after the poll period").toBe(opening + 2);
+    expect(notice()).toBeNull();
   });
 
   it("a signed-in page reads the room on opening and again on every focus, return to the tab and poll, as before", async () => {

@@ -441,7 +441,7 @@ export function V4AskClient({
   // ask-d1 D / ask-f16: the real page from the first frame, signed in or not; the session is learnt beside it (V4AskGate).
   // The accept screen reads newDebate.* keys, as on /new.
   return (
-    <V4AskGate catalog={newDebateCatalog} locale={locale}>{(session) => (
+    <V4AskGate catalog={newDebateCatalog} locale={locale}>{(session, sessionRefused) => (
       <V4AskForm
         catalog={catalog}
         homeCatalog={homeCatalog}
@@ -451,6 +451,7 @@ export function V4AskClient({
         crisisCountryHint={crisisCountryHint}
         initialQuestion={initialQuestion}
         session={session}
+        sessionRefused={sessionRefused}
         againRunId={againRunId}
         pickUpId={pickUpId}
         kept={kept}
@@ -468,6 +469,7 @@ function V4AskForm({
   crisisCountryHint,
   initialQuestion,
   session,
+  sessionRefused,
   againRunId,
   pickUpId,
   kept: keptAtOpen
@@ -481,6 +483,8 @@ function V4AskForm({
   initialQuestion: string;
   /** Whether the visitor is signed in (CHECKING until the session read answers). */
   session: V4Session;
+  /** The API itself said there is no session (never true while the session read only failed). */
+  sessionRefused: boolean;
   /** Owner review 3 Nov (wait-f11): the debate whose question fills the box (`?again=`); null: none. */
   againRunId: string | null;
   /** The saved question "My questions" handed over by the address (`?pickup=`); null: none. */
@@ -574,8 +578,9 @@ function V4AskForm({
     readingLevel: level,
     // V4 start step, Task 70b (ask-f8): a declined consent's line sits right under Next, never at the page's bottom.
     showDeclinedLine: false,
-    // A signed-out visitor's room read could only be refused; while the session is still checked, it is read as always.
-    roomReads: session !== "OUT"
+    // Once the API has said there is no session, a room read could only be refused. While the session is still checked,
+    // or when its read merely failed (the person may be signed in), the room is read as always.
+    roomReads: !(session === "OUT" && sessionRefused)
   });
   // Task 76e (owner answer Q8): the site updated while the page is open (the room read again every 5 minutes, on focus and on
   // becoming visible, Task 70b's refreshRoom); its latest room is the start step's, so the new widths reach the card.
