@@ -191,10 +191,12 @@ export function validatePreviewProviderTestConfig(value: unknown): PreviewProvid
  return parsePreviewProviderTestConfig(source);
 }
 /**
- * Step 1 (owner, 2026-10-08): the identity user ids that may start debates on the private
- * preview. Malformed refuses to boot; a value (even an empty one) without the preview
- * configuration refuses to boot, so it never silently applies to the real site; missing or
- * empty on the preview is an empty team and every ask is refused at request time.
+ * The team line: the identity user ids that may start debates on the private preview, and the
+ * accounts that may buy there unless the buyer rule lets any account (previewBuyerAdmits); under
+ * PREVIEW_ASKS_OPEN_TO's "everyone-with-listed-buyers" it means only the latter. Malformed refuses to boot; a value (even
+ * an empty one) without the preview configuration refuses to boot, so it never silently applies to
+ * the real site; missing or empty on the preview is an empty team and every ask is refused at
+ * request time.
  */
 export const PREVIEW_TEAM_MAX_MEMBERS = 20 as const;
 const PREVIEW_TEAM_USER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
@@ -220,14 +222,18 @@ export function previewTeamAdmits(
 /**
  * Who may start debates on the preview when the team rule is lifted, read from PREVIEW_ASKS_OPEN_TO. Absent: the team
  * rule as above. "everyone": any signed-in account. "everyone-with-test-payments": the same, while payments are the
- * sandbox's; the two names keep the boot line truthful about which payment system strangers meet. Each name is accepted
- * only exactly.
+ * sandbox's; the two names keep the boot line truthful about which payment system strangers meet.
+ * "everyone-with-listed-buyers": any signed-in account may ask too, while payments are the sandbox's, and the team line
+ * stays in the file with one meaning only: the accounts that may buy (previewBuyerAdmits). Each name is accepted only
+ * exactly.
  */
-export const PREVIEW_ASKS_OPEN_TO_VALUES = Object.freeze(["everyone", "everyone-with-test-payments"] as const);
+export const PREVIEW_ASKS_OPEN_TO_VALUES = Object.freeze(["everyone", "everyone-with-test-payments", "everyone-with-listed-buyers"] as const);
 export type PreviewAsksOpenTo = typeof PREVIEW_ASKS_OPEN_TO_VALUES[number];
 /**
  * The API and the runner both parse the setting here, so they decide alike. Refused at boot: any other value; no preview
- * configuration (the spending gates would not be in the path); a team list in the same file (one file, one meaning);
+ * configuration (the spending gates would not be in the path); a team list beside "everyone" or
+ * "everyone-with-test-payments" (one file, one meaning), and "everyone-with-listed-buyers" without one (that value has no
+ * meaning without its list of buyers, and the API and runner files keep the same list, which release checks compare);
  * local mode (no room, so no per-person ceiling). Each refusal is a TypeError whose message is its code.
  */
 export function parsePreviewAsksOpenTo(
@@ -237,7 +243,9 @@ export function parsePreviewAsksOpenTo(
   const value = PREVIEW_ASKS_OPEN_TO_VALUES.find((candidate) => candidate === source);
   if (value === undefined) throw new TypeError("PREVIEW_ASKS_OPEN_TO_INVALID");
   if (!context.previewConfigured) throw new TypeError("PREVIEW_ASKS_OPEN_TO_WITHOUT_PREVIEW");
-  if (context.teamKeyPresent) throw new TypeError("PREVIEW_ASKS_OPEN_TO_WITH_TEAM");
+  if (value === "everyone-with-listed-buyers") {
+    if (!context.teamKeyPresent) throw new TypeError("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_WITHOUT_TEAM");
+  } else if (context.teamKeyPresent) throw new TypeError("PREVIEW_ASKS_OPEN_TO_WITH_TEAM");
   if (!context.hosted) throw new TypeError("PREVIEW_ASKS_OPEN_TO_NOT_HOSTED");
   return value;
 }
@@ -253,6 +261,25 @@ export function previewAskAdmits(
   if (config === undefined) return true;
   if (asksOpen === true) return userId !== undefined;
   return previewTeamAdmits(config, teamUserIds, userId);
+}
+/**
+ * Who may start a purchase on the preview: a checkout or a plan upgrade, the two steps that create a charge and open the
+ * payment provider's page (the price requests before them stay open to every signed-in account, so anyone may read the
+ * whole order page). Off the preview there is no rule. On it, any signed-in account may buy in exactly two states: real
+ * payments with asks open to "everyone" (anyone may ask, so anyone may pay), and the friends' test behind the site
+ * password, "everyone-with-test-payments" on NETOPIA's sandbox. Everywhere else only an account on the team line may buy:
+ * with real payments and the team rule, an account that may not ask would pay and then be refused every question; on the
+ * sandbox, the provider's public test card buys a plan's real AI allowance, so opening or closing asks never opens
+ * buying to strangers. A pairing the API's boot refuses (a value on the other payment system) answers the team line too.
+ * A session without a user id is refused on the preview either way.
+ */
+export function previewBuyerAdmits(
+  config: PreviewProviderTestConfig | undefined, teamUserIds: readonly string[] | undefined,
+  asksOpenTo: PreviewAsksOpenTo | undefined, livePayments: boolean, userId: string | undefined
+): boolean {
+  if (config === undefined) return true;
+  const anyAccount = livePayments ? asksOpenTo === "everyone" : asksOpenTo === "everyone-with-test-payments";
+  return anyAccount ? userId !== undefined : previewTeamAdmits(config, teamUserIds, userId);
 }
 /**
  * Step 1 — THE ONE READ BEHIND THE TEAM RULE FOR RUNS ALREADY IN THE SYSTEM, shared by the

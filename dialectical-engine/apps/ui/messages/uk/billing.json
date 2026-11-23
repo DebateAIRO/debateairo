@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Спершу прийміть оновлені Умови, а потім поверніться на цю сторінку.",
   "billing.checkout.pageOutdated": "Ця сторінка застаріла. Будь ласка, оновіть її.",
   "billing.checkout.erasurePending": "Ваш обліковий запис заплановано до видалення. Скасуйте видалення в Налаштуваннях, щоб оформити підписку або змінити план.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Забагато спроб за останню годину. Спробуйте пізніше.",
   "billing.checkout.genericError": "Щось пішло не так. Спробуйте ще раз.",
   "billing.checkout.formUnavailable": "Не вдалося відкрити сторінку оплати. Будь ласка, спробуйте ще раз за хвилину.",

@@ -638,6 +638,32 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(button("Yes, move to Pro")).toBeUndefined();
   });
 
+  // The preview's buyer rule: the upgrade's price is shown to every signed-in account, and only the pay button answers
+  // 403 PREVIEW_TEAM_ONLY, with nothing charged: the order page's sentence, never "try again" or "still confirming".
+  it("an account not invited to buy sees the upgrade's price, and the invited-accounts sentence after the pay button", async () => {
+    const SENTENCE = "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.";
+    client.quoteSubscriptionUpgrade.mockResolvedValue({
+      quote_ref: "44444444-4444-4444-8444-444444444444", plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", currency: "USD", tax_name: "TVA",
+      tax_rate_basis_points: 2100, tax_country: "RO", recurring_total: "60.50",
+      renews_on: "2026-10-29T10:00:00.000Z", expires_at: "2026-10-03T12:30:00.000Z"
+    });
+    client.upgradeSubscription.mockRejectedValueOnce(new ContractHttpError("FORBIDDEN", 403, "x", "PREVIEW_TEAM_ONLY"));
+    await render();
+    await click("Change plan");
+    await click("Upgrade to Pro");
+    expect(upgradeButton()?.textContent).toContain(formatMoney("en", "36.30", "USD"));
+    expect(text()).not.toContain(SENTENCE);
+    const readsBefore = client.getBillingSubscription.mock.calls.length;
+    await upgradeAndPay();
+    expect(client.upgradeSubscription).toHaveBeenCalledTimes(1);
+    expect(text()).toContain(SENTENCE);
+    expect(text()).not.toContain("That didn't work. Please try again.");
+    expect(text()).not.toContain("We're still confirming this with the payment provider.");
+    // Nothing moved, so the card is not read again.
+    expect(client.getBillingSubscription.mock.calls.length).toBe(readsBefore);
+    expect(goToPayment).not.toHaveBeenCalled();
+  });
+
   it("asks for the updated Terms first when D6b's routes answer LEGAL_REACCEPTANCE_REQUIRED, never 'try again'", async () => {
     const reaccept = "Please accept the updated Terms first, then come back to this page.";
     const refusal = () => new ContractHttpError("FORBIDDEN", 403, "x", "LEGAL_REACCEPTANCE_REQUIRED");

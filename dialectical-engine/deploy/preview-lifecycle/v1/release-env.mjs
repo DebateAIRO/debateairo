@@ -107,14 +107,18 @@ const ACROSS_SAME = Object.freeze(['DEBATEAI_DEPLOYMENT_MODE', 'HATCHET_WORKFLOW
  * Who may start debates (PREVIEW_ASKS_OPEN_TO, read by the API's and the runner's parsePreviewAsksOpenTo): both must read it
  * alike within a release, and two releases side by side must too, so an ask one release admits the other never fails.
  * Each file is also held to the parser's own rules, so `same` names a file the launcher would refuse before any restart:
- * absent, or exactly one of the two values, with the preview configuration, no team list and hosted mode.
+ * absent, or exactly one of the three values, with the preview configuration and hosted mode, and with no team list
+ * beside "everyone" or "everyone-with-test-payments" but always one beside "everyone-with-listed-buyers" (there the team
+ * list names who may buy, and the team checks above keep it the same in both files and across two releases).
  */
 const ASKS_OPEN_KEY = 'PREVIEW_ASKS_OPEN_TO';
-const ASKS_OPEN_VALUES = Object.freeze(['everyone', 'everyone-with-test-payments']);
+const ASKS_OPEN_VALUES = Object.freeze(['everyone', 'everyone-with-test-payments', 'everyone-with-listed-buyers']);
+const ASKS_OPEN_WITH_TEAM = 'everyone-with-listed-buyers';
 export function asksOpenValid(environment) {
   const value = environment[ASKS_OPEN_KEY];
   return value === undefined || (ASKS_OPEN_VALUES.includes(value) && environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON !== undefined
-    && environment.PREVIEW_TEAM_USER_IDS_JSON === undefined && environment.DEBATEAI_DEPLOYMENT_MODE === 'hosted');
+    && (environment.PREVIEW_TEAM_USER_IDS_JSON !== undefined) === (value === ASKS_OPEN_WITH_TEAM)
+    && environment.DEBATEAI_DEPLOYMENT_MODE === 'hosted');
 }
 function asksOpenChecks(releases) {
   const out = [];

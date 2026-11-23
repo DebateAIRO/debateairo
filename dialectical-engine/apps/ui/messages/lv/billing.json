@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Lūdzu, vispirms pieņemiet atjauninātos noteikumus un pēc tam atgriezieties šajā lapā.",
   "billing.checkout.pageOutdated": "Šī lapa ir novecojusi. Lūdzu, ielādējiet to no jauna.",
   "billing.checkout.erasurePending": "Jūsu konta dzēšana ir ieplānota. Lai abonētu vai mainītu plānu, atceliet dzēšanu iestatījumos.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Pēdējā stundā bijis pārāk daudz mēģinājumu. Lūdzu, mēģiniet vēlreiz vēlāk.",
   "billing.checkout.genericError": "Kaut kas nogāja greizi. Lūdzu, mēģiniet vēlreiz.",
   "billing.checkout.formUnavailable": "Maksājuma lapu neizdevās atvērt. Lūdzu, mēģiniet vēlreiz pēc minūtes.",

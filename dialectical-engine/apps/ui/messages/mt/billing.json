@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Jekk jogħġbok aċċetta l-ewwel it-Termini aġġornati, imbagħad erġa’ lura f’din il-paġna.",
   "billing.checkout.pageOutdated": "Din il-paġna mhix aġġornata. Jekk jogħġbok erġa’ tellagħha.",
   "billing.checkout.erasurePending": "Il-kont tiegħek huwa skedat biex jitħassar. Ikkanċella t-tħassir fl-Issettjar biex tabbona jew tibdel il-pjan tiegħek.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Tentattivi żżejjed fl-aħħar siegħa. Erġa’ pprova aktar tard.",
   "billing.checkout.genericError": "Xi ħaġa marret ħażin. Erġa’ pprova.",
   "billing.checkout.formUnavailable": "Il-paġna tal-ħlas ma setgħetx tinfetaħ. Jekk jogħġbok erġa’ pprova wara minuta.",

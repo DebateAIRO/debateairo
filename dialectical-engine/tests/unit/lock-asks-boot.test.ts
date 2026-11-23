@@ -1,14 +1,15 @@
 // PREVIEW_ASKS_OPEN_TO at the API's boot, once the room and billing are built: open asks need the room (it alone bounds
 // each person's spending), "everyone" needs real payments (on the sandbox a public test card would buy real AI credit,
-// and with billing off no account has a plan window of its own), and "everyone-with-test-payments" is refused on any
-// other payment system, so the boot line is always true.
+// and with billing off no account has a plan window of its own), and "everyone-with-test-payments" and
+// "everyone-with-listed-buyers" are refused on any other payment system than the sandbox, so the boot line is always
+// true. With the listed buyers' value a second line counts the accounts that may buy.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { assertPreviewAsksOpenBoot, previewAsksOpenBootLine } from "../../apps/api/src/preview-asks-open.js";
+import { assertPreviewAsksOpenBoot, previewAsksOpenBootLine, previewListedBuyersBootLine } from "../../apps/api/src/preview-asks-open.js";
 
 const refusals = await import("../../deploy/" + "preview-auth-dev/v1/startup-refusals.mjs");
 
-const VALUES = [undefined, "everyone", "everyone-with-test-payments"] as const;
+const VALUES = [undefined, "everyone", "everyone-with-test-payments", "everyone-with-listed-buyers"] as const;
 const PAYMENTS = ["sandbox", "live", null] as const;
 
 /** The expected verdict, written out case by case: null passes, else the code. */
@@ -18,7 +19,8 @@ function expected(asksOpen: typeof VALUES[number], roomComposed: boolean, paymen
   if (asksOpen === "everyone") {
     return payment === "sandbox" ? "PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING" : payment === null ? "PREVIEW_ASKS_OPEN_TO_BILLING_OFF" : null;
   }
-  return payment === "sandbox" ? null : "PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX";
+  if (asksOpen === "everyone-with-test-payments") return payment === "sandbox" ? null : "PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX";
+  return payment === "sandbox" ? null : "PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX";
 }
 
 describe("assertPreviewAsksOpenBoot", () => {
@@ -42,12 +44,26 @@ describe("assertPreviewAsksOpenBoot", () => {
     expect(expected("everyone", true, null)).toBe("PREVIEW_ASKS_OPEN_TO_BILLING_OFF");
     expect(expected("everyone-with-test-payments", true, "sandbox")).toBeNull();
     expect(expected("everyone", true, "sandbox")).toBe("PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING");
+    expect(expected("everyone-with-listed-buyers", true, "sandbox")).toBeNull();
+    expect(expected("everyone-with-listed-buyers", true, "live")).toBe("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX");
+    expect(expected("everyone-with-listed-buyers", true, null)).toBe("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX");
   });
 
   it("the boot line names the opening that runs, and nothing with the team rule", () => {
     expect(previewAsksOpenBootLine(undefined)).toBeNull();
     expect(JSON.parse(previewAsksOpenBootLine("everyone")!)).toEqual({ event: "api.preview.asks_open", to: "everyone" });
     expect(JSON.parse(previewAsksOpenBootLine("everyone-with-test-payments")!)).toEqual({ event: "api.preview.asks_open", to: "everyone-with-test-payments" });
+    expect(JSON.parse(previewAsksOpenBootLine("everyone-with-listed-buyers")!)).toEqual({ event: "api.preview.asks_open", to: "everyone-with-listed-buyers" });
+  });
+
+  it("with the listed buyers' value a second line says how many accounts may buy, a count and never an id", () => {
+    const ids = ["0b7c6f1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e", "9f8e7d6c-5b4a-4321-9876-543210fedcba"];
+    const line = previewListedBuyersBootLine("everyone-with-listed-buyers", ids)!;
+    expect(JSON.parse(line)).toEqual({ event: "api.preview.listed_buyers", count: 2 });
+    for (const id of ids) expect(line).not.toContain(id);
+    expect(JSON.parse(previewListedBuyersBootLine("everyone-with-listed-buyers", [])!)).toEqual({ event: "api.preview.listed_buyers", count: 0 });
+    // Any other value, or the team rule: no such line.
+    for (const value of [undefined, "everyone", "everyone-with-test-payments"] as const) expect(previewListedBuyersBootLine(value, ids), String(value)).toBeNull();
   });
 });
 
@@ -77,5 +93,21 @@ describe("apps/api/src/main.ts wires the setting", () => {
     const api = main.indexOf("const api = buildApi({");
     const first = main.indexOf(spread), second = main.lastIndexOf(spread);
     expect(first).toBeGreaterThan(application); expect(first).toBeLessThan(api); expect(second).toBeGreaterThan(api);
+  });
+
+  it("hands buildApi the value itself, under the same condition as the open mode, for the buyer rule", () => {
+    const value = "...(previewGate === undefined || environment.PREVIEW_ASKS_OPEN === undefined ? {} : { previewAsksOpenTo: environment.PREVIEW_ASKS_OPEN }),";
+    expect(count(value)).toBe(1);
+    expect(main.indexOf(value)).toBeGreaterThan(main.indexOf("const api = buildApi({"));
+    expect(count("previewAsksOpenTo")).toBe(1);
+  });
+
+  it("prints the count line right after the asks line, from the parsed team line", () => {
+    const asksLine = main.indexOf("if (previewAsksOpenLine !== null) console.warn(previewAsksOpenLine);");
+    const countLine = main.indexOf("const previewListedBuyersLine = previewListedBuyersBootLine(environment.PREVIEW_ASKS_OPEN, environment.PREVIEW_TEAM_USER_IDS);");
+    expect(asksLine).toBeGreaterThan(0);
+    expect(countLine).toBeGreaterThan(asksLine);
+    expect(main).toContain("if (previewListedBuyersLine !== null) console.warn(previewListedBuyersLine);");
+    expect(countLine).toBeLessThan(main.indexOf("const api = buildApi({"));
   });
 });

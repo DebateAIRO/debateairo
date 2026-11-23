@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "请先接受更新后的条款，然后返回此页面。",
   "billing.checkout.pageOutdated": "此页面已过时。请重新加载。",
   "billing.checkout.erasurePending": "您的账户已计划删除。请在“设置”中取消删除，以便订阅或更改方案。",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "过去一小时内尝试次数过多。请稍后重试。",
   "billing.checkout.genericError": "出了点问题。请重试。",
   "billing.checkout.formUnavailable": "无法打开付款页面。请一分钟后重试。",

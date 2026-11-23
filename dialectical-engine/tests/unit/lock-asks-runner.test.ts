@@ -1,8 +1,9 @@
 // PREVIEW_ASKS_OPEN_TO at the runner's start. The runner's start-up gate fails every open job no team member owns; with
 // asks open the API admits every signed-in account, so the runner fails only a job no account owns (a legacy asker's,
 // as the API's waker does) and does not refuse to start for an empty team. Prepare-only and start both parse the runner
-// file with the API's same parser, so both agree with the API in either open value; the launcher still requires the
-// preview configuration.
+// file with the API's same parser, so both agree with the API in every open value; the launcher still requires the
+// preview configuration. Under everyone-with-listed-buyers the runner file carries the API's team line too (it names who
+// may buy, and release checks compare the two files' lines); the runner starts with it and never reads it.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -10,6 +11,7 @@ import { postgresRunnerPreviewTeamGateStore, refusePreviewOutsiderWork } from ".
 import { PREVIEW_ACCOUNT_RUNS_SQL, PREVIEW_TEAM_RUNS_SQL } from "../../packages/providers/src/preview-test.js";
 import * as runtime from "../../packages/register/src/runtime-environment.js";
 import { validRunnerEnvironmentFixture } from "../support/apiEnvironmentFixture.js";
+import { parsedPreviewRunnerEnvironment } from "../support/previewAsksComposition.js";
 
 const LAUNCHER = readFileSync(resolve("deploy/preview-auth-dev/v1/launch-runner.mjs"), "utf8");
 const RUNNER_MAIN = readFileSync(resolve("apps/runner/src/main.ts"), "utf8");
@@ -48,6 +50,17 @@ describe("the runner launcher's start rule", () => {
     // Open without the preview configuration never parses; the launcher's own check is the second line of the same rule.
     expect(() => parse({ PREVIEW_ASKS_OPEN_TO: "everyone" })).toThrow("PREVIEW_ASKS_OPEN_TO_WITHOUT_PREVIEW");
     expect(refuses({ PREVIEW_ASKS_OPEN: "everyone", PREVIEW_GATE_SETTINGS: undefined })).toBe(true);
+  });
+
+  it("listed buyers: the file with its team line starts, listed or empty; without the team line it never parses", () => {
+    const refuses = new Function("parsed", `let refused=false;const refuse=()=>{refused=true;};${OPEN_CHECK}\n else if(${TEAM_REQUIRED_CONDITION})refuse('PREVIEW_RUNNER_TEAM_REQUIRED');return refused;`) as (parsed: unknown) => boolean;
+    for (const team of [TEAM, "[]"]) {
+      const parsed = parsedPreviewRunnerEnvironment(GATE, { PREVIEW_ASKS_OPEN_TO: "everyone-with-listed-buyers", PREVIEW_TEAM_USER_IDS_JSON: team });
+      expect(parsed.PREVIEW_ASKS_OPEN, team).toBe("everyone-with-listed-buyers");
+      expect(refuses(parsed), team).toBe(false);
+    }
+    expect(() => parsedPreviewRunnerEnvironment(GATE, { PREVIEW_ASKS_OPEN_TO: "everyone-with-listed-buyers" }))
+      .toThrow("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_WITHOUT_TEAM");
   });
 });
 
@@ -118,6 +131,20 @@ describe("the runner's start-up gate with asks open", () => {
     expect(full.calls).toEqual(["list:101"]);
     const lost = harness([{ runId: run(9), workItemId: job(9) }], [], true);
     await expect(refusePreviewOutsiderWork(lost.input([]))).rejects.toMatchObject({ code: "RUNNER_PREVIEW_TEAM_REFUSAL_UNRECORDED" });
+  });
+
+  it("listed buyers, as main.ts hands the parsed file: a job of an account not on the team line is not failed, and the team is never read", async () => {
+    const parsed = parsedPreviewRunnerEnvironment(GATE, { PREVIEW_ASKS_OPEN_TO: "everyone-with-listed-buyers", PREVIEW_TEAM_USER_IDS_JSON: TEAM });
+    // run(1): an account's run, not the listed one's; run(2): a legacy asker's, which no account owns.
+    const h = harness([{ runId: run(1), workItemId: job(1) }, { runId: run(2), workItemId: job(2) }], [run(1)]);
+    const { asksOpen: _harnessDefault, ...input } = h.input(parsed.PREVIEW_TEAM_USER_IDS);
+    expect(await refusePreviewOutsiderWork({
+      ...input, previewConfigured: true,
+      // apps/runner/src/main.ts's own line: the open rule whenever the value is set.
+      ...(parsed.PREVIEW_ASKS_OPEN === undefined ? {} : { asksOpen: true as const })
+    })).toEqual({ checked: 2, refused: 1 });
+    expect(h.calls).toEqual(["list:101", "account:2", "fail"]);
+    expect(h.failures).toEqual([{ runId: run(2), workItemId: job(2), reason: "RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY" }]);
   });
 
   it("open without the account read refuses the start before reading anything, never runs with no rule", async () => {

@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Najprije prihvatite ažurirane Uvjete, a zatim se vratite na ovu stranicu.",
   "billing.checkout.pageOutdated": "Ova je stranica zastarjela. Ponovno je učitajte.",
   "billing.checkout.erasurePending": "Vaš je račun zakazan za brisanje. Otkažite brisanje u Postavkama kako biste se pretplatili ili promijenili plan.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Previše pokušaja u posljednjih sat vremena. Pokušajte ponovno kasnije.",
   "billing.checkout.genericError": "Nešto je pošlo po zlu. Pokušajte ponovno.",
   "billing.checkout.formUnavailable": "Stranicu za plaćanje nije bilo moguće otvoriti. Pokušajte ponovno za minutu.",

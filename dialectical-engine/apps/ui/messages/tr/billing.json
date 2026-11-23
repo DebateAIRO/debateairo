@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Lütfen önce güncellenmiş Koşulları kabul edin, ardından bu sayfaya dönün.",
   "billing.checkout.pageOutdated": "Bu sayfa güncel değil. Lütfen yeniden yükleyin.",
   "billing.checkout.erasurePending": "Hesabınızın silinmesi planlandı. Abone olmak veya planınızı değiştirmek için silme işlemini Ayarlar’dan iptal edin.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Son bir saatte çok fazla deneme yapıldı. Lütfen daha sonra yeniden deneyin.",
   "billing.checkout.genericError": "Bir sorun oluştu. Lütfen yeniden deneyin.",
   "billing.checkout.formUnavailable": "Ödeme sayfası açılamadı. Lütfen bir dakika sonra yeniden deneyin.",

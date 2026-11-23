@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Najpierw zaakceptuj zaktualizowane Warunki, a potem wróć na tę stronę.",
   "billing.checkout.pageOutdated": "Ta strona jest nieaktualna. Załaduj ją ponownie.",
   "billing.checkout.erasurePending": "Twoje konto jest zaplanowane do usunięcia. Anuluj usunięcie w Ustawieniach, aby subskrybować lub zmienić plan.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Zbyt wiele prób w ciągu ostatniej godziny. Spróbuj ponownie później.",
   "billing.checkout.genericError": "Coś poszło nie tak. Spróbuj ponownie.",
   "billing.checkout.formUnavailable": "Nie udało się otworzyć strony płatności. Spróbuj ponownie za minutę.",

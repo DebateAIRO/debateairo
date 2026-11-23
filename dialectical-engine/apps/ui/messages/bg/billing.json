@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Моля, първо приемете актуализираните Условия, след което се върнете на тази страница.",
   "billing.checkout.pageOutdated": "Тази страница е остаряла. Моля, презаредете я.",
   "billing.checkout.erasurePending": "Профилът Ви е насрочен за изтриване. Отменете изтриването в Настройки, за да се абонирате или да промените плана си.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Твърде много опити през последния час. Моля, опитайте отново по-късно.",
   "billing.checkout.genericError": "Нещо се обърка. Моля, опитайте отново.",
   "billing.checkout.formUnavailable": "Страницата за плащане не можа да се отвори. Моля, опитайте отново след минута.",

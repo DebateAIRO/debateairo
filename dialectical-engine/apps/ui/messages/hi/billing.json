@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "कृपया पहले अद्यतन शर्तें स्वीकार करें, फिर इस पेज पर वापस आएँ।",
   "billing.checkout.pageOutdated": "यह पेज पुराना हो गया है। कृपया इसे फिर से लोड करें।",
   "billing.checkout.erasurePending": "आपका खाता हटाए जाने के लिए निर्धारित है। सदस्यता लेने या अपनी योजना बदलने के लिए सेटिंग्स में हटाना रद्द करें।",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "पिछले एक घंटे में बहुत अधिक प्रयास हुए। कृपया बाद में फिर से प्रयास करें।",
   "billing.checkout.genericError": "कुछ गलत हो गया। कृपया फिर से प्रयास करें।",
   "billing.checkout.formUnavailable": "भुगतान पेज नहीं खुल सका। कृपया एक मिनट बाद फिर से कोशिश करें।",

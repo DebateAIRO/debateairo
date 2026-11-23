@@ -25,6 +25,7 @@ import {
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
 import { currentDocument, legalArchive } from "@debateai/legal-manifest";
 import { createNetopiaPayments, iso2ToNetopiaCountry, loadTrustedKeys } from "@debateai/payments-netopia";
+import type { PreviewAsksOpenTo, PreviewProviderTestConfig } from "@debateai/providers";
 import {
   TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue, type CountryPolicy, type PlanId
 } from "@debateai/register";
@@ -267,7 +268,17 @@ async function createActiveAccount(
   return Object.freeze({ userId, ownerRef, sessionId });
 }
 
-export async function startBillingStack(): Promise<BillingStack> {
+/**
+ * The hosted preview's members of buildApi's options, as main.ts hands them, for a stack that tests the preview's buyer
+ * rule: the preview configuration, the team line and PREVIEW_ASKS_OPEN_TO's value. `teamUserIds` is read when a request
+ * arrives, so a test signs its people up first and then fills the list, as the owner lists existing accounts before the
+ * API's start. Without it the stack is off the preview, as before.
+ */
+export type BillingStackPreview = Readonly<{
+  config: PreviewProviderTestConfig; teamUserIds: readonly string[]; asksOpenTo?: PreviewAsksOpenTo;
+}>;
+
+export async function startBillingStack(options: Readonly<{ preview?: BillingStackPreview }> = {}): Promise<BillingStack> {
   // The test file that starts the stack: its API pools come from apiTestPools under that file's name (the master-key
   // list is checked against it). Read before the first wait.
   const testFile = currentTestFile();
@@ -440,9 +451,12 @@ export async function startBillingStack(): Promise<BillingStack> {
     allowance: new BillingPersonAllowanceSource({ entitlements, plans: testBillingPlans, closeBasisPoints: 9_500 }),
     spend: spendStore
   });
+  const preview = options.preview;
   const api: FastifyInstance = buildApi({
     application: unusedAskApplication(), sessions, allowedOrigin: TEST_APP_ORIGIN,
     billing: { ...runtime.routes, usage },
+    ...(preview === undefined ? {} : { previewProviderTestConfig: preview.config, previewTeamUserIds: preview.teamUserIds }),
+    ...(preview?.asksOpenTo === undefined ? {} : { previewAsksOpen: true as const, previewAsksOpenTo: preview.asksOpenTo }),
     // As main.ts passes them: the deletion routes, and billing's renewal stop on a scheduled deletion (P15, W7).
     accountErasure, billingErasure: runtime.erasure
   });

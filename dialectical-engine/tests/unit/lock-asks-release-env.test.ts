@@ -1,6 +1,8 @@
 // release-env.mjs `same` and PREVIEW_ASKS_OPEN_TO: a release's API and runner files must say the same, two releases
 // side by side must too, and each file must pass the parser's own rules, so a file the launcher would refuse is named
-// before any restart. A parity table holds release-env's verdict and the shared parser to one answer.
+// before any restart. Under everyone-with-listed-buyers the team line stays in both files and names who may buy, so the
+// team checks that already compare it within a release and across two releases hold the buyers list to one value too.
+// A parity table holds release-env's verdict and the shared parser to one answer.
 import { describe, expect, it } from "vitest";
 import { parsePreviewAsksOpenTo } from "@debateai/providers";
 
@@ -71,9 +73,45 @@ describe("same: PREVIEW_ASKS_OPEN_TO", () => {
   });
 });
 
+describe("same: PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers", () => {
+  const LISTED: Env = { PREVIEW_ASKS_OPEN_TO: "everyone-with-listed-buyers" };
+  const OTHER_TEAM = JSON.stringify(["0b9c6c1e-5f3a-4f0e-9d6b-1a2b3c4d5e6f", "9f8e7d6c-5b4a-4321-9876-543210fedcba"]);
+
+  it("both files with the value and the same team line: OK, alone or beside a release that says the same", () => {
+    expect(bad(sameChecks([release("t", "A", NEW_KEY, { both: LISTED })]))).toEqual([]);
+    expect(bad(sameChecks([release("old-v1", "A", OLD_KEY, { both: LISTED }), release("new-v1", "B", NEW_KEY, { both: LISTED })]))).toEqual([]);
+    // An empty list is still a list: nobody may buy.
+    expect(bad(sameChecks([release("t", "A", NEW_KEY, { both: { ...LISTED, PREVIEW_TEAM_USER_IDS_JSON: "[]" } })]))).toEqual([]);
+  });
+
+  it("the value without the team line: BAD VALID_PREVIEW_ASKS_OPEN_TO:<label>", () => {
+    expect(bad(sameChecks([release("t", "A", NEW_KEY, { both: { ...LISTED, PREVIEW_TEAM_USER_IDS_JSON: "" } })])))
+      .toEqual(["VALID_PREVIEW_ASKS_OPEN_TO:t"]);
+  });
+
+  it("the runner without the value: BAD SAME_API_RUNNER_PREVIEW_ASKS_OPEN_TO:<label>", () => {
+    expect(bad(sameChecks([release("t", "A", NEW_KEY, { api: LISTED })]))).toEqual(["SAME_API_RUNNER_PREVIEW_ASKS_OPEN_TO:t"]);
+  });
+
+  it("a buyers list that differs between the API and the runner, or between two releases, is named by the team checks", () => {
+    expect(bad(sameChecks([release("t", "A", NEW_KEY, { both: LISTED, api: { PREVIEW_TEAM_USER_IDS_JSON: OTHER_TEAM } })])))
+      .toEqual(["SAME_API_RUNNER_PREVIEW_TEAM_USER_IDS_JSON:t"]);
+    expect(bad(sameChecks([release("old-v1", "A", OLD_KEY, { both: LISTED }),
+      release("new-v1", "B", NEW_KEY, { both: { ...LISTED, PREVIEW_TEAM_USER_IDS_JSON: OTHER_TEAM } })])))
+      .toEqual(["SAME_PREVIEW_TEAM_USER_IDS_JSON"]);
+  });
+
+  it("beside a release under another value: BAD SAME_PREVIEW_ASKS_OPEN_TO", () => {
+    expect(bad(sameChecks([release("old-v1", "A", OLD_KEY, { both: LISTED }), release("new-v1", "B", NEW_KEY)])))
+      .toEqual(["SAME_PREVIEW_ASKS_OPEN_TO"]);
+    expect(bad(sameChecks([release("old-v1", "A", OLD_KEY, { both: OPEN("everyone-with-test-payments") }), release("new-v1", "B", NEW_KEY, { both: LISTED })])))
+      .toEqual(["SAME_PREVIEW_TEAM_USER_IDS_JSON", "SAME_PREVIEW_ASKS_OPEN_TO"]);
+  });
+});
+
 describe("release-env and the shared parser give one verdict", () => {
   const rows: Env[] = [];
-  for (const value of [undefined, "everyone", "everyone-with-test-payments", "Everyone", "true", "", "everyone "]) {
+  for (const value of [undefined, "everyone", "everyone-with-test-payments", "everyone-with-listed-buyers", "Everyone", "true", "", "everyone "]) {
     for (const team of [undefined, "[]", TEAM]) for (const mode of ["hosted", "local"]) for (const config of [CONFIG, undefined]) {
       const env: Env = { DEBATEAI_DEPLOYMENT_MODE: mode };
       if (value !== undefined) env.PREVIEW_ASKS_OPEN_TO = value;
@@ -94,6 +132,6 @@ describe("release-env and the shared parser give one verdict", () => {
       }
       expect(asksOpenValid(env), JSON.stringify(env)).toBe(parser);
     }
-    expect(rows).toHaveLength(7 * 3 * 2 * 2);
+    expect(rows).toHaveLength(8 * 3 * 2 * 2);
   });
 });

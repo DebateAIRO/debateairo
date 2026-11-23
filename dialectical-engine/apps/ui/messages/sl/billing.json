@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Najprej sprejmite posodobljene Pogoje, nato se vrnite na to stran.",
   "billing.checkout.pageOutdated": "Ta stran je zastarela. Znova jo naložite.",
   "billing.checkout.erasurePending": "Vaš račun je načrtovan za izbris. Za naročilo ali spremembo paketa prekličite izbris v Nastavitvah.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "V zadnji uri je bilo preveč poskusov. Poskusite znova pozneje.",
   "billing.checkout.genericError": "Prišlo je do napake. Poskusite znova.",
   "billing.checkout.formUnavailable": "Strani za plačilo ni bilo mogoče odpreti. Poskusite znova čez minuto.",

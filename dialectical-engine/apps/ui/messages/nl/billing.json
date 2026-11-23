@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Accepteer eerst de bijgewerkte voorwaarden en kom dan terug naar deze pagina.",
   "billing.checkout.pageOutdated": "Deze pagina is verouderd. Laad haar opnieuw.",
   "billing.checkout.erasurePending": "Uw account staat gepland om te worden verwijderd. Annuleer de verwijdering in Instellingen om te abonneren of uw abonnement te wijzigen.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Te veel pogingen in het afgelopen uur. Probeer het later opnieuw.",
   "billing.checkout.genericError": "Er is iets misgegaan. Probeer het opnieuw.",
   "billing.checkout.formUnavailable": "De betaalpagina kon niet worden geopend. Probeer het over een minuut opnieuw.",
