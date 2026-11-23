@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ContractHttpError, type PublicDebate } from "@debateai/contract";
 import { createStaffApiClient, type StaffApiClient } from "../lib/staffApi.js";
+import { holdsNoStaffSession } from "../lib/api.js";
 import { formatDate, t, type MessageCatalog } from "../lib/i18n/translate.js";
 import type { LocaleCode } from "../lib/i18n/locales.js";
 import staffEnglish from "../messages/en/staff.json";
@@ -74,6 +75,9 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
 
   useEffect(() => {
     const epoch = ++generation.current;
+    // Before the team sign-in this browser holds no team cookie: the read could only be refused (401), which makes the
+    // browser forget the site password, so the page says what that refusal would have made it say.
+    if (holdsNoStaffSession()) { setNotElevated(true); return () => { generation.current++; }; }
     void api.publicationReviews().then(value => {
       if (generation.current === epoch) setQueue(value);
     }, failure => {

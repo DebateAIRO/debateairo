@@ -97,8 +97,11 @@ export function useReportWatch(runId: string | null, isDig: boolean, onReady: (v
     if (next.versions.at(-1)?.state === "WRITING") return "AGAIN";
     return watchForStart && canAskForReport(reportStageOf(next)) ? "AGAIN" : "DONE";
   }, [runId, apply, watchForStart]);
+  // The investigation is read only for its owner's session, and a read that fails while one is waited for is tried again:
+  // once the browser holds no session, the checks wait for one (useWaitPolling's `needsSession`).
   const polling = useWaitPolling(check, {
-    everyMs: REPORT_POLL_MS, enabled: runId !== null, restartKey: `${runId ?? ""}|${restart}|${watchForStart ? "carry" : ""}`
+    everyMs: REPORT_POLL_MS, enabled: runId !== null, restartKey: `${runId ?? ""}|${restart}|${watchForStart ? "carry" : ""}`,
+    needsSession: true
   });
 
   const reread = useCallback(async (): Promise<InvestigationReports | null> => {

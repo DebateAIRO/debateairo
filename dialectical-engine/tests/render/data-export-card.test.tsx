@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DataExportCard } from "../../apps/ui/components/DataExportCard.js";
@@ -10,6 +10,10 @@ import { SecurityActionResume } from "../../apps/ui/components/auth/SecurityActi
 import settings from "../../apps/ui/messages/en/settings.json" with { type: "json" };
 import auth from "../../apps/ui/messages/en/auth.json" with { type: "json" };
 import pub from "../../apps/ui/messages/en/public.json" with { type: "json" };
+import { holdSessionCookies } from "../support/sessionCookie.js";
+
+// These pages are only shown to a signed-in person: each test starts in a browser that holds a session's cookies.
+beforeEach(() => holdSessionCookies().drop);
 
 vi.mock("@/components/AuthGate", () => ({ AuthGate: ({ children }: { children: () => React.ReactNode }) => children() }));
 vi.mock("@/components/consent/ConsentSettingsPanel", () => ({ ConsentSettingsPanel: () => <section aria-label="Privacy" /> }));

@@ -2,8 +2,8 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
-import { createBrowserContractClient, createSameOriginFetch, holdsNoSession } from "../../apps/ui/lib/api.js";
-import { holdSessionCookies } from "../support/sessionCookie.js";
+import { createBrowserContractClient, createRecoveryFetch, createSameOriginFetch, holdsNoMfaRecovery, holdsNoPasswordReset, holdsNoSession } from "../../apps/ui/lib/api.js";
+import { holdReadableCookies, holdSessionCookies, MFA_RECOVERY_CSRF_COOKIE, PASSWORD_RESET_CSRF_COOKIE } from "../support/sessionCookie.js";
 
 /*
  * The site sits behind a site password at the edge, and a browser forgets that password whenever a request it sent with it
@@ -37,6 +37,26 @@ describe("a browser that holds no session sends no read the API can only refuse"
     expect(holdsNoSession()).toBe(true);
     vi.stubGlobal("document", undefined);
     expect(holdsNoSession(), "a server render").toBe(false);
+  });
+
+  it("holdsNoPasswordReset and holdsNoMfaRecovery each follow their own readable cookie, and know nothing without a document", () => {
+    expect([holdsNoPasswordReset(), holdsNoMfaRecovery()]).toEqual([true, true]);
+    // A session is neither a reset nor a recovery.
+    const session = holdSessionCookies();
+    expect([holdsNoPasswordReset(), holdsNoMfaRecovery()]).toEqual([true, true]);
+    session.drop();
+    const reset = holdReadableCookies(PASSWORD_RESET_CSRF_COOKIE);
+    expect([holdsNoPasswordReset(), holdsNoMfaRecovery(), holdsNoSession()]).toEqual([false, true, true]);
+    reset.drop();
+    const recovery = holdReadableCookies(MFA_RECOVERY_CSRF_COOKIE);
+    expect([holdsNoPasswordReset(), holdsNoMfaRecovery(), holdsNoSession()]).toEqual([true, false, true]);
+    recovery.drop();
+    // A value the API never sets is no reset: the site's proxy forwards no sign-in cookie at all beside a malformed one.
+    holdReadableCookies("__Host-debateai-password-reset-csrf=short");
+    expect(holdsNoPasswordReset()).toBe(true);
+    vi.restoreAllMocks();
+    vi.stubGlobal("document", undefined);
+    expect([holdsNoPasswordReset(), holdsNoMfaRecovery()], "a server render").toEqual([false, false]);
   });
 
   it("with no cookie, GET /v1/session and GET /v1/asks/room are answered 401 SESSION_REQUIRED without a request", async () => {
@@ -121,5 +141,51 @@ describe("a browser that holds no session sends no read the API can only refuse"
       ["/api/v1/asks", "GET"],
       ["/api/v1/deployment", "GET"]
     ]);
+  });
+});
+
+describe("the reset and recovery pages' fetch answers a status read the API can only refuse", () => {
+  const STATUS = { reset: "/api/v1/auth/password-reset/status", recovery: "/api/v1/auth/mfa-recovery/status" } as const;
+
+  it("with neither readable cookie, both status reads get the API's own 401 without a request", async () => {
+    const server = forwarded();
+    const recovery = createRecoveryFetch("/api", server.fetch);
+    for (const [url, code] of [[STATUS.reset, "PASSWORD_RESET_INVALID"], [STATUS.recovery, "MFA_RECOVERY_INVALID"]] as const) {
+      const response = await recovery(url, { method: "GET" });
+      expect(response.status, url).toBe(401);
+      expect(response.headers.get("content-type")).toBe("application/json");
+      expect(await response.json()).toEqual({ error: code });
+    }
+    expect(server.calls).toEqual([]);
+  });
+
+  it("each status read goes to the server when its own cookie is held, and every other request always does", async () => {
+    const server = forwarded();
+    const recovery = createRecoveryFetch("/api", server.fetch);
+    holdReadableCookies(PASSWORD_RESET_CSRF_COOKIE);
+    await recovery(STATUS.reset, { method: "GET" });
+    await recovery(STATUS.recovery, { method: "GET" });
+    expect(server.calls.map((call) => call.url), "a reset is no recovery").toEqual([STATUS.reset]);
+    vi.restoreAllMocks();
+    holdReadableCookies(MFA_RECOVERY_CSRF_COOKIE);
+    await recovery(STATUS.recovery);
+    vi.restoreAllMocks();
+    for (const url of ["/api/v1/auth/password-reset/start", "/api/v1/auth/mfa-recovery/start", "/api/v1/auth/mfa-recovery/finish/status", "/api/v1/auth/password-reset/cancel-current"]) {
+      await recovery(url, { method: "POST" });
+    }
+    await recovery(STATUS.reset, { method: "POST" });
+    expect(server.calls.map((call) => call.url)).toEqual([
+      STATUS.reset, STATUS.recovery,
+      "/api/v1/auth/password-reset/start", "/api/v1/auth/mfa-recovery/start", "/api/v1/auth/mfa-recovery/finish/status",
+      "/api/v1/auth/password-reset/cancel-current", STATUS.reset
+    ]);
+  });
+
+  it("without a fetch of its own it sends through the browser's fetch at the time of the request", async () => {
+    const server = forwarded();
+    const recovery = createRecoveryFetch("/api");
+    vi.stubGlobal("fetch", server.fetch);
+    await recovery("/api/v1/auth/password-reset/start", { method: "POST" });
+    expect(server.calls.map((call) => call.url)).toEqual(["/api/v1/auth/password-reset/start"]);
   });
 });

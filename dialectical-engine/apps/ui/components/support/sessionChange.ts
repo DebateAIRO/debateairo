@@ -1,4 +1,4 @@
-import { contractClient, holdsNoSession } from "../../lib/api.js";
+import { contractClient, forgetEndedSession, heldSessionCookie, holdsNoSession } from "../../lib/api.js";
 import { clearPendingExport } from "../../lib/dataExportPending.js";
 import {
   browserSupportConversationStorage,
@@ -125,9 +125,12 @@ export function onConversationWake(listener: WakeListener): () => void {
 export async function readWakeFacts(): Promise<WakeFacts> {
   // No session in this browser: signed out, without sending a read the API could only refuse.
   if (holdsNoSession()) return SIGNED_OUT;
+  const heldBefore = heldSessionCookie();
   const response = await fetch("/api/v1/session", {
     method: "GET", cache: "no-store", credentials: "same-origin"
   });
+  // A session the server has ended: the next read is answered here, as for a browser that holds none.
+  await forgetEndedSession("/v1/session", response, heldBefore);
   if (response.status === 401) return SIGNED_OUT;
   if (!response.ok) return UNKNOWN;
   let currentSessionStartedAtMs: number | null = null;

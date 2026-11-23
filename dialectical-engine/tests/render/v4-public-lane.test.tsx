@@ -66,6 +66,8 @@ import { PublicDebateOverview } from "../../apps/ui/components/PublicDebateOverv
 import { DIG_UNDO_MS, readDigUndo, resetDigUndo } from "../../apps/ui/lib/v4/digUndo.js";
 import { resetPublicDigs } from "../../apps/ui/lib/v4/publicDig.js";
 import { contributionOf, seedPublicDebates, PUBLIC_DIG_SUGGESTIONS, PUBLIC_REF, PUBLIC_REF_AUTHOR_GONE, PUBLIC_UPDATE_REF } from "../../tools/v4-mock-api/public-seed.js";
+import { WAIT_AFTER_FAILURE_MS } from "../../apps/ui/lib/v4/useWaitPolling.js";
+import { holdSessionCookies } from "../support/sessionCookie.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -1008,6 +1010,29 @@ describe("Write a report", () => {
     expect(lane.writePublicReport).toHaveBeenCalledTimes(1);
     expect(card()).not.toBeNull();
     expect(host!.querySelector("[data-public-report-failed]")).toBeNull();
+  });
+
+  it("a check that fails on a lost connection after a sign-out in another tab is tried again: the page's read needs no session", async () => {
+    vi.useFakeTimers();
+    let signedIn: ReturnType<typeof holdSessionCookies> | null = holdSessionCookies();
+    try {
+      const page = debate();
+      await mount(page);
+      await click(press());
+      expect(lane.readPublicDebate).toHaveBeenCalledTimes(1);
+      signedIn.drop(); signedIn = null;
+      lane.readPublicDebate = vi.fn(async () => { throw new Error("OFFLINE"); });
+      await advance(15_000);
+      expect(lane.readPublicDebate, "the check that fails").toHaveBeenCalledTimes(1);
+      await advance(WAIT_AFTER_FAILURE_MS);
+      expect(lane.readPublicDebate, "tried again").toHaveBeenCalledTimes(2);
+      lane.readPublicDebate = vi.fn(async () => withVersion(page, 2));
+      await advance(WAIT_AFTER_FAILURE_MS);
+      expect(lane.refresh, "the report arrives without a press").toHaveBeenCalledTimes(1);
+      expect(card()).toBeNull();
+    } finally {
+      signedIn?.drop();
+    }
   });
 
   it("after a reload, only the server can say a report is being written: someone else's is not called yours when it arrives", async () => {
