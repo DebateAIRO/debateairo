@@ -5199,9 +5199,9 @@ hold both releases to the same value (`SAME_PREVIEW_ASKS_OPEN_TO`) and the same 
 Never change the list (MAIN-SITE.md's BUYERS) from SB3 to the end of the upload. The value can be set only when every
 release that may run, or be gone back to, carries it: an older API refuses it at start (`PREVIEW_ASKS_OPEN_TO_INVALID`)
 and lets any signed-in account buy on NETOPIA's sandbox. So 6b opens only after the upload that brings it is over
-(SB14 retired the release before), and before any way back to a release older than that one (WB2 included) come
-MAIN-SITE.md's PWON, then ASKS_CLOSE. After SB13b, edit the first line of MAIN-SITE.md's names file, then run its
-OPENCHECK.
+and you have decided not to go back to the release before (WB2 is still possible after SB14), and before any way
+back to a release older than that one (WB2 included) come MAIN-SITE.md's PWON, then ASKS_CLOSE. After SB13b, edit
+the first line of MAIN-SITE.md's names file, then run its OPENCHECK.
 
 ### SB1. Names, the archive `$S` and the copies the way back needs
 

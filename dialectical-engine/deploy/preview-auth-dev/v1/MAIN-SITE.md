@@ -3201,9 +3201,9 @@ the answer comes in time.
 account. Its tester signs up like anyone else (the bot check, the e-mail link, a second factor). Its test payment can
 go one of three ways; ask NETOPIA which it wants:
 - (a) You list its tester. Ask NETOPIA for the address its tester will sign up with, and for the billing country the
-  tester will choose. Once the tester has signed up, run BUYERS (6b.3) with that address, best together with other
-  accounts you list, at a quiet minute (each change restarts the API). The tester then buys with the test card the
-  test-mode note prints, with no password anywhere.
+  tester will choose. Once the tester has signed up, run BUYERS (6b.3) with that address, in the same quiet minutes
+  as the other accounts you list (each BUYERS run is one restart of the API). The tester then buys with the test card
+  the test-mode note prints, with no password anywhere.
 - (b) You pay with your own listed account while NETOPIA watches.
 - (c) NETOPIA accepts that buying stays closed until the contract. Its tester then sees the whole order page and, at
   the last button, the sentence "Buying a plan is open only to invited accounts for now. You can keep using the Free
@@ -3226,10 +3226,10 @@ your identity, checks your shop's profile (it looks at the open site), and sends
   can be read without a password.
 - With the review window: sign-in, account creation, debates and the order page ask for an access password for now.
   They open to everyone later, after the contract.
-- With 6b, instead of the line above: no page of the site asks for any password; anyone can create an account, sign
-  in, read the debates and use the Free plan, and everyone can see the whole order page. While payments are in test
-  mode, only accounts we invite can buy a plan; any other account is told so at the last button, and nothing is
-  charged. Say which of the three ways of step 2 you offer for NETOPIA's test payment.
+- With 6b, instead of the line above: no page of the site asks for an access password; anyone can create an account,
+  sign in, read the debates and use the Free plan, and every signed-in account can see the whole order page. While
+  payments are in test mode, only accounts we invite can buy a plan; any other account is told so at the last button,
+  and nothing is charged. Say which of the three ways of step 2 you offer for NETOPIA's test payment.
 - Card payments run on NETOPIA's test system (sandbox) until NETOPIA switches live payments on, and the home page and
   the plans page say so: "Mod de test: plățile de pe acest site nu sunt reale și nu se iau bani" (in English: "Test
   mode: payments on this site are not real and no money is taken").
@@ -3522,8 +3522,9 @@ out with SIGNUPS.
 PWON (b) comes first.
 
 (e) **One account may buy no more** (only while 6b is open): BUYERS (6b.3) with `W=remove`. It stops that account's
-new checkouts and upgrades; a plan it holds goes on until it is withdrawn or cancelled (3.3). To stop all buying at
-once, use PWON (b): then only the team, who know the site password, can reach the site.
+new checkouts and upgrades; a plan it holds goes on until it is withdrawn or cancelled (3.3). To stop all buying by
+anyone outside the team at once, use PWON (b): then only the team, who know the site password, can reach the site (a
+payment page opened earlier can still be paid for up to a day).
 
 (a), (b) and (b2) work at any time, even during an upload. (c), (d) and (e) do not: wait until the upload is over.
 Their names file stops them only once the new release is staged, not from the start of the upload, so do not count on
@@ -3574,8 +3575,8 @@ never become accounts that may ask.
 - the upload of that release comes first (the release guide), with its downtime: not while NETOPIA is looking at the
   site (5.6);
 - open 6b only once that upload is over: SB13b passed, the first line of names.sh names the new upload (end of 3.0),
-  and you would no longer go back to the release before it (side by side: SB14 retired it; drained: you would no
-  longer choose rbD-B);
+  and you have decided not to go back to the release before it (side by side: WB2 is still possible after SB14; if
+  you ever use it, PWON and ASKS_CLOSE come first; drained: you would no longer choose rbD-B);
 - while 6b is open, go back to an older release only after PWON, then ASKS_CLOSE;
 - the sentence an account that is not listed sees (`billing.checkout.invitedBuyersOnly`) is written in English first
   and translated into Romanian before a release: check that the release you uploaded carries the Romanian words, or
@@ -3633,6 +3634,10 @@ never become accounts that may ask.
    plan within 14 days of its purchase (or its holder cancels it) before part 7; nobody buys as a Romanian buyer; a
    payment page left unfinished blocks real payments for up to 24 hours. The simplest choice: nobody but the team
    buys.
+6. **The words on buying.** The site shows the plans and their prices to every signed-in account, but while payments
+   are in test mode only invited accounts can buy. Decide whether the Terms, the test-mode note, or both must say
+   that buying is open only to invited accounts while payments are in test mode. Changing either needs an upload, so
+   decide before you open.
 
 ### 6b.2 The steps, in order
 
@@ -3736,7 +3741,8 @@ whether that account still holds an open sandbox plan or an unfinished payment p
 saved test card, and its holder can still change that card, until the plan is withdrawn or cancelled: run
 WITHDRAWOTHER (3.3) within 14 days of its purchase, after you tell them, or ask them to cancel it in Settings or on
 `/cancel`. A NETOPIA page it opened while it was listed can still be paid for up to a day. Taking everyone off leaves
-the list empty (`[]`): nobody may buy. To stop all buying at once, PWON is faster (6b.5).
+the list empty (`[]`): nobody may buy. To stop all buying by anyone outside the team at once, PWON is faster (6b.5); a
+payment page opened earlier can still be paid for up to a day.
 
 **If it stops:**
 - `no account with that address`: check the address you typed; the account must have signed up first.
@@ -3822,7 +3828,8 @@ id and no amount of money: the mail lines are counts and a share of the limit.
   of the purchase, after you tell them, or the holder cancels). A non-zero count is a `LOOK:` line, not a failure.
 - `checkouts and upgrades started since the opening by accounts never on the list` must be 0: a checkout or an upgrade
   the API refuses writes no row. Not 0 means the buyer rule did not hold: PWON now (6.5 (b)), then ask. Do not
-  withdraw anything before you ask.
+  withdraw anything before you ask. This count leaves out every account that was ever on the list since the opening:
+  a purchase by an account after you took it off the list shows only in the `LOOK:` line above, not here.
 - A `LOOK: mail stopped` line: on that day new sign-ups could not finish (the ordinary share of `daily_limit` was
   used up), or all mail stopped. Decide whether to stop sign-ups for a while (SIGNUPS, 6.5 (c)), or ask about the
   limit.
@@ -3834,7 +3841,8 @@ id and no amount of money: the mail lines are counts and a share of the limit.
 The brakes are those of 6.5, fastest first:
 - (a) each gate's `stop`: all AI spending stops, at any time.
 - (b) PWON (8.4): the password back on every page in about a second, at any time, even during an upload. 6b's value
-  stays, but only the team, who know the password, can reach the site. To stop all buying at once, this is the brake.
+  stays, but only the team, who know the password, can reach the site. To stop all buying by anyone outside the
+  team at once, this is the brake (a payment page opened earlier can still be paid for up to a day).
 - (c) SIGNUPS: sign-ups only. With the password off it checks the 503 itself.
 - (d) ASKS_CLOSE: only after PWON (it refuses while the Log in page does not ask for the site password).
 - (e) BUYERS with `W=remove`: one account buys no more; a plan it holds goes on until it is withdrawn or cancelled.

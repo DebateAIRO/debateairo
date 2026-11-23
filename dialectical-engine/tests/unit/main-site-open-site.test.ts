@@ -513,7 +513,7 @@ describe('the words of 6b', () => {
     for (const heading of ['6b.1 Before you open', '6b.2 The steps, in order', '6b.3 Add or remove a buyer (BUYERS)', '6b.4 The morning check (OPENCHECK)',
       '6b.5 The brakes, and the way back', '6b.6 Before part 7']) expect(runbook.split('\n')).toContain(`### ${heading}`);
     expect(flat).toContain('**The one exception is 6b:** the password may come off before real payments only with `everyone-with-listed-buyers`');
-    expect(flat).toContain('no page of the site asks for any password');
+    expect(flat).toContain('no page of the site asks for an access password');
     expect(flat).toContain('While payments are in test mode, only accounts we invite can buy a plan');
     expect(flat).toContain('Never list the tester when it will buy as a Romanian buyer');
   });
