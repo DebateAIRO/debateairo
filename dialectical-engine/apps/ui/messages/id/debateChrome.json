@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Debat privat",
   "debateChrome.privateDebateDeleted": "Debat privat telah dihapus",
   "debateChrome.privateDebateDeletionProcessing": "Penghapusan debat privat sedang diproses",
-  "debateChrome.privateDebateDeletedDetail": "Debat ini merupakan penanda penghapusan. Konten privat terenkripsinya tidak dapat dibaca lagi secara permanen.",
+  "debateChrome.privateDebateDeletedDetail": "Debat ini adalah penanda penghapusan. Konten privat terenkripsinya tidak dapat dibaca lagi di sini. Cadangan kami mungkin masih menyimpannya (Kebijakan privasi, bagian 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Konten privat tidak lagi tersedia selama pembersihan kunci permanen diselesaikan.",
   "debateChrome.tree.building": "Menyusun pohon argumen…",
   "debateChrome.tree.notProduced": "Tidak ada pohon argumen yang dihasilkan untuk debat ini.",

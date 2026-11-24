@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Özel tartışma",
   "debateChrome.privateDebateDeleted": "Özel tartışma silindi",
   "debateChrome.privateDebateDeletionProcessing": "Özel tartışmanın silinmesi işleniyor",
-  "debateChrome.privateDebateDeletedDetail": "Bu tartışma bir silme kaydıdır. Şifrelenmiş özel içeriği kalıcı olarak okunamaz durumdadır.",
+  "debateChrome.privateDebateDeletedDetail": "Bu tartışma bir silme kaydıdır. Şifrelenmiş özel içeriği burada artık okunamaz. Yedeklerimiz bunu hâlâ tutuyor olabilir (Gizlilik Politikası, 7. bölüm).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Kalıcı anahtar temizliği tamamlanırken özel içeriğe artık erişilemez.",
   "debateChrome.tree.building": "Argüman ağacı oluşturuluyor…",
   "debateChrome.tree.notProduced": "Bu tartışma için argüman ağacı oluşturulmadı.",

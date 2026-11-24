@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { AuthCatalogProvider } from "@/components/AuthShell";
-import { MfaRecoveryCatalogProvider } from "@/components/MfaRecoveryCatalog";
+import { MfaRecoveryCatalogProvider, PASSWORD_RESET_LINK_KEY } from "@/components/MfaRecoveryCatalog";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 
@@ -13,6 +13,9 @@ export default async function EnrollMfaLayout({ children }: { children: ReactNod
   const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   // The footer's "Know your password…" link reads the mfa-recovery catalogue (owner, 2026-10-09: all 35 locales).
-  const [catalog, mfaRecoveryCatalog] = await Promise.all([loadNamespace(locale, "auth"), loadNamespace(locale, "mfa-recovery")]);
+  // The footer of /recover also links to the password reset, whose name comes from the password-reset catalogue.
+  const [catalog, mfaRecovery, passwordReset] = await Promise.all([loadNamespace(locale, "auth"), loadNamespace(locale, "mfa-recovery"), loadNamespace(locale, "password-reset")]);
+  const resetTitle = passwordReset["request.title"];
+  const mfaRecoveryCatalog = resetTitle ? { ...mfaRecovery, [PASSWORD_RESET_LINK_KEY]: resetTitle } : mfaRecovery;
   return <AuthCatalogProvider catalog={catalog}><MfaRecoveryCatalogProvider catalog={mfaRecoveryCatalog}>{children}</MfaRecoveryCatalogProvider></AuthCatalogProvider>;
 }

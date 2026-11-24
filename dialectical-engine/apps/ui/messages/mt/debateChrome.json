@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Dibattitu privat",
   "debateChrome.privateDebateDeleted": "Id-dibattitu privat tħassar",
   "debateChrome.privateDebateDeletionProcessing": "It-tħassir tad-dibattitu privat qed jiġi pproċessat",
-  "debateChrome.privateDebateDeletedDetail": "Dan id-dibattitu huwa rekord ta’ qabar. Il-kontenut privat kriptat tiegħu ma jista’ jinqara qatt aktar.",
+  "debateChrome.privateDebateDeletedDetail": "Dan id-dibattitu tħassar u fadal biss rekord tiegħu. Il-kontenut privat kriptat tiegħu ma jistax jinqara aktar hawn. Il-kopji ta’ riżerva tagħna jistgħu jkunu għadhom iżommuh (Politika dwar il-Privatezza, taqsima 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Il-kontenut privat ma għadux disponibbli waqt li jintemm it-tindif permanenti taċ-ċwievet.",
   "debateChrome.tree.building": "Qed tinbena s-siġra tal-argumenti…",
   "debateChrome.tree.notProduced": "Ma nħolqot ebda siġra tal-argumenti għal dan id-dibattitu.",

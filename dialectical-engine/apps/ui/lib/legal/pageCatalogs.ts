@@ -21,7 +21,7 @@ export type LegalPageCatalogs = Readonly<{
  * catalogues. An explicit `?lang=` counts when it names a language whose legal texts a person can be shown
  * (isLegalTextLocale: the offered languages and French for Canada): the API links a person to the exact text they are
  * asked to accept, and that link must show that text, not the cookie's. Any other value counts as no `?lang=` at all,
- * because the other languages' drafts carry the current version number over older text that nobody checked.
+ * because a language outside that list is not held to the current English text.
  */
 export async function loadLegalPageCatalogs(explicitLocale?: string): Promise<LegalPageCatalogs> {
   const requested = (await cookies()).get(LOCALE_COOKIE)?.value;

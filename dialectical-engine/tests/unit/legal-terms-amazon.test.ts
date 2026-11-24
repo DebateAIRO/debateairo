@@ -87,8 +87,9 @@ describe("Terms of Service: Amazon Web Services serves one of the debate models"
     expect(draft(code), code).not.toMatch(/GPT|Luna|ChatGPT/u);
   });
 
-  it("the not-offered translations brought up to date are ja and ko", () => {
-    expect(CURRENT_NOT_OFFERED).toEqual(["ja", "ko"]);
+  it("every not-offered translation has been brought up to date (24 November 2026: all 32)", () => {
+    expect(CURRENT_NOT_OFFERED).toEqual(LOCALES.map(({ code }) => code).filter((code) => !RELEASED.includes(code)));
+    expect(CURRENT_NOT_OFFERED).toHaveLength(32);
   });
 
   it.each(CURRENT_NOT_OFFERED.map((code) => [code]))("%s: one paragraph names Amazon Bedrock, between DeepInfra's and Perplexity's", (code) => {

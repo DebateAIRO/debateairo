@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Debate privado",
   "debateChrome.privateDebateDeleted": "Debate privado eliminado",
   "debateChrome.privateDebateDeletionProcessing": "A eliminação do debate privado está a ser processada",
-  "debateChrome.privateDebateDeletedDetail": "Este debate é um registo residual. O respetivo conteúdo privado cifrado está permanentemente ilegível.",
+  "debateChrome.privateDebateDeletedDetail": "Este debate é um registo residual. O seu conteúdo privado cifrado já não pode ser lido aqui. As nossas cópias de segurança podem ainda conservá-lo (Política de Privacidade, secção 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "O conteúdo privado deixou de estar disponível enquanto termina a limpeza permanente das chaves.",
   "debateChrome.tree.building": "A construir a árvore de argumentos…",
   "debateChrome.tree.notProduced": "Não foi produzida qualquer árvore de argumentos para este debate.",

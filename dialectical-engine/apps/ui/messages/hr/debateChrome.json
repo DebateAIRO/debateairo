@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Privatna rasprava",
   "debateChrome.privateDebateDeleted": "Privatna rasprava je izbrisana",
   "debateChrome.privateDebateDeletionProcessing": "Brisanje privatne rasprave je u tijeku",
-  "debateChrome.privateDebateDeletedDetail": "Od ove rasprave ostao je samo zapis o brisanju. Njezin šifrirani privatni sadržaj trajno je nečitljiv.",
+  "debateChrome.privateDebateDeletedDetail": "Od ove rasprave ostao je samo zapis o brisanju. Njezin šifrirani privatni sadržaj ovdje se više ne može čitati. Naše sigurnosne kopije ga još mogu sadržavati (Pravila o privatnosti, odjeljak 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Privatni sadržaj više nije dostupan dok traje trajno čišćenje ključeva.",
   "debateChrome.tree.building": "Izgradnja stabla argumenata…",
   "debateChrome.tree.notProduced": "Za ovu raspravu nije stvoreno stablo argumenata.",

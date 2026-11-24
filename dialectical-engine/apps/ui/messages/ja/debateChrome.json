@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "非公開ディベート",
   "debateChrome.privateDebateDeleted": "非公開ディベートは削除されました",
   "debateChrome.privateDebateDeletionProcessing": "非公開ディベートを削除中です",
-  "debateChrome.privateDebateDeletedDetail": "このディベートには削除済みであることを示す記録だけが残っています。暗号化された非公開コンテンツは永久に読み取れません。",
+  "debateChrome.privateDebateDeletedDetail": "このディベートには削除済みであることを示す記録だけが残っています。暗号化された非公開コンテンツは、ここではもう読み取れません。ただし、当社のバックアップには残っている場合があります（プライバシーポリシー第7節）。",
   "debateChrome.privateDebateDeletionProcessingDetail": "暗号鍵の完全な消去が完了するまで、非公開コンテンツは利用できません。",
   "debateChrome.tree.building": "論証ツリーを構築中…",
   "debateChrome.tree.notProduced": "このディベートの論証ツリーは生成されませんでした。",
