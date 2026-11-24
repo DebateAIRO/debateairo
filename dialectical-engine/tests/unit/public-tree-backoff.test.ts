@@ -303,6 +303,41 @@ describe("one item whose check always fails holds back no other, in any of the s
     expect(world.endAsked("f-judge-down")).toEqual([15_000, 90_000, 225_000, 480_000]);
   });
 
+  it("past a list's worth of waiting Free debates, one whose own end-of-debate check keeps failing keeps its own wait while the cursor reads past it, and loses it only once the round ends without it", async () => {
+    let clock = 0;
+    const endAsked: number[] = [];
+    // 150 waiting debates, more than the 100 a read gives: the cursor reads them in two passes a round.
+    const names = Array.from({ length: 150 }, (_, at) => `f-${String(at).padStart(3, "0")}`);
+    let waiting = [...names];
+    const turn = checksInTurn(backedOffContentCheck({ check: async () => ({ outcome: "ALLOW" }) }, { now: () => clock }), { now: () => clock });
+    const cursor = freeSweepCursor();
+    const pass = () => turn.pass(() => sweepFreePublications({
+      cursor,
+      contributions: { readFreeToPublishAfter: async (limit, after) => waiting.filter((name) => after === null || name > after.run_id).slice(0, limit)
+        .map((name) => ({ run_id: name, owner_ref: "o", notice_at: "2026-11-24T08:00:00.000Z" })), refuseFree: async () => "REFUSED" as never },
+      publishOne: async (row) => {
+        // Only the first one has no stored decision, and its own check never answers; the others wait for an approval.
+        if (row.run_id !== "f-000") return "WAITING_FOR_APPROVAL";
+        const decision = await turn.checkBefore(row.run_id, async () => { endAsked.push(clock); return "UNAVAILABLE" as const; }, (answer) => answer === "UNAVAILABLE");
+        return decision ?? "CHECK_UNAVAILABLE";
+      }
+    }), () => cursor.after !== null);
+    // The clock stands still: its own wait of a minute never ends, so it is asked once in ten passes (five rounds).
+    for (let at = 0; at < 10; at += 1) await pass();
+    expect(endAsked).toEqual([0]);
+    // Its wait ends with the clock, and it is asked again on its next turn.
+    clock += 60_000;
+    for (let at = 0; at < 2; at += 1) await pass();
+    expect(endAsked).toEqual([0, 60_000]);
+    // Gone from the list for a whole round (two passes), it is forgotten with its wait: back, it is asked at once.
+    waiting = names.slice(1);
+    for (let at = 0; at < 2; at += 1) await pass();
+    waiting = [...names];
+    expect(cursor.after).toBeNull();
+    await pass();
+    expect(endAsked).toEqual([0, 60_000, 60_000]);
+  });
+
   it("a pass waits for at most one end-of-debate check that fails: each may take the whole background time, so the others are asked on the next passes, and a debate whose verdict is stored still goes public at once", async () => {
     const world = await freeSweepWorld({
       waiting: ["f-down-1", "f-down-2", "f-down-3", "f-stored"], stored: new Set(["f-stored"]),

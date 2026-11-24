@@ -1523,7 +1523,7 @@ describe("a Free debate goes public only when the end-of-debate check allows it"
               await options.beforePrepare!(debate);
               return freeStore().prepare(runId, ref);
             } } });
-        } }));
+        } }), () => cursor.after !== null);
     };
     return { pass, outcomeOf: (debate: FreeDebate) => outcomes.get(debate.run), modelCalls, judged, wait: (ms: number) => { clock += ms; } };
   }

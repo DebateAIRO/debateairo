@@ -2564,7 +2564,7 @@ if (publications !== undefined) {
           publish: (input) => publicContributions.publishFree({ runId: input.runId, publicationRef: input.publicationRef, grantTokenHash: input.grantTokenHash, content: input.content, presentedAt: input.presentedAt }),
           refuse: (runId) => publicContributions.refuseFree(runId) } });
     } });
-  }), () => console.error("[PUBLIC_PAGE_WORK_PENDING]"));
+  }, () => freePublicationCursor.after !== null), () => console.error("[PUBLIC_PAGE_WORK_PENDING]"));
   publicPageTimer = gatedInterval(releaseWatcher, triggerPublicPage, PUBLIC_PAGE_SWEEP_DEFAULTS.everyMs);
   // Decision 36: sealed originals and reports' words past their six months.
   publicReviewPurgeTimer = gatedInterval(releaseWatcher, () => { void sweepPublicReviewPurge({ repository: publicFlagRepository, withKey: (publicationRef, runId, use) => publications.withReviewKey(publicationRef, runId, use),
