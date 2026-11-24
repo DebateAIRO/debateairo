@@ -200,9 +200,9 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.1 
       expect(lines.find((line) => line.startsWith("**Version ")), `${kind} ${code}: the version line`)
         .toContain(`**Version ${CURRENT[kind]} · Effective ${legalDayText(code, day, "line")} · `);
     }
-    // Every language's Privacy Policy (all are offered) says it was last updated that day.
+    // Every language's Privacy Policy (all are offered) says it was last updated on the Privacy Policy's day.
     expect([...OFFERED].sort()).toEqual(CODES);
-    for (const code of OFFERED) expect(section14(draft("PRIVACY", code))[2], code).toContain(legalDayText(code, day, "line"));
+    if (kind === "PRIVACY") for (const code of OFFERED) expect(section14(draft("PRIVACY", code))[2], code).toContain(legalDayText(code, day, "line"));
   });
 
   it("keeps both re-acceptance floors at 1.0: an acceptance of 1.0, or of any pre-launch draft, owes nothing", () => {
