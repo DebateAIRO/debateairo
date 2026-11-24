@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: POLITICA DE CONFIDENȚIALITATE · v1.1 · ÎN VIGOARE DE LA 25 NOIEMBRIE 2026
+eyebrow: POLITICA DE CONFIDENȚIALITATE · v1.1 · ÎN VIGOARE DE LA 24 NOIEMBRIE 2026
 title: Ce stocăm și de ce
 lede: Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.
 endMarker: SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v1.1
@@ -19,7 +19,7 @@ jumps:
 13 MODULE COOKIE
 -->
 
-**Version 1.1 · Effective 25 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/privacy/versions · Operator: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.1 · Effective 24 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/privacy/versions · Operator: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Colectăm ceea ce este necesar unui cont și ceea ce introduceți în dezbaterile dumneavoastră. Ceea ce scrieți asistentului de suport ajunge la modelul său de IA pentru ca acesta să vă poată răspunde, iar noi nu păstrăm nimic din acestea. Întrebările dumneavoastră sunt transmise furnizorilor de IA enumerați în Registrul furnizorilor de IA, în principal DeepInfra, în Statele Unite. Condițiile DeepInfra, Anthropic și Amazon nu le permit să antreneze modele pe ceea ce scrieți. Furnizorul de căutare pe web primește numai expresiile scurte de căutare pe care le scriu modelele (secțiunea 5). Furnizorul nostru de găzduire vă stochează contul și dezbaterile la Londra, în Regatul Unit; secțiunea 5 arată unde ajung în rest datele dumneavoastră. Pe planul gratuit, dezbaterile sunt publice după ce se încheie, în urma unei verificări cu IA; pe un plan cu plată, sunt private dacă nu le publicați. Ștergerea contului distruge în serviciul activ cheile datelor dumneavoastră private, dar nu șterge copiile noastre de rezervă, iar unele dintre ele conțin aceste chei (secțiunea 7); dezbaterile publice rămân publice, iar pseudonimul dumneavoastră este eliminat din ele. Ne puteți contacta la privacy@dezbatere.ro, iar persoanele menționate într-o dezbatere pot să ne scrie fără a avea cont.
 
@@ -261,7 +261,7 @@ Pentru a refuza aceste elemente, blocați sau ștergeți modulele cookie și dat
 
 Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la dezbatere.ro/privacy/versions. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune.
 
-Această politică a fost actualizată ultima dată la 25 noiembrie 2026. Versiunea 1.1 a înlocuit versiunea 1.0: secțiunea 5 arată acum că DeepInfra rulează pe propriile servere fiecare model pus la dispoziția unei dezbateri prin intermediul său, iar rezumatul și secțiunea 4 au fost modificate în mod corespunzător.
+Această politică a fost actualizată ultima dată la 24 noiembrie 2026. Versiunea 1.1 a înlocuit versiunea 1.0: secțiunea 5 arată acum că DeepInfra rulează pe propriile servere fiecare model pus la dispoziția unei dezbateri prin intermediul său, iar rezumatul și secțiunea 4 au fost modificate în mod corespunzător.
 
 ## Annex B — Condiții regionale privind confidențialitatea
 

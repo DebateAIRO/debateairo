@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v1.1 · CÓ HIỆU LỰC 25 THÁNG 11 NĂM 2026
+eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v1.1 · CÓ HIỆU LỰC 24 THÁNG 11 NĂM 2026
 title: Những điều bạn đồng ý
 lede: Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.
 endMarker: HẾT ĐIỀU KHOẢN · v1.1
@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 1.1 · Effective 25 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
+**Version 1.1 · Effective 24 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Trên gói miễn phí, các cuộc tranh luận của bạn trở thành công khai khi kết thúc, sau khi AI kiểm tra; trên gói trả phí, chúng là riêng tư trừ khi bạn công khai chúng. Khi đã công khai, bất kỳ ai cũng có thể đọc một cuộc tranh luận, và nó vẫn công khai. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi, chủ yếu là DeepInfra, tại Hoa Kỳ. Điều khoản của DeepInfra, Anthropic và Perplexity không cho phép họ huấn luyện mô hình bằng văn bản đó; mục 8 cho biết chúng tôi chưa xác nhận điều này đối với công ty nào. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 

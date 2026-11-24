@@ -430,7 +430,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Lorsque nous modifions la présente politique, nous publions la nouvelle version avec un résumé des modifications et une nouvelle date d'entrée en vigueur, et conservons les versions antérieures à l'adresse dezbatere.ro/privacy/versions. Si une modification ajoute une nouvelle finalité ou un nouveau destinataire, nous vous en informons par e-mail et dans le produit avant le début du nouveau traitement, et vous laissons le temps de vous y opposer. Lorsqu'une nouvelle finalité dépend de votre consentement — par exemple, si nous souhaitions un jour utiliser du contenu pour améliorer des modèles — nous sollicitons ce consentement séparément et spécifiquement ; nous ne considérons jamais l'acceptation de Conditions mises à jour comme un consentement à un nouveau traitement. Pour les clarifications qui ne modifient en rien nos pratiques, nous publions simplement la nouvelle version." },
-      { kind: "p", text: "La présente politique a été mise à jour pour la dernière fois le 25 novembre 2026. La version 1.1 a remplacé la version 1.0 : la section 5 indique désormais que DeepInfra exécute sur ses propres serveurs tout modèle fourni à un débat par son intermédiaire, et le résumé et la section 4 ont été modifiés en conséquence." }
+      { kind: "p", text: "La présente politique a été mise à jour pour la dernière fois le 24 novembre 2026. La version 1.1 a remplacé la version 1.0 : la section 5 indique désormais que DeepInfra exécute sur ses propres serveurs tout modèle fourni à un débat par son intermédiaire, et le résumé et la section 4 ont été modifiés en conséquence." }
     ]
   },
   {
@@ -495,8 +495,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.1",
-  sha256: "4887ade280a33efac6eec8d571c5864cfeaac45e99ab1773ad6057d4d11066b1",
-  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v1.1 · EN VIGUEUR LE 25 NOVEMBRE 2026",
+  sha256: "2c639718616db98b874948e323503ddb1f5ff23e2cd1edf12f22fe42b9f741a0",
+  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v1.1 · EN VIGUEUR LE 24 NOVEMBRE 2026",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",
   endMarker: "FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v1.1",

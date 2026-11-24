@@ -494,8 +494,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.1",
-  sha256: "d136fe4efd5b6ab697b10a34f88fa8b20f9c28bf65f28a4fc623a63ffae0b1ae",
-  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v1.1 · EFFETTIVA 25 TA’ NOVEMBRU 2026",
+  sha256: "0ae647f15b118b64026d9f045d530f575916792c4de42eb4cc88b6bbf5607c18",
+  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v1.1 · EFFETTIVA 24 TA’ NOVEMBRU 2026",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",
   endMarker: "TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v1.1",

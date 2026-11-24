@@ -494,8 +494,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.1",
-  sha256: "eb78e35cf9b99b6e5b8249bbae9356d664eb5cdbf3199a0bb8d42a35ddb38e72",
-  eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v1.1 · ÚČINNÉ OD 25. LISTOPADU 2026",
+  sha256: "5346acfc46bb4b0260b3d2f35abcccda9a53e79447b0d881b019aa10e53e84b7",
+  eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v1.1 · ÚČINNÉ OD 24. LISTOPADU 2026",
   title: "Co uchováváme a proč",
   lede: "Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.",
   endMarker: "KONEC ZÁSAD · GDPR (EU) 2016/679 · v1.1",
