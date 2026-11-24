@@ -174,12 +174,15 @@ echo "UNDO_DONE"
 The button is gone on the next page load. Accounts already linked to Google keep their link and their other ways to
 sign in. The user, group, key file and program stay; removing them is a separate, deliberate step.
 
+## The relay's way out to the Internet (owner ruling 2026-11-24)
+
+Like the Turnstile relay, this unit is closed in by systemd (no access to keys, databases or settings) but may open
+connections to any address; its code calls only Google's fixed addresses. `deploy/social/README.md` asks for a host
+firewall rule before enablement. The owner ruled on 2026-11-24: **no firewall rule, the same as the Turnstile relay.**
+Google's address ranges change, and a stale rule would break sign-in.
+
 ## What this guide does not settle
 
-- **The relay's way out to the Internet.** Like the Turnstile relay, this unit is closed in by systemd (no access to
-  keys, databases or settings) but may open connections to any address; its code calls only Google's fixed addresses.
-  `deploy/social/README.md` asks for a host firewall rule before enablement. Pinning Google's address ranges is the
-  owner's decision.
 - **Apple and X.** Apple returns by form post, an address the website does not answer yet. X needs its own
   registration. Facebook stays disabled in code.
 - **A test of this guide.** These blocks were written from a read of the server and have not been run.
