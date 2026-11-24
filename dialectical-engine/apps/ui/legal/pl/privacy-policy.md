@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: POLITYKA PRYWATNOŚCI · v1.2 · OBOWIĄZUJE OD 25 LISTOPADA 2026
+eyebrow: POLITYKA PRYWATNOŚCI · v1.2 · OBOWIĄZUJE OD 26 LISTOPADA 2026
 title: Co przechowujemy i dlaczego
 lede: Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.
 endMarker: KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v1.2
@@ -19,7 +19,7 @@ jumps:
 13 PLIKI COOKIE
 -->
 
-**Version 1.2 · Effective 25 listopada 2026 · Poprzednie wersje na dezbatere.ro/privacy/versions · Administrator: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 26 listopada 2026 · Poprzednie wersje na dezbatere.ro/privacy/versions · Administrator: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Gromadzimy dane potrzebne do działania konta oraz treści, które wpisujesz w swoich debatach. To, co piszesz do asystenta wsparcia, trafia do jego modelu AI, aby mógł Ci odpowiedzieć, i niczego z tego nie przechowujemy. Twoje pytania trafiają do dostawców AI wymienionych w naszym Rejestrze, głównie do DeepInfra, w Stanach Zjednoczonych. Warunki DeepInfra, Anthropic i Amazon nie pozwalają im trenować modeli na tym, co piszesz. Dostawca wyszukiwania w internecie otrzymuje wyłącznie krótkie frazy wyszukiwania, które piszą modele (sekcja 5). Nasz dostawca hostingu przechowuje Twoje konto i Twoje debaty w Londynie, w Zjednoczonym Królestwie; sekcja 5 wskazuje, dokąd jeszcze trafiają Twoje dane. W planie bezpłatnym debaty stają się publiczne po zakończeniu, po sprawdzeniu przez AI; w płatnym planie są prywatne, chyba że je opublikujesz. Usunięcie konta niszczy klucze do Twoich prywatnych danych w działającej usłudze, ale nie usuwa naszych kopii zapasowych, a niektóre z nich zawierają te klucze (sekcja 7); publiczne debaty pozostają publiczne, a Twój pseudonim zostaje z nich usunięty. Możesz skontaktować się z nami pod adresem privacy@dezbatere.ro, a osoby wymienione w debacie mogą napisać do nas bez posiadania konta.
 
@@ -265,7 +265,7 @@ Aby odmówić tych elementów, zablokuj lub usuń pliki cookie i dane witryny dl
 
 Gdy zmieniamy niniejszą politykę, publikujemy nową wersję wraz z podsumowaniem zmian i nową datą wejścia w życie, a poprzednie wersje zachowujemy pod adresem dezbatere.ro/privacy/versions. O zmianie wprowadzającej nowy cel lub nowego odbiorcę informujemy Cię przed rozpoczęciem nowego przetwarzania, pocztą elektroniczną i w produkcie, oraz zapewniamy czas na wniesienie sprzeciwu. Jeżeli nowy cel zależy od Twojej zgody — na przykład gdybyśmy kiedykolwiek chcieli wykorzystać treści do ulepszania modeli — prosimy o tę zgodę osobno i w sposób konkretny; nigdy nie traktujemy akceptacji zaktualizowanych Warunków świadczenia usług jako zgody na nowe przetwarzanie. W przypadku wyjaśnień, które nie zmieniają naszych działań, po prostu publikujemy nową wersję.
 
-Niniejsza polityka została ostatnio zaktualizowana 25 listopada 2026. Wersja 1.2 zastąpiła wersję 1.1: sekcja 5 stanowi teraz, że zanim debata stanie się publiczna, jej publiczny tekst jest wysyłany do Claude Haiku 5.5 do sprawdzenia oraz że ten sam model sprawdza to, co jest dodawane do publicznej debaty, i zgłoszenia złożone przyciskiem Zgłoś; wyjaśnia, że na potrzeby kontroli po zakończeniu debaty wysyłany jest wyłącznie tekst syntezy; jej lista tego, co Rejestr podaje dla każdego dostawcy, wymienia nową kontrolę i kontrolę zgłoszenia; Rejestr wymienia nową kontrolę dla Anthropic; sekcja 8 wymienia teraz cztery decyzje, które nasze automatyczne kontrole podejmują bez udziału człowieka, oraz to, co możesz zrobić po każdej z nich; Załącznik B.4 i Załącznik B.6 zostały odpowiednio zmienione. Wersja 1.1 zastąpiła wersję 1.0: sekcja 5 stanowi teraz, że DeepInfra uruchamia na własnych serwerach każdy model, z którego debata korzysta za jego pośrednictwem, a podsumowanie i sekcja 4 zostały odpowiednio zmienione.
+Niniejsza polityka została ostatnio zaktualizowana 26 listopada 2026. Wersja 1.2 zastąpiła wersję 1.1: sekcja 5 stanowi teraz, że zanim debata stanie się publiczna, jej publiczny tekst jest wysyłany do Claude Haiku 5.5 do sprawdzenia oraz że ten sam model sprawdza to, co jest dodawane do publicznej debaty, i zgłoszenia złożone przyciskiem Zgłoś; wyjaśnia, że na potrzeby kontroli po zakończeniu debaty wysyłany jest wyłącznie tekst syntezy; jej lista tego, co Rejestr podaje dla każdego dostawcy, wymienia nową kontrolę i kontrolę zgłoszenia; Rejestr wymienia nową kontrolę dla Anthropic; sekcja 8 wymienia teraz cztery decyzje, które nasze automatyczne kontrole podejmują bez udziału człowieka, oraz to, co możesz zrobić po każdej z nich; Załącznik B.4 i Załącznik B.6 zostały odpowiednio zmienione. Wersja 1.1 zastąpiła wersję 1.0: sekcja 5 stanowi teraz, że DeepInfra uruchamia na własnych serwerach każdy model, z którego debata korzysta za jego pośrednictwem, a podsumowanie i sekcja 4 zostały odpowiednio zmienione.
 
 ## Annex B — Regionalne warunki prywatności
 

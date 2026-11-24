@@ -1,6 +1,8 @@
 import { previewGateSocket, validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewAskAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, PREVIEW_ACCOUNT_RUNS_SQL, type PreviewAsksOpenTo, type PreviewProviderTestConfig } from "@debateai/providers";
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
+import { registerRecoveryPermitRoutes, recoveryPermitPolicyInventory } from "./recovery-permit-routes.js";
+import type { RecoveryPermitApplication } from "./recovery-permit.js";
 import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
 import {
   digSuggestionTextFromAnswer,
@@ -1497,6 +1499,7 @@ export function apiOperationalErrorDiagnostic(error: unknown): string {
 export const authorizationPolicyInventory = Object.freeze([
   ...passwordResetPolicyInventory,
   ...emailMfaPolicyInventory,
+  ...recoveryPermitPolicyInventory,
   {route:'POST /v1/account/social/{provider}/step-up/begin',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
   {route:'POST /v1/account/social/step-up/status',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
   {route:'POST /v1/account/social/step-up/passkey-options',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
@@ -2043,6 +2046,8 @@ export interface ApiOptions {
   readonly passwordReset?: PasswordResetApplication;
   readonly backupEmail?: BackupEmailApplication;
   readonly mfaRecovery?: MfaRecoveryApplication;
+  /** The person's side of the Owner's permit for a locked-out account (0188); absent, its five routes are not registered. */
+  readonly recoveryPermit?: RecoveryPermitApplication;
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
   readonly consumerWebAuthn?: ConsumerWebAuthnApplication;
@@ -2709,7 +2714,10 @@ const SIGN_IN_ROUTES: ReadonlySet<string> = new Set([
   "/v1/auth/password-reset/exchange",
   "/v1/auth/password-reset/complete",
   "/v1/auth/mfa-recovery/start",
-  "/v1/auth/mfa-recovery/exchange"
+  "/v1/auth/mfa-recovery/exchange",
+  "/v1/auth/recovery-permit/start",
+  "/v1/auth/recovery-permit/request",
+  "/v1/auth/recovery-permit/finish"
 ]);
 /**
  * The onboarding steps after sign-up and recovery: without a session already held they end in a new
@@ -4430,6 +4438,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
 
   if (options.passwordReset) registerPasswordResetRoutes(api,{service:options.passwordReset,policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:async(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/password-reset/start",clientIpNetworkScope(sourceFor(request).ip))&&await recoveryStartProofOrRefuse(reply,request.body,"password-reset")});
   registerEmailMfaRoutes(api,{...(options.backupEmail?{backup:options.backupEmail}:{}),...(options.mfaRecovery?{mfa:options.mfaRecovery}:{}),policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:async(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/mfa-recovery/start",clientIpNetworkScope(sourceFor(request).ip))&&await recoveryStartProofOrRefuse(reply,request.body,"mfa-recovery")});
+  // The permit's start is admitted as /recover's own start is: the per-network limit, then the Turnstile proof of the same page while it is required.
+  registerRecoveryPermitRoutes(api,{...(options.recoveryPermit?{service:options.recoveryPermit}:{}),policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:async(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/recovery-permit/start",clientIpNetworkScope(sourceFor(request).ip))&&await recoveryStartProofOrRefuse(reply,request.body,"account-recovery")});
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
       // L1-F3: this route had no per-source admission control at all — only a

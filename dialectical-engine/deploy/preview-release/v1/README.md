@@ -5347,23 +5347,26 @@ pnpm run legal:redate --date YYYY-MM-DD             # sets the day everywhere, r
 
 What the command dates, and what it leaves. It reads the release the site runs from `tests/n1-baseline.json` (the commit
 it names). A document whose current version has an archive copy in that commit is released: the command leaves it at the
-day it has, and prints `<document> <version>: in the release the site runs (tests/n1-baseline.json), so it keeps its
-day, <day>`. Every other document takes the new day: in every language, the day in the eyebrow and in the version line;
-in English, and in each translation that follows the current English text, the same day wherever else the text gives it;
-then its archive copies of the current version are made again, the modules and the manifest are regenerated, and
-`legal:release-check` runs last. So when only one document has a new version (Privacy Policy 1.2 beside a released Terms
-1.1), only that one takes the upload day, and the other keeps its own. A document that already carries the day given
-changes nothing, and the command prints `<document>: from <day> to <day>; translations recorded again: none` for it, the
-same day twice; it does so for a released document too, and then does not print the line above.
+day it has, and prints `<document>: released, keeps <day>`. Every other document takes the new day: in every language,
+the day in the eyebrow and in the version line; in English, and in each translation that follows the current English
+text, the same day wherever else the text gives it. Then the archive copies of its current version are removed, the
+modules and the manifest are regenerated, each translation that followed the English text is recorded again as
+following it, the archive step copies the current texts, and `legal:release-check` runs last. So when only one document
+has a new version (Privacy Policy 1.2 beside a released Terms 1.1), only that one takes the upload day, and the other
+keeps its own. A document that already carries the day given changes nothing, released or not, and the command prints
+`<document>: from <day> to <day>; translations recorded again: none` for it, the same day twice. When no document
+changes, it prints `no text to re-date to <day>: nothing to change` and still runs `legal:release-check`.
 
 What it refuses, before it writes anything: a day not written `YYYY-MM-DD`; a day before today (Romanian time); a day
 not after the day the document's previous version took effect; a day when both documents are released and carry another
-day (a released text keeps its day, so a change to it needs a new version number); an English version line it cannot
-read (`**Version N.M · Effective <day> <Month> <year> · …`); a draft whose eyebrow or version line does not carry its
-current day in the command's words; a `tests/n1-baseline.json` that names no commit; and a clone that does not hold the
-commit `tests/n1-baseline.json` names (fetch it first). That file names a new release only once the pull request after
-its upload (SB13c) is merged, so until then the command does not see that release: after an upload, do not re-date the
-version that upload carried.
+day (a released text keeps its day, so a change to it needs a new version number); any change while a translation of
+either document, in a language the release offers, follows an older English text (the archive step would keep that
+untranslated text under the current number for good, so translate it and record it first); an English version line it
+cannot read (`**Version N.M · Effective <day> <Month> <year> · …`); a draft whose eyebrow or version line does not carry
+its current day in the command's words; a `tests/n1-baseline.json` that names no commit; a folder outside a git clone;
+and a clone that does not hold the commit `tests/n1-baseline.json` names (fetch it first). That file names a new release
+only once the pull request after its upload (SB13c) is merged, so until then the command does not see that release:
+after an upload, do not re-date the version that upload carried.
 
 A day before the upload would read as a change made retroactive, which the Terms promise never to do. So if the switch
 (SB13) happens on a later day than the one set, run the command again with the new day, through the same four steps,
@@ -5376,7 +5379,8 @@ side-by-side path nothing else does either, so this step is the check. On the dr
 texts of the new release by the same rule, with the live release read on the server: a text whose current version has an
 archive copy in `OREV`'s commit (the live release, from the release lock, read in the reference clone A2 made) must keep
 the day it has in that commit; any other text must carry today (Bucharest). A text that does not stops PRECHECK with
-`legal-date`. The main-site runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`) follows the same per-document rule.
+`legal-date`. The main-site runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`, 1.8 step 3 and 2.1 step 1) still asks
+for the upload day in both English texts: it does not follow this rule yet.
 
 ### SB1. Names, the archive `$S` and the copies the way back needs
 

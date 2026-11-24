@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: POLITIKA DWAR IL-PRIVATEZZA · v1.2 · EFFETTIVA 25 TA’ NOVEMBRU 2026
+eyebrow: POLITIKA DWAR IL-PRIVATEZZA · v1.2 · EFFETTIVA 26 TA’ NOVEMBRU 2026
 title: X’naħżnu, u għaliex
 lede: Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.
 endMarker: TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v1.2
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 1.2 · Effective 25 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions · Kontrollur: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 26 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions · Kontrollur: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Niġbru dak li jeħtieġ kont u dak li tittajpja fid-dibattiti tiegħek. Dak li tikteb lill-assistent tal-appoġġ jintbagħat lill-mudell tal-IA tiegħu biex ikun jista’ jwieġbek, u ma nżommu xejn minnu. Il-mistoqsijiet tiegħek jintbagħtu lill-fornituri tal-IA elenkati fir-Reġistru tagħna, prinċipalment lil DeepInfra, fl-Istati Uniti. It-termini ta’ DeepInfra, Anthropic u Amazon ma jippermettulhomx iħarrġu mudelli fuq dak li tikteb. Il-fornitur tat-tfittxija fuq il-web jirċievi biss il-frażijiet qosra ta’ tfittxija li jiktbu l-mudelli (taqsima 5). Il-fornitur tal-ospitar tagħna jaħżen il-kont tiegħek u d-dibattiti tiegħek f’Londra, fir-Renju Unit; it-taqsima 5 tispjega fejn oħra tmur id-data tiegħek. Fuq il-pjan B’xejn, id-dibattiti huma pubbliċi meta jintemmu, wara verifika bl-IA; fuq pjan bi ħlas, huma privati sakemm ma tippubblikahomx. It-tħassir tal-kont tiegħek jeqred iċ-ċwievet tad-data privata tiegħek fis-servizz attiv, iżda ma jħassarx il-kopji ta’ riżerva tagħna, u xi wħud minnhom fihom dawk iċ-ċwievet (taqsima 7); id-dibattiti pubbliċi jibqgħu pubbliċi, u l-psewdonimu tiegħek jitneħħa minnhom. Tista’ tikkuntattjana fuq privacy@dezbatere.ro, u persuni msemmija f’dibattitu jistgħu jikitbu lilna mingħajr kont.
 
@@ -265,7 +265,7 @@ Biex tirrifjuta dawn l-elementi, imblokka jew ħassar il-cookies u d-data tas-si
 
 Meta nibdlu din il-politika nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u data effettiva ġdida, u nżommu l-verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions. Għal bidla li żżid skop ġdid jew riċevitur ġdid, ngħarrfuk qabel jibda l-ipproċessar il-ġdid, bil-posta elettronika u fil-prodott, u nagħtuk żmien biex toġġezzjona. Fejn skop ġdid jiddependi mill-kunsens tiegħek — pereżempju jekk xi darba nkunu rridu nużaw il-kontenut biex intejbu l-mudelli — nitolbu dak il-kunsens separatament u b’mod speċifiku; qatt ma nqisu l-aċċettazzjoni ta’ Termini aġġornati bħala kunsens għal ipproċessar ġdid. Għal kjarifiki li ma jbiddlu xejn dwar dak li nagħmlu, sempliċement nippubblikaw il-verżjoni l-ġdida.
 
-Din il-politika ġiet aġġornata l-aħħar fil-25 ta’ Novembru 2026. Il-verżjoni 1.2 issostitwiet il-verżjoni 1.1: it-taqsima 5 issa tgħid li, qabel ma dibattitu jsir pubbliku, it-test pubbliku tiegħu jintbagħat lil Claude Haiku 5.5 biex jiġi vverifikat, u li l-istess mudell jivverifika dak li jiżdied ma’ dibattitu pubbliku u r-rapporti magħmula bil-buttuna Irrapporta; tagħmilha ċara li għall-verifika fi tmiem id-dibattitu jintbagħat biss it-test tas-sinteżi; il-lista tagħha ta’ dak li jiddikjara r-Reġistru għal kull fornitur issemmi l-verifika l-ġdida u l-verifika ta’ rapport; ir-Reġistru jelenka l-verifika l-ġdida għal Anthropic; it-taqsima 8 issa ssemmi l-erba’ deċiżjonijiet li jieħdu l-verifiki awtomatiċi tagħna mingħajr l-involviment ta’ ebda persuna, u x’tista’ tagħmel wara kull waħda; l-Anness B.4 u l-Anness B.6 ġew mibdula biex jaqblu magħha. Il-verżjoni 1.1 issostitwiet il-verżjoni 1.0: it-taqsima 5 issa tgħid li DeepInfra jħaddem fuq is-servers tiegħu stess kull mudell li jingħata lil dibattitu permezz tiegħu, u s-sommarju u t-taqsima 4 ġew mibdula biex jaqblu magħha.
+Din il-politika ġiet aġġornata l-aħħar fil-26 ta’ Novembru 2026. Il-verżjoni 1.2 issostitwiet il-verżjoni 1.1: it-taqsima 5 issa tgħid li, qabel ma dibattitu jsir pubbliku, it-test pubbliku tiegħu jintbagħat lil Claude Haiku 5.5 biex jiġi vverifikat, u li l-istess mudell jivverifika dak li jiżdied ma’ dibattitu pubbliku u r-rapporti magħmula bil-buttuna Irrapporta; tagħmilha ċara li għall-verifika fi tmiem id-dibattitu jintbagħat biss it-test tas-sinteżi; il-lista tagħha ta’ dak li jiddikjara r-Reġistru għal kull fornitur issemmi l-verifika l-ġdida u l-verifika ta’ rapport; ir-Reġistru jelenka l-verifika l-ġdida għal Anthropic; it-taqsima 8 issa ssemmi l-erba’ deċiżjonijiet li jieħdu l-verifiki awtomatiċi tagħna mingħajr l-involviment ta’ ebda persuna, u x’tista’ tagħmel wara kull waħda; l-Anness B.4 u l-Anness B.6 ġew mibdula biex jaqblu magħha. Il-verżjoni 1.1 issostitwiet il-verżjoni 1.0: it-taqsima 5 issa tgħid li DeepInfra jħaddem fuq is-servers tiegħu stess kull mudell li jingħata lil dibattitu permezz tiegħu, u s-sommarju u t-taqsima 4 ġew mibdula biex jaqblu magħha.
 
 ## Annex B — Termini reġjonali dwar il-privatezza
 

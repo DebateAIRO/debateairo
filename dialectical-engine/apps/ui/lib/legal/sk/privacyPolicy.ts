@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Keď tieto zásady zmeníme, zverejníme novú verziu so zhrnutím zmien a novým dátumom účinnosti a predchádzajúce verzie ponecháme na dezbatere.ro/privacy/versions. O zmene, ktorá pridáva nový účel alebo nového príjemcu, vás informujeme e-mailom aj v produkte pred začatím nového spracúvania a poskytneme vám čas na vznesenie námietky. Ak nový účel závisí od vášho súhlasu — napríklad ak by sme niekedy chceli obsah používať na zlepšovanie modelov — požiadame vás o tento súhlas samostatne a konkrétne; prijatie aktualizovaných Podmienok nikdy nepovažujeme za súhlas s novým spracúvaním. Pri spresneniach, ktoré nemenia naše postupy, jednoducho zverejníme novú verziu." },
-      { kind: "p", text: "Tieto zásady boli naposledy aktualizované 25. novembra 2026. Verzia 1.2 nahradila verziu 1.1: časť 5 teraz uvádza, že predtým, ako sa debata stane verejnou, sa jej verejný text odosiela na kontrolu modelu Claude Haiku 5.5 a že ten istý model kontroluje to, čo sa pridáva do verejnej debaty, a hlásenia podané tlačidlom Nahlásiť; objasňuje, že na kontrolu po skončení debaty sa odosiela iba text syntézy; jej zoznam toho, čo register uvádza pri každom poskytovateľovi, uvádza novú kontrolu a kontrolu hlásenia; register uvádza novú kontrolu pri Anthropic; časť 8 teraz uvádza štyri rozhodnutia, ktoré naše automatické kontroly prijímajú bez účasti človeka, a čo môžete urobiť po každom z nich; príloha B.4 a príloha B.6 boli zodpovedajúco upravené. Verzia 1.1 nahradila verziu 1.0: časť 5 teraz uvádza, že DeepInfra prevádzkuje na vlastných serveroch každý model debaty, ktorý sa poskytuje jej prostredníctvom, a zhrnutie a časť 4 boli zodpovedajúco upravené." }
+      { kind: "p", text: "Tieto zásady boli naposledy aktualizované 26. novembra 2026. Verzia 1.2 nahradila verziu 1.1: časť 5 teraz uvádza, že predtým, ako sa debata stane verejnou, sa jej verejný text odosiela na kontrolu modelu Claude Haiku 5.5 a že ten istý model kontroluje to, čo sa pridáva do verejnej debaty, a hlásenia podané tlačidlom Nahlásiť; objasňuje, že na kontrolu po skončení debaty sa odosiela iba text syntézy; jej zoznam toho, čo register uvádza pri každom poskytovateľovi, uvádza novú kontrolu a kontrolu hlásenia; register uvádza novú kontrolu pri Anthropic; časť 8 teraz uvádza štyri rozhodnutia, ktoré naše automatické kontroly prijímajú bez účasti človeka, a čo môžete urobiť po každom z nich; príloha B.4 a príloha B.6 boli zodpovedajúco upravené. Verzia 1.1 nahradila verziu 1.0: časť 5 teraz uvádza, že DeepInfra prevádzkuje na vlastných serveroch každý model debaty, ktorý sa poskytuje jej prostredníctvom, a zhrnutie a časť 4 boli zodpovedajúco upravené." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "013bdb468d4cfba05442ebb7200a8b5062f65ad086ffa0feebc83e69e866a992",
-  eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v1.2 · ÚČINNÉ OD 25. NOVEMBRA 2026",
+  sha256: "17fe158d6b6bd3dec35aedc0a53656774a8a56aac389892d77b8f5633b987f12",
+  eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v1.2 · ÚČINNÉ OD 26. NOVEMBRA 2026",
   title: "Čo uchovávame a prečo",
   lede: "Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.",
   endMarker: "KONIEC ZÁSAD · GDPR (EU) 2016/679 · v1.2",

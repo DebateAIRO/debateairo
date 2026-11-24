@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Ko ta pravilnik spremenimo, objavimo novo različico s povzetkom sprememb in novim datumom začetka veljavnosti, prejšnje različice pa ohranimo na dezbatere.ro/privacy/versions. O spremembi, ki dodaja nov namen ali novega prejemnika, vas obvestimo po e-pošti in v izdelku pred začetkom nove obdelave ter vam damo čas za ugovor. Kadar je nov namen odvisen od vaše privolitve — na primer, če bi kadar koli želeli uporabiti vsebino za izboljševanje modelov — vas za to privolitev zaprosimo ločeno in posebej; sprejetja posodobljenih Pogojev nikoli ne obravnavamo kot privolitev za novo obdelavo. Pri pojasnilih, ki ničesar ne spremenijo glede našega ravnanja, preprosto objavimo novo različico." },
-      { kind: "p", text: "Ta pravilnik je bil nazadnje posodobljen 25. novembra 2026. Različica 1.2 je nadomestila različico 1.1: razdelek 5 zdaj navaja, da se javno besedilo razprave, preden ta postane javna, pošlje v preverjanje modelu Claude Haiku 5.5 in da isti model preverja to, kar se doda javni razpravi, ter prijave, oddane z gumbom Prijavi; pojasnjuje, da se za preverjanje ob koncu razprave pošlje samo besedilo sinteze; njegov seznam tega, kar Register navaja za vsakega ponudnika, navaja novo preverjanje in preverjanje prijave; Register navaja novo preverjanje za Anthropic; razdelek 8 zdaj navaja štiri odločitve, ki jih naša samodejna preverjanja sprejmejo brez udeležbe osebe, in kaj lahko storite po vsaki od njih; Priloga B.4 in Priloga B.6 sta bili ustrezno spremenjeni. Različica 1.1 je nadomestila različico 1.0: razdelek 5 zdaj navaja, da DeepInfra vsak model, ki ga razprava prejme prek nje, izvaja na lastnih strežnikih, povzetek in razdelek 4 pa sta bila ustrezno spremenjena." }
+      { kind: "p", text: "Ta pravilnik je bil nazadnje posodobljen 26. novembra 2026. Različica 1.2 je nadomestila različico 1.1: razdelek 5 zdaj navaja, da se javno besedilo razprave, preden ta postane javna, pošlje v preverjanje modelu Claude Haiku 5.5 in da isti model preverja to, kar se doda javni razpravi, ter prijave, oddane z gumbom Prijavi; pojasnjuje, da se za preverjanje ob koncu razprave pošlje samo besedilo sinteze; njegov seznam tega, kar Register navaja za vsakega ponudnika, navaja novo preverjanje in preverjanje prijave; Register navaja novo preverjanje za Anthropic; razdelek 8 zdaj navaja štiri odločitve, ki jih naša samodejna preverjanja sprejmejo brez udeležbe osebe, in kaj lahko storite po vsaki od njih; Priloga B.4 in Priloga B.6 sta bili ustrezno spremenjeni. Različica 1.1 je nadomestila različico 1.0: razdelek 5 zdaj navaja, da DeepInfra vsak model, ki ga razprava prejme prek nje, izvaja na lastnih strežnikih, povzetek in razdelek 4 pa sta bila ustrezno spremenjena." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "0c90bf188ba274d623081dbf6bfcac4ce6d016cf257a4fe48ad00b8b4a1ee22b",
-  eyebrow: "PRAVILNIK O ZASEBNOSTI · v1.2 · VELJA OD 25. NOVEMBRA 2026",
+  sha256: "f01503a9e4bd284097c1bfc2713d47ee62e9105e4380ea791b09a688822e5271",
+  eyebrow: "PRAVILNIK O ZASEBNOSTI · v1.2 · VELJA OD 26. NOVEMBRA 2026",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",
   endMarker: "KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v1.2",

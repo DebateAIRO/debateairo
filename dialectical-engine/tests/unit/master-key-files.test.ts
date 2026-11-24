@@ -209,6 +209,8 @@ const FIXTURE_STEP_CALLERS: ReadonlyMap<string, string> = new Map([
   ["tests/integration/team-allowance-http.test.ts",
     "the staff alert readiness fixture (authorizeStaffAlertFixture) writes on the superuser during a staff request"],
   ["tests/integration/staff-http-database.test.ts",
+    "the staff alert readiness fixture (authorizeStaffAlertFixture) writes on the superuser during a staff request"],
+  ["tests/integration/recovery-permits-http.test.ts",
     "the staff alert readiness fixture (authorizeStaffAlertFixture) writes on the superuser during a staff request"]
 ]);
 

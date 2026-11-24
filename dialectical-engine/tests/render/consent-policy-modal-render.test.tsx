@@ -221,7 +221,8 @@ describe("privacy policy modal — rendered", () => {
     // 0157 (Privacy 3.11, amended in place): three table rows more.
     // Privacy 3.14: section 4's product-news row left (we send no marketing email).
     // Privacy 3.15: section 7 gains the unfinished sign-up row, and its acceptance row becomes two.
-    expect(expectedBullets).toBe(92);
+    // Privacy 1.2: sections 2, 4 and 7 each gain a row on requests for help getting back into an account.
+    expect(expectedBullets).toBe(95);
     expect(dialog.querySelectorAll(".policyText").length).toBe(expectedParagraphs);
     expect(dialog.querySelectorAll(".policyItem").length).toBe(expectedBullets);
 

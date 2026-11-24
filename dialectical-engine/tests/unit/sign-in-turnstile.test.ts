@@ -186,7 +186,9 @@ describe("Turnstile on sign-in (setting off: today's behaviour)", () => {
 const START_ROUTES = [
   ["/v1/auth/password-reset/start", { email: "alice@example.test" }, "password-reset"],
   ["/v1/auth/mfa-recovery/start", { email: "alice@example.test", destination: "primary" }, "mfa-recovery"],
-  ["/v1/auth/recovery/start", { email: "alice@example.test" }, "account-recovery"]
+  ["/v1/auth/recovery/start", { email: "alice@example.test" }, "account-recovery"],
+  // The ask for help on /recover's own page is proved with that page's action.
+  ["/v1/auth/recovery-permit/start", { email: "alice@example.test" }, "account-recovery"]
 ] as const;
 
 function startApi(required: boolean | undefined, verifier: TurnstileVerifier) {
@@ -197,7 +199,8 @@ function startApi(required: boolean | undefined, verifier: TurnstileVerifier) {
     ...(required === undefined ? {} : { turnstileRecoveryRequired: required }),
     passwordReset: { start: async (input: unknown) => { work.push({ route: "password-reset", input }); return generic; } },
     mfaRecovery: { start: async (input: unknown) => { work.push({ route: "mfa-recovery", input }); return generic; } },
-    recovery: { start: async (input: unknown) => { work.push({ route: "account-recovery", input }); return generic; } }
+    recovery: { start: async (input: unknown) => { work.push({ route: "account-recovery", input }); return generic; } },
+    recoveryPermit: { start: async (input: unknown) => { work.push({ route: "recovery-permit", input }); return generic; } }
   } as unknown as ApiOptions);
   return { api, work };
 }

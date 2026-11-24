@@ -11,11 +11,11 @@ export function romanianToday(now?: Date): LegalDay;
 export type LegalRedatePlan = Readonly<{
   to: LegalDay;
   from: Readonly<Record<LegalManifestKind, LegalDay>>;
+  /** The documents left as they are because their current version is in the release the site runs. */
+  kept: ReadonlyArray<Readonly<{ kind: LegalManifestKind; name: string; version: string; path: string }>>;
   drafts: ReadonlyArray<Readonly<{ path: string; after: string; lines: ReadonlyArray<Readonly<{ before: string; after: string }>> }>>;
   archiveRemovals: ReadonlyArray<Readonly<{ kind: LegalManifestKind; code: string; sha256: string; path: string }>>;
   retranslate: Readonly<Record<LegalManifestKind, readonly string[]>>;
-  /** The documents whose current version is in the release the site runs: each keeps its day. */
-  kept: ReadonlyArray<Readonly<{ kind: LegalManifestKind; name: string; version: string; day: LegalDay; path: string }>>;
 }>;
 export function planLegalRedate(input: Readonly<{
   to: LegalDay;

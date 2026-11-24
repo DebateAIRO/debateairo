@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
+import { legalEnglishTranslatedFrom } from "../support/legalText.js";
 
 /**
  * Privacy Policy 3.8, R22 item 15 (owner-approved 2026-10-29): the V4 debate pages keep three things in the account
@@ -23,21 +24,28 @@ import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 const markdown = (locale: string): string =>
   readFileSync(resolve(process.cwd(), "apps/ui/legal", locale, "privacy-policy.md"), "utf8");
 
-const section = (locale: string, from: number): string => {
-  const body = new RegExp(`^## ${from}\\.[^\\n]*\\n([\\s\\S]*?)^## `, "mu").exec(markdown(locale))?.[1];
-  if (body === undefined) throw new Error(`${locale}: no section ${from}`);
+const sectionOf = (text: string, from: number): string => {
+  const body = new RegExp(`^## ${from}\\.[^\\n]*\\n([\\s\\S]*?)^## `, "mu").exec(text)?.[1];
+  if (body === undefined) throw new Error(`no section ${from}`);
   return body;
 };
 
 /** The body rows of the section's one table, without the header and the separator. */
-const tableRows = (locale: string, from: number): string[] =>
-  section(locale, from).split("\n").filter((line) => line.startsWith("| ")).slice(1)
+const rowsOf = (text: string, from: number): string[] =>
+  sectionOf(text, from).split("\n").filter((line) => line.startsWith("| ")).slice(1)
     .filter((line) => !/^\|\s*-{3}/u.test(line));
+const tableRows = (locale: string, from: number): string[] => rowsOf(markdown(locale), from);
 
 const cells = (row: string): string[] => row.split("|").slice(1, -1).map((cell) => cell.trim());
 
-/** Where the section 2 row sits: ninth, after "Debate content". The section 7 row is found by what it is, its name (later versions add rows before it). */
-const COLLECT_AT = 8;
+/**
+ * Where the section 2 row sits: right after "Debate content", at the place it has in the English text the language
+ * follows (legalEnglishTranslatedFrom: a translation can still follow the English text before a change that added rows
+ * above it). The section 7 row is found by what it is, its name (later versions add rows before it).
+ */
+const englishFor = (locale: string): string => (locale === "en" ? markdown("en") : legalEnglishTranslatedFrom("PRIVACY"));
+const collectAt = (locale: string): number =>
+  rowsOf(englishFor(locale), 2).findIndex((row) => cells(row)[0] === "**Page settings and visits**");
 const retainRowNamed = (locale: string, label: string): string | undefined => tableRows(locale, 7).find((row) => cells(row)[0] === label);
 
 const PINNED = {
@@ -54,15 +62,13 @@ const PINNED = {
 } as const;
 
 describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22 item 15)", () => {
-  const englishCollect = tableRows("en", 2).length;
-  const englishRetain = tableRows("en", 7).length;
-
   it("English has the new rows where the owner placed them", () => {
     // 0157: the moderation notices row in section 2, and its two rows in section 7; Privacy 3.12: the questions not started yet,
     // one row in each. Privacy 3.15: section 7 gains the unfinished sign-up row, and its acceptance row becomes two.
-    expect(englishCollect).toBe(17);
-    expect(cells(tableRows("en", 2)[COLLECT_AT - 1]!)[0]).toBe("**Debate content**");
-    expect(englishRetain).toBe(32);
+    // Privacy 1.2: the requests for help getting back into an account, one row in each.
+    expect(tableRows("en", 2)).toHaveLength(18);
+    expect(cells(tableRows("en", 2)[collectAt("en") - 1]!)[0]).toBe("**Debate content**");
+    expect(tableRows("en", 7)).toHaveLength(33);
     const names = tableRows("en", 7).map((row) => cells(row)[0]);
     expect(names.indexOf("Page settings and visits")).toBeGreaterThan(names.indexOf("Provider return records and retrieval references"));
     expect(names.indexOf("Provider return records and retrieval references")).toBeGreaterThanOrEqual(0);
@@ -70,13 +76,13 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
 
   it.each(LOCALES.map(({ code }) => [code]))("%s: the same three changes at the same places", (code) => {
     const collect = tableRows(code, 2);
-    expect(collect, `${code}: section 2 rows`).toHaveLength(englishCollect);
-    const row = cells(collect[COLLECT_AT]!);
+    expect(collect, `${code}: section 2 rows`).toHaveLength(rowsOf(englishFor(code), 2).length);
+    const row = cells(collect[collectAt(code)]!);
     expect(row, `${code}: section 2 row shape`).toHaveLength(3);
     expect(row[0], `${code}: a bold category`).toMatch(/^\*\*[^*]+\*\*$/u);
     const label = row[0]!.slice(2, -2);
     const retain = tableRows(code, 7);
-    expect(retain, `${code}: section 7 rows`).toHaveLength(englishRetain);
+    expect(retain, `${code}: section 7 rows`).toHaveLength(rowsOf(englishFor(code), 7).length);
     const found = retainRowNamed(code, label);
     expect(found, `${code}: section 7 names the section 2 row`).toBeDefined();
     const kept = cells(found!);
@@ -88,7 +94,7 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
   });
 
   it.each(Object.entries(PINNED))("%s: the rows read exactly as approved", (code, pinned) => {
-    expect(tableRows(code, 2)[COLLECT_AT]).toBe(pinned.collect);
+    expect(tableRows(code, 2)[collectAt(code)]).toBe(pinned.collect);
     expect(cells(tableRows(code, 4)[0]!)[1]).toBe(pinned.purpose);
     expect(retainRowNamed(code, cells(pinned.retain)[0]!)).toBe(pinned.retain);
   });

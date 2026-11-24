@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Bu politikayı değiştirdiğimizde yeni sürümü, değişikliklerin özeti ve yeni bir yürürlük tarihiyle birlikte yayımlar ve önceki sürümleri dezbatere.ro/privacy/versions adresinde tutarız. Yeni bir amaç veya yeni bir alıcı ekleyen değişikliklerde, yeni işleme başlamadan önce size e-postayla ve ürün içinde bilgi verir ve itiraz etmeniz için süre tanırız. Yeni bir amaç rızanıza bağlıysa — örneğin bir gün içeriği modelleri geliştirmek için kullanmak istersek — bu rızayı ayrıca ve özel olarak isteriz; güncellenmiş Koşulların kabulünü hiçbir zaman yeni işleme için rıza saymayız. Yaptıklarımızı değiştirmeyen açıklamalar bakımından yeni sürümü yayımlamakla yetiniriz." },
-      { kind: "p", text: "Bu politika en son 25 Kasım 2026 tarihinde güncellenmiştir. Sürüm 1.2, sürüm 1.1'in yerini almıştır: bölüm 5 artık bir tartışma herkese açık hâle gelmeden önce herkese açık metninin kontrol edilmek üzere Claude Haiku 5.5'e gönderildiğini ve aynı modelin herkese açık bir tartışmaya eklenen şeyi ve Bildir düğmesiyle yapılan bildirimleri kontrol ettiğini belirtmektedir; tartışma sonu kontrolü için yalnızca sentez metninin gönderildiğini açıkça ortaya koymaktadır; Sicilin her sağlayıcı için belirttiklerine ilişkin listesi yeni kontrolü ve bir bildirimin kontrolünü anmaktadır; Sicil, Anthropic için yeni kontrolü listelemektedir; bölüm 8 artık otomatik kontrollerimizin hiçbir kişi devreye girmeden verdiği dört kararı ve her birinden sonra neler yapabileceğinizi belirtmektedir; Ek B.4 ve Ek B.6 buna uygun olarak değiştirilmiştir. Sürüm 1.1, sürüm 1.0'ın yerini almıştır: bölüm 5 artık DeepInfra'nın, bir tartışmaya kendisi aracılığıyla verilen her modeli kendi sunucularında çalıştırdığını belirtmektedir; özet ve bölüm 4 de buna uygun olarak değiştirilmiştir." }
+      { kind: "p", text: "Bu politika en son 26 Kasım 2026 tarihinde güncellenmiştir. Sürüm 1.2, sürüm 1.1'in yerini almıştır: bölüm 5 artık bir tartışma herkese açık hâle gelmeden önce herkese açık metninin kontrol edilmek üzere Claude Haiku 5.5'e gönderildiğini ve aynı modelin herkese açık bir tartışmaya eklenen şeyi ve Bildir düğmesiyle yapılan bildirimleri kontrol ettiğini belirtmektedir; tartışma sonu kontrolü için yalnızca sentez metninin gönderildiğini açıkça ortaya koymaktadır; Sicilin her sağlayıcı için belirttiklerine ilişkin listesi yeni kontrolü ve bir bildirimin kontrolünü anmaktadır; Sicil, Anthropic için yeni kontrolü listelemektedir; bölüm 8 artık otomatik kontrollerimizin hiçbir kişi devreye girmeden verdiği dört kararı ve her birinden sonra neler yapabileceğinizi belirtmektedir; Ek B.4 ve Ek B.6 buna uygun olarak değiştirilmiştir. Sürüm 1.1, sürüm 1.0'ın yerini almıştır: bölüm 5 artık DeepInfra'nın, bir tartışmaya kendisi aracılığıyla verilen her modeli kendi sunucularında çalıştırdığını belirtmektedir; özet ve bölüm 4 de buna uygun olarak değiştirilmiştir." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "e463879f59f030d6470362f213b862499ec97bf98f1810d296cae4b982945855",
-  eyebrow: "GİZLİLİK POLİTİKASI · v1.2 · YÜRÜRLÜK TARİHİ 25 KASIM 2026",
+  sha256: "225a6c9ecbc419f51cc1bde8989501f0585cd31e892b62a612c84067863e842f",
+  eyebrow: "GİZLİLİK POLİTİKASI · v1.2 · YÜRÜRLÜK TARİHİ 26 KASIM 2026",
   title: "Neleri neden saklıyoruz?",
   lede: "GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.",
   endMarker: "POLİTİKANIN SONU · GDPR (EU) 2016/679 · v1.2",

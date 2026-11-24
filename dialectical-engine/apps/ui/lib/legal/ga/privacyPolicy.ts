@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Nuair a athraímid an beartas seo, cuirimid an leagan nua ar fáil mar aon le hachoimre ar an méid a d'athraigh agus dáta nua teachta i bhfeidhm, agus coinnímid na leaganacha roimhe seo ag dezbatere.ro/privacy/versions. I gcás athraithe lena gcuirtear cuspóir nua nó faighteoir nua leis, insímid duit sula dtosaíonn an phróiseáil nua, trí ríomhphost agus sa táirge, agus tugaimid am duit agóid a dhéanamh. Sa chás ina mbraitheann cuspóir nua ar do thoiliú — mar shampla, dá mba mhian linn riamh ábhar a úsáid chun samhlacha a fheabhsú — iarraimid an toiliú sin ar leithligh agus go sonrach; ní chaithimid riamh le glacadh le Téarmaí nuashonraithe mar thoiliú le próiseáil nua. I gcás soiléirithe nach n-athraíonn aon ní faoin méid a dhéanaimid, ní dhéanaimid ach an leagan nua a fhoilsiú." },
-      { kind: "p", text: "Nuashonraíodh an beartas seo an uair dheireanach ar 25 Samhain 2026. Tháinig leagan 1.2 in ionad leagan 1.1: deir rannán 5 anois, sula mbíonn díospóireacht poiblí, go seoltar a téacs poiblí chuig Claude Haiku 5.5 lena sheiceáil, agus go seiceálann an tsamhail chéanna an méid a chuirtear le díospóireacht phoiblí agus na tuairiscí a dhéantar leis an gcnaipe Tuairiscigh; soiléiríonn sé nach seoltar ach téacs na sintéise don tseiceáil ag deireadh díospóireachta; ainmníonn a liosta den mhéid a luann an Clár i gcás gach soláthraí an tseiceáil nua agus seiceáil tuairisce; liostaíonn an Clár an tseiceáil nua do Anthropic; ainmníonn rannán 8 anois na ceithre chinneadh a dhéanann ár seiceálacha uathoibríocha gan duine a bheith páirteach, agus cad is féidir leat a dhéanamh tar éis gach ceann acu; athraíodh Iarscríbhinn B.4 agus Iarscríbhinn B.6 dá réir. Tháinig leagan 1.1 in ionad leagan 1.0: deir rannán 5 anois go n-oibríonn DeepInfra ar a fhreastalaithe féin gach samhail a thugtar do dhíospóireacht tríd, agus athraíodh an achoimre agus rannán 4 dá réir." }
+      { kind: "p", text: "Nuashonraíodh an beartas seo an uair dheireanach ar 26 Samhain 2026. Tháinig leagan 1.2 in ionad leagan 1.1: deir rannán 5 anois, sula mbíonn díospóireacht poiblí, go seoltar a téacs poiblí chuig Claude Haiku 5.5 lena sheiceáil, agus go seiceálann an tsamhail chéanna an méid a chuirtear le díospóireacht phoiblí agus na tuairiscí a dhéantar leis an gcnaipe Tuairiscigh; soiléiríonn sé nach seoltar ach téacs na sintéise don tseiceáil ag deireadh díospóireachta; ainmníonn a liosta den mhéid a luann an Clár i gcás gach soláthraí an tseiceáil nua agus seiceáil tuairisce; liostaíonn an Clár an tseiceáil nua do Anthropic; ainmníonn rannán 8 anois na ceithre chinneadh a dhéanann ár seiceálacha uathoibríocha gan duine a bheith páirteach, agus cad is féidir leat a dhéanamh tar éis gach ceann acu; athraíodh Iarscríbhinn B.4 agus Iarscríbhinn B.6 dá réir. Tháinig leagan 1.1 in ionad leagan 1.0: deir rannán 5 anois go n-oibríonn DeepInfra ar a fhreastalaithe féin gach samhail a thugtar do dhíospóireacht tríd, agus athraíodh an achoimre agus rannán 4 dá réir." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "d5609e4dcd2f76e9e994de6ca0743bcf0f353e5ff904a4e1836a2e37115c08fc",
-  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v1.2 · I bhFEIDHM 25 SAMHAIN 2026",
+  sha256: "2a4ddbfc2d0aeb247fd7146242a66863e52f3506bb3f7efdf25134964605bd60",
+  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v1.2 · I bhFEIDHM 26 SAMHAIN 2026",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",
   endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v1.2",

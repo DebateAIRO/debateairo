@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v1.2 · ÚČINNÉ OD 25. NOVEMBRA 2026
+eyebrow: ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v1.2 · ÚČINNÉ OD 26. NOVEMBRA 2026
 title: Čo uchovávame a prečo
 lede: Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.
 endMarker: KONIEC ZÁSAD · GDPR (EU) 2016/679 · v1.2
@@ -19,7 +19,7 @@ jumps:
 13 SÚBORY COOKIE
 -->
 
-**Version 1.2 · Effective 25. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/privacy/versions · Prevádzkovateľ: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 26. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/privacy/versions · Prevádzkovateľ: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Zhromažďujeme údaje potrebné pre účet a to, čo napíšete do svojich debát. To, čo napíšete asistentovi podpory, sa odovzdáva jeho modelu umelej inteligencie, aby vám mohol odpovedať, a nič z toho neuchovávame. Vaše otázky sa odosielajú poskytovateľom umelej inteligencie uvedeným v našom registri, najmä poskytovateľovi DeepInfra, v Spojených štátoch. Podmienky spoločností DeepInfra, Anthropic a Amazon im nedovoľujú trénovať modely na tom, čo napíšete. Poskytovateľ vyhľadávania na webe dostáva iba krátke vyhľadávacie frázy, ktoré napíšu modely (časť 5). Náš poskytovateľ hostingu uchováva váš účet a vaše debaty v Londýne vo Spojenom kráľovstve; časť 5 uvádza, kam ďalej putujú vaše údaje. V bezplatnom programe sú debaty po dokončení verejné, po kontrole umelou inteligenciou; v platenom programe sú súkromné, pokiaľ ich nezverejníte. Odstránením účtu sa zničia kľúče k vašim súkromným údajom v ostrej prevádzke služby, nevymažú sa tým však naše zálohy a niektoré z nich tieto kľúče obsahujú (časť 7); verejné debaty zostanú verejné a váš pseudonym sa z nich odstráni. Môžete nás kontaktovať na privacy@dezbatere.ro a osoby uvedené v debate nám môžu napísať aj bez účtu.
 
@@ -265,7 +265,7 @@ Ak chcete tieto položky odmietnuť, zablokujte alebo vymažte súbory cookie a 
 
 Keď tieto zásady zmeníme, zverejníme novú verziu so zhrnutím zmien a novým dátumom účinnosti a predchádzajúce verzie ponecháme na dezbatere.ro/privacy/versions. O zmene, ktorá pridáva nový účel alebo nového príjemcu, vás informujeme e-mailom aj v produkte pred začatím nového spracúvania a poskytneme vám čas na vznesenie námietky. Ak nový účel závisí od vášho súhlasu — napríklad ak by sme niekedy chceli obsah používať na zlepšovanie modelov — požiadame vás o tento súhlas samostatne a konkrétne; prijatie aktualizovaných Podmienok nikdy nepovažujeme za súhlas s novým spracúvaním. Pri spresneniach, ktoré nemenia naše postupy, jednoducho zverejníme novú verziu.
 
-Tieto zásady boli naposledy aktualizované 25. novembra 2026. Verzia 1.2 nahradila verziu 1.1: časť 5 teraz uvádza, že predtým, ako sa debata stane verejnou, sa jej verejný text odosiela na kontrolu modelu Claude Haiku 5.5 a že ten istý model kontroluje to, čo sa pridáva do verejnej debaty, a hlásenia podané tlačidlom Nahlásiť; objasňuje, že na kontrolu po skončení debaty sa odosiela iba text syntézy; jej zoznam toho, čo register uvádza pri každom poskytovateľovi, uvádza novú kontrolu a kontrolu hlásenia; register uvádza novú kontrolu pri Anthropic; časť 8 teraz uvádza štyri rozhodnutia, ktoré naše automatické kontroly prijímajú bez účasti človeka, a čo môžete urobiť po každom z nich; príloha B.4 a príloha B.6 boli zodpovedajúco upravené. Verzia 1.1 nahradila verziu 1.0: časť 5 teraz uvádza, že DeepInfra prevádzkuje na vlastných serveroch každý model debaty, ktorý sa poskytuje jej prostredníctvom, a zhrnutie a časť 4 boli zodpovedajúco upravené.
+Tieto zásady boli naposledy aktualizované 26. novembra 2026. Verzia 1.2 nahradila verziu 1.1: časť 5 teraz uvádza, že predtým, ako sa debata stane verejnou, sa jej verejný text odosiela na kontrolu modelu Claude Haiku 5.5 a že ten istý model kontroluje to, čo sa pridáva do verejnej debaty, a hlásenia podané tlačidlom Nahlásiť; objasňuje, že na kontrolu po skončení debaty sa odosiela iba text syntézy; jej zoznam toho, čo register uvádza pri každom poskytovateľovi, uvádza novú kontrolu a kontrolu hlásenia; register uvádza novú kontrolu pri Anthropic; časť 8 teraz uvádza štyri rozhodnutia, ktoré naše automatické kontroly prijímajú bez účasti človeka, a čo môžete urobiť po každom z nich; príloha B.4 a príloha B.6 boli zodpovedajúco upravené. Verzia 1.1 nahradila verziu 1.0: časť 5 teraz uvádza, že DeepInfra prevádzkuje na vlastných serveroch každý model debaty, ktorý sa poskytuje jej prostredníctvom, a zhrnutie a časť 4 boli zodpovedajúco upravené.
 
 ## Annex B — Regionálne podmienky ochrany osobných údajov
 

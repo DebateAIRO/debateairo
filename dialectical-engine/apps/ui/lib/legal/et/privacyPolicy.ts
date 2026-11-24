@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kui muudame seda poliitikat, avaldame uue versiooni koos muudatuste kokkuvõtte ja uue jõustumiskuupäevaga ning säilitame varasemad versioonid aadressil dezbatere.ro/privacy/versions. Uue eesmärgi või vastuvõtja lisamisel teavitame teid enne uue töötlemise algust e-posti teel ja tootes ning anname teile aega vastuväite esitamiseks. Kui uus eesmärk sõltub teie nõusolekust — näiteks kui sooviksime kunagi kasutada sisu mudelite täiustamiseks — küsime selleks eraldi ja konkreetset nõusolekut; me ei käsita uuendatud Tingimustega nõustumist kunagi nõusolekuna uueks töötlemiseks. Selgituste korral, mis ei muuda meie tegevust, avaldame lihtsalt uue versiooni." },
-      { kind: "p", text: "Selle poliitika viimase ajakohastamise kuupäev: 25. november 2026. Versioon 1.2 asendas versiooni 1.1: jaotises 5 on nüüd öeldud, et enne kui väitlus muutub avalikuks, saadetakse selle avalik tekst kontrollimiseks mudelile Claude Haiku 5.5 ning et sama mudel kontrollib seda, mida avalikule väitlusele lisatakse, ja Teatage-nupuga tehtud teateid; see teeb selgeks, et väitluse lõpus tehtava kontrolli jaoks saadetakse ainult sünteesi tekst; selle loetelu sellest, mida register iga pakkuja kohta märgib, nimetab uut kontrolli ja teate kontrolli; register nimetab uut kontrolli ettevõtte Anthropic juures; jaotis 8 nimetab nüüd neli otsust, mida meie automaatsed kontrollid ilma inimeseta teevad, ja seda, mida saate pärast igaüht neist teha; lisa B.4 ja lisa B.6 muudeti vastavalt. Versioon 1.1 asendas versiooni 1.0: jaotises 5 on nüüd öeldud, et DeepInfra käitab oma serverites iga mudelit, mis väitlusele selle kaudu antakse, ning kokkuvõtet ja jaotist 4 muudeti vastavalt." }
+      { kind: "p", text: "Selle poliitika viimase ajakohastamise kuupäev: 26. november 2026. Versioon 1.2 asendas versiooni 1.1: jaotises 5 on nüüd öeldud, et enne kui väitlus muutub avalikuks, saadetakse selle avalik tekst kontrollimiseks mudelile Claude Haiku 5.5 ning et sama mudel kontrollib seda, mida avalikule väitlusele lisatakse, ja Teatage-nupuga tehtud teateid; see teeb selgeks, et väitluse lõpus tehtava kontrolli jaoks saadetakse ainult sünteesi tekst; selle loetelu sellest, mida register iga pakkuja kohta märgib, nimetab uut kontrolli ja teate kontrolli; register nimetab uut kontrolli ettevõtte Anthropic juures; jaotis 8 nimetab nüüd neli otsust, mida meie automaatsed kontrollid ilma inimeseta teevad, ja seda, mida saate pärast igaüht neist teha; lisa B.4 ja lisa B.6 muudeti vastavalt. Versioon 1.1 asendas versiooni 1.0: jaotises 5 on nüüd öeldud, et DeepInfra käitab oma serverites iga mudelit, mis väitlusele selle kaudu antakse, ning kokkuvõtet ja jaotist 4 muudeti vastavalt." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "e81ed5f983f0763c518c7499766ed2edf8371827b68bbb2d264565cbbe935b1d",
-  eyebrow: "PRIVAATSUSPOLIITIKA · v1.2 · KEHTIB ALATES 25. NOVEMBRIST 2026",
+  sha256: "e48e9c141b00de4e8e31ff471c7229af1df531a1ed0c580e81d9e86bdc672f7e",
+  eyebrow: "PRIVAATSUSPOLIITIKA · v1.2 · KEHTIB ALATES 26. NOVEMBRIST 2026",
   title: "Mida ja miks me talletame",
   lede: "Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.",
   endMarker: "POLIITIKA LÕPP · GDPR (EU) 2016/679 · v1.2",

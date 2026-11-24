@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { awaitsTranslation } from "../support/mailKeysAwaitingTranslation.js";
 
 /**
  * S01 copy parity (SPEC-v4 R-34, R-42, R-45; Appendix B A-2). For each of the 35 catalogue codes: the auth.* key set of
@@ -56,9 +57,22 @@ function blocks(section: string): Block[] {
 const kindsOf = (code: string): string[] => blocks(section13(code)).map((block) => block.kind);
 
 describe("S01 copy parity over the 35 catalogue codes (R-34, R-42, R-45)", () => {
-  it("the catalogue holds the 35 codes and en holds the 115 auth keys", () => {
+  it("the catalogue holds the 35 codes and en holds the 139 auth keys, 24 of them written in English first", () => {
     expect(CODES).toHaveLength(35);
-    expect(EN_AUTH_KEYS).toHaveLength(115);
+    expect(EN_AUTH_KEYS).toHaveLength(139);
+    expect(EN_AUTH_KEYS.filter(awaitsTranslation)).toHaveLength(24);
+  });
+
+  // A key awaiting translation is in every catalogue, as the English sentence itself: a catalogue that translated one
+  // while its prefix is still listed fails here, so the list (tests/support/mailKeysAwaitingTranslation.ts) is never stale.
+  it("every key awaiting translation holds the English sentence in every catalogue", () => {
+    const english = JSON.parse(readFileSync(join(MESSAGES, "en", "mail.json"), "utf8")) as Record<string, string>;
+    const differ: string[] = [];
+    for (const code of CODES) {
+      const own = JSON.parse(readFileSync(join(MESSAGES, code, "mail.json"), "utf8")) as Record<string, string>;
+      for (const key of EN_AUTH_KEYS.filter(awaitsTranslation)) if (own[key] !== english[key]) differ.push(`${code}:${key}`);
+    }
+    expect(differ).toEqual([]);
   });
 
   it("the English §13 has the six-block shape the other locales must keep", () => {

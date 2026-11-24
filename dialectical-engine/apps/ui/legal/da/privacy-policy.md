@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: PRIVATLIVSPOLITIK · v1.2 · GÆLDENDE FRA 25. NOVEMBER 2026
+eyebrow: PRIVATLIVSPOLITIK · v1.2 · GÆLDENDE FRA 26. NOVEMBER 2026
 title: Hvad vi opbevarer, og hvorfor
 lede: Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.
 endMarker: SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v1.2
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 1.2 · Effective 25. november 2026 · Tidligere versioner på dezbatere.ro/privacy/versions · Dataansvarlig: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 26. november 2026 · Tidligere versioner på dezbatere.ro/privacy/versions · Dataansvarlig: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Vi indsamler det, en konto har brug for, og det, du skriver i dine debatter. Det, du skriver til supportassistenten, går til dens AI-model, så den kan svare dig, og vi gemmer intet af det. Dine spørgsmål sendes til de AI-udbydere, der er anført i vores Register, hovedsageligt DeepInfra, i USA. Vilkårene hos DeepInfra, Anthropic og Amazon tillader dem ikke at træne modeller på det, du skriver. Udbyderen af websøgning modtager kun de korte søgefraser, som modellerne skriver (afsnit 5). Vores hostingudbyder opbevarer din konto og dine debatter i London i Storbritannien; afsnit 5 beskriver, hvor dine data ellers sendes hen. På det gratis abonnement er debatter offentlige, når de er afsluttet, efter en AI-kontrol; på et betalt abonnement er de private, medmindre du offentliggør dem. Når du sletter din konto, destrueres nøglerne til dine private data i den kørende tjeneste, men det sletter ikke vores sikkerhedskopier, og nogle af dem indeholder disse nøgler (afsnit 7); offentlige debatter forbliver offentlige, og dit pseudonym fjernes fra dem. Du kan kontakte os på privacy@dezbatere.ro, og personer, som nævnes i en debat, kan skrive til os uden at have en konto.
 
@@ -265,7 +265,7 @@ For at afvise disse elementer skal du blokere eller slette cookies og webstedsda
 
 Når vi ændrer denne politik, offentliggør vi den nye version med en oversigt over ændringerne og en ny ikrafttrædelsesdato og beholder de tidligere versioner på dezbatere.ro/privacy/versions. Ved en ændring, der tilføjer et nyt formål eller en ny modtager, underretter vi dig via e-mail og i produktet, før den nye behandling begynder, og giver dig tid til at gøre indsigelse. Hvor et nyt formål afhænger af dit samtykke — eksempelvis hvis vi nogensinde ønskede at bruge indhold til at forbedre modeller — beder vi særskilt og specifikt om dette samtykke; vi behandler aldrig accept af opdaterede Vilkår som samtykke til ny behandling. Ved præciseringer, der ikke ændrer noget ved det, vi gør, offentliggør vi blot den nye version.
 
-Denne politik blev senest opdateret den 25. november 2026. Version 1.2 erstattede version 1.1: afsnit 5 angiver nu, at en debats offentlige tekst, før debatten bliver offentlig, sendes til Claude Haiku 5.5 for at blive kontrolleret, og at den samme model kontrollerer det, der føjes til en offentlig debat, og de anmeldelser, der sendes med knappen Anmeld; det gør det klart, at kun synteseteksten sendes til kontrollen ved debattens afslutning; dets liste over, hvad Registret angiver for hver udbyder, nævner den nye kontrol og kontrollen af en anmeldelse; Registret angiver den nye kontrol for Anthropic; afsnit 8 nævner nu de fire afgørelser, som vores automatiske kontroller træffer, uden at en person er involveret, og hvad du kan gøre efter hver af dem; bilag B.4 og bilag B.6 er ændret tilsvarende. Version 1.1 erstattede version 1.0: afsnit 5 angiver nu, at DeepInfra kører alle de modeller, som en debat får via DeepInfra, på egne servere, og resuméet og afsnit 4 er ændret tilsvarende.
+Denne politik blev senest opdateret den 26. november 2026. Version 1.2 erstattede version 1.1: afsnit 5 angiver nu, at en debats offentlige tekst, før debatten bliver offentlig, sendes til Claude Haiku 5.5 for at blive kontrolleret, og at den samme model kontrollerer det, der føjes til en offentlig debat, og de anmeldelser, der sendes med knappen Anmeld; det gør det klart, at kun synteseteksten sendes til kontrollen ved debattens afslutning; dets liste over, hvad Registret angiver for hver udbyder, nævner den nye kontrol og kontrollen af en anmeldelse; Registret angiver den nye kontrol for Anthropic; afsnit 8 nævner nu de fire afgørelser, som vores automatiske kontroller træffer, uden at en person er involveret, og hvad du kan gøre efter hver af dem; bilag B.4 og bilag B.6 er ændret tilsvarende. Version 1.1 erstattede version 1.0: afsnit 5 angiver nu, at DeepInfra kører alle de modeller, som en debat får via DeepInfra, på egne servere, og resuméet og afsnit 4 er ændret tilsvarende.
 
 ## Annex B — Regionale privatlivsvilkår
 

@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Gdy zmieniamy niniejszą politykę, publikujemy nową wersję wraz z podsumowaniem zmian i nową datą wejścia w życie, a poprzednie wersje zachowujemy pod adresem dezbatere.ro/privacy/versions. O zmianie wprowadzającej nowy cel lub nowego odbiorcę informujemy Cię przed rozpoczęciem nowego przetwarzania, pocztą elektroniczną i w produkcie, oraz zapewniamy czas na wniesienie sprzeciwu. Jeżeli nowy cel zależy od Twojej zgody — na przykład gdybyśmy kiedykolwiek chcieli wykorzystać treści do ulepszania modeli — prosimy o tę zgodę osobno i w sposób konkretny; nigdy nie traktujemy akceptacji zaktualizowanych Warunków świadczenia usług jako zgody na nowe przetwarzanie. W przypadku wyjaśnień, które nie zmieniają naszych działań, po prostu publikujemy nową wersję." },
-      { kind: "p", text: "Niniejsza polityka została ostatnio zaktualizowana 25 listopada 2026. Wersja 1.2 zastąpiła wersję 1.1: sekcja 5 stanowi teraz, że zanim debata stanie się publiczna, jej publiczny tekst jest wysyłany do Claude Haiku 5.5 do sprawdzenia oraz że ten sam model sprawdza to, co jest dodawane do publicznej debaty, i zgłoszenia złożone przyciskiem Zgłoś; wyjaśnia, że na potrzeby kontroli po zakończeniu debaty wysyłany jest wyłącznie tekst syntezy; jej lista tego, co Rejestr podaje dla każdego dostawcy, wymienia nową kontrolę i kontrolę zgłoszenia; Rejestr wymienia nową kontrolę dla Anthropic; sekcja 8 wymienia teraz cztery decyzje, które nasze automatyczne kontrole podejmują bez udziału człowieka, oraz to, co możesz zrobić po każdej z nich; Załącznik B.4 i Załącznik B.6 zostały odpowiednio zmienione. Wersja 1.1 zastąpiła wersję 1.0: sekcja 5 stanowi teraz, że DeepInfra uruchamia na własnych serwerach każdy model, z którego debata korzysta za jego pośrednictwem, a podsumowanie i sekcja 4 zostały odpowiednio zmienione." }
+      { kind: "p", text: "Niniejsza polityka została ostatnio zaktualizowana 26 listopada 2026. Wersja 1.2 zastąpiła wersję 1.1: sekcja 5 stanowi teraz, że zanim debata stanie się publiczna, jej publiczny tekst jest wysyłany do Claude Haiku 5.5 do sprawdzenia oraz że ten sam model sprawdza to, co jest dodawane do publicznej debaty, i zgłoszenia złożone przyciskiem Zgłoś; wyjaśnia, że na potrzeby kontroli po zakończeniu debaty wysyłany jest wyłącznie tekst syntezy; jej lista tego, co Rejestr podaje dla każdego dostawcy, wymienia nową kontrolę i kontrolę zgłoszenia; Rejestr wymienia nową kontrolę dla Anthropic; sekcja 8 wymienia teraz cztery decyzje, które nasze automatyczne kontrole podejmują bez udziału człowieka, oraz to, co możesz zrobić po każdej z nich; Załącznik B.4 i Załącznik B.6 zostały odpowiednio zmienione. Wersja 1.1 zastąpiła wersję 1.0: sekcja 5 stanowi teraz, że DeepInfra uruchamia na własnych serwerach każdy model, z którego debata korzysta za jego pośrednictwem, a podsumowanie i sekcja 4 zostały odpowiednio zmienione." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "f0247483bd664efd5e8545b6d99f211983cfa1eaa905c87744e4930811b26c29",
-  eyebrow: "POLITYKA PRYWATNOŚCI · v1.2 · OBOWIĄZUJE OD 25 LISTOPADA 2026",
+  sha256: "65bdb97915ef3c127464c36c5a65762028f503a6f7e3b00a3893e1e4b53fc0d9",
+  eyebrow: "POLITYKA PRYWATNOŚCI · v1.2 · OBOWIĄZUJE OD 26 LISTOPADA 2026",
   title: "Co przechowujemy i dlaczego",
   lede: "Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.",
   endMarker: "KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v1.2",

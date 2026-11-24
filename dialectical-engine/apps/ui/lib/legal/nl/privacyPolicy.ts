@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Wanneer wij dit beleid wijzigen, publiceren wij de nieuwe versie met een samenvatting van de wijzigingen en een nieuwe ingangsdatum, en bewaren wij eerdere versies op dezbatere.ro/privacy/versions. Bij een wijziging die een nieuw doel of een nieuwe ontvanger toevoegt, informeren wij u per e-mail en in het product voordat de nieuwe verwerking begint en geven wij u tijd om bezwaar te maken. Wanneer een nieuw doel afhankelijk is van uw toestemming — bijvoorbeeld als wij ooit inhoud zouden willen gebruiken om modellen te verbeteren — vragen wij die toestemming afzonderlijk en specifiek; wij beschouwen aanvaarding van bijgewerkte Voorwaarden nooit als toestemming voor nieuwe verwerking. Bij verduidelijkingen die niets veranderen aan wat wij doen, publiceren wij eenvoudigweg de nieuwe versie." },
-      { kind: "p", text: "Dit beleid is voor het laatst bijgewerkt op 25 november 2026. Versie 1.2 verving versie 1.1: hoofdstuk 5 zegt nu dat de openbare tekst van een debat, voordat het openbaar wordt, ter controle naar Claude Haiku 5.5 wordt gestuurd, en dat hetzelfde model controleert wat aan een openbaar debat wordt toegevoegd en de meldingen die met de knop Melden worden gemaakt; het maakt duidelijk dat voor de controle aan het einde van het debat alleen de tekst van de synthese wordt gestuurd; de lijst van wat het Register per aanbieder vermeldt, noemt de nieuwe controle en de controle van een melding; het Register vermeldt de nieuwe controle voor Anthropic; hoofdstuk 8 noemt nu de vier besluiten die onze automatische controles zonder tussenkomst van een persoon nemen, en wat u na elk ervan kunt doen; Bijlage B.4 en Bijlage B.6 zijn daarop aangepast. Versie 1.1 verving versie 1.0: hoofdstuk 5 zegt nu dat DeepInfra elk model dat via DeepInfra aan een debat wordt geleverd op zijn eigen servers laat draaien, en de samenvatting en hoofdstuk 4 zijn daarop aangepast." }
+      { kind: "p", text: "Dit beleid is voor het laatst bijgewerkt op 26 november 2026. Versie 1.2 verving versie 1.1: hoofdstuk 5 zegt nu dat de openbare tekst van een debat, voordat het openbaar wordt, ter controle naar Claude Haiku 5.5 wordt gestuurd, en dat hetzelfde model controleert wat aan een openbaar debat wordt toegevoegd en de meldingen die met de knop Melden worden gemaakt; het maakt duidelijk dat voor de controle aan het einde van het debat alleen de tekst van de synthese wordt gestuurd; de lijst van wat het Register per aanbieder vermeldt, noemt de nieuwe controle en de controle van een melding; het Register vermeldt de nieuwe controle voor Anthropic; hoofdstuk 8 noemt nu de vier besluiten die onze automatische controles zonder tussenkomst van een persoon nemen, en wat u na elk ervan kunt doen; Bijlage B.4 en Bijlage B.6 zijn daarop aangepast. Versie 1.1 verving versie 1.0: hoofdstuk 5 zegt nu dat DeepInfra elk model dat via DeepInfra aan een debat wordt geleverd op zijn eigen servers laat draaien, en de samenvatting en hoofdstuk 4 zijn daarop aangepast." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "a6bc71ac7a4bf9f643c24fed356e5fe5b64685608873108c6a5bd9bde43a346e",
-  eyebrow: "PRIVACYBELEID · v1.2 · VAN KRACHT OP 25 NOVEMBER 2026",
+  sha256: "af2cd6b48182ad7d1ba9fa0e06cabd2a3793151e83227be0bbc38d996ee80d20",
+  eyebrow: "PRIVACYBELEID · v1.2 · VAN KRACHT OP 26 NOVEMBER 2026",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",
   endMarker: "EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v1.2",

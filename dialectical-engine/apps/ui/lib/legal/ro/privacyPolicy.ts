@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la dezbatere.ro/privacy/versions. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune." },
-      { kind: "p", text: "Această politică a fost actualizată ultima dată la 25 noiembrie 2026. Versiunea 1.2 a înlocuit versiunea 1.1: secțiunea 5 arată acum că, înainte ca o dezbatere să devină publică, textul ei public este trimis către Claude Haiku 5.5 pentru a fi verificat și că același model verifică ceea ce se adaugă la o dezbatere publică și raportările făcute cu butonul Raportare; precizează că pentru verificarea de la finalul dezbaterii se trimite numai textul sintezei; lista ei cu ceea ce indică Registrul pentru fiecare furnizor numește noua verificare și verificarea unei raportări; Registrul indică noua verificare pentru Anthropic; secțiunea 8 numește acum cele patru decizii pe care verificările noastre automate le iau fără nicio persoană și ce puteți face după fiecare; anexele B.4 și B.6 au fost modificate în mod corespunzător. Versiunea 1.1 a înlocuit versiunea 1.0: secțiunea 5 arată acum că DeepInfra rulează pe propriile servere fiecare model pus la dispoziția unei dezbateri prin intermediul său, iar rezumatul și secțiunea 4 au fost modificate în mod corespunzător." }
+      { kind: "p", text: "Această politică a fost actualizată ultima dată la 26 noiembrie 2026. Versiunea 1.2 a înlocuit versiunea 1.1: secțiunea 5 arată acum că, înainte ca o dezbatere să devină publică, textul ei public este trimis către Claude Haiku 5.5 pentru a fi verificat și că același model verifică ceea ce se adaugă la o dezbatere publică și raportările făcute cu butonul Raportare; precizează că pentru verificarea de la finalul dezbaterii se trimite numai textul sintezei; lista ei cu ceea ce indică Registrul pentru fiecare furnizor numește noua verificare și verificarea unei raportări; Registrul indică noua verificare pentru Anthropic; secțiunea 8 numește acum cele patru decizii pe care verificările noastre automate le iau fără nicio persoană și ce puteți face după fiecare; anexele B.4 și B.6 au fost modificate în mod corespunzător. Versiunea 1.1 a înlocuit versiunea 1.0: secțiunea 5 arată acum că DeepInfra rulează pe propriile servere fiecare model pus la dispoziția unei dezbateri prin intermediul său, iar rezumatul și secțiunea 4 au fost modificate în mod corespunzător." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "9e896ddb990f3a4964eb0d471c4d4300eac6dc741d731d6f2c1323f38ad7e2e6",
-  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v1.2 · ÎN VIGOARE DE LA 25 NOIEMBRIE 2026",
+  sha256: "035026b7aaf6b4007a0851403de9fa520b87b0c10500d7ab1354b07a79be8335",
+  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v1.2 · ÎN VIGOARE DE LA 26 NOIEMBRIE 2026",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",
   endMarker: "SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v1.2",

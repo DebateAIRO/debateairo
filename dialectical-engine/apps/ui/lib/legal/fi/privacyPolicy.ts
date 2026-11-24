@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kun muutamme tätä käytäntöä, julkaisemme uuden version, yhteenvedon muutoksista ja uuden voimaantulopäivän sekä säilytämme aiemmat versiot osoitteessa dezbatere.ro/privacy/versions. Jos muutos lisää uuden tarkoituksen tai uuden vastaanottajan, ilmoitamme sinulle sähköpostitse ja tuotteessa ennen uuden käsittelyn aloittamista ja annamme aikaa vastustaa sitä. Jos uusi tarkoitus perustuu suostumukseesi — esimerkiksi jos joskus haluaisimme käyttää sisältöä mallien parantamiseen — pyydämme suostumuksen erikseen ja yksilöidysti; emme koskaan pidä päivitettyjen Ehtojen hyväksymistä suostumuksena uuteen käsittelyyn. Jos selvennykset eivät muuta toimintaamme, julkaisemme vain uuden version." },
-      { kind: "p", text: "Tämä käytäntö päivitettiin viimeksi 25. marraskuuta 2026. Versio 1.2 korvasi version 1.1: osiossa 5 todetaan nyt, että ennen kuin väittely tulee julkiseksi, sen julkinen teksti lähetetään mallille Claude Haiku 5.5 tarkistettavaksi ja että sama malli tarkistaa sen, mitä julkiseen väittelyyn lisätään, sekä Ilmoita-painikkeella tehdyt ilmoitukset; siinä tehdään selväksi, että väittelyn päätteeksi tehtävää tarkistusta varten lähetetään vain synteesin teksti; sen luettelo siitä, mitä Rekisteri ilmoittaa kustakin palveluntarjoajasta, nimeää uuden tarkistuksen ja ilmoituksen tarkistuksen; Rekisterissä luetellaan uusi tarkistus Anthropicin kohdalla; osiossa 8 nimetään nyt ne neljä päätöstä, jotka automaattiset tarkistuksemme tekevät ilman henkilöä, ja se, mitä voit tehdä kunkin jälkeen; liitettä B.4 ja liitettä B.6 muutettiin vastaavasti. Versio 1.1 korvasi version 1.0: osiossa 5 todetaan nyt, että DeepInfra ajaa omilla palvelimillaan jokaista mallia, joka väittelylle annetaan sen kautta, ja yhteenvetoa sekä osiota 4 muutettiin vastaavasti." }
+      { kind: "p", text: "Tämä käytäntö päivitettiin viimeksi 26. marraskuuta 2026. Versio 1.2 korvasi version 1.1: osiossa 5 todetaan nyt, että ennen kuin väittely tulee julkiseksi, sen julkinen teksti lähetetään mallille Claude Haiku 5.5 tarkistettavaksi ja että sama malli tarkistaa sen, mitä julkiseen väittelyyn lisätään, sekä Ilmoita-painikkeella tehdyt ilmoitukset; siinä tehdään selväksi, että väittelyn päätteeksi tehtävää tarkistusta varten lähetetään vain synteesin teksti; sen luettelo siitä, mitä Rekisteri ilmoittaa kustakin palveluntarjoajasta, nimeää uuden tarkistuksen ja ilmoituksen tarkistuksen; Rekisterissä luetellaan uusi tarkistus Anthropicin kohdalla; osiossa 8 nimetään nyt ne neljä päätöstä, jotka automaattiset tarkistuksemme tekevät ilman henkilöä, ja se, mitä voit tehdä kunkin jälkeen; liitettä B.4 ja liitettä B.6 muutettiin vastaavasti. Versio 1.1 korvasi version 1.0: osiossa 5 todetaan nyt, että DeepInfra ajaa omilla palvelimillaan jokaista mallia, joka väittelylle annetaan sen kautta, ja yhteenvetoa sekä osiota 4 muutettiin vastaavasti." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "b65d6aff38b8a6d62a64d71ef380dbf9ab1040861baecbcddc8ddfdfaa549385",
-  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v1.2 · VOIMASSA 25. MARRASKUUTA 2026 ALKAEN",
+  sha256: "03485dc24d03e7db83f6223cc3f82d852d59d6a3540ec2977074ae547b834b02",
+  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v1.2 · VOIMASSA 26. MARRASKUUTA 2026 ALKAEN",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",
   endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v1.2",

@@ -58,6 +58,7 @@ describe("Support catalog route coverage", () => {
       "/public/debate/[id]",
       "/recover",
       "/recover-authenticator",
+      "/recover/help",
       "/reset-password",
       "/settings",
       "/settings/security",

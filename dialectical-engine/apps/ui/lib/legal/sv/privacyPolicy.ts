@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "När vi ändrar denna policy publicerar vi den nya versionen med en sammanfattning av vad som har ändrats och ett nytt ikraftträdandedatum, och vi behåller tidigare versioner på dezbatere.ro/privacy/versions. Om en ändring lägger till ett nytt ändamål eller en ny mottagare informerar vi dig via e-post och i produkten innan den nya behandlingen börjar och ger dig tid att invända. Om ett nytt ändamål är beroende av ditt samtycke — exempelvis om vi någon gång skulle vilja använda innehåll för att förbättra modeller — ber vi separat och specifikt om det samtycket; vi behandlar aldrig godkännande av uppdaterade villkor som samtycke till ny behandling. Vid förtydliganden som inte ändrar något i det vi gör publicerar vi helt enkelt den nya versionen." },
-      { kind: "p", text: "Denna policy uppdaterades senast den 25 november 2026. Version 1.2 ersatte version 1.1: avsnitt 5 anger nu att en debatts offentliga text, innan debatten blir offentlig, skickas till Claude Haiku 5.5 för kontroll, och att samma modell kontrollerar det som läggs till i en offentlig debatt och de rapporter som görs med knappen Rapportera; det klargör att bara syntestexten skickas för kontrollen vid debattens slut; dess lista över vad registret anger för varje leverantör nämner den nya kontrollen och kontrollen av en rapport; registret anger den nya kontrollen för Anthropic; avsnitt 8 nämner nu de fyra beslut som våra automatiska kontroller fattar utan att någon person är inblandad, och vad du kan göra efter vart och ett; bilaga B.4 och bilaga B.6 ändrades i enlighet med detta. Version 1.1 ersatte version 1.0: avsnitt 5 anger nu att DeepInfra på egna servrar kör varje modell som en debatt får via DeepInfra, och sammanfattningen och avsnitt 4 ändrades i enlighet med detta." }
+      { kind: "p", text: "Denna policy uppdaterades senast den 26 november 2026. Version 1.2 ersatte version 1.1: avsnitt 5 anger nu att en debatts offentliga text, innan debatten blir offentlig, skickas till Claude Haiku 5.5 för kontroll, och att samma modell kontrollerar det som läggs till i en offentlig debatt och de rapporter som görs med knappen Rapportera; det klargör att bara syntestexten skickas för kontrollen vid debattens slut; dess lista över vad registret anger för varje leverantör nämner den nya kontrollen och kontrollen av en rapport; registret anger den nya kontrollen för Anthropic; avsnitt 8 nämner nu de fyra beslut som våra automatiska kontroller fattar utan att någon person är inblandad, och vad du kan göra efter vart och ett; bilaga B.4 och bilaga B.6 ändrades i enlighet med detta. Version 1.1 ersatte version 1.0: avsnitt 5 anger nu att DeepInfra på egna servrar kör varje modell som en debatt får via DeepInfra, och sammanfattningen och avsnitt 4 ändrades i enlighet med detta." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "f59d4440095e7a2d52b25953deb36075f62b18a0c7b15927196111d6f00de8bb",
-  eyebrow: "INTEGRITETSPOLICY · v1.2 · GÄLLER FRÅN 25 NOVEMBER 2026",
+  sha256: "1661493e922a4dc14e28f02bb033325856942d2409160fbdfdd2ca0c07b84482",
+  eyebrow: "INTEGRITETSPOLICY · v1.2 · GÄLLER FRÅN 26 NOVEMBER 2026",
   title: "Vad vi lagrar och varför",
   lede: "Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.",
   endMarker: "SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v1.2",

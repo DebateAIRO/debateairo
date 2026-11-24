@@ -79,6 +79,7 @@ import { loadForward0184 } from './migration-forward0184.js';
 import { loadForward0185 } from './migration-forward0185.js';
 import { loadForward0186 } from './migration-forward0186.js';
 import { loadForward0187 } from './migration-forward0187.js';
+import { loadForward0188 } from './migration-forward0188.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -183,10 +184,13 @@ export type ChainStep=ForwardStepPlan&Readonly<{n1:N1Declaration}>;
  * expand: one function, so a person's month keeps the plan numbers it started with), then the preview's approved buyers (0186,
  * expand: one table and five functions, so the Owner approves buyers on the Team page with no restart; staff.audit_event's
  * event list widened NOT VALID under a reviewed pair), then the passkeys a sign-in after the first step may use (0187,
- * expand: one function of the cross-account marker, so the browser offers only the bound account's own passkeys).
+ * expand: one function of the cross-account marker, so the browser offers only the bound account's own passkeys), then the
+ * Owner's permit for a locked-out account (0188, expand: four tables and twenty-seven functions, so a person with no passkey
+ * and no saved code can set up one new sign-in method after the Owner's approval and a 72-hour wait; staff.audit_event's
+ * event list widened again under a reviewed pair).
  * A new step appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174,loadForward0175,loadForward0176,loadForward0177,loadForward0178,loadForward0179,loadForward0180,loadForward0181,loadForward0182,loadForward0183,loadForward0184,loadForward0185,loadForward0186,loadForward0187]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174,loadForward0175,loadForward0176,loadForward0177,loadForward0178,loadForward0179,loadForward0180,loadForward0181,loadForward0182,loadForward0183,loadForward0184,loadForward0185,loadForward0186,loadForward0187,loadForward0188]);
 
 /** A forward step's file name; the receipt and declaration tables CHECK the same shape. */
 export const FORWARD_STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;

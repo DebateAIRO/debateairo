@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Mainot šo politiku, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un jaunu spēkā stāšanās datumu un saglabājam iepriekšējās versijas vietnē dezbatere.ro/privacy/versions. Par izmaiņām, ar kurām tiek pievienots jauns nolūks vai jauns saņēmējs, mēs jūs informējam pa e-pastu un produktā pirms jaunās apstrādes sākšanas un dodam laiku iebilst. Ja jauns nolūks ir atkarīgs no jūsu piekrišanas — piemēram, ja mēs kādreiz vēlētos izmantot saturu modeļu uzlabošanai —, mēs šādu piekrišanu lūdzam atsevišķi un konkrēti; atjaunināto Noteikumu akceptēšanu mēs nekad neuzskatām par piekrišanu jaunai apstrādei. Ja precizējumi neko nemaina mūsu darbībās, mēs vienkārši publicējam jauno versiju." },
-      { kind: "p", text: "Šīs politikas pēdējās atjaunināšanas datums: 2026. gada 25. novembris. Versija 1.2 aizstāja versiju 1.1: 5. sadaļā tagad norādīts, ka pirms debates kļūst publiskas to publiskais teksts tiek nosūtīts uz Claude Haiku 5.5 pārbaudei un ka tas pats modelis pārbauda to, kas tiek pievienots publiskai debatei, un ziņojumus, kas iesniegti ar pogu „Ziņot”; tajā skaidri norādīts, ka debašu beigu pārbaudei tiek nosūtīts tikai sintēzes teksts; tās sarakstā par to, ko Reģistrs norāda par katru pakalpojumu sniedzēju, ir minēta jaunā pārbaude un ziņojuma pārbaude; Reģistrā jaunā pārbaude ir norādīta pie Anthropic; 8. sadaļā tagad ir nosaukti četri lēmumi, ko mūsu automātiskās pārbaudes pieņem bez cilvēka iesaistes, un tas, ko jūs varat darīt pēc katra no tiem; B.4 pielikums un B.6 pielikums tika attiecīgi mainīti. Versija 1.1 aizstāja versiju 1.0: 5. sadaļā tagad norādīts, ka DeepInfra savos serveros darbina katru modeli, kas ar tā starpniecību tiek nodrošināts debatēm, un atbilstoši tam tika mainīts kopsavilkums un 4. sadaļa." }
+      { kind: "p", text: "Šīs politikas pēdējās atjaunināšanas datums: 2026. gada 26. novembris. Versija 1.2 aizstāja versiju 1.1: 5. sadaļā tagad norādīts, ka pirms debates kļūst publiskas to publiskais teksts tiek nosūtīts uz Claude Haiku 5.5 pārbaudei un ka tas pats modelis pārbauda to, kas tiek pievienots publiskai debatei, un ziņojumus, kas iesniegti ar pogu „Ziņot”; tajā skaidri norādīts, ka debašu beigu pārbaudei tiek nosūtīts tikai sintēzes teksts; tās sarakstā par to, ko Reģistrs norāda par katru pakalpojumu sniedzēju, ir minēta jaunā pārbaude un ziņojuma pārbaude; Reģistrā jaunā pārbaude ir norādīta pie Anthropic; 8. sadaļā tagad ir nosaukti četri lēmumi, ko mūsu automātiskās pārbaudes pieņem bez cilvēka iesaistes, un tas, ko jūs varat darīt pēc katra no tiem; B.4 pielikums un B.6 pielikums tika attiecīgi mainīti. Versija 1.1 aizstāja versiju 1.0: 5. sadaļā tagad norādīts, ka DeepInfra savos serveros darbina katru modeli, kas ar tā starpniecību tiek nodrošināts debatēm, un atbilstoši tam tika mainīts kopsavilkums un 4. sadaļa." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "0040e6e013fa18fac3b8e110eeecda93ad0f6d899c4d59a3e976ec3293d461a1",
-  eyebrow: "PRIVĀTUMA POLITIKA · v1.2 · SPĒKĀ NO 2026. GADA 25. NOVEMBRA",
+  sha256: "f234727e33192636ab9b98a91f6f60be16397f77b8559eb7a4fd464ade82f501",
+  eyebrow: "PRIVĀTUMA POLITIKA · v1.2 · SPĒKĀ NO 2026. GADA 26. NOVEMBRA",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",
   endMarker: "POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v1.2",

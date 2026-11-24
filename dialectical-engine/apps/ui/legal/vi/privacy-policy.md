@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: CHÍNH SÁCH QUYỀN RIÊNG TƯ · v1.2 · CÓ HIỆU LỰC 25 THÁNG 11 NĂM 2026
+eyebrow: CHÍNH SÁCH QUYỀN RIÊNG TƯ · v1.2 · CÓ HIỆU LỰC 26 THÁNG 11 NĂM 2026
 title: Dữ liệu chúng tôi lưu trữ và lý do
 lede: Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.
 endMarker: HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v1.2
@@ -19,7 +19,7 @@ jumps:
 13 COOKIE
 -->
 
-**Version 1.2 · Effective 25 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/privacy/versions · Bên kiểm soát: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 26 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/privacy/versions · Bên kiểm soát: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Chúng tôi thu thập những gì cần thiết để tài khoản hoạt động và những gì bạn nhập vào các cuộc tranh luận của mình. Những gì bạn viết cho trợ lý hỗ trợ được gửi đến mô hình AI của trợ lý để nó có thể trả lời bạn, và chúng tôi không lưu giữ bất kỳ phần nào của nội dung đó. Câu hỏi của bạn được gửi đến các nhà cung cấp AI nêu trong Sổ đăng ký của chúng tôi, chủ yếu là DeepInfra, tại Hoa Kỳ. Điều khoản của DeepInfra, Anthropic và Amazon không cho phép họ huấn luyện mô hình bằng những gì bạn viết. Nhà cung cấp dịch vụ tìm kiếm trên web chỉ nhận các cụm từ tìm kiếm ngắn do các mô hình viết ra (mục 5). Nhà cung cấp dịch vụ lưu trữ của chúng tôi lưu trữ tài khoản và các cuộc tranh luận của bạn tại London, Vương quốc Anh; mục 5 cho biết dữ liệu của bạn còn được chuyển đến đâu nữa. Trên gói Miễn phí, các cuộc tranh luận trở thành công khai khi kết thúc, sau khi AI kiểm tra; trên gói trả phí, chúng là riêng tư trừ khi bạn công khai chúng. Việc xóa tài khoản sẽ hủy các khóa của dữ liệu riêng tư của bạn trên dịch vụ đang vận hành, nhưng không xóa các bản sao lưu của chúng tôi, và một số bản sao lưu chứa các khóa đó (mục 7); các cuộc tranh luận công khai vẫn công khai, và bút danh của bạn bị gỡ khỏi chúng. Bạn có thể liên hệ với chúng tôi tại privacy@dezbatere.ro, và người được nêu tên trong một cuộc tranh luận có thể viết thư cho chúng tôi mà không cần tài khoản.
 
@@ -265,7 +265,7 @@ Trình duyệt có thể gửi tín hiệu “Do Not Track” hoặc một tín 
 
 Khi thay đổi chính sách này, chúng tôi đăng phiên bản mới kèm bản tóm tắt những thay đổi và ngày hiệu lực mới, đồng thời lưu các phiên bản trước tại dezbatere.ro/privacy/versions. Đối với thay đổi bổ sung mục đích mới hoặc bên nhận mới, chúng tôi thông báo cho bạn trước khi hoạt động xử lý mới bắt đầu, qua email và trong sản phẩm, đồng thời dành cho bạn thời gian phản đối. Khi mục đích mới phụ thuộc vào sự đồng ý của bạn — ví dụ nếu sau này chúng tôi muốn sử dụng nội dung để cải thiện mô hình — chúng tôi sẽ xin sự đồng ý đó một cách riêng biệt và cụ thể; chúng tôi không bao giờ coi việc chấp nhận Điều khoản cập nhật là sự đồng ý cho hoạt động xử lý mới. Đối với các nội dung làm rõ không làm thay đổi cách chúng tôi hành động, chúng tôi chỉ đăng phiên bản mới.
 
-Chính sách này được cập nhật lần cuối vào ngày 25 tháng 11 năm 2026. Phiên bản 1.2 thay thế phiên bản 1.1: mục 5 hiện nêu rằng, trước khi một cuộc tranh luận trở thành công khai, văn bản công khai của nó được gửi đến Claude Haiku 5.5 để kiểm tra, và cùng mô hình này kiểm tra những gì được thêm vào một cuộc tranh luận công khai cũng như các báo cáo gửi bằng nút Báo cáo; mục này làm rõ rằng chỉ văn bản của phần tổng hợp được gửi cho bước kiểm tra cuối cuộc tranh luận; danh sách những gì Sổ đăng ký nêu cho từng nhà cung cấp trong mục này nêu tên bước kiểm tra mới và bước kiểm tra một báo cáo; Sổ đăng ký liệt kê bước kiểm tra mới cho Anthropic; mục 8 hiện nêu bốn quyết định mà các bước kiểm tra tự động của chúng tôi đưa ra mà không có người nào tham gia, và những gì bạn có thể làm sau mỗi quyết định; Phụ lục B.4 và Phụ lục B.6 đã được thay đổi cho phù hợp. Phiên bản 1.1 thay thế phiên bản 1.0: mục 5 hiện nêu rằng DeepInfra chạy trên máy chủ riêng của mình mọi mô hình được cung cấp cho một cuộc tranh luận thông qua DeepInfra, và phần tóm tắt cùng mục 4 đã được thay đổi cho phù hợp.
+Chính sách này được cập nhật lần cuối vào ngày 26 tháng 11 năm 2026. Phiên bản 1.2 thay thế phiên bản 1.1: mục 5 hiện nêu rằng, trước khi một cuộc tranh luận trở thành công khai, văn bản công khai của nó được gửi đến Claude Haiku 5.5 để kiểm tra, và cùng mô hình này kiểm tra những gì được thêm vào một cuộc tranh luận công khai cũng như các báo cáo gửi bằng nút Báo cáo; mục này làm rõ rằng chỉ văn bản của phần tổng hợp được gửi cho bước kiểm tra cuối cuộc tranh luận; danh sách những gì Sổ đăng ký nêu cho từng nhà cung cấp trong mục này nêu tên bước kiểm tra mới và bước kiểm tra một báo cáo; Sổ đăng ký liệt kê bước kiểm tra mới cho Anthropic; mục 8 hiện nêu bốn quyết định mà các bước kiểm tra tự động của chúng tôi đưa ra mà không có người nào tham gia, và những gì bạn có thể làm sau mỗi quyết định; Phụ lục B.4 và Phụ lục B.6 đã được thay đổi cho phù hợp. Phiên bản 1.1 thay thế phiên bản 1.0: mục 5 hiện nêu rằng DeepInfra chạy trên máy chủ riêng của mình mọi mô hình được cung cấp cho một cuộc tranh luận thông qua DeepInfra, và phần tóm tắt cùng mục 4 đã được thay đổi cho phù hợp.
 
 ## Annex B — Điều khoản quyền riêng tư theo khu vực
 

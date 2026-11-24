@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Pakeitę šią politiką paskelbiame naują versiją kartu su pakeitimų santrauka ir nauja įsigaliojimo data, o ankstesnes versijas saugome adresu dezbatere.ro/privacy/versions. Jei pakeitimu pridedamas naujas tikslas ar naujas gavėjas, prieš pradėdami naują tvarkymą informuojame jus el. paštu ir produkte bei suteikiame laiko nesutikti. Jei naujas tikslas priklauso nuo jūsų sutikimo — pavyzdžiui, jei kada nors norėtume naudoti turinį modeliams tobulinti — tokio sutikimo prašome atskirai ir konkrečiai; atnaujintų Sąlygų priėmimo niekada nelaikome sutikimu su nauju duomenų tvarkymu. Jei paaiškinimai nieko nekeičia mūsų veikloje, tiesiog paskelbiame naują versiją." },
-      { kind: "p", text: "Ši politika paskutinį kartą atnaujinta 2026 m. lapkričio 25 d. 1.2 versija pakeitė 1.1 versiją: 5 skyriuje dabar nurodyta, kad prieš debatams tampant viešiems jų viešas tekstas siunčiamas Claude Haiku 5.5 patikrinti ir kad tas pats modelis tikrina tai, kas pridedama prie viešo debato, ir pranešimus, pateiktus mygtuku Pranešti; jame aiškiai nurodyta, kad debatų pabaigos patikrai siunčiamas tik apibendrinimo tekstas; jo sąraše, ką Registras nurodo apie kiekvieną teikėją, įvardyta nauja patikra ir pranešimo patikra; Registre nauja patikra nurodyta prie Anthropic; 8 skyriuje dabar įvardyti keturi sprendimai, kuriuos mūsų automatinės patikros priima be žmogaus, ir ką galite daryti po kiekvieno iš jų; B.4 priedas ir B.6 priedas atitinkamai pakeisti. 1.1 versija pakeitė 1.0 versiją: 5 skyriuje dabar nurodyta, kad DeepInfra savo serveriuose paleidžia kiekvieną modelį, kurį debatai gauna per ją, o santrauka ir 4 skyrius atitinkamai pakeisti." }
+      { kind: "p", text: "Ši politika paskutinį kartą atnaujinta 2026 m. lapkričio 26 d. 1.2 versija pakeitė 1.1 versiją: 5 skyriuje dabar nurodyta, kad prieš debatams tampant viešiems jų viešas tekstas siunčiamas Claude Haiku 5.5 patikrinti ir kad tas pats modelis tikrina tai, kas pridedama prie viešo debato, ir pranešimus, pateiktus mygtuku Pranešti; jame aiškiai nurodyta, kad debatų pabaigos patikrai siunčiamas tik apibendrinimo tekstas; jo sąraše, ką Registras nurodo apie kiekvieną teikėją, įvardyta nauja patikra ir pranešimo patikra; Registre nauja patikra nurodyta prie Anthropic; 8 skyriuje dabar įvardyti keturi sprendimai, kuriuos mūsų automatinės patikros priima be žmogaus, ir ką galite daryti po kiekvieno iš jų; B.4 priedas ir B.6 priedas atitinkamai pakeisti. 1.1 versija pakeitė 1.0 versiją: 5 skyriuje dabar nurodyta, kad DeepInfra savo serveriuose paleidžia kiekvieną modelį, kurį debatai gauna per ją, o santrauka ir 4 skyrius atitinkamai pakeisti." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "d0291260765a73f6cf03e9eba5dd37bcc49822b64b8bbaeede2ea0c7b3ed56dd",
-  eyebrow: "PRIVATUMO POLITIKA · v1.2 · ĮSIGALIOJA 2026 M. LAPKRIČIO 25 D.",
+  sha256: "5e5811a0f9dae7d1297eb4f5183551d779ca6c5fa2f6832db447d623fcf05eaa",
+  eyebrow: "PRIVATUMO POLITIKA · v1.2 · ĮSIGALIOJA 2026 M. LAPKRIČIO 26 D.",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",
   endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v1.2",

@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Når vi ændrer denne politik, offentliggør vi den nye version med en oversigt over ændringerne og en ny ikrafttrædelsesdato og beholder de tidligere versioner på dezbatere.ro/privacy/versions. Ved en ændring, der tilføjer et nyt formål eller en ny modtager, underretter vi dig via e-mail og i produktet, før den nye behandling begynder, og giver dig tid til at gøre indsigelse. Hvor et nyt formål afhænger af dit samtykke — eksempelvis hvis vi nogensinde ønskede at bruge indhold til at forbedre modeller — beder vi særskilt og specifikt om dette samtykke; vi behandler aldrig accept af opdaterede Vilkår som samtykke til ny behandling. Ved præciseringer, der ikke ændrer noget ved det, vi gør, offentliggør vi blot den nye version." },
-      { kind: "p", text: "Denne politik blev senest opdateret den 25. november 2026. Version 1.2 erstattede version 1.1: afsnit 5 angiver nu, at en debats offentlige tekst, før debatten bliver offentlig, sendes til Claude Haiku 5.5 for at blive kontrolleret, og at den samme model kontrollerer det, der føjes til en offentlig debat, og de anmeldelser, der sendes med knappen Anmeld; det gør det klart, at kun synteseteksten sendes til kontrollen ved debattens afslutning; dets liste over, hvad Registret angiver for hver udbyder, nævner den nye kontrol og kontrollen af en anmeldelse; Registret angiver den nye kontrol for Anthropic; afsnit 8 nævner nu de fire afgørelser, som vores automatiske kontroller træffer, uden at en person er involveret, og hvad du kan gøre efter hver af dem; bilag B.4 og bilag B.6 er ændret tilsvarende. Version 1.1 erstattede version 1.0: afsnit 5 angiver nu, at DeepInfra kører alle de modeller, som en debat får via DeepInfra, på egne servere, og resuméet og afsnit 4 er ændret tilsvarende." }
+      { kind: "p", text: "Denne politik blev senest opdateret den 26. november 2026. Version 1.2 erstattede version 1.1: afsnit 5 angiver nu, at en debats offentlige tekst, før debatten bliver offentlig, sendes til Claude Haiku 5.5 for at blive kontrolleret, og at den samme model kontrollerer det, der føjes til en offentlig debat, og de anmeldelser, der sendes med knappen Anmeld; det gør det klart, at kun synteseteksten sendes til kontrollen ved debattens afslutning; dets liste over, hvad Registret angiver for hver udbyder, nævner den nye kontrol og kontrollen af en anmeldelse; Registret angiver den nye kontrol for Anthropic; afsnit 8 nævner nu de fire afgørelser, som vores automatiske kontroller træffer, uden at en person er involveret, og hvad du kan gøre efter hver af dem; bilag B.4 og bilag B.6 er ændret tilsvarende. Version 1.1 erstattede version 1.0: afsnit 5 angiver nu, at DeepInfra kører alle de modeller, som en debat får via DeepInfra, på egne servere, og resuméet og afsnit 4 er ændret tilsvarende." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "31230d5d31ba7035d8b20a9f33f9c4c64dc0dd8a712b2849d3fe4d4d9280ef1a",
-  eyebrow: "PRIVATLIVSPOLITIK · v1.2 · GÆLDENDE FRA 25. NOVEMBER 2026",
+  sha256: "2ee66a80243ad53edd58f9ae30c7341c16fc1482a95b92ff9af074c4d98ef3af",
+  eyebrow: "PRIVATLIVSPOLITIK · v1.2 · GÆLDENDE FRA 26. NOVEMBER 2026",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",
   endMarker: "SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v1.2",

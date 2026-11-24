@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: INFORMATIVA SULLA PRIVACY · v1.2 · IN VIGORE DAL 25 NOVEMBRE 2026
+eyebrow: INFORMATIVA SULLA PRIVACY · v1.2 · IN VIGORE DAL 26 NOVEMBRE 2026
 title: Cosa conserviamo e perché
 lede: I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.
 endMarker: FINE DELL'INFORMATIVA · GDPR (EU) 2016/679 · v1.2
@@ -19,7 +19,7 @@ jumps:
 13 COOKIE
 -->
 
-**Version 1.2 · Effective 25 novembre 2026 · Versioni precedenti su dezbatere.ro/privacy/versions · Titolare del trattamento: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 26 novembre 2026 · Versioni precedenti su dezbatere.ro/privacy/versions · Titolare del trattamento: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Raccogliamo ciò che serve a un account e ciò che digiti nei tuoi dibattiti. Ciò che scrivi all’assistente di supporto viene inviato al suo modello di IA perché possa risponderti, e noi non ne conserviamo nulla. Le tue domande vengono inviate ai fornitori di IA elencati nel nostro Registro, principalmente DeepInfra, negli Stati Uniti. Le condizioni di DeepInfra, Anthropic e Amazon non consentono loro di addestrare modelli su ciò che scrivi. Il fornitore di ricerca sul web riceve solo le brevi frasi di ricerca formulate dai modelli (sezione 5). Il nostro fornitore di hosting conserva il tuo account e i tuoi dibattiti a Londra, nel Regno Unito; la sezione 5 spiega dove altro vanno i tuoi dati. Nel piano Gratuito i dibattiti sono pubblici una volta conclusi, dopo la verifica dell’IA; nei piani a pagamento sono privati, salvo che tu li pubblichi. La cancellazione dell’account distrugge le chiavi dei tuoi dati privati nel servizio attivo, ma non cancella i nostri backup, e alcuni di essi contengono tali chiavi (sezione 7); i dibattiti pubblici restano pubblici e il tuo pseudonimo viene rimosso da essi. Puoi contattarci all'indirizzo privacy@dezbatere.ro e le persone nominate in un dibattito possono scriverci senza avere un account.
 
@@ -265,7 +265,7 @@ Per rifiutare questi elementi, blocca o elimina i cookie e i dati di questo sito
 
 Quando modifichiamo la presente informativa, pubblichiamo la nuova versione insieme a una sintesi delle modifiche e a una nuova data di entrata in vigore e conserviamo le versioni precedenti su dezbatere.ro/privacy/versions. Per una modifica che aggiunga una nuova finalità o un nuovo destinatario, ti informiamo per email e all'interno del prodotto prima dell'inizio del nuovo trattamento e ti concediamo il tempo necessario per opporti. Laddove una nuova finalità dipenda dal tuo consenso — ad esempio, se in futuro volessimo utilizzare i contenuti per migliorare i modelli — chiediamo tale consenso separatamente e in modo specifico; non consideriamo mai l'accettazione di Condizioni aggiornate come consenso a un nuovo trattamento. Per chiarimenti che non modificano in alcun modo le nostre attività, ci limitiamo a pubblicare la nuova versione.
 
-La presente informativa è stata aggiornata da ultimo il 25 novembre 2026. La versione 1.2 ha sostituito la versione 1.1: la sezione 5 indica ora che, prima che un dibattito diventi pubblico, il suo testo pubblico viene inviato a Claude Haiku 5.5 per essere verificato, e che lo stesso modello verifica ciò che viene aggiunto a un dibattito pubblico e le segnalazioni fatte con il pulsante Segnala; chiarisce che per la verifica di fine dibattito viene inviato solo il testo della sintesi; il suo elenco di ciò che il Registro indica per ciascun fornitore menziona la nuova verifica e la verifica di una segnalazione; il Registro elenca la nuova verifica per Anthropic; la sezione 8 indica ora le quattro decisioni che le nostre verifiche automatiche prendono senza alcuna persona, e che cosa puoi fare dopo ciascuna; l'Allegato B.4 e l'Allegato B.6 sono stati modificati di conseguenza. La versione 1.1 ha sostituito la versione 1.0: la sezione 5 indica ora che DeepInfra esegue sui propri server ogni modello fornito a un dibattito tramite DeepInfra, e il riepilogo iniziale e la sezione 4 sono stati modificati di conseguenza.
+La presente informativa è stata aggiornata da ultimo il 26 novembre 2026. La versione 1.2 ha sostituito la versione 1.1: la sezione 5 indica ora che, prima che un dibattito diventi pubblico, il suo testo pubblico viene inviato a Claude Haiku 5.5 per essere verificato, e che lo stesso modello verifica ciò che viene aggiunto a un dibattito pubblico e le segnalazioni fatte con il pulsante Segnala; chiarisce che per la verifica di fine dibattito viene inviato solo il testo della sintesi; il suo elenco di ciò che il Registro indica per ciascun fornitore menziona la nuova verifica e la verifica di una segnalazione; il Registro elenca la nuova verifica per Anthropic; la sezione 8 indica ora le quattro decisioni che le nostre verifiche automatiche prendono senza alcuna persona, e che cosa puoi fare dopo ciascuna; l'Allegato B.4 e l'Allegato B.6 sono stati modificati di conseguenza. La versione 1.1 ha sostituito la versione 1.0: la sezione 5 indica ora che DeepInfra esegue sui propri server ogni modello fornito a un dibattito tramite DeepInfra, e il riepilogo iniziale e la sezione 4 sono stati modificati di conseguenza.
 
 ## Annex B — Condizioni regionali sulla privacy
 

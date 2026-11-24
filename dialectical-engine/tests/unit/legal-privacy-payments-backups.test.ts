@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
-import { legalText } from "../support/legalText.js";
+import { legalEnglishTranslatedFrom, legalText } from "../support/legalText.js";
 
 /**
  * What the Privacy Policy says about payments, the consent record, the backups and unfinished sign-ups: what NETOPIA
@@ -12,6 +12,8 @@ import { legalText } from "../support/legalText.js";
  */
 
 const draft = (code: string): string => legalText("PRIVACY", code);
+/** The English text a language is held to: English itself, or the English text the translations were made from. */
+const englishFor = (code: string): string => (code === "en" ? draft("en") : legalEnglishTranslatedFrom("PRIVACY"));
 
 const section = (text: string, no: number): string => {
   const body = new RegExp(`^## ${no}\\.[^\\n]*\\n([\\s\\S]*?)^## `, "mu").exec(text)?.[1];
@@ -88,7 +90,7 @@ describe("Privacy Policy: NETOPIA, the consent record, the backups, unfinished s
     expect(recipients, `${code}: one paragraph of section 5 names NETOPIA`).toHaveLength(1);
     expect(recipients[0]!.split("NETOPIA Financial Services S.A.").length - 1, `${code}: the company, once`).toBe(1);
     const retention = rows(section(text, 7));
-    expect(retention, `${code}: section 7 rows`).toHaveLength(rows(section(draft("en"), 7)).length);
+    expect(retention, `${code}: section 7 rows`).toHaveLength(rows(section(englishFor(code), 7)).length);
     for (const row of retention) expect(cells(row), `${code}: ${row.slice(0, 40)}`).toHaveLength(3);
     // Two rows keep something 24 hours (the email links and the unfinished sign-up), and the acceptance records keep
     // their 6 years. The translations not offered yet write some numbers in words, so this counts rows, not places.
@@ -122,7 +124,7 @@ describe("Privacy Policy: NETOPIA, the consent record, the backups, unfinished s
       expect(recipients.split(token), `${code}: ${token} once`).toHaveLength(2);
     }
     expect(recipients.match(/OVHcloud/gu), `${code}: OVHcloud for the hosting and for its backups`).toHaveLength(2);
-    expect(text.split("Art. ").length, `${code}: as many Art. references as English`).toBe(draft("en").split("Art. ").length);
+    expect(text.split("Art. ").length, `${code}: as many Art. references as English`).toBe(englishFor(code).split("Art. ").length);
     expect(section(text, 9), `${code}: section 9 names HTTPS`).toMatch(/HTTPS[\s\S]*TLS/u);
     expect(section(text, 13), `${code}: section 13 names the two companies`).toMatch(/NETOPIA[^\n]*Cloudflare/u);
   });

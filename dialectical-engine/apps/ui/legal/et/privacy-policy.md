@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: PRIVAATSUSPOLIITIKA · v1.2 · KEHTIB ALATES 25. NOVEMBRIST 2026
+eyebrow: PRIVAATSUSPOLIITIKA · v1.2 · KEHTIB ALATES 26. NOVEMBRIST 2026
 title: Mida ja miks me talletame
 lede: Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.
 endMarker: POLIITIKA LÕPP · GDPR (EU) 2016/679 · v1.2
@@ -19,7 +19,7 @@ jumps:
 13 KÜPSISED
 -->
 
-**Version 1.2 · Effective 25. november 2026 · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 26. november 2026 · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Kogume seda, mida konto vajab, ja seda, mida sisestate oma väitlustesse. Seda, mida kirjutate kasutajatoe assistendile, saadetakse selle tehisintellekti mudelile, et see saaks teile vastata, ning me ei säilita sellest midagi. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele, peamiselt pakkujale DeepInfra Ameerika Ühendriikides. Pakkujate DeepInfra, Anthropic ja Amazon tingimused ei luba neil mudeleid teie kirjutatu põhjal treenida. Veebiotsingu pakkuja saab ainult lühikesed otsingufraasid, mille mudelid kirjutavad (jaotis 5). Meie majutusteenuse pakkuja säilitab teie konto ja väitlused Londonis Ühendkuningriigis; jaotises 5 on öeldud, kuhu mujale teie andmed jõuavad. Tasuta paketi korral on väitlused pärast lõpetamist avalikud, pärast tehisintellekti kontrolli; tasulise paketi korral on need privaatsed, kui te neid ei avalda. Konto kustutamine hävitab teie privaatsete andmete võtmed töötavas teenuses, kuid see ei kustuta meie varukoopiaid ja mõned neist sisaldavad neid võtmeid (jaotis 7); avalikud väitlused jäävad avalikuks ning teie pseudonüüm eemaldatakse neist. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad meiega ühendust võtta ilma kontota.
 
@@ -265,7 +265,7 @@ Nende üksuste keelamiseks blokeerige või kustutage selle saidi küpsised ja sa
 
 Kui muudame seda poliitikat, avaldame uue versiooni koos muudatuste kokkuvõtte ja uue jõustumiskuupäevaga ning säilitame varasemad versioonid aadressil dezbatere.ro/privacy/versions. Uue eesmärgi või vastuvõtja lisamisel teavitame teid enne uue töötlemise algust e-posti teel ja tootes ning anname teile aega vastuväite esitamiseks. Kui uus eesmärk sõltub teie nõusolekust — näiteks kui sooviksime kunagi kasutada sisu mudelite täiustamiseks — küsime selleks eraldi ja konkreetset nõusolekut; me ei käsita uuendatud Tingimustega nõustumist kunagi nõusolekuna uueks töötlemiseks. Selgituste korral, mis ei muuda meie tegevust, avaldame lihtsalt uue versiooni.
 
-Selle poliitika viimase ajakohastamise kuupäev: 25. november 2026. Versioon 1.2 asendas versiooni 1.1: jaotises 5 on nüüd öeldud, et enne kui väitlus muutub avalikuks, saadetakse selle avalik tekst kontrollimiseks mudelile Claude Haiku 5.5 ning et sama mudel kontrollib seda, mida avalikule väitlusele lisatakse, ja Teatage-nupuga tehtud teateid; see teeb selgeks, et väitluse lõpus tehtava kontrolli jaoks saadetakse ainult sünteesi tekst; selle loetelu sellest, mida register iga pakkuja kohta märgib, nimetab uut kontrolli ja teate kontrolli; register nimetab uut kontrolli ettevõtte Anthropic juures; jaotis 8 nimetab nüüd neli otsust, mida meie automaatsed kontrollid ilma inimeseta teevad, ja seda, mida saate pärast igaüht neist teha; lisa B.4 ja lisa B.6 muudeti vastavalt. Versioon 1.1 asendas versiooni 1.0: jaotises 5 on nüüd öeldud, et DeepInfra käitab oma serverites iga mudelit, mis väitlusele selle kaudu antakse, ning kokkuvõtet ja jaotist 4 muudeti vastavalt.
+Selle poliitika viimase ajakohastamise kuupäev: 26. november 2026. Versioon 1.2 asendas versiooni 1.1: jaotises 5 on nüüd öeldud, et enne kui väitlus muutub avalikuks, saadetakse selle avalik tekst kontrollimiseks mudelile Claude Haiku 5.5 ning et sama mudel kontrollib seda, mida avalikule väitlusele lisatakse, ja Teatage-nupuga tehtud teateid; see teeb selgeks, et väitluse lõpus tehtava kontrolli jaoks saadetakse ainult sünteesi tekst; selle loetelu sellest, mida register iga pakkuja kohta märgib, nimetab uut kontrolli ja teate kontrolli; register nimetab uut kontrolli ettevõtte Anthropic juures; jaotis 8 nimetab nüüd neli otsust, mida meie automaatsed kontrollid ilma inimeseta teevad, ja seda, mida saate pärast igaüht neist teha; lisa B.4 ja lisa B.6 muudeti vastavalt. Versioon 1.1 asendas versiooni 1.0: jaotises 5 on nüüd öeldud, et DeepInfra käitab oma serverites iga mudelit, mis väitlusele selle kaudu antakse, ning kokkuvõtet ja jaotist 4 muudeti vastavalt.
 
 ## Annex B — Piirkondlikud privaatsustingimused
 

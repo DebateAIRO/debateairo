@@ -1149,25 +1149,30 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(prose).toContain('that answer is recorded in the note before SB1');
     expect(prose).toContain('after an upload, do not re-date the version that upload carried');
     // A released document keeps its day and the other takes the new one; the command never refuses for that alone.
-    expect(prose).toContain('the command leaves it at the day it has, and prints `<document> <version>: in the release the site runs (tests/n1-baseline.json), so it keeps its day, <day>`');
+    expect(prose).toContain('the command leaves it at the day it has, and prints `<document>: released, keeps <day>`');
     expect(prose).toContain('a day when both documents are released and carry another day');
     expect(prose).not.toContain('Nothing else checks the day');
     // The day given is a document's own day: nothing changes, and the command prints that day twice, released or not.
-    expect(prose).toContain('A document that already carries the day given changes nothing, and the command prints `<document>: from <day> to <day>; translations recorded again: none` for it, the same day twice; it does so for a released document too, and then does not print the line above.');
+    expect(prose).toContain('A document that already carries the day given changes nothing, released or not, and the command prints `<document>: from <day> to <day>; translations recorded again: none` for it, the same day twice.');
+    expect(prose).toContain('When no document changes, it prints `no text to re-date to <day>: nothing to change` and still runs `legal:release-check`.');
     // Every refusal the command makes before it writes anything.
     expect(prose).toContain('an English version line it cannot read (`**Version N.M · Effective <day> <Month> <year> · …`)');
     expect(prose).toContain('a `tests/n1-baseline.json` that names no commit');
     expect(prose).toContain('a clone that does not hold the commit `tests/n1-baseline.json` names (fetch it first)');
-    // The main-site runbook reads the day by the same rule.
-    expect(prose).toContain('The main-site runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`) follows the same per-document rule.');
+    expect(prose).toContain('any change while a translation of either document, in a language the release offers, follows an older English text');
+    // The main-site runbook still asks for the upload day in both texts, and the guide says so.
+    expect(prose).toContain('The main-site runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`, 1.8 step 3 and 2.1 step 1) still asks for the upload day in both English texts: it does not follow this rule yet.');
+    expect(read('deploy/preview-auth-dev/v1/MAIN-SITE.md')).toContain('It must print the same line twice, `Effective <the upload day>`');
     expect(prose).not.toContain('it is not changed here');
     // What else reads the day: no check on the side-by-side path; PRECHECK on the drained path, by the same rule.
     expect(prose).toContain('`legal:release-check` does not: it passes with any day the command accepts. On the side-by-side path nothing else does either, so this step is the check.');
     expect(prose).toContain('On the drained path PRECHECK reads both English texts of the new release by the same rule');
     // The words the guide quotes are the ones the command prints.
     const redate = read('apps/ui/scripts/legal-redate.mjs');
-    expect(redate).toContain(': in the release the site runs (tests/n1-baseline.json), so it keeps its day, ');
+    expect(redate).toContain('`${name}: released, keeps ${before}\\n`');
     expect(redate).toContain('; translations recorded again: ');
+    expect(redate).toContain('`no text to re-date to ${day}: nothing to change\\n`');
+    expect(redate).toContain('follows an older English text: translate it and record it (generate-legal-data.mjs --translated) first');
     expect(redate).toContain('the English version line gives no version and day in the form `Version N.M · Effective <day> <Month> <year>`');
     expect(redate).toContain('tests/n1-baseline.json names no commit');
     const scripts = (JSON.parse(read('package.json')) as { scripts: Record<string, string> }).scripts;

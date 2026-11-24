@@ -75,12 +75,19 @@ describe("sign-in methods, in the English legal texts", () => {
     for (const text of [terms, privacy]) expect(text).not.toContain("Facebook");
   });
 
-  it("the change histories since launch (both texts' 1.1, the Privacy Policy's 1.2) are not about signing in: both texts said how you sign in at launch", () => {
-    for (const [text, history] of [[terms, ["Version 1.1 replaced"]], [privacy, ["Version 1.2 replaced", "Version 1.1 replaced"]]] as const) {
-      expect([...text.matchAll(/(Version|version) \d+\.\d+ replaced/gu)].map((match) => match[0])).toEqual(history);
-      const summary = text.slice(text.indexOf(history[0]));
+  it("no change history says that signing in changed: both texts said how you sign in at launch", () => {
+    const history = (text: string): string[] => [...text.matchAll(/(Version|version) \d+\.\d+ replaced/gu)].map((match) => match[0]);
+    expect(history(terms)).toEqual(["Version 1.1 replaced"]);
+    expect(history(privacy)).toEqual(["Version 1.2 replaced", "Version 1.1 replaced"]);
+    // 1.1's summary is about DeepInfra, and says nothing of signing in.
+    for (const text of [terms, privacy]) {
+      const summary = text.slice(text.indexOf("Version 1.1 replaced"));
       expect(summary.slice(0, summary.indexOf("\n"))).not.toMatch(/sign in|sign-in|passkey|phone/iu);
     }
+    // 1.2's summary is about asking for help getting back into an account, not about how you sign in.
+    const twelve = privacy.slice(privacy.indexOf("Version 1.2 replaced"), privacy.indexOf("Version 1.1 replaced"));
+    expect(twelve).toContain("ask for help getting back into your account");
+    expect(twelve).not.toMatch(/sign in|phone/iu);
   });
 
   it("says the recovery email address is optional, and that Settings shows the whole phone number only after you confirm it is you", () => {

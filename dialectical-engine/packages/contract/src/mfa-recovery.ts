@@ -36,6 +36,24 @@ export const mfaRecoveryEndpointContracts = endpoints([
   ["POST /v1/auth/mfa-recovery/finish/status", link, MfaRecoveryFinishStatusSchema, 200],
   ["POST /v1/auth/mfa-recovery/finish", MfaRecoveryFinishRequestSchema, result("completed"), 200]
 ]);
+/**
+ * The Owner's permit for a locked-out account (migration 0188): a person with no passkey, no authenticator app and no
+ * saved code asks for help. `start` answers the same for every address. `request` takes the emailed link and the account
+ * password and, when both are right, puts the ask before the Owner. `finish`, 72 hours after an approval, takes the
+ * emailed finish link and the password and answers /recover's own enrol-only capability.
+ */
+export const RecoveryPermitStartRequestSchema = z.object({ email: z.string().min(1).max(320), turnstile_token: TurnstileTokenSchema.optional() }).strict();
+export const RecoveryPermitProofRequestSchema = z.object({ token: bearer, password: z.string().min(1).max(1024) }).strict();
+export const RecoveryPermitFinishStatusSchema = z.discriminatedUnion("status", [MfaRecoveryWaitingSchema, z.object({ status: z.literal("ready_to_finish"), expires_at: date }).strict()]);
+export const RecoveryPermitOpenedSchema = z.object({ status: z.literal("RECOVERY_ENROLL_ONLY"), available_methods: z.array(z.enum(["passkey", "totp"])).min(1).max(2),
+  totp_unavailable_reason: z.literal("PASSWORD_UNAVAILABLE").nullable(), recovery_capability: bearer, expires_at: z.iso.datetime() }).strict();
+export const recoveryPermitEndpointContracts = endpoints([
+  ["POST /v1/auth/recovery-permit/start", RecoveryPermitStartRequestSchema, generic, 202],
+  ["POST /v1/auth/recovery-permit/request", RecoveryPermitProofRequestSchema, result("requested"), 200],
+  ["POST /v1/auth/recovery-permit/cancel", link, result("cancelled"), 200],
+  ["POST /v1/auth/recovery-permit/finish/status", link, RecoveryPermitFinishStatusSchema, 200],
+  ["POST /v1/auth/recovery-permit/finish", RecoveryPermitProofRequestSchema, RecoveryPermitOpenedSchema, 200]
+]);
 export const backupEmailEndpointContracts = endpoints([
   ["GET /v1/account/backup-email", null, BackupEmailStateSchema, 200],
   ["POST /v1/account/backup-email/verify/start", BackupEmailVerificationRequestSchema, generic, 202],
@@ -62,7 +80,7 @@ function transport(fetcher: typeof fetch, base: string, prefix: string, csrf: ()
     try { value = await response.json(); } catch { throw new ContractHttpError("INVALID_RESPONSE", response.status, "Email recovery could not be confirmed."); }
     if (response.status !== expected) {
       const raw = typeof value === "object" && value !== null ? (value as { error?: unknown }).error : null;
-      const code = typeof raw === "string" && /^(?:MFA_RECOVERY|BACKUP_EMAIL)_[A-Z_]{1,80}$/.test(raw) ? raw : null;
+      const code = typeof raw === "string" && /^(?:MFA_RECOVERY|BACKUP_EMAIL|RECOVERY_PERMIT)_[A-Z_]{1,80}$/.test(raw) ? raw : null;
       throw new ContractHttpError(response.status === 429 ? "RATE_LIMITED" : response.status === 403 ? "FORBIDDEN" : response.status >= 500 ? "SERVER_FAILURE" : "UNPROCESSABLE", response.status, "Email recovery was not accepted.", code);
     }
     const parsed = schema.safeParse(value); if (!parsed.success) throw new ContractHttpError("INVALID_RESPONSE", response.status, "Email recovery could not be confirmed.");
@@ -77,9 +95,24 @@ export function createBackupEmailClient(fetcher: typeof fetch = fetch, base = "/
   const request = transport(fetcher, base, "/v1/account/backup-email", csrf, "x-csrf-token");
   return { status: () => request("", BackupEmailStateSchema), startVerification: (password: string, code: string) => request("/verify/start", generic, { password, code }, true, 202), confirm: (token: string) => request("/verify/confirm", result("verified"), { token }, false) };
 }
+/** The person's side of the Owner's permit. No cookie and no CSRF pair: every call carries its own emailed link. */
+export function createRecoveryPermitClient(fetcher: typeof fetch = fetch, base = "/api") {
+  const request = transport(fetcher, base, "/v1/auth/recovery-permit/", () => undefined, "x-recovery-permit-unused");
+  return {
+    start: (email: string, turnstileToken?: string) => request("start", generic, { email, ...(turnstileToken === undefined ? {} : { turnstile_token: turnstileToken }) }, false, 202),
+    request: (token: string, password: string) => request("request", result("requested"), { token, password }, false),
+    cancel: (token: string) => request("cancel", result("cancelled"), { token }, false),
+    finishStatus: (token: string) => request("finish/status", RecoveryPermitFinishStatusSchema, { token }, false),
+    finish: (token: string, password: string) => request("finish", RecoveryPermitOpenedSchema, { token, password }, false)
+  };
+}
+export type RecoveryPermitClient = ReturnType<typeof createRecoveryPermitClient>;
+export type RecoveryPermitFinishStatus = z.infer<typeof RecoveryPermitFinishStatusSchema>;
+export type RecoveryPermitOpened = z.infer<typeof RecoveryPermitOpenedSchema>;
 export type MfaRecoveryState = z.infer<typeof MfaRecoveryStateSchema>;
 export type MfaRecoveryFinishStatus = z.infer<typeof MfaRecoveryFinishStatusSchema>;
 export type MfaRecoveryClient = ReturnType<typeof createMfaRecoveryClient>;
 export type BackupEmailClient = ReturnType<typeof createBackupEmailClient>;
 
 export const mfaRecoveryContractSchemas=Object.freeze({MfaRecoveryStartRequestSchema,MfaRecoveryExchangeRequestSchema,MfaRecoveryStateSchema,MfaRecoveryExchangeSchema,MfaRecoveryWaitingSchema,MfaRecoveryFinishStatusSchema,MfaRecoveryFinishRequestSchema,MfaRecoveryFactorSchema,MfaRecoveryCodesSchema,BackupEmailStateSchema,BackupEmailVerificationRequestSchema});
+export const recoveryPermitContractSchemas=Object.freeze({RecoveryPermitStartRequestSchema,RecoveryPermitProofRequestSchema,RecoveryPermitFinishStatusSchema,RecoveryPermitOpenedSchema});

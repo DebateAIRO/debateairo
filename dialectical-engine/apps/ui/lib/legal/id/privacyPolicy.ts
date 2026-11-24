@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Ketika mengubah kebijakan ini, kami menerbitkan versi baru beserta ringkasan perubahan dan tanggal berlaku baru, serta menyimpan versi sebelumnya di dezbatere.ro/privacy/versions. Untuk perubahan yang menambahkan tujuan atau penerima baru, kami memberi tahu Anda sebelum pemrosesan baru dimulai, melalui email dan di dalam produk, serta memberi waktu untuk mengajukan keberatan. Jika tujuan baru bergantung pada persetujuan Anda — misalnya jika kami suatu saat ingin menggunakan konten untuk meningkatkan model — kami meminta persetujuan tersebut secara terpisah dan spesifik; kami tidak pernah menganggap penerimaan Ketentuan yang diperbarui sebagai persetujuan atas pemrosesan baru. Untuk klarifikasi yang tidak mengubah apa pun tentang tindakan kami, kami hanya menerbitkan versi baru." },
-      { kind: "p", text: "Kebijakan ini terakhir diperbarui pada 25 November 2026. Versi 1.2 menggantikan versi 1.1: bagian 5 kini menyatakan bahwa, sebelum debat menjadi publik, teks publiknya dikirim kepada Claude Haiku 5.5 untuk diperiksa, dan bahwa model yang sama memeriksa apa yang ditambahkan ke debat publik serta laporan yang dibuat dengan tombol Laporkan; bagian itu menegaskan bahwa hanya teks sintesis yang dikirim untuk pemeriksaan akhir debat; daftarnya tentang apa yang dicantumkan Daftar untuk setiap penyedia menyebutkan pemeriksaan baru dan pemeriksaan laporan; Daftar mencantumkan pemeriksaan baru untuk Anthropic; bagian 8 kini menyebutkan empat keputusan yang dibuat pemeriksaan otomatis kami tanpa melibatkan seseorang, dan apa yang dapat Anda lakukan setelah masing-masing; Lampiran B.4 dan Lampiran B.6 diubah agar sesuai. Versi 1.1 menggantikan versi 1.0: bagian 5 kini menyatakan bahwa DeepInfra menjalankan di servernya sendiri setiap model yang dipakai suatu debat melalui DeepInfra, dan ringkasan serta bagian 4 diubah agar sesuai." }
+      { kind: "p", text: "Kebijakan ini terakhir diperbarui pada 26 November 2026. Versi 1.2 menggantikan versi 1.1: bagian 5 kini menyatakan bahwa, sebelum debat menjadi publik, teks publiknya dikirim kepada Claude Haiku 5.5 untuk diperiksa, dan bahwa model yang sama memeriksa apa yang ditambahkan ke debat publik serta laporan yang dibuat dengan tombol Laporkan; bagian itu menegaskan bahwa hanya teks sintesis yang dikirim untuk pemeriksaan akhir debat; daftarnya tentang apa yang dicantumkan Daftar untuk setiap penyedia menyebutkan pemeriksaan baru dan pemeriksaan laporan; Daftar mencantumkan pemeriksaan baru untuk Anthropic; bagian 8 kini menyebutkan empat keputusan yang dibuat pemeriksaan otomatis kami tanpa melibatkan seseorang, dan apa yang dapat Anda lakukan setelah masing-masing; Lampiran B.4 dan Lampiran B.6 diubah agar sesuai. Versi 1.1 menggantikan versi 1.0: bagian 5 kini menyatakan bahwa DeepInfra menjalankan di servernya sendiri setiap model yang dipakai suatu debat melalui DeepInfra, dan ringkasan serta bagian 4 diubah agar sesuai." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "8dc602bedb642802790e723797e79ad683e8f7fc879e3aded5bb825a98b2b9e1",
-  eyebrow: "KEBIJAKAN PRIVASI · v1.2 · BERLAKU 25 NOVEMBER 2026",
+  sha256: "40f334a95a0714359f43406140e75d2217aa74f96a2b6693bf7c2b75ee984fd3",
+  eyebrow: "KEBIJAKAN PRIVASI · v1.2 · BERLAKU 26 NOVEMBER 2026",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",
   endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v1.2",

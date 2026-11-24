@@ -432,7 +432,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kada izmijenimo ova pravila, objavljujemo novu verziju sa sažetkom izmjena i novim datumom stupanja na snagu te čuvamo prethodne verzije na dezbatere.ro/privacy/versions. Za izmjenu kojom se dodaje nova svrha ili novi primatelj obavještavamo vas prije početka nove obrade, e-poštom i u proizvodu, te vam dajemo vrijeme za prigovor. Ako nova svrha ovisi o vašoj privoli — primjerice ako ikada poželimo upotrebljavati sadržaj za poboljšavanje modela — tu privolu tražimo zasebno i određeno; prihvaćanje ažuriranih Uvjeta nikada ne smatramo privolom za novu obradu. Za pojašnjenja koja ništa ne mijenjaju u vezi s našim postupanjem jednostavno objavljujemo novu verziju." },
-      { kind: "p", text: "Ova su pravila posljednji put ažurirana 25. studenoga 2026. Verzija 1.2 zamijenila je verziju 1.1: odjeljak 5. sada navodi da se, prije nego što rasprava postane javna, njezin javni tekst šalje modelu Claude Haiku 5.5 na provjeru te da isti model provjerava ono što se dodaje javnoj raspravi i prijave podnesene gumbom Prijavite; pojašnjava da se za provjeru na kraju rasprave šalje samo tekst sinteze; njegov popis onoga što Registar navodi za svakog pružatelja navodi novu provjeru i provjeru prijave; Registar navodi novu provjeru za Anthropic; odjeljak 8. sada navodi četiri odluke koje naše automatske provjere donose bez sudjelovanja osobe i što možete učiniti nakon svake od njih; Prilog B.4 i Prilog B.6 izmijenjeni su u skladu s time. Verzija 1.1 zamijenila je verziju 1.0: odjeljak 5. sada navodi da DeepInfra na vlastitim poslužiteljima izvodi svaki model koji se raspravi pruža njezinim posredstvom, a sažetak i odjeljak 4. izmijenjeni su u skladu s time." }
+      { kind: "p", text: "Ova su pravila posljednji put ažurirana 26. studenoga 2026. Verzija 1.2 zamijenila je verziju 1.1: odjeljak 5. sada navodi da se, prije nego što rasprava postane javna, njezin javni tekst šalje modelu Claude Haiku 5.5 na provjeru te da isti model provjerava ono što se dodaje javnoj raspravi i prijave podnesene gumbom Prijavite; pojašnjava da se za provjeru na kraju rasprave šalje samo tekst sinteze; njegov popis onoga što Registar navodi za svakog pružatelja navodi novu provjeru i provjeru prijave; Registar navodi novu provjeru za Anthropic; odjeljak 8. sada navodi četiri odluke koje naše automatske provjere donose bez sudjelovanja osobe i što možete učiniti nakon svake od njih; Prilog B.4 i Prilog B.6 izmijenjeni su u skladu s time. Verzija 1.1 zamijenila je verziju 1.0: odjeljak 5. sada navodi da DeepInfra na vlastitim poslužiteljima izvodi svaki model koji se raspravi pruža njezinim posredstvom, a sažetak i odjeljak 4. izmijenjeni su u skladu s time." }
     ]
   },
   {
@@ -497,8 +497,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "d70b49b26a7a2b3b90aa99c629e53e461f4625350d9ee1d44cadd615e6490508",
-  eyebrow: "PRAVILA O PRIVATNOSTI · v1.2 · NA SNAZI OD 25. STUDENOGA 2026.",
+  sha256: "7d3ef3610cb4cf3382c116757c744bb060099269d1cb663e052003b7ab4c219c",
+  eyebrow: "PRAVILA O PRIVATNOSTI · v1.2 · NA SNAZI OD 26. STUDENOGA 2026.",
   title: "Što pohranjujemo i zašto",
   lede: "Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.",
   endMarker: "KRAJ PRAVILA · GDPR (EU) 2016/679 · v1.2",
