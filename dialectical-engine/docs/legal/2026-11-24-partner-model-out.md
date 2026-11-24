@@ -95,7 +95,8 @@ is seated they are no longer true.
     longer receives anything).
 - **Not reviewed by counsel.** This reading of section 14 has not been reviewed by counsel.
 
-The owner's answer: OPEN (not yet given).
+The owner's answer, given on 24 November 2026: Terms 1.1 takes effect on the upload day, posted with its summary and
+without the email. The owner confirmed that day that all four accounts on the site are his own.
 
 ## The letter
 
