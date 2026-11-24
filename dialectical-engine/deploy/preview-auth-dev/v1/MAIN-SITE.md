@@ -3763,8 +3763,9 @@ payments are NETOPIA's sandbox.
 5. The box asks, for example: "Allow ste•••n.n•••our@example.com to buy test plans? Each test plan it buys must be
    withdrawn or cancelled within 14 days, before real payments." The shortened address keeps the start, the middle
    and the end of the part before the @, and the domain whole, so you can tell whose account it is
-   (stefan.nour@example.com reads `ste•••n.n•••our@example.com`). If it is not the person you mean, press **Cancel**.
-   Otherwise press **Confirm** and touch your key.
+   (stefan.nour@example.com reads `ste•••n.n•••our@example.com`). It never shows that part whole: a name of one or two
+   characters before the @ shows only the dots (`•••@example.com`), and one of three or four only its first character.
+   If it is not the person you mean, press **Cancel**. Otherwise press **Confirm** and touch your key.
 6. Expect "Done: this account can buy now.", and a new row: the shortened address and "allowed on <date>". The line
    above the rows counts the accounts that can buy, the team included. The security alert arrives at your alert
    address within a minute or two.

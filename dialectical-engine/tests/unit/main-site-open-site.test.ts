@@ -694,6 +694,10 @@ describe('the words of 6b', () => {
     expect(flat).toContain(`"${confirm}"`);
     expect(flat).toContain('stefan.nour@example.com reads `ste•••n.n•••our@example.com`');
     expect(maskedAddress('stefan.nour@example.com')).toBe('ste•••n.n•••our@example.com');
+    // A very short name never shows whole: the guide says what the API prints for one of two characters and of four.
+    expect(flat).toContain(`a name of one or two characters before the @ shows only the dots (\`${maskedAddress('ab@example.com')}\`)`);
+    expect(maskedAddress('anna@example.com')).toBe('a•••@example.com');
+    expect(flat).toContain('and one of three or four only its first character');
     // The page's sentences for an unreadable list, in part 10 and in 6b.
     const billing = JSON.parse(read('apps/ui/messages/en/billing.json')) as Record<string, string>;
     expect(flat).toContain(`the page says "${billing['billing.checkout.genericError']}"`);

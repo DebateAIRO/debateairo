@@ -43,16 +43,18 @@ const canonical = (body: unknown) => parseCanonicalRegisterJson(Buffer.from(JSON
 const DOTS = "•••";
 
 /**
- * The address as the Owner's list shows it: the part before the @ shortened, the domain in full. The local part is cut
- * into a first, a middle and a last piece of the same size, with three dots between them whatever is left out, so the
- * length never shows; each size leaves out at least two characters:
- *   long, 11 characters or more: pieces of 3 (stefan.nour@example.com reads ste•••n.n•••our@example.com);
- *   medium, 8 to 10: pieces of 2 (anabella@example.com reads an•••be•••la@example.com);
- *   short, 5 to 7: pieces of 1 (maria@example.com reads m•••i•••a@example.com);
- *   very short, 1 to 4: the first character and the dots (anna@example.com reads a•••@example.com).
- * Counting from 0, the middle piece starts half its size (rounded down) before character n/2 (rounded up) of a name of
- * n characters. Characters are code points, so an accented or non-Latin name is cut between characters, never inside
- * one. Null for anything that is not local@domain.
+ * The address as the Owner's list shows it, so the full address never leaves the server: the domain in full, and the name
+ * before the @ shortened so that it never shows whole and always leaves out at least two of its characters (all of a
+ * one-character name), while a longer name keeps enough for the Owner to recognise it:
+ *   1 or 2 characters: only the dots (ab@example.com reads •••@example.com);
+ *   3 or 4: the first character and the dots (anna@example.com reads a•••@example.com);
+ *   5 to 7: a first, a middle and a last piece of 1 (maria@example.com reads m•••i•••a@example.com);
+ *   8 to 10: pieces of 2 (anabella@example.com reads an•••be•••la@example.com);
+ *   11 or more: pieces of 3 (stefan.nour@example.com reads ste•••n.n•••our@example.com).
+ * Three dots stand between the pieces whatever they leave out, so the length never shows. Counting from 0, the middle
+ * piece starts half its size (rounded down) before character n/2 (rounded up) of a name of n characters. Characters are
+ * code points, so an accented or non-Latin name is counted and cut by character, never by byte. Null for anything that is
+ * not local@domain.
  */
 export function maskedAddress(address: string): string | null {
   const at = address.lastIndexOf("@");
@@ -60,6 +62,7 @@ export function maskedAddress(address: string): string | null {
   const local = Array.from(address.slice(0, at)), domain = address.slice(at + 1);
   if (/[\s@]/u.test(domain) || local.some((character) => /[\s@]/u.test(character))) return null;
   const length = local.length;
+  if (length <= 2) return `${DOTS}@${domain}`;
   if (length <= 4) return `${local[0]}${DOTS}@${domain}`;
   const size = length >= 11 ? 3 : length >= 8 ? 2 : 1;
   const middle = Math.ceil(length / 2) - Math.floor(size / 2);
