@@ -29,6 +29,11 @@ export type ConsumerCredential = Readonly<{
     passwordHash: string|null;
     securityEpoch: number;
 }>;
+/** One passkey a sign-in may name to the browser: its credential id and the transports it registered with. */
+export type ConsumerAllowCredential = Readonly<{
+    id: string;
+    transports: readonly string[];
+}>;
 export type ConsumerSessionCommit = Readonly<{
     userId: string;
     ownerRef: string;
@@ -182,6 +187,15 @@ export class PostgresConsumerAuthRepository {
     }
     async readChallenge(handleHash: string, purpose: 'ENROLLMENT' | 'LOGIN', bindingHash: string): Promise<ConsumerChallenge | null> {
         const result = await this.pool.query('SELECT identity.read_consumer_passkey_challenge($1,$2,$3) AS value', [handleHash, purpose, bindingHash]);
+        return result.rows[0].value;
+    }
+    /**
+     * The passkeys the account a sign-in challenge is bound to may answer it with: id and transports only, oldest first.
+     * A challenge is bound to an account only after the first step (email and password, or a provider) was proved, so a
+     * challenge begun without one reads none. The system login's alone (X36), as readCredential.
+     */
+    async readAllowCredentials(handleHash: string, bindingHash: string): Promise<readonly ConsumerAllowCredential[]> {
+        const result = await crossAccount("X36", () => this.pool.query('SELECT identity.read_consumer_passkey_allow_credentials($1,$2) AS value', [handleHash, bindingHash]));
         return result.rows[0].value;
     }
     /** A passkey's stored credential, before any session: the system login's alone (0171, X36), as the request's challenge is its own to begin. */
