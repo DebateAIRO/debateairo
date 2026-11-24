@@ -555,7 +555,8 @@ describe("practice line-up (addition D14-D16, D23)", () => {
     expect(added.rows.find((row) => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY)!.sourceRef).toBe(PRACTICE_LINE_UP_SOURCE_REF);
     // The row the throwaway version seals reads back, by the row's own reader, as the line-up tried.
     expect(practiceRowsLineUp(added.rows)).toEqual(TRIAL);
-    const live = parsePreviewLineUp({ free_model_ids: oldForm.free_model_ids, premium_model_ids: oldForm.premium_model_ids, thinking_levels: null });
+    // The export's own row, as this code seals one: the env's line-up without Qwen (no new version seats a partner-served model).
+    const live = parsePreviewLineUp({ free_model_ids: oldForm.free_model_ids, premium_model_ids: oldForm.premium_model_ids.filter((id) => id !== QWEN), thinking_levels: null });
     const replaced = practiceOverrideVersionRows(exportWith([alpha, previewLineUpPolicyRow(live, "kit")]), { shape: null, length: null, lineUp: TRIAL }, codeHashes);
     expect(replaced.lineUpRow).toBe("REPLACED");
     expect(replaced.rows.filter((row) => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY)).toHaveLength(1);

@@ -136,17 +136,22 @@ const savedRetentionRow = (lines: readonly string[]): string => sectionLine(line
 
 /**
  * The languages whose paragraph on Next is still its first translation: English, and each translation that
- * apps/ui/legal/translated-from.json does not record as translated from the current English text. A translation
- * brought up to date for a release was written again from the English, so its first two sentences are not pinned
- * here; `legal-documents-locale-complete` holds it to the English structure, and the release check
- * (`legal-english-first`) to the current English text.
+ * apps/ui/legal/translated-from.json does not record as translated from the current English text or from an English
+ * text released since launch (the archive keeps each one). A translation brought up to date for a release was written
+ * again from the English, so its first two sentences are not pinned here; `legal-documents-locale-complete` holds it
+ * to the English structure, and the release check (`legal-english-first`) to the current English text.
  */
 const englishNow = createHash("sha256").update(legalText("PRIVACY", "en"), "utf8").digest("hex");
 const translatedFrom = (JSON.parse(readFileSync(resolve(root, "apps/ui/legal/translated-from.json"), "utf8")) as {
   PRIVACY: Record<string, { version: string; sha256: string }>;
 }).PRIVACY;
+const releasedEnglish = new Set(Object.keys((JSON.parse(readFileSync(resolve(root, "packages/legal-manifest/src/manifest.json"), "utf8")) as {
+  archive: { PRIVACY?: Record<string, Record<string, unknown>> };
+}).archive.PRIVACY?.en ?? {}));
+const fromEnglishSinceLaunch = (code: string): boolean =>
+  translatedFrom[code]?.sha256 === englishNow || releasedEnglish.has(translatedFrom[code]?.sha256 ?? "");
 const FIRST_TRANSLATION = LOCALES.map(({ code }) => code)
-  .filter((code) => code === "en" || translatedFrom[code]?.sha256 !== englishNow);
+  .filter((code) => code === "en" || !fromEnglishSinceLaunch(code));
 
 const sha256Of = (text: string): string => createHash("sha256").update(text, "utf8").digest("hex");
 /** What stands between two sentences: nothing after the CJK full stop, else one space. */
@@ -175,10 +180,10 @@ describe("Privacy Policy: what happens when you press Next, and the questions no
     expect(Object.keys(SITE_UPDATE_CLAUSE).sort()).toEqual(LOCALES.map(({ code }) => code).sort());
   });
 
-  it("leaves out of the first-translation checks only the translations brought up to date from the current English", () => {
+  it("leaves out of the first-translation checks only the translations brought up to date from an English text released since launch", () => {
     const left = LOCALES.map(({ code }) => code).filter((code) => !FIRST_TRANSLATION.includes(code));
     expect([...left].sort()).toEqual(["fr", "ja", "ko", "ro"]);
-    for (const code of left) expect(translatedFrom[code]?.sha256, code).toBe(englishNow);
+    for (const code of left) expect(fromEnglishSinceLaunch(code), code).toBe(true);
   });
 
   it("English says the three approved rules: the tab keeps the words only, up to 20 questions, a key for each", () => {
@@ -254,14 +259,14 @@ describe("the Register names the two jobs before a debate starts", () => {
   });
 
   // Whichever companies the API's targets reach, the clarifying questions stand on exactly one row (Anthropic's, else
-  // the support chat's) and what to look into on DeepInfra's and Anthropic's rows, else the support chat's. The
-  // company DeepInfra forwards one model to (16 November 2026) is one of the AIs that suggest what to look into.
+  // the support chat's) and what to look into on DeepInfra's and Anthropic's rows, else the support chat's. No model
+  // DeepInfra forwards to a partner company is seated, so no such company suggests anything either.
   it.each([
     // Amazon Bedrock's model is a line-up model like DeepInfra's, so its row names the same job.
-    ["no answer from the API (the whole reviewed catalogue)", null, ["claude"], ["claude", "deepinfra", "deepinfra-partner", "amazon"]],
-    ["targets on Anthropic, DeepInfra and Amazon", ["anthropic", "deepinfra", "amazon"], ["claude"], ["claude", "deepinfra", "deepinfra-partner", "amazon"]],
-    ["targets on DeepInfra only", ["deepinfra"], ["support"], ["deepinfra", "deepinfra-partner", "support"]],
-    ["targets on Anthropic and DeepInfra", ["anthropic", "deepinfra"], ["claude"], ["claude", "deepinfra", "deepinfra-partner"]],
+    ["no answer from the API (the whole reviewed catalogue)", null, ["claude"], ["claude", "deepinfra", "amazon"]],
+    ["targets on Anthropic, DeepInfra and Amazon", ["anthropic", "deepinfra", "amazon"], ["claude"], ["claude", "deepinfra", "amazon"]],
+    ["targets on DeepInfra only", ["deepinfra"], ["support"], ["deepinfra", "support"]],
+    ["targets on Anthropic and DeepInfra", ["anthropic", "deepinfra"], ["claude"], ["claude", "deepinfra"]],
     ["a target on a host no catalogue row knows", ["host:api.acme.example"], ["support"], ["support"]]
   ] as const)("names the rows that do each job before a debate starts: %s", (_build, companies, clarifying, suggesting) => {
     const register = providerRegister(companies);

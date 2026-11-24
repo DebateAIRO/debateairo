@@ -1,11 +1,14 @@
-# Preview practice (all five AIs, before any upload)
+# Preview practice (every AI of the line-up, before any upload)
 
 ## What this is, in plain words
 
-The owner's rule: before ANY upload to the v3 preview, a practice with all five real AIs must pass:
-GLM-5.3-Flash, DeepSeek-V4.1-Flash, MiMo-V2.6-Pro and Qwen3.8-Flash (through the DeepInfra spending gate) and
-Claude Haiku 5.5 (through the Anthropic spending gate). Nothing is published, nothing reaches the site, and no
-person's question is used.
+The owner's rule: before ANY upload to the v3 preview, a practice with every real AI of the line-up must pass:
+GLM-5.3-Flash, DeepSeek-V4.1-Flash and MiMo-V2.6-Pro (through the DeepInfra spending gate) and Claude Haiku 5.5
+(through the Anthropic spending gate). Qwen3.8-Flash is no longer one of them: DeepInfra passes its requests to a
+partner company it does not name, so no settings version seats it (`deploy/preview-release/v1/README.md`, "Taking Qwen
+out of the live line-up"), and a practice line-up that names it is refused
+(`PRACTICE_LINE_UP_INVALID PREVIEW_LINE_UP_POLICY_INVALID:<list>:partner_served`). Nothing is published, nothing
+reaches the site, and no person's question is used.
 
 The practice runs on the operator's Mac, from the candidate code in a worktree. It keeps everything in a throwaway
 database that is deleted at the end. The only thing it shares with the live preview is the two spending gates on the
@@ -943,8 +946,8 @@ also-raised claims are sent whole (LG-C part 2, Task 15).
 
 ## Money and time (rough)
 
-- formats, default (5 models x 9 jobs x 2 samples): 90 jobs (the run's report gives what it spent). The models go at the same time, so
-  it takes about as long as the slowest model's 18 jobs: about 15 to 50 minutes (GLM, Qwen and MiMo take 30 to 170
+- formats, default (each model of the line-up x 9 jobs x 2 samples: 18 jobs a model; the run's report gives what it spent). The models go at the same time, so
+  it takes about as long as the slowest model's 18 jobs: about 15 to 50 minutes (GLM and MiMo take 30 to 170
   seconds a call), plus up to `--busy-wait-minutes` (default 30) when a model is busy. With `--sequential`, about 1
   to 2 hours, plus the same.
 - openings, all 12 questions and all four arms: about 350 calls; the first real run's report gives what it
@@ -1454,8 +1457,8 @@ Optional flags:
 §4.8). Its value is `<model>=<level>,<level>,...;<model>=...`:
 
 - each level must be on that model's reviewed menu (GLM: high, low; DeepSeek: high, low, none; MiMo: default, none;
-  Qwen: default, low, medium, none; Haiku: high, medium, low), and each model must be in this run (`--models`, or the
-  preview's roster without it). Anything else refuses before a gate is asked (`PRACTICE_LEVELS_INVALID`);
+  Haiku: high, medium, low), and each model must be in this run (`--models`, or the preview's roster without it; Qwen
+  is in neither any more). Anything else refuses before a gate is asked (`PRACTICE_LEVELS_INVALID`);
 - a level listed twice is run twice (`high#1`, `high#2`): the gap between those two runs shows how much the results
   move by chance alone (the "chance band" line under the table in `report.md`);
 - the runs take turns per job (A, B, C, then B, C, A, ...), one after another, never at once, so a slow or busy hour
@@ -1479,7 +1482,7 @@ Step A (spec 2026-10-12 §6, a few small calls): does each level really work? On
 `D` and `P` as in S-5, fresh status files from S-3:
 
 ```sh
-PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --lanes PANEL --samples 1 --levels "zai-org/GLM-5.3-Flash=high,low;deepseek-ai/DeepSeek-V4.1-Flash=high,low,none;Qwen/Qwen3.8-Flash=default,medium,low,none;XiaomiMiMo/MiMo-V2.6-Pro=default,none;claude-haiku-5-5=high,medium,low" --out "$P/levels-step-a"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --lanes PANEL --samples 1 --levels "zai-org/GLM-5.3-Flash=high,low;deepseek-ai/DeepSeek-V4.1-Flash=high,low,none;XiaomiMiMo/MiMo-V2.6-Pro=default,none;claude-haiku-5-5=high,medium,low" --out "$P/levels-step-a"
 echo "exit: $?"
 ```
 
@@ -1490,18 +1493,17 @@ English and the Romanian practice question, each twice), today's level run twice
 |---|---|
 | GLM | high, high, low |
 | DeepSeek | high, high, low, none |
-| Qwen | default, default, medium, low, none |
 | MiMo | default, default, none |
 | Haiku | high, high, medium, low |
 
 Take out of the `--levels` value any level Step A showed refused or ignored, then (fresh status files from S-3 again):
 
 ```sh
-PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --samples 4 --busy-wait-minutes 30 --levels "zai-org/GLM-5.3-Flash=high,high,low;deepseek-ai/DeepSeek-V4.1-Flash=high,high,low,none;Qwen/Qwen3.8-Flash=default,default,medium,low,none;XiaomiMiMo/MiMo-V2.6-Pro=default,default,none;claude-haiku-5-5=high,high,medium,low" --out "$P/levels-step-b"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --samples 4 --busy-wait-minutes 30 --levels "zai-org/GLM-5.3-Flash=high,high,low;deepseek-ai/DeepSeek-V4.1-Flash=high,high,low,none;XiaomiMiMo/MiMo-V2.6-Pro=default,default,none;claude-haiku-5-5=high,high,medium,low" --out "$P/levels-step-b"
 echo "exit: $?"
 ```
 
-That is 19 runs of 36 jobs, about 680 jobs. The verdict stays per model, with all of that model's runs counted
+That is 14 runs of 36 jobs, about 500 jobs. The verdict stays per model, with all of that model's runs counted
 together (a slip fixed by the second try is a warning; a step failed for good, or more than 1 slip in 10 of the
 model's answered calls, fails). Each run's own bar is shown, for the comparison only, in the levels table's "over
 bar" column; its "answered / jobs" column shows the jobs a busy model skipped.

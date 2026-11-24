@@ -306,7 +306,7 @@ const DATABASE_AHEAD=/^PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD: the database has st
 /**
  * Ruling R72 (side-by-side spec §13 addition, SA11 fix round 1): the kit's refusal of the operator's line-up or answer
  * seats, printed as its code so the owner learns why a plan stopped (nothing is sealed when it stops). Whole-message
- * matches only: the providers' and the register's line-up codes (`PREVIEW_LINE_UP_POLICY_INVALID:<member>[:list|unreviewed|duplicate]`,
+ * matches only: the providers' and the register's line-up codes (`PREVIEW_LINE_UP_POLICY_INVALID:<member>[:list|unreviewed|duplicate|partner_served]`,
  * `maker_rule`), the thinking parser's code-shaped detail (Ruling R65: `<what>[:<model>[:<step>]]`, each part at most 64
  * characters of the code alphabet) and the kit's `answer-seat…` rules. A thinking detail is owner-typed (a model or step
  * name could be anything, a pasted key or socket path included), so it follows the common rule of the final fix wave S14,
@@ -314,7 +314,7 @@ const DATABASE_AHEAD=/^PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD: the database has st
  * part is 1-64 characters of [A-Za-z0-9_./-] and the detail is not key-shaped (an unbroken run of 24 or more letters or
  * digits, a '//', or a vendor `sk-` prefix); otherwise the line stays opaque.
  */
-const LINE_UP_REFUSAL=/^PREVIEW_LINE_UP_POLICY_INVALID:(?:value|members|maker_rule|kind|thinking_levels|(?:free_model_ids|premium_model_ids)(?::(?:list|unreviewed|duplicate))?)$/;
+const LINE_UP_REFUSAL=/^PREVIEW_LINE_UP_POLICY_INVALID:(?:value|members|maker_rule|kind|thinking_levels|(?:free_model_ids|premium_model_ids)(?::(?:list|unreviewed|duplicate|partner_served))?)$/;
 const THINKING_REFUSAL=/^PREVIEW_THINKING_LEVELS_INVALID:(?:table|(?:model|entry|steps|level|step)(?::[A-Za-z0-9_./-]{1,64}){0,2})$/;
 const SEAT_REFUSAL=/^PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat[a-z-]{0,48}$/;
 /** Final fix wave S14: the common key-shaped rule (24+ letters/digits in one run, a '//', a vendor `sk-` prefix). */

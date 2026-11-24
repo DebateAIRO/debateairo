@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "EU標準契約条項（EU域外へのデータ送信のために欧州委員会が定めたモデル契約）",
   "legal.providers.locationDeepInfra": "米国のみ。DeepInfraが自社のサーバーで実行するモデルが対象。DeepInfraは1つのモデルのリクエストをパートナー企業に転送しており、その企業は次の項目に記載",
   "legal.providers.retentionDeepInfra": "保存しない。DeepInfraは、リクエストに回答する間だけテキストをメモリ上に保持し、その後削除する。ログには、時刻や費用などのリクエストの詳細が記録され、テキストは記録されない。DeepInfraが自社のサーバーで実行するモデルが対象",
-  "legal.providers.deepinfraPartnerName": "DeepInfraの1つのモデルのパートナー企業（DeepInfraは企業名を公表していない）",
   "legal.providers.locationPerplexity": "米国。Perplexityと、Perplexityが自社のために業務を行う企業として挙げている企業の所在地。Perplexityは地域を明示していない",
   "legal.providers.retentionPerplexity": "Perplexityは、検索リクエストについて固定の期間を公表していない。サービスやアカウントによって異なるとしている。データ処理条件に基づき、当社がサービスの利用をやめてから30日以内に個人データを削除する",
   "legal.providers.luxembourg": "Luxembourg",

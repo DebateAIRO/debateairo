@@ -6,6 +6,7 @@ import {
   readStoryPolicyFromRegister,
   runSettingsCheckSteps,
   settingsCheckReport,
+  settingsGatePartnerServedCodes,
   settingsGateThinkingCodes,
   settingsGateTokenCeilingCodes,
   settingsGateUnreviewedCodes,
@@ -56,8 +57,9 @@ import {
  *      (SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:<provider>);
  *    - condition 6, the code copy (addition D20, which with D26 replaces plan D6): every seatable model and every model
  *      the sealed table names is a reviewed row (SETTINGS_GATE_UNREVIEWED:<model or ref>), every level of the sealed
- *      table is on its model's reviewed menu in this code (SETTINGS_GATE_THINKING_UNREVIEWED:<model>:<level>), and no
- *      sealed ceiling the preview sends is above a seatable model's output bound
+ *      table is on its model's reviewed menu in this code (SETTINGS_GATE_THINKING_UNREVIEWED:<model>:<level>), no seatable
+ *      model is one its provider forwards to a company the legal texts do not name (SETTINGS_GATE_PARTNER_SERVED:<model>),
+ *      and no sealed ceiling the preview sends is above a seatable model's output bound
  *      (SETTINGS_GATE_TOKEN_CEILING:<rowKey>:<model>; the storyteller's bound exempt). The line-up is read as sealed
  *      (shape only, `readSealedPreviewLineUp`), so a version an older, wider code sealed is named code by code;
  *  - first of the version's own steps, the activation's rule (0124): a sealed GENERAL version, else
@@ -223,6 +225,11 @@ export function runnerSettingsCheckSteps(input: Readonly<{
         const { lineUp, seatable } = await seatableOf();
         return settingsGateUnreviewedCodes({ seatable, lineUp });
       }
+    },
+    {
+      // Condition 6: no seatable model is one its provider forwards to a company the legal texts do not name.
+      name: "gate-models-partner-served",
+      run: async () => (onPreview() ? settingsGatePartnerServedCodes({ seatable: (await seatableOf()).seatable }) : [])
     },
     {
       // Condition 6: every sealed level is on its model's reviewed menu in this code.

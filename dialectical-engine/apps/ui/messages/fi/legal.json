@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "EU:n vakiosopimuslausekkeet (Euroopan komission mallisopimus tietojen lähettämiseksi EU:n ulkopuolelle)",
   "legal.providers.locationDeepInfra": "Vain Yhdysvallat. Tämä koskee malleja, joita DeepInfra ajaa omilla palvelimillaan; yhden mallin pyynnöt se välittää kumppaniyritykselle, joka on lueteltu seuraavassa kohdassa",
   "legal.providers.retentionDeepInfra": "Ei säilytetä. DeepInfra pitää tekstin vain muistissa sen ajan, kun se vastaa pyyntöön, ja poistaa sen sitten. Sen lokeissa on pyynnön tietoja, kuten aika ja kustannus, mutta ei koskaan tekstiä. Tämä koskee malleja, joita DeepInfra ajaa omilla palvelimillaan",
-  "legal.providers.deepinfraPartnerName": "DeepInfran kumppani yhdelle mallille (DeepInfra ei nimeä yritystä)",
   "legal.providers.locationPerplexity": "Yhdysvallat, jossa Perplexity ja yritykset, joiden se ilmoittaa työskentelevän sille, sijaitsevat. Perplexity ei ilmoita aluetta",
   "legal.providers.retentionPerplexity": "Perplexity ei julkaise kiinteää aikaa hakupyynnöille: se kertoo, että tämä riippuu palvelusta ja tilistä. Tietojenkäsittelyehtojensa mukaan se poistaa henkilötiedot 30 päivän kuluessa siitä, kun lopetamme palvelun käytön",
   "legal.providers.luxembourg": "Luxembourg",

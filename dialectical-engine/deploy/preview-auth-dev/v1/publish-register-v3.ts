@@ -65,7 +65,7 @@ import { mapPromptContractHash } from '@debateai/map';
 import { resolveDebateShapeRunnerSettings } from '../../../apps/runner/src/debate-shape-boot.js';
 import { assertQuestionLanguagePolicyBootable } from '../../../apps/api/src/question-language/boot.js';
 import { buildDevelopmentStoryRegisterRows } from '../../../apps/runner/src/dev-deployment-register.js';
-import type { PreviewLineUp } from '@debateai/providers';
+import { assertPreviewLineUpSeatable, type PreviewLineUp } from '@debateai/providers';
 import { PREVIEW_GLM_PROVIDER_REFS } from '../../../packages/providers/src/preview-test.js';
 import { PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRowForRef, previewRefsAreReviewedSet } from '../../../packages/providers/src/preview-models.js';
 import { staffAccessPolicyFromValue } from '../../../packages/register/src/staff-access-policy.js';
@@ -355,7 +355,8 @@ export function composePreviewSnapshotV3(input:Readonly<{sourceRows:readonly Reg
     if(row.rowKey===QUESTION_LANGUAGE_POLICY_ROW_KEY)parseQuestionLanguagePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===LENGTH_GUIDANCE_POLICY_ROW_KEY)parseLengthGuidancePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===ENGINE_VERSION_POLICY_ROW_KEY)parseEngineVersionPolicy(JSON.parse(row.valueJsonText));
-    if(row.rowKey===PREVIEW_LINE_UP_POLICY_ROW_KEY)previewLineUpPolicyFromValue(JSON.parse(row.valueJsonText));
+    // A carried line-up is sealed again into the new version, so it must also seat no partner-served model.
+    if(row.rowKey===PREVIEW_LINE_UP_POLICY_ROW_KEY)assertPreviewLineUpSeatable(previewLineUpPolicyFromValue(JSON.parse(row.valueJsonText)));
   }
   // The sealed map prompts' hash: a required source key (v2's builder makes it), parsed by the register's own reader.
   parseMapContractHash(JSON.parse(sourceMap.get(MAP_CONTRACT_HASH_ROW_KEY)!.valueJsonText));

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: 요약
-eyebrow: 서비스 이용약관 · v1.0 · 시행일 2026년 11월 23일
+eyebrow: 서비스 이용약관 · v1.1 · 시행일 2026년 11월 25일
 title: 귀하가 동의하는 사항
 lede: 귀하와 DMS Merchandise Shop S.R.L. 간의 계약을 알기 쉬운 말로 설명합니다. 19개 조항과 부속서 A가 있으며, 끝까지 스크롤하여 확인하십시오.
-endMarker: 이용약관 끝 · v1.0
+endMarker: 이용약관 끝 · v1.1
 bodyLabel: 서비스 이용약관 본문
 annexTitle: 부속서 A — 지역별 약관
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 준거법
 -->
 
-**Version 1.0 · Effective 2026년 11월 23일 · 이전 버전: dezbatere.ro/terms/versions · 언어: 한국어.**
+**Version 1.1 · Effective 2026년 11월 25일 · 이전 버전: dezbatere.ro/terms/versions · 언어: 한국어.**
 
 **In short.** 귀하는 만 18세 이상이어야 합니다. Dialectical Engine은 AI 모델을 사용해 논증을 구성하며, 생성하는 모든 내용은 틀릴 수 있으므로 자문이 아닙니다. 무료 요금제에서는 토론이 완료되면 AI 검사를 거쳐 공개됩니다. 유료 요금제에서는 귀하가 공개하지 않는 한 토론은 비공개입니다. 공개되면 누구나 토론을 읽을 수 있으며 토론은 계속 공개 상태로 남습니다. 귀하가 제출한 텍스트는 당사의 제공업체 등록부에 열거된 AI 제공업체, 주로 미국의 DeepInfra로 전송됩니다. DeepInfra, Anthropic 및 Amazon의 이용약관은 이들이 그 텍스트로 모델을 훈련하는 것을 허용하지 않으며, 어느 회사에 대해 이를 아직 확인하지 못했는지는 제8조에 설명되어 있습니다. 웹 검색 제공업체는 모델이 작성하는 짧은 검색 문구만 받습니다(제8조). 계정 보유 여부와 관계없이 불법 콘텐츠를 support@dezbatere.ro로 신고하십시오. 루마니아법이 준거법이지만 귀하가 거주하는 지역의 소비자 보호는 그대로 유지됩니다.
 

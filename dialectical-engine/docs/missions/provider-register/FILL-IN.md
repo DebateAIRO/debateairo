@@ -12,6 +12,10 @@ wholly "[to confirm]": `DEEPINFRA_PARTNER_PROVIDER`, the company DeepInfra forwa
 (Qwen3.8-Flash) to, which DeepInfra does not name. Fill it when DeepInfra says who it is, or remove it together with
 that model. The table below describes the rows as they stood on 30 September 2026.
 
+## 24 November 2026: the partner row removed with the model
+
+Qwen3.8-Flash left the line-up and the partner row went: `docs/legal/2026-11-24-partner-model-out.md`.
+
 ## 17 November 2026: both rows re-read against the contract documents
 
 `docs/legal/2026-11-17-provider-contract-facts.md`. DeepInfra's facts stand. Perplexity's row now says "Yes" to

@@ -47,6 +47,7 @@ DeepInfra to send the text to that third party.
 Qwen3.8-Flash is in the line-up. DeepInfra does not say which company the partner is, where it
 processes, or how long it keeps text. The owner asks DeepInfra. Until the answer is in, the partner
 has a row of its own on the page (`DEEPINFRA_PARTNER_PROVIDER`), with every fact "[to confirm]".
+(24 November 2026: Qwen3.8-Flash left the line-up and the row went; see `2026-11-24-partner-model-out.md`.)
 
 ## Perplexity (web search)
 

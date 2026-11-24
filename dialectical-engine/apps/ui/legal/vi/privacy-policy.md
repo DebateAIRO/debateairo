@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: CHÍNH SÁCH QUYỀN RIÊNG TƯ · v1.0 · CÓ HIỆU LỰC 23 THÁNG 11 NĂM 2026
+eyebrow: CHÍNH SÁCH QUYỀN RIÊNG TƯ · v1.1 · CÓ HIỆU LỰC 25 THÁNG 11 NĂM 2026
 title: Dữ liệu chúng tôi lưu trữ và lý do
 lede: Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.
-endMarker: HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v1.0
+endMarker: HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v1.1
 bodyLabel: Nội dung Chính sách quyền riêng tư
 annexTitle: Phụ lục B — Điều khoản quyền riêng tư theo khu vực
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIE
 -->
 
-**Version 1.0 · Effective 23 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/privacy/versions · Bên kiểm soát: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.1 · Effective 25 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/privacy/versions · Bên kiểm soát: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Chúng tôi thu thập những gì cần thiết để tài khoản hoạt động và những gì bạn nhập vào các cuộc tranh luận của mình. Những gì bạn viết cho trợ lý hỗ trợ được gửi đến mô hình AI của trợ lý để nó có thể trả lời bạn, và chúng tôi không lưu giữ bất kỳ phần nào của nội dung đó. Câu hỏi của bạn được gửi đến các nhà cung cấp AI nêu trong Sổ đăng ký của chúng tôi, chủ yếu là DeepInfra, tại Hoa Kỳ. Điều khoản của DeepInfra, Anthropic và Perplexity không cho phép họ huấn luyện mô hình bằng những gì bạn viết; mục 5 cho biết chúng tôi chưa xác nhận điều này đối với công ty nào. Nhà cung cấp dịch vụ lưu trữ của chúng tôi lưu trữ tài khoản và các cuộc tranh luận của bạn tại London, Vương quốc Anh; mục 5 cho biết dữ liệu của bạn còn được chuyển đến đâu nữa. Trên gói miễn phí, các cuộc tranh luận trở thành công khai khi kết thúc, sau khi AI kiểm tra; trên gói trả phí, chúng là riêng tư trừ khi bạn công khai chúng. Việc xóa tài khoản sẽ hủy khóa của dữ liệu riêng tư trên máy chủ của chúng tôi, nhưng các bản sao đã mã hóa trên kho lưu trữ sao lưu riêng biệt của chúng tôi không bị xóa tự động (mục 7); các cuộc tranh luận công khai vẫn công khai, và bút danh của bạn bị gỡ khỏi chúng. Bạn có thể liên hệ với chúng tôi tại privacy@dezbatere.ro, và người được nêu tên trong một cuộc tranh luận có thể viết thư cho chúng tôi mà không cần tài khoản.
 

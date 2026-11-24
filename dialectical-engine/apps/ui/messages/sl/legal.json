@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "Standardna pogodbena določila EU (vzorčna pogodba Evropske komisije za pošiljanje podatkov zunaj EU)",
   "legal.providers.locationDeepInfra": "Samo Združene države Amerike. To velja za modele, ki jih DeepInfra izvaja na lastnih strežnikih; zahteve za en model posreduje partnerski družbi, navedeni v naslednjem vnosu",
   "legal.providers.retentionDeepInfra": "Ne hrani se. DeepInfra besedilo drži v pomnilniku le, medtem ko odgovarja na zahtevo, nato ga izbriše. Njegovi dnevniki vsebujejo podrobnosti zahteve, kot sta čas in strošek, nikoli besedila. To velja za modele, ki jih DeepInfra izvaja na lastnih strežnikih",
-  "legal.providers.deepinfraPartnerName": "Partner družbe DeepInfra za en model (DeepInfra te družbe ne imenuje)",
   "legal.providers.locationPerplexity": "Združene države Amerike, kjer so Perplexity in družbe, ki jih navaja kot tiste, ki delajo zanjo. Perplexity ne navaja nobene regije",
   "legal.providers.retentionPerplexity": "Perplexity ne objavlja določenega obdobja hrambe za iskalne zahteve: navaja, da je odvisno od storitve in računa. Po svojih pogojih obdelave podatkov izbriše osebne podatke v 30 dneh po tem, ko storitve nehamo uporabljati",
   "legal.providers.luxembourg": "Luxembourg",
