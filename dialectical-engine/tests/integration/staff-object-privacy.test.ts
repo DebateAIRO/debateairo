@@ -63,8 +63,10 @@ describe("staff object and identity privacy projections", () => {
     const next = await repo.readTeamPage({ context: one.context, ordinaryTokenHash: one.ordinaryTokenHash, limit: 1, cursor: page.next_cursor! });
     expect(next.members[0]?.staff_id).not.toBe(page.members[0]?.staff_id);
     expect([page.members[0]?.staff_id,next.members[0]?.staff_id].sort()).toEqual([one.staffId,two.staffId].sort());
-    const audit = await repo.readAuditPage({ context: one.context, ordinaryTokenHash: one.ordinaryTokenHash, limit: 100 });
-    expect(audit).toEqual({ events: [], next_cursor: null, order: "RECORDED_AT_ID_ASC" });
+    // 0090's audit reader by its own name: this database stops at 0090, and the repository reads 0186's reader beside it
+    // (staff.read_audit_page_v2), which a database this old does not have.
+    const audit = (await runtime.query("SELECT staff.read_audit_page($1::jsonb,$2,100,NULL,NULL) AS value", [one.context, one.ordinaryTokenHash])).rows[0].value;
+    expect(audit).toEqual({ events: [], nextPosition: null, order: "RECORDED_AT_ID_ASC" });
     for (const sentinel of SENTINELS) expect(JSON.stringify({page,next,audit})).not.toContain(sentinel);
     await expect(repo.readTeamPage({ context: one.context, ordinaryTokenHash: one.ordinaryTokenHash, limit: 101 })).rejects.toThrow();
     await database.pool.query("UPDATE staff.subject SET state='DISABLED',security_epoch=security_epoch+1 WHERE staff_id=$1",[one.staffId]);
