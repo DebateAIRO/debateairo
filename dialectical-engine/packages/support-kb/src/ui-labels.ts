@@ -713,7 +713,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "بدء مناظرة",
       "مناظرة جديدة",
-      "بدء جولة"
+      "اطرح سؤالًا"
     ],
     "sign-in": [
       "الحساب"
@@ -772,7 +772,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Започнете дебат",
       "Нов дебат",
-      "Започнете кръг"
+      "Задайте въпрос"
     ],
     "sign-in": [
       "Профил"
@@ -831,7 +831,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Začněte debatu",
       "Nová debata",
-      "Začněte kolo"
+      "Položit otázku"
     ],
     "sign-in": [
       "Účet"
@@ -890,7 +890,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Start en debat",
       "Ny debat",
-      "Start en runde"
+      "Stil et spørgsmål"
     ],
     "sign-in": [
       "Konto"
@@ -949,7 +949,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Debatte beginnen",
       "Neue Debatte",
-      "Runde beginnen"
+      "Eine Frage stellen"
     ],
     "sign-in": [
       "Konto"
@@ -1008,7 +1008,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Έναρξη αντιπαράθεσης",
       "Νέα αντιπαράθεση",
-      "Έναρξη γύρου"
+      "Κάντε μια ερώτηση"
     ],
     "sign-in": [
       "Λογαριασμός"
@@ -1126,7 +1126,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Iniciar un debate",
       "Nuevo debate",
-      "Iniciar una ronda"
+      "Hacer una pregunta"
     ],
     "sign-in": [
       "Cuenta"
@@ -1185,7 +1185,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Alustage väitlust",
       "Uus väitlus",
-      "Alustage vooru"
+      "Esitage küsimus"
     ],
     "sign-in": [
       "Konto"
@@ -1244,7 +1244,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Aloita väittely",
       "Uusi väittely",
-      "Aloita kierros"
+      "Esitä kysymys"
     ],
     "sign-in": [
       "Tili"
@@ -1303,7 +1303,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Lancer un débat",
       "Nouveau débat",
-      "Lancer une manche"
+      "Poser une question"
     ],
     "sign-in": [
       "Compte"
@@ -1362,7 +1362,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Tosaigh díospóireacht",
       "Díospóireacht nua",
-      "Tosaigh babhta"
+      "Cuir ceist"
     ],
     "sign-in": [
       "Cuntas"
@@ -1421,7 +1421,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "התחלת דיון",
       "דיון חדש",
-      "התחלת סבב"
+      "שאלו שאלה"
     ],
     "sign-in": [
       "חשבון"
@@ -1480,7 +1480,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "वाद-विवाद शुरू करें",
       "नया वाद-विवाद",
-      "दौर शुरू करें"
+      "प्रश्न पूछें"
     ],
     "sign-in": [
       "खाता"
@@ -1539,7 +1539,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Započnite raspravu",
       "Nova rasprava",
-      "Započnite rundu"
+      "Postavite pitanje"
     ],
     "sign-in": [
       "Račun"
@@ -1598,7 +1598,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Vita indítása",
       "Új vita",
-      "Forduló indítása"
+      "Tegyen fel egy kérdést"
     ],
     "sign-in": [
       "Fiók"
@@ -1657,7 +1657,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Mulai debat",
       "Debat baru",
-      "Mulai ronde"
+      "Ajukan pertanyaan"
     ],
     "sign-in": [
       "Akun"
@@ -1716,7 +1716,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Avvia un dibattito",
       "Nuovo dibattito",
-      "Inizia un round"
+      "Fai una domanda"
     ],
     "sign-in": [
       "Account"
@@ -1775,7 +1775,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "ディベートを開始",
       "新しいディベート",
-      "ラウンドを開始"
+      "質問する"
     ],
     "sign-in": [
       "アカウント"
@@ -1834,7 +1834,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "토론 시작",
       "새 토론",
-      "라운드 시작"
+      "질문하기"
     ],
     "sign-in": [
       "계정"
@@ -1893,7 +1893,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Pradėti debatus",
       "Nauji debatai",
-      "Pradėti raundą"
+      "Užduoti klausimą"
     ],
     "sign-in": [
       "Paskyra"
@@ -1952,7 +1952,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Sākt debates",
       "Jaunas debates",
-      "Sākt raundu"
+      "Uzdot jautājumu"
     ],
     "sign-in": [
       "Konts"
@@ -2011,7 +2011,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Ibda dibattitu",
       "Dibattitu ġdid",
-      "Ibda rawnd"
+      "Agħmel mistoqsija"
     ],
     "sign-in": [
       "Kont"
@@ -2070,7 +2070,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Een debat starten",
       "Nieuw debat",
-      "Ronde starten"
+      "Stel een vraag"
     ],
     "sign-in": [
       "Account"
@@ -2129,7 +2129,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Rozpocznij debatę",
       "Nowa debata",
-      "Rozpocznij rundę"
+      "Zadaj pytanie"
     ],
     "sign-in": [
       "Konto"
@@ -2188,7 +2188,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Iniciar um debate",
       "Novo debate",
-      "Iniciar uma ronda"
+      "Fazer uma pergunta"
     ],
     "sign-in": [
       "Conta"
@@ -2306,7 +2306,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Начать дебаты",
       "Новые дебаты",
-      "Начать раунд"
+      "Задать вопрос"
     ],
     "sign-in": [
       "Учётная запись"
@@ -2365,7 +2365,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Začať debatu",
       "Nová debata",
-      "Začať kolo"
+      "Položiť otázku"
     ],
     "sign-in": [
       "Účet"
@@ -2424,7 +2424,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Začni razpravo",
       "Nova razprava",
-      "Začni krog"
+      "Postavite vprašanje"
     ],
     "sign-in": [
       "Račun"
@@ -2483,7 +2483,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Starta en debatt",
       "Ny debatt",
-      "Starta en omgång"
+      "Ställ en fråga"
     ],
     "sign-in": [
       "Konto"
@@ -2542,7 +2542,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Tartışma başlat",
       "Yeni tartışma",
-      "Tur başlat"
+      "Soru sorun"
     ],
     "sign-in": [
       "Hesap"
@@ -2601,7 +2601,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Почати дебати",
       "Нові дебати",
-      "Почати раунд"
+      "Поставити запитання"
     ],
     "sign-in": [
       "Обліковий запис"
@@ -2660,7 +2660,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Bắt đầu một cuộc tranh luận",
       "Cuộc tranh luận mới",
-      "Bắt đầu một vòng"
+      "Đặt câu hỏi"
     ],
     "sign-in": [
       "Tài khoản"
@@ -2719,7 +2719,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "开始辩论",
       "新辩论",
-      "开始一轮"
+      "提出问题"
     ],
     "sign-in": [
       "账户"
@@ -4313,7 +4313,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "بدء جولة"
+      "اطرح سؤالًا"
     ],
     [
       "Create account",
@@ -4519,7 +4519,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Започнете кръг"
+      "Задайте въпрос"
     ],
     [
       "Create account",
@@ -4725,7 +4725,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Začněte kolo"
+      "Položit otázku"
     ],
     [
       "Create account",
@@ -4927,7 +4927,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Start en runde"
+      "Stil et spørgsmål"
     ],
     [
       "Create account",
@@ -5125,7 +5125,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Runde beginnen"
+      "Eine Frage stellen"
     ],
     [
       "Create account",
@@ -5323,7 +5323,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Έναρξη γύρου"
+      "Κάντε μια ερώτηση"
     ],
     [
       "Create account",
@@ -5526,7 +5526,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Iniciar una ronda"
+      "Hacer una pregunta"
     ],
     [
       "Create account",
@@ -5728,7 +5728,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Alustage vooru"
+      "Esitage küsimus"
     ],
     [
       "Create account",
@@ -5930,7 +5930,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Aloita kierros"
+      "Esitä kysymys"
     ],
     [
       "Create account",
@@ -6132,7 +6132,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Lancer une manche"
+      "Poser une question"
     ],
     [
       "Create account",
@@ -6330,7 +6330,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Tosaigh babhta"
+      "Cuir ceist"
     ],
     [
       "Create account",
@@ -6536,7 +6536,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "התחלת סבב"
+      "שאלו שאלה"
     ],
     [
       "Create account",
@@ -6742,7 +6742,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "दौर शुरू करें"
+      "प्रश्न पूछें"
     ],
     [
       "Create account",
@@ -6948,7 +6948,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Započnite rundu"
+      "Postavite pitanje"
     ],
     [
       "Create account",
@@ -7150,7 +7150,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Forduló indítása"
+      "Tegyen fel egy kérdést"
     ],
     [
       "Create account",
@@ -7356,7 +7356,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Mulai ronde"
+      "Ajukan pertanyaan"
     ],
     [
       "Create account",
@@ -7558,7 +7558,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Inizia un round"
+      "Fai una domanda"
     ],
     [
       "Create account",
@@ -7748,7 +7748,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "ラウンドを開始"
+      "質問する"
     ],
     [
       "Create account",
@@ -7954,7 +7954,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "라운드 시작"
+      "질문하기"
     ],
     [
       "Create account",
@@ -8160,7 +8160,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Pradėti raundą"
+      "Užduoti klausimą"
     ],
     [
       "Create account",
@@ -8362,7 +8362,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Sākt raundu"
+      "Uzdot jautājumu"
     ],
     [
       "Create account",
@@ -8564,7 +8564,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Ibda rawnd"
+      "Agħmel mistoqsija"
     ],
     [
       "Create account",
@@ -8762,7 +8762,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Ronde starten"
+      "Stel een vraag"
     ],
     [
       "Create account",
@@ -8956,7 +8956,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Rozpocznij rundę"
+      "Zadaj pytanie"
     ],
     [
       "Create account",
@@ -9158,7 +9158,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Iniciar uma ronda"
+      "Fazer uma pergunta"
     ],
     [
       "Create account",
@@ -9361,7 +9361,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Начать раунд"
+      "Задать вопрос"
     ],
     [
       "Create account",
@@ -9567,7 +9567,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Začať kolo"
+      "Položiť otázku"
     ],
     [
       "Create account",
@@ -9765,7 +9765,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Začni krog"
+      "Postavite vprašanje"
     ],
     [
       "Create account",
@@ -9967,7 +9967,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Starta en omgång"
+      "Ställ en fråga"
     ],
     [
       "Create account",
@@ -10165,7 +10165,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Tur başlat"
+      "Soru sorun"
     ],
     [
       "Create account",
@@ -10367,7 +10367,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Почати раунд"
+      "Поставити запитання"
     ],
     [
       "Create account",
@@ -10573,7 +10573,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "Bắt đầu một vòng"
+      "Đặt câu hỏi"
     ],
     [
       "Create account",
@@ -10779,7 +10779,7 @@ export const SUPPORT_CONTROL_NAMES = {
     ],
     [
       "Ask a question",
-      "开始一轮"
+      "提出问题"
     ],
     [
       "Create account",
@@ -10959,10 +10959,10 @@ export const SUPPORT_CONTROL_NAMES = {
 export const SUPPORT_CAPABILITY_KEY_NAMES = {
   "ar": {
     "ai-transparency": "الشفافية بشأن الذكاء الاصطناعي",
-    "legal-notice": "المعلومات القانونية",
+    "legal-notice": "بيانات الشركة والتواصل",
     "legal-terms": "شروط الخدمة",
     "legal-terms-versions": "نسخ الشروط",
-    "legal-privacy": "سياسة الخصوصية",
+    "legal-privacy": "سياسة الخصوصية (GDPR)",
     "legal-health-data": "خصوصية البيانات الصحية في الولايات المتحدة",
     "legal-cookies": "سياسة ملفات تعريف الارتباط",
     "legal-providers": "مزودو النماذج",
@@ -10971,15 +10971,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "الأسعار",
     "billing-card-change": "حدّث البطاقة",
     "billing-cancel": "إلغاء خطة",
-    "billing-withdraw": "الانسحاب من خطة",
+    "billing-withdraw": "الانسحاب من العقد",
     "legal-privacy-versions": "جميع نسخ هذه السياسة"
   },
   "bg": {
     "ai-transparency": "Прозрачност за ИИ",
-    "legal-notice": "Информация за дружеството",
+    "legal-notice": "Данни за дружеството и контакт",
     "legal-terms": "Условия за ползване",
     "legal-terms-versions": "Версии на условията",
-    "legal-privacy": "Политика за поверителност",
+    "legal-privacy": "Политика за поверителност (GDPR)",
     "legal-health-data": "Поверителност на здравните данни (САЩ)",
     "legal-cookies": "Политика за бисквитките",
     "legal-providers": "Доставчици на модели",
@@ -10988,15 +10988,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Цени",
     "billing-card-change": "Смяна на картата",
     "billing-cancel": "Прекратяване на план",
-    "billing-withdraw": "Отказ от план",
+    "billing-withdraw": "Отказ от договора",
     "legal-privacy-versions": "Всички версии на тази политика"
   },
   "cs": {
     "ai-transparency": "Transparentnost AI",
-    "legal-notice": "Informace o provozovateli",
+    "legal-notice": "Údaje o společnosti a kontakt",
     "legal-terms": "Podmínky poskytování služby",
     "legal-terms-versions": "Verze podmínek",
-    "legal-privacy": "Zásady ochrany osobních údajů",
+    "legal-privacy": "Zásady ochrany osobních údajů (GDPR)",
     "legal-health-data": "Ochrana údajů o zdraví v USA",
     "legal-cookies": "Zásady používání souborů cookie",
     "legal-providers": "Poskytovatelé modelů",
@@ -11005,15 +11005,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Ceník",
     "billing-card-change": "Změnit kartu",
     "billing-cancel": "Zrušení plánu",
-    "billing-withdraw": "Odstoupení od plánu",
+    "billing-withdraw": "Odstoupení od smlouvy",
     "legal-privacy-versions": "Všechny verze těchto zásad"
   },
   "da": {
     "ai-transparency": "AI-gennemsigtighed",
-    "legal-notice": "Juridiske oplysninger",
+    "legal-notice": "Virksomhedsoplysninger og kontakt",
     "legal-terms": "Tjenestevilkår",
     "legal-terms-versions": "Versioner af vilkårene",
-    "legal-privacy": "Privatlivspolitik",
+    "legal-privacy": "Privatlivspolitik (GDPR)",
     "legal-health-data": "Helbredsoplysninger i USA",
     "legal-cookies": "Cookiepolitik",
     "legal-providers": "Modeludbydere",
@@ -11022,7 +11022,7 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Priser",
     "billing-card-change": "Opdater kort",
     "billing-cancel": "Opsig en plan",
-    "billing-withdraw": "Fortryd en plan",
+    "billing-withdraw": "Fortryd din aftale",
     "legal-privacy-versions": "Alle versioner af denne politik"
   },
   "de": {
@@ -11030,7 +11030,7 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-notice": "Impressum",
     "legal-terms": "Nutzungsbedingungen",
     "legal-terms-versions": "Fassungen der Nutzungsbedingungen",
-    "legal-privacy": "Datenschutzerklärung",
+    "legal-privacy": "Datenschutzerklärung (DSGVO)",
     "legal-health-data": "Gesundheitsdaten (USA)",
     "legal-cookies": "Cookie-Richtlinie",
     "legal-providers": "Modellanbieter",
@@ -11039,15 +11039,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Preise",
     "billing-card-change": "Karte aktualisieren",
     "billing-cancel": "Tarif kündigen",
-    "billing-withdraw": "Tarif widerrufen",
+    "billing-withdraw": "Vertrag widerrufen",
     "legal-privacy-versions": "Alle Fassungen dieser Erklärung"
   },
   "el": {
     "ai-transparency": "Διαφάνεια ΤΝ",
-    "legal-notice": "Νομικές πληροφορίες",
+    "legal-notice": "Στοιχεία εταιρείας και επικοινωνία",
     "legal-terms": "Όροι παροχής υπηρεσιών",
     "legal-terms-versions": "Εκδόσεις των όρων",
-    "legal-privacy": "Πολιτική απορρήτου",
+    "legal-privacy": "Πολιτική απορρήτου (GDPR)",
     "legal-health-data": "Απόρρητο δεδομένων υγείας (ΗΠΑ)",
     "legal-cookies": "Πολιτική cookies",
     "legal-providers": "Πάροχοι μοντέλων",
@@ -11056,16 +11056,16 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Τιμές",
     "billing-card-change": "Ενημέρωση κάρτας",
     "billing-cancel": "Ακύρωση προγράμματος",
-    "billing-withdraw": "Υπαναχώρηση από πρόγραμμα",
+    "billing-withdraw": "Υπαναχώρηση από τη σύμβαση",
     "legal-privacy-versions": "Όλες οι εκδόσεις αυτής της πολιτικής"
   },
   "en": {},
   "es": {
     "ai-transparency": "Transparencia sobre IA",
-    "legal-notice": "Aviso legal",
+    "legal-notice": "Datos de la empresa y contacto",
     "legal-terms": "Términos de servicio",
     "legal-terms-versions": "Versiones de los términos",
-    "legal-privacy": "Política de privacidad",
+    "legal-privacy": "Política de privacidad (RGPD)",
     "legal-health-data": "Privacidad de datos de salud en EE. UU.",
     "legal-cookies": "Política de cookies",
     "legal-providers": "Proveedores de modelos",
@@ -11074,15 +11074,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Precios",
     "billing-card-change": "Actualizar tarjeta",
     "billing-cancel": "Cancelar un plan",
-    "billing-withdraw": "Desistir de un plan",
+    "billing-withdraw": "Desistir del contrato",
     "legal-privacy-versions": "Todas las versiones de esta política"
   },
   "et": {
     "ai-transparency": "Tehisintellekti läbipaistvus",
-    "legal-notice": "Teenusepakkuja andmed",
+    "legal-notice": "Ettevõtte andmed ja kontakt",
     "legal-terms": "Teenusetingimused",
     "legal-terms-versions": "Tingimuste versioonid",
-    "legal-privacy": "Privaatsuspoliitika",
+    "legal-privacy": "Privaatsuspoliitika (IKÜM)",
     "legal-health-data": "USA terviseandmete privaatsus",
     "legal-cookies": "Küpsisepoliitika",
     "legal-providers": "Mudelipakkujad",
@@ -11091,15 +11091,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Hinnad",
     "billing-card-change": "Uuenda kaarti",
     "billing-cancel": "Paketi tühistamine",
-    "billing-withdraw": "Paketist taganemine",
+    "billing-withdraw": "Lepingust taganemine",
     "legal-privacy-versions": "Selle poliitika kõik versioonid"
   },
   "fi": {
     "ai-transparency": "Tekoälyn läpinäkyvyys",
-    "legal-notice": "Palveluntarjoajan tiedot",
+    "legal-notice": "Yrityksen tiedot ja yhteystiedot",
     "legal-terms": "Käyttöehdot",
     "legal-terms-versions": "Käyttöehtojen versiot",
-    "legal-privacy": "Tietosuojakäytäntö",
+    "legal-privacy": "Tietosuojakäytäntö (GDPR)",
     "legal-health-data": "Terveystietojen suoja (Yhdysvallat)",
     "legal-cookies": "Evästekäytäntö",
     "legal-providers": "Mallien tarjoajat",
@@ -11108,15 +11108,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Hinnat",
     "billing-card-change": "Päivitä kortti",
     "billing-cancel": "Peruuta tilaus",
-    "billing-withdraw": "Peru tilaus peruuttamisoikeudella",
+    "billing-withdraw": "Sopimuksen peruminen",
     "legal-privacy-versions": "Tämän käytännön kaikki versiot"
   },
   "fr": {
     "ai-transparency": "Transparence de l’IA",
-    "legal-notice": "Mentions légales",
+    "legal-notice": "Coordonnées de la société et contact",
     "legal-terms": "Conditions d’utilisation",
     "legal-terms-versions": "Versions des conditions",
-    "legal-privacy": "Politique de confidentialité",
+    "legal-privacy": "Politique de confidentialité (RGPD)",
     "legal-health-data": "Données de santé (États-Unis)",
     "legal-cookies": "Politique relative aux cookies",
     "legal-providers": "Fournisseurs de modèles",
@@ -11130,10 +11130,10 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
   },
   "ga": {
     "ai-transparency": "Trédhearcacht IS",
-    "legal-notice": "Fógra dlíthiúil",
+    "legal-notice": "Sonraí na cuideachta agus teagmháil",
     "legal-terms": "Téarmaí seirbhíse",
     "legal-terms-versions": "Leaganacha na dtéarmaí",
-    "legal-privacy": "Beartas príobháideachais",
+    "legal-privacy": "Beartas príobháideachais (RGCS)",
     "legal-health-data": "Príobháideachas sonraí sláinte (SAM)",
     "legal-cookies": "Beartas fianán",
     "legal-providers": "Soláthraithe samhlacha",
@@ -11142,15 +11142,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Praghsanna",
     "billing-card-change": "Nuashonraigh an cárta",
     "billing-cancel": "Cuir plean ar ceal",
-    "billing-withdraw": "Tarraing siar ó phlean",
+    "billing-withdraw": "Tarraing siar ón gconradh",
     "legal-privacy-versions": "Gach leagan den bheartas seo"
   },
   "he": {
     "ai-transparency": "שקיפות בינה מלאכותית",
-    "legal-notice": "הודעה משפטית",
+    "legal-notice": "פרטי החברה ויצירת קשר",
     "legal-terms": "תנאי השירות",
     "legal-terms-versions": "גרסאות התנאים",
-    "legal-privacy": "מדיניות הפרטיות",
+    "legal-privacy": "מדיניות הפרטיות (GDPR)",
     "legal-health-data": "פרטיות נתוני בריאות בארה״ב",
     "legal-cookies": "מדיניות העוגיות",
     "legal-providers": "ספקי מודלים",
@@ -11159,15 +11159,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "מחירים",
     "billing-card-change": "עדכון כרטיס",
     "billing-cancel": "ביטול תוכנית",
-    "billing-withdraw": "ביטול עסקה בתוכנית",
+    "billing-withdraw": "ביטול העסקה",
     "legal-privacy-versions": "כל הגרסאות של מדיניות זו"
   },
   "hi": {
     "ai-transparency": "AI पारदर्शिता",
-    "legal-notice": "विधिक सूचना",
+    "legal-notice": "कंपनी का विवरण और संपर्क",
     "legal-terms": "सेवा की शर्तें",
     "legal-terms-versions": "शर्तों के संस्करण",
-    "legal-privacy": "गोपनीयता नीति",
+    "legal-privacy": "गोपनीयता नीति (GDPR)",
     "legal-health-data": "अमेरिकी स्वास्थ्य डेटा गोपनीयता",
     "legal-cookies": "कुकी नीति",
     "legal-providers": "मॉडल प्रदाता",
@@ -11176,7 +11176,7 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "मूल्य",
     "billing-card-change": "कार्ड अपडेट करें",
     "billing-cancel": "योजना रद्द करें",
-    "billing-withdraw": "योजना से अनुबंध वापस लें",
+    "billing-withdraw": "अनुबंध से वापसी",
     "legal-privacy-versions": "इस नीति के सभी संस्करण"
   },
   "hr": {
@@ -11184,7 +11184,7 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-notice": "Impresum",
     "legal-terms": "Uvjeti korištenja",
     "legal-terms-versions": "Verzije uvjeta",
-    "legal-privacy": "Pravila o privatnosti",
+    "legal-privacy": "Pravila o privatnosti (GDPR)",
     "legal-health-data": "Privatnost zdravstvenih podataka (SAD)",
     "legal-cookies": "Pravila o kolačićima",
     "legal-providers": "Pružatelji modela",
@@ -11193,15 +11193,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Cijene",
     "billing-card-change": "Promijeni karticu",
     "billing-cancel": "Otkazivanje plana",
-    "billing-withdraw": "Raskid ugovora o planu",
+    "billing-withdraw": "Raskid ugovora",
     "legal-privacy-versions": "Sve verzije ovih pravila"
   },
   "hu": {
     "ai-transparency": "MI-átláthatóság",
-    "legal-notice": "Impresszum",
+    "legal-notice": "Cégadatok és kapcsolat",
     "legal-terms": "Szolgáltatási feltételek",
     "legal-terms-versions": "A feltételek változatai",
-    "legal-privacy": "Adatvédelmi szabályzat",
+    "legal-privacy": "Adatvédelmi szabályzat (GDPR)",
     "legal-health-data": "Amerikai egészségügyi adatok védelme",
     "legal-cookies": "Sütiszabályzat",
     "legal-providers": "Modellszolgáltatók",
@@ -11210,15 +11210,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Árak",
     "billing-card-change": "Kártya módosítása",
     "billing-cancel": "Csomag lemondása",
-    "billing-withdraw": "Elállás a csomagtól",
+    "billing-withdraw": "Elállás a szerződéstől",
     "legal-privacy-versions": "A szabályzat összes változata"
   },
   "id": {
     "ai-transparency": "Transparansi AI",
-    "legal-notice": "Informasi hukum",
+    "legal-notice": "Data perusahaan dan kontak",
     "legal-terms": "Ketentuan layanan",
     "legal-terms-versions": "Versi ketentuan",
-    "legal-privacy": "Kebijakan privasi",
+    "legal-privacy": "Kebijakan privasi (GDPR)",
     "legal-health-data": "Privasi data kesehatan AS",
     "legal-cookies": "Kebijakan kuki",
     "legal-providers": "Penyedia model",
@@ -11227,15 +11227,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Harga",
     "billing-card-change": "Perbarui kartu",
     "billing-cancel": "Batalkan paket",
-    "billing-withdraw": "Menarik diri dari paket",
+    "billing-withdraw": "Menarik diri dari kontrak",
     "legal-privacy-versions": "Semua versi kebijakan ini"
   },
   "it": {
     "ai-transparency": "Trasparenza dell’IA",
-    "legal-notice": "Dati societari",
+    "legal-notice": "Dati societari e contatti",
     "legal-terms": "Condizioni di servizio",
     "legal-terms-versions": "Versioni delle condizioni",
-    "legal-privacy": "Informativa sulla privacy",
+    "legal-privacy": "Informativa sulla privacy (GDPR)",
     "legal-health-data": "Privacy dei dati sanitari (USA)",
     "legal-cookies": "Informativa sui cookie",
     "legal-providers": "Fornitori di modelli",
@@ -11244,7 +11244,7 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Prezzi",
     "billing-card-change": "Aggiorna la carta",
     "billing-cancel": "Disdici un piano",
-    "billing-withdraw": "Recedi da un piano",
+    "billing-withdraw": "Recedi dal contratto",
     "legal-privacy-versions": "Tutte le versioni di questa informativa"
   },
   "ja": {
@@ -11252,7 +11252,7 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-notice": "特定商取引法に基づく表記",
     "legal-terms": "利用規約",
     "legal-terms-versions": "利用規約の版履歴",
-    "legal-privacy": "プライバシーポリシー",
+    "legal-privacy": "プライバシーポリシー（GDPR）",
     "legal-health-data": "米国の健康データ・プライバシー",
     "legal-cookies": "クッキーポリシー",
     "legal-providers": "モデルプロバイダー",
@@ -11261,15 +11261,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "料金",
     "billing-card-change": "カードを更新",
     "billing-cancel": "プランの解約",
-    "billing-withdraw": "プランの撤回",
+    "billing-withdraw": "契約の撤回",
     "legal-privacy-versions": "本ポリシーのすべての版"
   },
   "ko": {
     "ai-transparency": "AI 투명성",
-    "legal-notice": "사업자 정보",
+    "legal-notice": "사업자 정보 및 연락처",
     "legal-terms": "서비스 이용약관",
     "legal-terms-versions": "이용약관 버전 기록",
-    "legal-privacy": "개인정보 처리방침",
+    "legal-privacy": "개인정보 처리방침(GDPR)",
     "legal-health-data": "미국 건강 데이터 개인정보 보호",
     "legal-cookies": "쿠키 정책",
     "legal-providers": "모델 제공업체",
@@ -11278,15 +11278,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "요금",
     "billing-card-change": "카드 변경",
     "billing-cancel": "요금제 해지",
-    "billing-withdraw": "요금제 철회",
+    "billing-withdraw": "계약 철회",
     "legal-privacy-versions": "본 방침의 모든 버전"
   },
   "lt": {
     "ai-transparency": "DI skaidrumas",
-    "legal-notice": "Rekvizitai",
+    "legal-notice": "Įmonės duomenys ir kontaktai",
     "legal-terms": "Paslaugų teikimo sąlygos",
     "legal-terms-versions": "Sąlygų versijos",
-    "legal-privacy": "Privatumo politika",
+    "legal-privacy": "Privatumo politika (BDAR)",
     "legal-health-data": "JAV sveikatos duomenų privatumas",
     "legal-cookies": "Slapukų politika",
     "legal-providers": "Modelių teikėjai",
@@ -11295,15 +11295,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Kainos",
     "billing-card-change": "Atnaujinti kortelę",
     "billing-cancel": "Atšaukti planą",
-    "billing-withdraw": "Atsisakyti plano",
+    "billing-withdraw": "Sutarties atsisakymas",
     "legal-privacy-versions": "Visos šios politikos versijos"
   },
   "lv": {
     "ai-transparency": "MI pārredzamība",
-    "legal-notice": "Rekvizīti",
+    "legal-notice": "Uzņēmuma rekvizīti un kontakti",
     "legal-terms": "Pakalpojuma noteikumi",
     "legal-terms-versions": "Noteikumu versijas",
-    "legal-privacy": "Privātuma politika",
+    "legal-privacy": "Privātuma politika (VDAR)",
     "legal-health-data": "ASV veselības datu privātums",
     "legal-cookies": "Sīkdatņu politika",
     "legal-providers": "Modeļu pakalpojumu sniedzēji",
@@ -11312,15 +11312,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Cenas",
     "billing-card-change": "Atjaunināt karti",
     "billing-cancel": "Atcelt plānu",
-    "billing-withdraw": "Atteikties no plāna",
+    "billing-withdraw": "Atteikšanās no līguma",
     "legal-privacy-versions": "Visas šīs politikas versijas"
   },
   "mt": {
     "ai-transparency": "Trasparenza tal-IA",
-    "legal-notice": "Informazzjoni dwar il-kumpanija",
+    "legal-notice": "Dettalji tal-kumpanija u kuntatt",
     "legal-terms": "Termini tas-servizz",
     "legal-terms-versions": "Verżjonijiet tat-termini",
-    "legal-privacy": "Politika dwar il-privatezza",
+    "legal-privacy": "Politika dwar il-privatezza (GDPR)",
     "legal-health-data": "Privatezza tad-data tas-saħħa fl-Istati Uniti",
     "legal-cookies": "Politika dwar il-cookies",
     "legal-providers": "Fornituri tal-mudelli",
@@ -11329,15 +11329,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Prezzijiet",
     "billing-card-change": "Aġġorna l-karta",
     "billing-cancel": "Ikkanċella pjan",
-    "billing-withdraw": "Irtira minn pjan",
+    "billing-withdraw": "Irtira mill-kuntratt",
     "legal-privacy-versions": "Il-verżjonijiet kollha ta’ din il-politika"
   },
   "nl": {
     "ai-transparency": "AI-transparantie",
-    "legal-notice": "Wettelijke informatie",
+    "legal-notice": "Bedrijfsgegevens en contact",
     "legal-terms": "Servicevoorwaarden",
     "legal-terms-versions": "Versies van de voorwaarden",
-    "legal-privacy": "Privacybeleid",
+    "legal-privacy": "Privacybeleid (AVG)",
     "legal-health-data": "Gezondheidsgegevens (VS)",
     "legal-cookies": "Cookiebeleid",
     "legal-providers": "Modelaanbieders",
@@ -11346,15 +11346,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Prijzen",
     "billing-card-change": "Kaart bijwerken",
     "billing-cancel": "Abonnement opzeggen",
-    "billing-withdraw": "Abonnement herroepen",
+    "billing-withdraw": "Uw overeenkomst herroepen",
     "legal-privacy-versions": "Alle versies van dit beleid"
   },
   "pl": {
     "ai-transparency": "Przejrzystość AI",
-    "legal-notice": "Nota prawna",
+    "legal-notice": "Dane firmy i kontakt",
     "legal-terms": "Warunki świadczenia usług",
     "legal-terms-versions": "Wersje warunków",
-    "legal-privacy": "Polityka prywatności",
+    "legal-privacy": "Polityka prywatności (RODO)",
     "legal-health-data": "Prywatność danych dotyczących zdrowia (USA)",
     "legal-cookies": "Polityka plików cookie",
     "legal-providers": "Dostawcy modeli",
@@ -11363,15 +11363,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Cennik",
     "billing-card-change": "Zmień kartę",
     "billing-cancel": "Rezygnacja z planu",
-    "billing-withdraw": "Odstąpienie od planu",
+    "billing-withdraw": "Odstąpienie od umowy",
     "legal-privacy-versions": "Wszystkie wersje tej polityki"
   },
   "pt": {
     "ai-transparency": "Transparência da IA",
-    "legal-notice": "Aviso legal",
+    "legal-notice": "Dados da empresa e contacto",
     "legal-terms": "Termos de Serviço",
     "legal-terms-versions": "Versões dos Termos",
-    "legal-privacy": "Política de Privacidade",
+    "legal-privacy": "Política de Privacidade (RGPD)",
     "legal-health-data": "Privacidade de dados de saúde (EUA)",
     "legal-cookies": "Política de Cookies",
     "legal-providers": "Fornecedores de modelos",
@@ -11380,16 +11380,16 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Preços",
     "billing-card-change": "Atualizar cartão",
     "billing-cancel": "Cancelar um plano",
-    "billing-withdraw": "Livre resolução de um plano",
+    "billing-withdraw": "Livre resolução do contrato",
     "legal-privacy-versions": "Todas as versões desta política"
   },
   "ro": {},
   "ru": {
     "ai-transparency": "Прозрачность ИИ",
-    "legal-notice": "Информация о компании",
+    "legal-notice": "Сведения о компании и контакты",
     "legal-terms": "Условия использования",
     "legal-terms-versions": "Версии условий",
-    "legal-privacy": "Политика конфиденциальности",
+    "legal-privacy": "Политика конфиденциальности (GDPR)",
     "legal-health-data": "Конфиденциальность данных о здоровье (США)",
     "legal-cookies": "Политика использования файлов cookie",
     "legal-providers": "Поставщики моделей",
@@ -11398,15 +11398,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Цены",
     "billing-card-change": "Обновить карту",
     "billing-cancel": "Отменить тариф",
-    "billing-withdraw": "Отказаться от тарифа",
+    "billing-withdraw": "Отказ от договора",
     "legal-privacy-versions": "Все версии этой политики"
   },
   "sk": {
     "ai-transparency": "Transparentnosť AI",
-    "legal-notice": "Informácie o prevádzkovateľovi",
+    "legal-notice": "Údaje o spoločnosti a kontakt",
     "legal-terms": "Podmienky poskytovania služby",
     "legal-terms-versions": "Verzie podmienok",
-    "legal-privacy": "Zásady ochrany osobných údajov",
+    "legal-privacy": "Zásady ochrany osobných údajov (GDPR)",
     "legal-health-data": "Ochrana údajov o zdraví v USA",
     "legal-cookies": "Zásady používania súborov cookie",
     "legal-providers": "Poskytovatelia modelov",
@@ -11415,15 +11415,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Cenník",
     "billing-card-change": "Zmeniť kartu",
     "billing-cancel": "Zrušenie programu",
-    "billing-withdraw": "Odstúpenie od programu",
+    "billing-withdraw": "Odstúpenie od zmluvy",
     "legal-privacy-versions": "Všetky verzie týchto zásad"
   },
   "sl": {
     "ai-transparency": "Preglednost UI",
-    "legal-notice": "Impresum",
+    "legal-notice": "Podatki o družbi in kontakt",
     "legal-terms": "Pogoji uporabe",
     "legal-terms-versions": "Različice pogojev",
-    "legal-privacy": "Pravilnik o zasebnosti",
+    "legal-privacy": "Pravilnik o zasebnosti (GDPR)",
     "legal-health-data": "Zasebnost zdravstvenih podatkov (ZDA)",
     "legal-cookies": "Pravilnik o piškotkih",
     "legal-providers": "Ponudniki modelov",
@@ -11432,15 +11432,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Cene",
     "billing-card-change": "Posodobi kartico",
     "billing-cancel": "Preklic paketa",
-    "billing-withdraw": "Odstop od paketa",
+    "billing-withdraw": "Odstop od pogodbe",
     "legal-privacy-versions": "Vse različice tega pravilnika"
   },
   "sv": {
     "ai-transparency": "AI-transparens",
-    "legal-notice": "Juridisk information",
+    "legal-notice": "Företagsuppgifter och kontakt",
     "legal-terms": "Användarvillkor",
     "legal-terms-versions": "Versioner av villkoren",
-    "legal-privacy": "Integritetspolicy",
+    "legal-privacy": "Integritetspolicy (GDPR)",
     "legal-health-data": "Hälsouppgifter i USA",
     "legal-cookies": "Cookiepolicy",
     "legal-providers": "Modelleverantörer",
@@ -11449,15 +11449,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Priser",
     "billing-card-change": "Uppdatera kort",
     "billing-cancel": "Säg upp ett abonnemang",
-    "billing-withdraw": "Ångra ett abonnemang",
+    "billing-withdraw": "Ångra ditt avtal",
     "legal-privacy-versions": "Alla versioner av den här policyn"
   },
   "tr": {
     "ai-transparency": "Yapay zekâ şeffaflığı",
-    "legal-notice": "Yasal Bilgiler",
+    "legal-notice": "Şirket bilgileri ve iletişim",
     "legal-terms": "Hizmet Koşulları",
     "legal-terms-versions": "Koşulların sürümleri",
-    "legal-privacy": "Gizlilik Politikası",
+    "legal-privacy": "Gizlilik Politikası (GDPR)",
     "legal-health-data": "ABD sağlık verileri gizliliği",
     "legal-cookies": "Çerez Politikası",
     "legal-providers": "Model sağlayıcıları",
@@ -11466,15 +11466,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Fiyatlar",
     "billing-card-change": "Kartı güncelle",
     "billing-cancel": "Plan iptali",
-    "billing-withdraw": "Plandan cayma",
+    "billing-withdraw": "Sözleşmeden cayma",
     "legal-privacy-versions": "Bu politikanın tüm sürümleri"
   },
   "uk": {
     "ai-transparency": "Прозорість ШІ",
-    "legal-notice": "Інформація про компанію",
+    "legal-notice": "Реквізити компанії та контакти",
     "legal-terms": "Умови надання послуг",
     "legal-terms-versions": "Версії умов",
-    "legal-privacy": "Політика конфіденційності",
+    "legal-privacy": "Політика конфіденційності (GDPR)",
     "legal-health-data": "Конфіденційність даних про здоров’я (США)",
     "legal-cookies": "Політика щодо файлів cookie",
     "legal-providers": "Постачальники моделей",
@@ -11483,15 +11483,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Ціни",
     "billing-card-change": "Оновити картку",
     "billing-cancel": "Скасувати план",
-    "billing-withdraw": "Відмовитися від плану",
+    "billing-withdraw": "Відмова від договору",
     "legal-privacy-versions": "Усі версії цієї політики"
   },
   "vi": {
     "ai-transparency": "Minh bạch về AI",
-    "legal-notice": "Thông tin pháp lý",
+    "legal-notice": "Thông tin công ty và liên hệ",
     "legal-terms": "Điều khoản dịch vụ",
     "legal-terms-versions": "Các phiên bản điều khoản",
-    "legal-privacy": "Chính sách quyền riêng tư",
+    "legal-privacy": "Chính sách quyền riêng tư (GDPR)",
     "legal-health-data": "Quyền riêng tư dữ liệu sức khỏe (Hoa Kỳ)",
     "legal-cookies": "Chính sách cookie",
     "legal-providers": "Nhà cung cấp mô hình",
@@ -11500,15 +11500,15 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Bảng giá",
     "billing-card-change": "Cập nhật thẻ",
     "billing-cancel": "Hủy gói",
-    "billing-withdraw": "Rút lại gói",
+    "billing-withdraw": "Rút lại hợp đồng",
     "legal-privacy-versions": "Tất cả phiên bản của chính sách này"
   },
   "zh": {
     "ai-transparency": "AI 透明度",
-    "legal-notice": "法律声明",
+    "legal-notice": "公司信息与联系方式",
     "legal-terms": "服务条款",
     "legal-terms-versions": "服务条款历史版本",
-    "legal-privacy": "隐私政策",
+    "legal-privacy": "隐私政策（GDPR）",
     "legal-health-data": "美国健康数据隐私",
     "legal-cookies": "Cookie 政策",
     "legal-providers": "模型提供商",
@@ -11517,7 +11517,7 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "价格",
     "billing-card-change": "更新银行卡",
     "billing-cancel": "取消方案",
-    "billing-withdraw": "撤回方案",
+    "billing-withdraw": "撤回合同",
     "legal-privacy-versions": "本政策的所有版本"
   }
 } as const satisfies Readonly<Record<SupportLanguage, Readonly<Record<string, string>>>>;

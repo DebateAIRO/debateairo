@@ -98,11 +98,11 @@ describe("the public page's words", () => {
       expect(line.replace(/\{[a-zA-Z]+\}/gu, ""), key).not.toMatch(/\d|[$€£]|\bscore|\bthreshold|\bcredit|\bpublic_|\b[A-Z_]{4,}\b/u);
     }
   });
-  it("Romanian has its own v4 catalogue; the other 33 languages have none and read the English one", () => {
+  it("every language has its own v4 catalogue (the other 33 since 24 November 2026)", () => {
     const locales = readdirSync(messages, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
     const withV4 = locales.filter((locale) => readdirSync(resolve(messages, locale)).includes("v4.json"));
-    expect(withV4.sort()).toEqual(["en", "ro"]);
-    expect(locales.length - withV4.length).toBe(33);
+    expect(withV4.sort()).toEqual([...locales].sort());
+    expect(withV4).toHaveLength(35);
   });
 });
 

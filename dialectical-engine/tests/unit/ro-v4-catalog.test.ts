@@ -88,11 +88,22 @@ describe("the v4 namespace loader", () => {
     for (const key of Object.keys(english)) expect(loaded[key], key).toBeTruthy();
   });
 
-  it("serves every other language the English file, English regional choices included", async () => {
+  it("serves English, regional choices included, the English file, and every other language its own file over English", async () => {
     const { loadNamespace } = await import(serverModule) as { loadNamespace: (locale: string, namespace: string) => Promise<Catalog> };
-    const others = [...LOCALES.map(({ code }) => code).filter((code) => code !== "ro"), "en-US", "en-GB"];
-    expect(others).toHaveLength(36);
-    for (const code of others) expect(await loadNamespace(code, "v4"), code).toEqual(english);
+    for (const code of ["en", "en-US", "en-GB"]) expect(await loadNamespace(code, "v4"), code).toEqual(english);
+    const others = LOCALES.map(({ code }) => code).filter((code) => code !== "en" && code !== "ro");
+    expect(others).toHaveLength(33);
+    const templates = (key: string): boolean => key.startsWith("v4.askText.") || key.startsWith("v4.digText.");
+    for (const code of others) {
+      const loaded = await loadNamespace(code, "v4");
+      const own = JSON.parse(raw(code)) as Catalog;
+      for (const key of Object.keys(english)) expect(loaded[key], `${code} ${key}`).toBeTruthy();
+      for (const [key, value] of Object.entries(own)) expect(loaded[key], `${code} ${key}`).toBe(value);
+      // Its own words, not English: the title of the ask screen is translated in every language.
+      expect(loaded["v4.ask.title"], code).not.toBe(english["v4.ask.title"]);
+      // The dig and ask templates stay in English in every catalogue (lib/v4/askText.ts reads them back).
+      for (const key of Object.keys(english).filter(templates)) expect(own[key], `${code} ${key}`).toBe(english[key]);
+    }
   });
 
   it("shows the English text, never the raw key, for a key the Romanian file lacks", async () => {

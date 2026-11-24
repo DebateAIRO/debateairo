@@ -18,7 +18,8 @@ import { legalEffectiveDay, legalText, type LegalKind as ResetKind } from "../su
  * language's Terms of Service and Privacy Policy say 1.1 in their eyebrow, end marker and version line, and the same
  * effective day (the number and the day change for all languages together, the day with legal-redate.mjs); the
  * languages the release offers carry one change summary, "Version
- * 1.1 replaced version 1.0", and the others none, since their text still follows an older English one; the floors stay
+ * 1.1 replaced version 1.0", and so does, in its own words, every other language since its text was brought up to the
+ * English 1.1 (24 November 2026); a language whose text follows an older English one carries none; the floors stay
  * 1.0, so nobody who accepted 1.0 is asked again; the archive holds exactly the 1.0 and 1.1 texts of the languages the
  * release offers; /terms/versions lists 1.1, in force, and 1.0, linked to its archived English text.
  */
@@ -49,6 +50,9 @@ const LAUNCH: Readonly<Record<ResetKind, Readonly<Record<string, string>>>> = {
     ro: "f5f5e9aae947daa2d85b6908e4fc96fa769bd642b4d0c557d5db3f99e3da8109"
   }
 };
+/** Whether both of a language's texts are recorded as translated from the current English text (apps/ui/legal/translated-from.json). */
+const TRANSLATED_FROM = JSON.parse(readFileSync(resolve(root, "apps/ui/legal/translated-from.json"), "utf8")) as Record<ResetKind, Record<string, { sha256: string }>>;
+const FOLLOWS_ENGLISH = (code: string): boolean => KINDS.every((kind) => TRANSLATED_FROM[kind][code]?.sha256 === sha(draft(kind, "en")));
 /** Each offered language's change summary opens with these words: version 1.1 replaced version 1.0. */
 const REPLACED: Readonly<Record<string, string>> = {
   en: "Version 1.1 replaced version 1.0: ",
@@ -68,7 +72,7 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, 1.1 now", 
     expect(currentDocument(kind, code)).toEqual({ version: "1.1", sha256: sha(text) });
   });
 
-  it.each(CODES.map((code) => [code]))("%s: one change summary in the languages the release offers, none in the others", (code) => {
+  it.each(CODES.map((code) => [code]))("%s: one change summary, in the release's languages word for word and in every translation that follows the English text", (code) => {
     // The Terms' section 14: its three paragraphs on changes, the last pointing to the versions page, then the summary.
     const terms = section14(draft("TERMS", code));
     expect(terms[3], "the Terms point to their versions page").toContain("dezbatere.ro/terms/versions");
@@ -85,6 +89,15 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, 1.1 now", 
       expect(privacy[2]!.split(REPLACED[code]!), "the Privacy Policy's summary, once").toHaveLength(2);
       expect(privacy[2], "it names the sections it changed").toMatch(/ 5 .* 4 /u);
       expect(privacy[2], "and names no other version").not.toMatch(/(?<![\d.])(?!1\.[01](?!\d))\d\.\d+(?!\d)/u);
+    } else if (FOLLOWS_ENGLISH(code)) {
+      // Not offered, but translated from the current English text: the same summary, in its own words.
+      expect(terms, "the Terms' section 14 and its summary").toHaveLength(5);
+      for (const summary of [terms[4]!, privacy[2]!]) {
+        expect(summary, "it names both versions").toMatch(/(?<![\d.])1\.1(?!\d)/u);
+        expect(summary, "it names both versions").toMatch(/(?<![\d.])1\.0(?!\d)/u);
+        expect(summary, "and names no other version").not.toMatch(/(?<![\d.])(?!1\.[01](?!\d))\d\.\d+(?!\d)/u);
+        expect(summary, "it names the company the change is about").toContain("DeepInfra");
+      }
     } else {
       expect(terms, "the Terms' section 14").toHaveLength(4);
       expect(privacy[2], "and no version").not.toMatch(/(?<![\d.])\d\.\d+(?![\d])/u);

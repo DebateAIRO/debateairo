@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Private Debatte",
   "debateChrome.privateDebateDeleted": "Private Debatte gelöscht",
   "debateChrome.privateDebateDeletionProcessing": "Löschung der privaten Debatte wird verarbeitet",
-  "debateChrome.privateDebateDeletedDetail": "Diese Debatte ist ein Löschvermerk. Ihr verschlüsselter privater Inhalt ist dauerhaft unlesbar.",
+  "debateChrome.privateDebateDeletedDetail": "Diese Debatte ist ein Löschvermerk. Ihr verschlüsselter privater Inhalt ist hier nicht mehr lesbar. Unsere Sicherungskopien können ihn noch enthalten (Datenschutzerklärung, Abschnitt 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Der private Inhalt ist nicht mehr verfügbar, während die dauerhafte Schlüsselbereinigung abgeschlossen wird.",
   "debateChrome.tree.building": "Argumentbaum wird aufgebaut…",
   "debateChrome.tree.notProduced": "Für diese Debatte wurde kein Argumentbaum erzeugt.",

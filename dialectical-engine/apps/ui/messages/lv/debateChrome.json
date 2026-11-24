@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Privātas debates",
   "debateChrome.privateDebateDeleted": "Privātās debates dzēstas",
   "debateChrome.privateDebateDeletionProcessing": "Notiek privāto debašu dzēšana",
-  "debateChrome.privateDebateDeletedDetail": "Šīs debates ir dzēstas; saglabājies tikai dzēšanas ieraksts. To šifrētais privātais saturs ir neatgriezeniski nelasāms.",
+  "debateChrome.privateDebateDeletedDetail": "Šīs debates ir dzēstas; saglabājies tikai dzēšanas ieraksts. To šifrēto privāto saturu šeit vairs nevar nolasīt. Mūsu rezerves kopijās tas vēl var būt saglabāts (Privātuma politikas 7. sadaļa).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Kamēr tiek pabeigta pastāvīgās atslēgas tīrīšana, privātais saturs vairs nav pieejams.",
   "debateChrome.tree.building": "Veido argumentu koku…",
   "debateChrome.tree.notProduced": "Šīm debatēm argumentu koks netika izveidots.",

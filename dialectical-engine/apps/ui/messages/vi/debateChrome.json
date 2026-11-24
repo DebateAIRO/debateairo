@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Cuộc tranh luận riêng tư",
   "debateChrome.privateDebateDeleted": "Đã xóa cuộc tranh luận riêng tư",
   "debateChrome.privateDebateDeletionProcessing": "Đang xử lý việc xóa cuộc tranh luận riêng tư",
-  "debateChrome.privateDebateDeletedDetail": "Cuộc tranh luận này chỉ còn là một bản ghi đánh dấu đã xóa. Nội dung riêng tư được mã hóa của nó vĩnh viễn không thể đọc được.",
+  "debateChrome.privateDebateDeletedDetail": "Cuộc tranh luận này chỉ còn là một bản ghi đánh dấu đã xóa. Nội dung riêng tư được mã hóa của nó không còn đọc được ở đây. Các bản sao lưu của chúng tôi vẫn có thể giữ nó (Chính sách quyền riêng tư, mục 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Nội dung riêng tư không còn khả dụng trong khi quá trình dọn dẹp khóa bền vững hoàn tất.",
   "debateChrome.tree.building": "Đang xây dựng cây lập luận…",
   "debateChrome.tree.notProduced": "Không tạo được cây lập luận cho cuộc tranh luận này.",

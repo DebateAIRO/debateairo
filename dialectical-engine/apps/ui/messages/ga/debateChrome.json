@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Díospóireacht phríobháideach",
   "debateChrome.privateDebateDeleted": "Díospóireacht phríobháideach scriosta",
   "debateChrome.privateDebateDeletionProcessing": "Tá scriosadh na díospóireachta príobháidí á phróiseáil",
-  "debateChrome.privateDebateDeletedDetail": "Is leac thuama í an díospóireacht seo. Ní féidir a hábhar príobháideach criptithe a léamh choíche arís.",
+  "debateChrome.privateDebateDeletedDetail": "Is leac thuama í an díospóireacht seo. Ní féidir a hábhar príobháideach criptithe a léamh anseo a thuilleadh. D’fhéadfadh sé a bheith fós inár gcúltacaí (Beartas Príobháideachais, alt 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Níl ábhar príobháideach ar fáil a thuilleadh agus glanadh buan na heochrach á chur i gcrích.",
   "debateChrome.tree.building": "Crann na n-argóintí á thógáil…",
   "debateChrome.tree.notProduced": "Níor táirgeadh crann argóintí don díospóireacht seo.",

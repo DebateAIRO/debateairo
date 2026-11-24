@@ -86,7 +86,8 @@ describe("the plan on the drafts as they are", () => {
       CODES.flatMap((code) => [`apps/ui/legal/${code}/privacy-policy.md`, `apps/ui/legal/${code}/terms-of-service.md`]).sort());
     for (const draft of result.drafts) {
       const code = draft.path.split("/")[3]!;
-      const following = ["en", "fr", "ro"].includes(code) && draft.path.endsWith("privacy-policy.md");
+      // Every translation follows the current English text (24 November 2026), so each Privacy Policy's last-updated day moves too.
+      const following = draft.path.endsWith("privacy-policy.md");
       expect(draft.lines.map((line) => line.before.slice(0, 9)).slice(0, 2), draft.path).toEqual(["eyebrow: ", "**Version"]);
       expect(draft.lines, draft.path).toHaveLength(following ? 3 : 2);
       if (following) {
@@ -97,7 +98,8 @@ describe("the plan on the drafts as they are", () => {
       expect(draft.after).toContain(legalDayText(code, next, "eyebrow"));
       expect(draft.after.split("\n").length).toBe(readFileSync(resolve(root, draft.path), "utf8").split("\n").length);
     }
-    expect(result.retranslate).toEqual({ PRIVACY: ["fr", "ro"], TERMS: ["fr", "ro"] });
+    const translations = CODES.filter((code) => code !== "en");
+    expect(result.retranslate).toEqual({ PRIVACY: translations, TERMS: translations });
   });
 
   it("removes the archive copies of the current version only; the 1.0 copies are never touched or asked about", () => {

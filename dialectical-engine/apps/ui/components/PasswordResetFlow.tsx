@@ -7,10 +7,10 @@ import { focusIsLost } from "@/lib/focusGuard";
 import { useFormAnnouncer } from "@/components/auth/InlineFieldMessage";
 import { useAlertRegion, useDeadlineWarning, useStepFocus } from "@/components/auth/timedStep";
 import { API_BASE, createRecoveryFetch, holdsNoPasswordReset } from "@/lib/api";
-import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import type { LocaleCode } from "@/lib/i18n/locales";
+import { dateLocale, t, type MessageCatalog } from "@/lib/i18n/translate";
 import english from "@/messages/en/password-reset.json";
 import mfaEnglish from "@/messages/en/mfa-recovery.json";
-import mfaRomanian from "@/messages/ro/mfa-recovery.json";
 
 const browserClient = createPasswordResetClient(createRecoveryFetch(API_BASE), API_BASE);
 type Phase = "request" | "sent" | "email_link" | "cancel_link" | "password_required" | "completed" | "cancelled" | "refused" | "expired";
@@ -20,8 +20,8 @@ const navigateToAuthenticatorRecovery = () => { window.location.assign("/recover
 type Field = "password" | "confirmation" | "code";
 const FIELD_ID: Readonly<Record<Field, string>> = { password: "password-reset-password", confirmation: "password-reset-confirmation", code: "password-reset-code" };
 
-export function PasswordResetFlow({ catalog = english, locale = "en", client = browserClient, onRecoverAccess = navigateToRecovery, onRecoverAuthenticator = navigateToAuthenticatorRecovery }: Readonly<{
-  catalog?: MessageCatalog; locale?: "en" | "ro"; client?: PasswordResetClient; onRecoverAccess?: () => void; onRecoverAuthenticator?: () => void;
+export function PasswordResetFlow({ catalog = english, mfaCatalog = mfaEnglish, locale = "en", client = browserClient, onRecoverAccess = navigateToRecovery, onRecoverAuthenticator = navigateToAuthenticatorRecovery }: Readonly<{
+  catalog?: MessageCatalog; mfaCatalog?: MessageCatalog; locale?: LocaleCode; client?: PasswordResetClient; onRecoverAccess?: () => void; onRecoverAuthenticator?: () => void;
 }>) {
   const [phase, setPhase] = useState<Phase>("request");
   const [email, setEmail] = useState("");
@@ -46,7 +46,7 @@ export function PasswordResetFlow({ catalog = english, locale = "en", client = b
   // control that was pressed; focus goes to it, unless the person has already moved on.
   const checkState = useRef<HTMLButtonElement>(null);
   const text = (key: string, values: Record<string, string | number> = {}) => t(catalog, key, values);
-  const methodText = (key: string) => t(locale === "ro" ? mfaRomanian : mfaEnglish, key);
+  const methodText = (key: string) => t(mfaCatalog, key);
   // The server's 30-minute reset session (WCAG 2.2.1): the deadline is shown, a polite region that is always
   // mounted warns about a minute before it, and an alert says when it ran out. No lifetime is changed here.
   const announcer = useFormAnnouncer(), expiry = useAlertRegion();
@@ -190,7 +190,7 @@ export function PasswordResetFlow({ catalog = english, locale = "en", client = b
         : phase === "sent" || phase === "expired" ? <p className="authFieldHint">{text("fallback.pending")}</p> : null}
   </>}>
     {announcer.region}{expiry.region}
-    {phase === "password_required" && expiresAt && <p className="authFieldHint">{text("deadline")} <time dateTime={expiresAt}>{new Intl.DateTimeFormat(locale === "ro" ? "ro-RO" : "en-GB", { hour: "2-digit", minute: "2-digit" }).format(new Date(expiresAt))}</time></p>}
+    {phase === "password_required" && expiresAt && <p className="authFieldHint">{text("deadline")} <time dateTime={expiresAt}>{new Intl.DateTimeFormat(dateLocale(locale), { hour: "2-digit", minute: "2-digit" }).format(new Date(expiresAt))}</time></p>}
     {warning && <p className="authFieldHint">{text("deadline.warning")}</p>}
     {error && <div className="authAlert" id="password-reset-error" role="alert">{error}</div>}
     {notice && <p className="authFieldHint" role="status">{notice}</p>}

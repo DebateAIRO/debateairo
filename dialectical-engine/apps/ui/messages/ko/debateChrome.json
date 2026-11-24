@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "비공개 토론",
   "debateChrome.privateDebateDeleted": "비공개 토론 삭제됨",
   "debateChrome.privateDebateDeletionProcessing": "비공개 토론 삭제 처리 중",
-  "debateChrome.privateDebateDeletedDetail": "이 토론은 삭제 표식입니다. 암호화된 비공개 콘텐츠는 영구적으로 읽을 수 없습니다.",
+  "debateChrome.privateDebateDeletedDetail": "이 토론은 삭제 표식입니다. 암호화된 비공개 콘텐츠는 더 이상 여기에서 읽을 수 없습니다. 당사 백업에는 아직 남아 있을 수 있습니다(개인정보 처리방침 제7조).",
   "debateChrome.privateDebateDeletionProcessingDetail": "영구 키 정리가 완료될 때까지 비공개 콘텐츠를 이용할 수 없습니다.",
   "debateChrome.tree.building": "논거 트리 구성 중…",
   "debateChrome.tree.notProduced": "이 토론에서 생성된 논거 트리가 없습니다.",

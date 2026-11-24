@@ -38,9 +38,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/ar/misc.json"),
       legal: () => import("../../messages/ar/legal.json"),
       billing: () => import("../../messages/ar/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/ar/password-reset.json"),
       "mfa-recovery": () => import("../../messages/ar/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/ar/v4.json"), import("../../messages/en/v4.json"))
     },
     bg: {
       chrome: () => import("../../messages/bg/chrome.json"),
@@ -59,9 +59,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/bg/misc.json"),
       legal: () => import("../../messages/bg/legal.json"),
       billing: () => import("../../messages/bg/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/bg/password-reset.json"),
       "mfa-recovery": () => import("../../messages/bg/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/bg/v4.json"), import("../../messages/en/v4.json"))
     },
     cs: {
       chrome: () => import("../../messages/cs/chrome.json"),
@@ -80,9 +80,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/cs/misc.json"),
       legal: () => import("../../messages/cs/legal.json"),
       billing: () => import("../../messages/cs/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/cs/password-reset.json"),
       "mfa-recovery": () => import("../../messages/cs/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/cs/v4.json"), import("../../messages/en/v4.json"))
     },
     da: {
       chrome: () => import("../../messages/da/chrome.json"),
@@ -101,9 +101,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/da/misc.json"),
       legal: () => import("../../messages/da/legal.json"),
       billing: () => import("../../messages/da/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/da/password-reset.json"),
       "mfa-recovery": () => import("../../messages/da/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/da/v4.json"), import("../../messages/en/v4.json"))
     },
     de: {
       chrome: () => import("../../messages/de/chrome.json"),
@@ -122,9 +122,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/de/misc.json"),
       legal: () => import("../../messages/de/legal.json"),
       billing: () => import("../../messages/de/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/de/password-reset.json"),
       "mfa-recovery": () => import("../../messages/de/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/de/v4.json"), import("../../messages/en/v4.json"))
     },
     el: {
       chrome: () => import("../../messages/el/chrome.json"),
@@ -143,9 +143,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/el/misc.json"),
       legal: () => import("../../messages/el/legal.json"),
       billing: () => import("../../messages/el/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/el/password-reset.json"),
       "mfa-recovery": () => import("../../messages/el/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/el/v4.json"), import("../../messages/en/v4.json"))
     },
     en: {
       chrome: () => import("../../messages/en/chrome.json"),
@@ -185,9 +185,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/es/misc.json"),
       legal: () => import("../../messages/es/legal.json"),
       billing: () => import("../../messages/es/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/es/password-reset.json"),
       "mfa-recovery": () => import("../../messages/es/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/es/v4.json"), import("../../messages/en/v4.json"))
     },
     et: {
       chrome: () => import("../../messages/et/chrome.json"),
@@ -206,9 +206,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/et/misc.json"),
       legal: () => import("../../messages/et/legal.json"),
       billing: () => import("../../messages/et/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/et/password-reset.json"),
       "mfa-recovery": () => import("../../messages/et/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/et/v4.json"), import("../../messages/en/v4.json"))
     },
     fi: {
       chrome: () => import("../../messages/fi/chrome.json"),
@@ -227,9 +227,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/fi/misc.json"),
       legal: () => import("../../messages/fi/legal.json"),
       billing: () => import("../../messages/fi/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/fi/password-reset.json"),
       "mfa-recovery": () => import("../../messages/fi/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/fi/v4.json"), import("../../messages/en/v4.json"))
     },
     fr: {
       chrome: () => import("../../messages/fr/chrome.json"),
@@ -248,9 +248,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/fr/misc.json"),
       legal: () => import("../../messages/fr/legal.json"),
       billing: () => import("../../messages/fr/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/fr/password-reset.json"),
       "mfa-recovery": () => import("../../messages/fr/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/fr/v4.json"), import("../../messages/en/v4.json"))
     },
     ga: {
       chrome: () => import("../../messages/ga/chrome.json"),
@@ -269,9 +269,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/ga/misc.json"),
       legal: () => import("../../messages/ga/legal.json"),
       billing: () => import("../../messages/ga/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/ga/password-reset.json"),
       "mfa-recovery": () => import("../../messages/ga/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/ga/v4.json"), import("../../messages/en/v4.json"))
     },
     he: {
       chrome: () => import("../../messages/he/chrome.json"),
@@ -290,9 +290,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/he/misc.json"),
       legal: () => import("../../messages/he/legal.json"),
       billing: () => import("../../messages/he/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/he/password-reset.json"),
       "mfa-recovery": () => import("../../messages/he/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/he/v4.json"), import("../../messages/en/v4.json"))
     },
     hi: {
       chrome: () => import("../../messages/hi/chrome.json"),
@@ -311,9 +311,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/hi/misc.json"),
       legal: () => import("../../messages/hi/legal.json"),
       billing: () => import("../../messages/hi/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/hi/password-reset.json"),
       "mfa-recovery": () => import("../../messages/hi/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/hi/v4.json"), import("../../messages/en/v4.json"))
     },
     hr: {
       chrome: () => import("../../messages/hr/chrome.json"),
@@ -332,9 +332,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/hr/misc.json"),
       legal: () => import("../../messages/hr/legal.json"),
       billing: () => import("../../messages/hr/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/hr/password-reset.json"),
       "mfa-recovery": () => import("../../messages/hr/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/hr/v4.json"), import("../../messages/en/v4.json"))
     },
     hu: {
       chrome: () => import("../../messages/hu/chrome.json"),
@@ -353,9 +353,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/hu/misc.json"),
       legal: () => import("../../messages/hu/legal.json"),
       billing: () => import("../../messages/hu/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/hu/password-reset.json"),
       "mfa-recovery": () => import("../../messages/hu/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/hu/v4.json"), import("../../messages/en/v4.json"))
     },
     id: {
       chrome: () => import("../../messages/id/chrome.json"),
@@ -374,9 +374,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/id/misc.json"),
       legal: () => import("../../messages/id/legal.json"),
       billing: () => import("../../messages/id/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/id/password-reset.json"),
       "mfa-recovery": () => import("../../messages/id/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/id/v4.json"), import("../../messages/en/v4.json"))
     },
     it: {
       chrome: () => import("../../messages/it/chrome.json"),
@@ -395,9 +395,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/it/misc.json"),
       legal: () => import("../../messages/it/legal.json"),
       billing: () => import("../../messages/it/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/it/password-reset.json"),
       "mfa-recovery": () => import("../../messages/it/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/it/v4.json"), import("../../messages/en/v4.json"))
     },
     ja: {
       chrome: () => import("../../messages/ja/chrome.json"),
@@ -416,9 +416,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/ja/misc.json"),
       legal: () => import("../../messages/ja/legal.json"),
       billing: () => import("../../messages/ja/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/ja/password-reset.json"),
       "mfa-recovery": () => import("../../messages/ja/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/ja/v4.json"), import("../../messages/en/v4.json"))
     },
     ko: {
       chrome: () => import("../../messages/ko/chrome.json"),
@@ -437,9 +437,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/ko/misc.json"),
       legal: () => import("../../messages/ko/legal.json"),
       billing: () => import("../../messages/ko/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/ko/password-reset.json"),
       "mfa-recovery": () => import("../../messages/ko/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/ko/v4.json"), import("../../messages/en/v4.json"))
     },
     lt: {
       chrome: () => import("../../messages/lt/chrome.json"),
@@ -458,9 +458,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/lt/misc.json"),
       legal: () => import("../../messages/lt/legal.json"),
       billing: () => import("../../messages/lt/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/lt/password-reset.json"),
       "mfa-recovery": () => import("../../messages/lt/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/lt/v4.json"), import("../../messages/en/v4.json"))
     },
     lv: {
       chrome: () => import("../../messages/lv/chrome.json"),
@@ -479,9 +479,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/lv/misc.json"),
       legal: () => import("../../messages/lv/legal.json"),
       billing: () => import("../../messages/lv/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/lv/password-reset.json"),
       "mfa-recovery": () => import("../../messages/lv/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/lv/v4.json"), import("../../messages/en/v4.json"))
     },
     mt: {
       chrome: () => import("../../messages/mt/chrome.json"),
@@ -500,9 +500,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/mt/misc.json"),
       legal: () => import("../../messages/mt/legal.json"),
       billing: () => import("../../messages/mt/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/mt/password-reset.json"),
       "mfa-recovery": () => import("../../messages/mt/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/mt/v4.json"), import("../../messages/en/v4.json"))
     },
     nl: {
       chrome: () => import("../../messages/nl/chrome.json"),
@@ -521,9 +521,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/nl/misc.json"),
       legal: () => import("../../messages/nl/legal.json"),
       billing: () => import("../../messages/nl/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/nl/password-reset.json"),
       "mfa-recovery": () => import("../../messages/nl/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/nl/v4.json"), import("../../messages/en/v4.json"))
     },
     pl: {
       chrome: () => import("../../messages/pl/chrome.json"),
@@ -542,9 +542,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/pl/misc.json"),
       legal: () => import("../../messages/pl/legal.json"),
       billing: () => import("../../messages/pl/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/pl/password-reset.json"),
       "mfa-recovery": () => import("../../messages/pl/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/pl/v4.json"), import("../../messages/en/v4.json"))
     },
     pt: {
       chrome: () => import("../../messages/pt/chrome.json"),
@@ -563,9 +563,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/pt/misc.json"),
       legal: () => import("../../messages/pt/legal.json"),
       billing: () => import("../../messages/pt/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/pt/password-reset.json"),
       "mfa-recovery": () => import("../../messages/pt/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/pt/v4.json"), import("../../messages/en/v4.json"))
     },
     ro: {
       chrome: () => import("../../messages/ro/chrome.json"),
@@ -586,7 +586,7 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       billing: () => import("../../messages/ro/billing.json"),
       "password-reset": () => import("../../messages/ro/password-reset.json"),
       "mfa-recovery": () => import("../../messages/ro/mfa-recovery.json"),
-      // The V4 screens have their own Romanian catalogue; every other language reads the English one.
+      // English sits under every language's V4 catalogue, so a text added in English first still shows as words.
       v4: () => overEnglish(import("../../messages/ro/v4.json"), import("../../messages/en/v4.json"))
     },
     ru: {
@@ -606,9 +606,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/ru/misc.json"),
       legal: () => import("../../messages/ru/legal.json"),
       billing: () => import("../../messages/ru/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/ru/password-reset.json"),
       "mfa-recovery": () => import("../../messages/ru/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/ru/v4.json"), import("../../messages/en/v4.json"))
     },
     sk: {
       chrome: () => import("../../messages/sk/chrome.json"),
@@ -627,9 +627,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/sk/misc.json"),
       legal: () => import("../../messages/sk/legal.json"),
       billing: () => import("../../messages/sk/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/sk/password-reset.json"),
       "mfa-recovery": () => import("../../messages/sk/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/sk/v4.json"), import("../../messages/en/v4.json"))
     },
     sl: {
       chrome: () => import("../../messages/sl/chrome.json"),
@@ -648,9 +648,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/sl/misc.json"),
       legal: () => import("../../messages/sl/legal.json"),
       billing: () => import("../../messages/sl/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/sl/password-reset.json"),
       "mfa-recovery": () => import("../../messages/sl/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/sl/v4.json"), import("../../messages/en/v4.json"))
     },
     sv: {
       chrome: () => import("../../messages/sv/chrome.json"),
@@ -669,9 +669,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/sv/misc.json"),
       legal: () => import("../../messages/sv/legal.json"),
       billing: () => import("../../messages/sv/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/sv/password-reset.json"),
       "mfa-recovery": () => import("../../messages/sv/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/sv/v4.json"), import("../../messages/en/v4.json"))
     },
     tr: {
       chrome: () => import("../../messages/tr/chrome.json"),
@@ -690,9 +690,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/tr/misc.json"),
       legal: () => import("../../messages/tr/legal.json"),
       billing: () => import("../../messages/tr/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/tr/password-reset.json"),
       "mfa-recovery": () => import("../../messages/tr/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/tr/v4.json"), import("../../messages/en/v4.json"))
     },
     uk: {
       chrome: () => import("../../messages/uk/chrome.json"),
@@ -711,9 +711,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/uk/misc.json"),
       legal: () => import("../../messages/uk/legal.json"),
       billing: () => import("../../messages/uk/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/uk/password-reset.json"),
       "mfa-recovery": () => import("../../messages/uk/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/uk/v4.json"), import("../../messages/en/v4.json"))
     },
     vi: {
       chrome: () => import("../../messages/vi/chrome.json"),
@@ -732,9 +732,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/vi/misc.json"),
       legal: () => import("../../messages/vi/legal.json"),
       billing: () => import("../../messages/vi/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/vi/password-reset.json"),
       "mfa-recovery": () => import("../../messages/vi/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/vi/v4.json"), import("../../messages/en/v4.json"))
     },
     zh: {
       chrome: () => import("../../messages/zh/chrome.json"),
@@ -753,9 +753,9 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       misc: () => import("../../messages/zh/misc.json"),
       legal: () => import("../../messages/zh/legal.json"),
       billing: () => import("../../messages/zh/billing.json"),
-      "password-reset": () => import("../../messages/en/password-reset.json"),
+      "password-reset": () => import("../../messages/zh/password-reset.json"),
       "mfa-recovery": () => import("../../messages/zh/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      v4: () => overEnglish(import("../../messages/zh/v4.json"), import("../../messages/en/v4.json"))
     }
   });
 

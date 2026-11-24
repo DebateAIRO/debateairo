@@ -32,6 +32,10 @@ const R22_PUBLIC = resolve(process.cwd(), "tests/support/fixtures/support-routin
 // changed words. That query now finds only the legal notice's own help article; the two articles that matched the old
 // words "Legal notice" drop out. Actions, recovery sources and source policy stay as they were, on all 66 rows.
 const COMPANY_DETAILS = resolve(process.cwd(), "tests/support/fixtures/support-routing-company-details-overlay.json");
+// 24 November 2026: every language was brought in line with the English texts, so the footer links to /legal and to the
+// Privacy Policy changed words in some of them (queries 7 and 10, each language's own label). 23 rows moved: the articles
+// found for those two labels, and on one Danish row the action offered. Recovery sources and source policy are unchanged.
+const TRANSLATIONS = resolve(process.cwd(), "tests/support/fixtures/support-routing-translations-2026-11-24-overlay.json");
 const QUERY_KEYS = [
   "chrome:chrome.aiTransparency", "chrome:chrome.legal.notice", "chrome:chrome.legal.terms", "chrome:chrome.legal.versions",
   "chrome:chrome.legal.privacy", "chrome:chrome.legal.health", "chrome:chrome.legal.cookies", "chrome:chrome.legal.providers",
@@ -131,6 +135,13 @@ describe("S05 33-locale routing pin (SPEC-v5 R10, R13)", () => {
       expect(current[0]!.split(","), key).toEqual([...legalNoticeArticles]);
       for (const source of current[0]!.split(",")) expect(prior[0]!.split(","), key).toContain(source);
     }
-    expect(now).toEqual({...beforeCompanyDetails,...companyDetails});
+    const translations = JSON.parse(readFileSync(TRANSLATIONS, "utf8")) as Record<string,string>;
+    const beforeTranslations = {...beforeCompanyDetails,...companyDetails};
+    expect(Object.keys(translations)).toHaveLength(23);
+    for (const [key,value] of Object.entries(translations)) {
+      expect(["7", "10"], key).toContain(key.split("|")[2]);
+      expect(value.split("|").slice(2), key).toEqual(beforeTranslations[key]!.split("|").slice(2));
+    }
+    expect(now).toEqual({...beforeTranslations,...translations});
   });
 });

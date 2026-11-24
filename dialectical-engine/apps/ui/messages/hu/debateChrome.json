@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Privát vita",
   "debateChrome.privateDebateDeleted": "A privát vita törölve",
   "debateChrome.privateDebateDeletionProcessing": "A privát vita törlése folyamatban van",
-  "debateChrome.privateDebateDeletedDetail": "Ez a vita sírkőbejegyzés. Titkosított privát tartalma végleg olvashatatlan.",
+  "debateChrome.privateDebateDeletedDetail": "Ez a vita sírkőbejegyzés. Titkosított privát tartalma már nem olvasható itt. Biztonsági mentéseinkben még benne lehet (Adatvédelmi szabályzat, 7. szakasz).",
   "debateChrome.privateDebateDeletionProcessingDetail": "A privát tartalom már nem érhető el, amíg befejeződik a kulcsok tartós eltávolítása.",
   "debateChrome.tree.building": "Az érvelési fa építése…",
   "debateChrome.tree.notProduced": "Ehhez a vitához nem készült érvelési fa.",
