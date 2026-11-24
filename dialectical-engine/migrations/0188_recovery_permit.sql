@@ -30,8 +30,10 @@
 --                                  TEAM_GRANT and bound to the decision, the ask, the account, the revision the Owner was
 --                                  looking at and the operation. An approval needs the team tools unlocked and writes the
 --                                  audit row and the independent alert; a refusal is containment and goes on while they
---                                  are locked. At most three approvals in any 24 hours.
---   staff.read_audit_page_v3       0186's audit page with this step's two events left out (the Owner's list shows them).
+--                                  are locked. At most three approvals in any 24 hours. The audit row is the existing
+--                                  event for a grant made under TEAM_GRANT (GRANT), with the reason SECURITY_RESPONSE
+--                                  and the reference account-recovery:approved or account-recovery:refused, so the
+--                                  list of audit events stays as 0186 left it.
 --
 -- Every limit is the database's own and is asked again at each step: never an account that is or was staff, never under
 -- a security hold, an erasure or an adverse risk mark, never without a password, never within 30 days of a change of the
@@ -42,9 +44,9 @@
 -- n1 (side-by-side spec §5, the database rule):
 -- n1: expand
 -- n1: keeps-verifier
---   expand          four new tables and twenty-seven new functions; nothing older is altered, dropped, renamed, revoked or
---                   replaced, but for staff.audit_event's event list, which only widens (one reviewed pair, last in this
---                   step): every event the release before writes stays allowed.
+--   expand          four new tables and twenty-six new functions; nothing older is altered, dropped, renamed, revoked or
+--                   replaced, and no object an earlier step keeps a recorded check of is changed, so the release
+--                   before restarts on this database as it did.
 --   keeps-verifier  no billing relation or billing function is added, so 0130's verifier stays in force.
 
 CREATE TABLE IF NOT EXISTS identity.recovery_permit (
@@ -749,71 +751,14 @@ BEGIN
  INSERT INTO staff.recovery_permit_decision(permit_id,user_id,kind,actor_staff_id,operation_id,request_sha256,alerted)
  VALUES(v_request_ref,v_target,v_kind,v_staff,v_operation,v_request_sha,p_alert IS NOT NULL) RETURNING * INTO v_row;
  -- The audit row names no account: the actor and subject are the Owner, and the alert is sealed for the Owner's key.
+ -- It is the existing event of a grant made under TEAM_GRANT; its reference says which decision on an ask it was.
  IF p_alert IS NOT NULL THEN
-  PERFORM staff.record_mutation(v_operation,CASE v_kind WHEN 'APPROVED' THEN 'ACCOUNT_RECOVERY_APPROVED' ELSE 'ACCOUNT_RECOVERY_REFUSED' END,
-   v_staff,v_staff,jsonb_build_object('code','SECURITY_RESPONSE'),v_user,p_alert,v_request);
+  PERFORM staff.record_mutation(v_operation,'GRANT',v_staff,v_staff,
+   jsonb_build_object('code','SECURITY_RESPONSE','ticketRef',CASE v_kind WHEN 'APPROVED' THEN 'account-recovery:approved' ELSE 'account-recovery:refused' END),
+   v_user,p_alert,v_request);
  END IF;
  RETURN jsonb_build_object('operationId',v_operation,'outcome','COMPLETED','recordedAt',v_row.recorded_at);
 END $$;
-
--- 0186's audit page, unchanged but for the two events of this step, which the general page leaves out as it leaves out
--- the approved buyers' (the Owner's list shows the asks). The release before keeps calling 0186's reader.
-CREATE OR REPLACE FUNCTION staff.read_audit_page_v3(
-  p_context jsonb,p_token text,p_limit integer,p_after_time timestamptz,p_after_id uuid
-) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
-DECLARE v_rows jsonb; v_next jsonb; v_count integer;
-BEGIN
-  PERFORM staff.require_http_authority(p_context,p_token,'AUDIT_READ');
-  IF p_limit IS NULL OR p_limit<1 OR p_limit>100
-    OR (p_after_time IS NULL)<>(p_after_id IS NULL) THEN RAISE EXCEPTION 'STAFF_PAGE_INVALID'; END IF;
-  WITH entries AS (
-    SELECT a.recorded_at,a.event_id,jsonb_build_object(
-      'event_id',a.event_id,'actor_staff_id',a.actor_staff_id,'subject_staff_id',a.subject_staff_id,
-      'event',CASE a.event_type
-        WHEN 'BOOTSTRAP' THEN 'OWNER_BOOTSTRAPPED' WHEN 'RECOVER_OWNER' THEN 'OWNER_RECOVERED'
-        WHEN 'INVITE' THEN 'INVITATION_ISSUED' WHEN 'ACCEPT' THEN 'INVITATION_ACCEPTED'
-        WHEN 'GRANT' THEN 'GRANTS_CHANGED' WHEN 'DISABLE' THEN 'STAFF_DISABLED'
-        WHEN 'KEY_CHANGE' THEN 'CREDENTIAL_REGISTERED'
-        WHEN 'ALLOWANCE_CONFIGURED' THEN 'ALLOWANCE_CONFIGURED'
-        WHEN 'ALLOWANCE_REVOKED' THEN 'ALLOWANCE_REVOKED' END,
-      'recorded_at',a.recorded_at,
-      'reason',jsonb_strip_nulls(jsonb_build_object('code',CASE a.reason_code
-        WHEN 'BOOTSTRAP' THEN 'TEAM_ONBOARDING' WHEN 'RECOVERY' THEN 'SECURITY_RESPONSE'
-        ELSE a.reason_code END,'ticket_ref',a.ticket_ref)),
-      'delivery_state',staff.http_delivery_state(a.event_id)
-    ) item FROM staff.audit_event a
-    WHERE a.event_type NOT IN('TEAM_LIMIT_CHANGED','TEAM_LIMIT_PARTNER_GRANTED','TEAM_LIMIT_PARTNER_REVOKED','TEAM_PRACTICE_RECORDED','PUBLIC_REVIEW_CHANGED',
-      'PREVIEW_BUYER_ADDED','PREVIEW_BUYER_REMOVED','ACCOUNT_RECOVERY_APPROVED','ACCOUNT_RECOVERY_REFUSED')
-    UNION ALL
-    SELECT r.recorded_at,r.event_id,jsonb_build_object(
-      'event_id',r.event_id,'actor_staff_id',r.actor_staff_id,
-      'event','PUBLICATION_REVIEW_' || CASE r.action
-        WHEN 'LIST' THEN 'LISTED' WHEN 'READ' THEN 'READ'
-        WHEN 'APPROVE' THEN 'APPROVED' ELSE 'REFUSED' END,
-      'review_ref',r.review_ref,'recorded_at',r.recorded_at
-    ) item FROM staff.publication_review_event r
-    UNION ALL
-    SELECT t.recorded_at,t.event_id,jsonb_build_object(
-      'event_id',t.event_id,'actor_staff_id',t.actor_staff_id,
-      'event','THREAT_REPORT_' || t.action,
-      'threat_report_ref',t.report_ref,'recorded_at',t.recorded_at
-    ) item FROM staff.threat_report_event t
-  ), page AS (
-    SELECT * FROM entries
-    WHERE p_after_time IS NULL OR (recorded_at,event_id)>(p_after_time,p_after_id)
-    ORDER BY recorded_at,event_id LIMIT p_limit+1
-  ), shown AS (
-    SELECT * FROM page ORDER BY recorded_at,event_id LIMIT p_limit
-  )
-  SELECT (SELECT count(*) FROM page),
-    COALESCE(jsonb_agg(item ORDER BY recorded_at,event_id),'[]'::jsonb),
-    (SELECT jsonb_build_array(recorded_at,event_id) FROM shown ORDER BY recorded_at DESC,event_id DESC LIMIT 1)
-  INTO v_count,v_rows,v_next FROM shown;
-  PERFORM staff.require_http_authority(p_context,p_token,'AUDIT_READ');
-  RETURN jsonb_build_object('events',v_rows,'nextPosition',
-    CASE WHEN v_count>p_limit THEN v_next ELSE NULL END,'order','RECORDED_AT_ID_ASC');
-END;
-$$;
 
 -- Ownership and the exact grants. The person's side belongs to the email route's owner and is called by the email
 -- route's role, the one login the API already uses for a recovery without a sign-in. The three functions that read and
@@ -848,7 +793,6 @@ ALTER FUNCTION identity.recovery_permit_decide_internal(uuid,uuid,bigint,text) O
 ALTER FUNCTION staff.recovery_permit_body(jsonb) OWNER TO debateai_staff_security_owner;
 ALTER FUNCTION staff.read_recovery_permits(jsonb,text) OWNER TO debateai_staff_security_owner;
 ALTER FUNCTION staff.recovery_permit_act(jsonb,uuid,jsonb,jsonb,jsonb) OWNER TO debateai_staff_security_owner;
-ALTER FUNCTION staff.read_audit_page_v3(jsonb,text,integer,timestamptz,uuid) OWNER TO debateai_staff_security_owner;
 REVOKE ALL ON FUNCTION identity.recovery_permit_facts_internal(uuid),identity.recovery_permit_open_gate_internal(uuid,uuid,text,jsonb),
  identity.recovery_permit_shut_gate_internal(uuid,bigint),
  identity.recovery_permit_adverse(uuid),identity.recovery_permit_channels(uuid),identity.recovery_permit_account_ok(uuid),
@@ -859,8 +803,7 @@ REVOKE ALL ON FUNCTION identity.recovery_permit_facts_internal(uuid),identity.re
  identity.recovery_permit_cancel(text,jsonb),identity.recovery_permit_prepare_finish(text),identity.recovery_permit_finish(text,text,text,jsonb),
  identity.recovery_permit_claim_notice(integer),identity.recovery_permit_finish_notice(uuid,uuid,boolean,integer,integer),
  identity.recovery_permit_expire(integer),identity.recovery_permit_queue_internal(),identity.recovery_permit_decide_internal(uuid,uuid,bigint,text),
- staff.recovery_permit_body(jsonb),staff.read_recovery_permits(jsonb,text),staff.recovery_permit_act(jsonb,uuid,jsonb,jsonb,jsonb),
- staff.read_audit_page_v3(jsonb,text,integer,timestamptz,uuid)
+ staff.recovery_permit_body(jsonb),staff.read_recovery_permits(jsonb,text),staff.recovery_permit_act(jsonb,uuid,jsonb,jsonb,jsonb)
  FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_mfa_recovery_runtime,debateai_staff_recovery;
 -- n1: reviewed gives the three new functions over /recover's tables those tables' owner (the owner of 0079's settings reader, as 0100 does for its own); touches no earlier object
 DO $recovery_permit_owner$ DECLARE v_owner name; BEGIN
@@ -880,14 +823,3 @@ GRANT EXECUTE ON FUNCTION identity.recovery_permit_prepare(bytea),identity.recov
  identity.recovery_permit_claim_notice(integer),identity.recovery_permit_finish_notice(uuid,uuid,boolean,integer,integer),
  identity.recovery_permit_expire(integer) TO debateai_mfa_recovery_runtime;
 GRANT EXECUTE ON FUNCTION staff.read_recovery_permits(jsonb,text),staff.recovery_permit_act(jsonb,uuid,jsonb,jsonb,jsonb) TO debateai_billing_runtime;
-GRANT EXECUTE ON FUNCTION staff.read_audit_page_v3(jsonb,text,integer,timestamptz,uuid) TO debateai_runtime;
-
--- The two events this step writes, beside 0186's list. LAST in this step on purpose: the pair takes ACCESS EXCLUSIVE on
--- staff.audit_event until the step commits, so every staff change waits for the rest of the step. NOT VALID, so nothing
--- is scanned; every row already there holds one of 0186's events.
--- n1: reviewed the event list only widens (0186's, plus the two this step writes); every event the release before writes stays allowed
-ALTER TABLE staff.audit_event DROP CONSTRAINT IF EXISTS audit_event_funded_event_type_check;
-ALTER TABLE staff.audit_event ADD CONSTRAINT audit_event_funded_event_type_check
-  CHECK(event_type IN('INVITE','ACCEPT','GRANT','DISABLE','BOOTSTRAP','RECOVER_OWNER','KEY_CHANGE','ALLOWANCE_CONFIGURED','ALLOWANCE_REVOKED',
-    'TEAM_LIMIT_CHANGED','TEAM_LIMIT_PARTNER_GRANTED','TEAM_LIMIT_PARTNER_REVOKED','TEAM_PRACTICE_RECORDED','PUBLIC_REVIEW_CHANGED',
-    'PREVIEW_BUYER_ADDED','PREVIEW_BUYER_REMOVED','ACCOUNT_RECOVERY_APPROVED','ACCOUNT_RECOVERY_REFUSED')) NOT VALID;

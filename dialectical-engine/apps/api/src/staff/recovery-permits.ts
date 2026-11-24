@@ -19,7 +19,9 @@ import { maskedAddress } from "./preview-buyers.js";
  * ceremony under the action TEAM_GRANT and bound by the server to the decision, the ask, its account, the revision the
  * page showed and the operation (`canonicalRecoveryPermitBinding`); the database computes the same digest again. An
  * approval needs the team tools unlocked and sends the independent alert; a refusal is containment and goes on while
- * they are locked. The Owner types no address and is handed no link and no code: the mails were sealed when the person
+ * they are locked. The audit row and the alert are the existing ones for a grant made under TEAM_GRANT (GRANT), with
+ * the reason SECURITY_RESPONSE and a reference that says which decision it was (`recoveryPermitAuditReference`), so the
+ * list of staff audit events is the one the release before knows. The Owner types no address and is handed no link and no code: the mails were sealed when the person
  * proved the password, and an approval only switches them on.
  */
 export type RecoveryPermitIntent = Extract<contract.StaffActionIntent, { action: "RECOVERY_PERMIT_APPROVE" | "RECOVERY_PERMIT_REFUSE" }>;
@@ -35,6 +37,9 @@ export interface RecoveryPermitStaffService {
   readEmail(userId: string): Promise<string | null>;
 }
 
+/** The reference a decision's audit row and alert carry, the same words the database writes (migration 0188). */
+export const recoveryPermitAuditReference = (intent: RecoveryPermitIntent["action"]): string =>
+  intent === "RECOVERY_PERMIT_APPROVE" ? "account-recovery:approved" : "account-recovery:refused";
 const sha = (bytes: string | Buffer) => createHash("sha256").update(bytes).digest("hex");
 const canonical = (body: unknown) => parseCanonicalRegisterJson(Buffer.from(JSON.stringify(body)));
 
@@ -101,8 +106,9 @@ export function registerRecoveryPermitRoutes(route: Route, service: () => Recove
     if (proof === null) throw REFUSED();
     // An approval has come through actionAuthority's lock check; a refusal never waits for the alert channel.
     const alertIntent = intent.action === "RECOVERY_PERMIT_REFUSE" && !await unlocked() ? null
-      : await intents().mutation({ event: intent.action === "RECOVERY_PERMIT_APPROVE" ? "ACCOUNT_RECOVERY_APPROVED" : "ACCOUNT_RECOVERY_REFUSED", operationId: binding.operationId,
-        keyUserId: authentication.context.userId, actorStaffId: authentication.context.staffId, subjectStaffId: authentication.context.staffId, reason: { code: "SECURITY_RESPONSE" } });
+      : await intents().mutation({ event: "GRANT", operationId: binding.operationId,
+        keyUserId: authentication.context.userId, actorStaffId: authentication.context.staffId, subjectStaffId: authentication.context.staffId,
+        reason: { code: "SECURITY_RESPONSE", ticketRef: recoveryPermitAuditReference(intent.action) } });
     const receipt = await present().repository.act({ actor: authentication.context, proof, intent: intent.action, requestRef: intent.request_ref, targetUserId: binding.targetId,
       expectedRevision: binding.expectedRevision, operationId: binding.operationId, alertIntent });
     return { operation_id: receipt.operationId, outcome: receipt.outcome, recorded_at: receipt.recordedAt.toISOString() };

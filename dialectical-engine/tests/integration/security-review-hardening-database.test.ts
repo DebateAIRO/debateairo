@@ -2173,6 +2173,8 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "identity.read_age_check_outcome(uuid)", "identity.read_ask_clarify_spent(uuid,timestamp with time zone,timestamp with time zone)",
     "identity.read_data_export_status(uuid)", "identity.read_debate_last_visit(uuid,uuid)", "identity.read_dig_level(uuid,uuid)",
     "identity.read_dig_links(uuid,uuid)", "identity.read_dig_picks_of_run(uuid)", "identity.read_email_settings(uuid,uuid)",
+    // 0189: whether the publication check kept a Free debate of the owner's private, asked as 0171's read_run_is_dig asks.
+    "identity.read_free_debate_refused_by_check(uuid,uuid)",
     "identity.read_investigation_of_run(uuid)", "identity.read_investigation_reports(uuid,uuid)", "identity.read_investigation_reports_of_run(uuid)",
     "identity.read_main_answer_updates_of_run(uuid)", "identity.read_own_public_contributions(uuid,uuid)", "identity.read_page_reading_level(uuid)",
     "identity.read_path_line_of_run(uuid)", "identity.read_path_rewrites_of_run(uuid)", "identity.read_path_suggestions_of_run(uuid)",
@@ -2200,8 +2202,8 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "staff.read_audit_page(jsonb,text,integer,timestamp with time zone,uuid)", "staff.read_issued_invitation(jsonb,text,uuid)",
     // 0186: 0150's audit page beside itself, and the Owner's list of the preview's approved buyers, both behind a staff privilege token.
     "staff.read_audit_page_v2(jsonb,text,integer,timestamp with time zone,uuid)", "staff.read_preview_buyers(jsonb,text)",
-    // 0188: 0186's audit page beside itself, and the Owner's list of asks to get back into an account, both behind a staff privilege token.
-    "staff.read_audit_page_v3(jsonb,text,integer,timestamp with time zone,uuid)", "staff.read_recovery_permits(jsonb,text)",
+    // 0188: the Owner's list of asks to get back into an account, behind a staff privilege token.
+    "staff.read_recovery_permits(jsonb,text)",
     "staff.read_member_allowance_command(jsonb,text,uuid,uuid)", "staff.read_member_allowance_page(jsonb,text)",
     "staff.read_mutation_target(jsonb,text,uuid,text)", "staff.read_public_flag_queue(jsonb,text)", "staff.read_public_flag_queue_answered(jsonb,text)",
     "staff.read_public_review(jsonb,text,uuid)",

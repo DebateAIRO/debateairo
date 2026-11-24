@@ -538,15 +538,23 @@ export class PostgresPublicationRepository {
     publicRef: string | null;
     /** Security review F2: a dig, which is never published (the same reader as readRunIsDig). */
     dig: boolean;
+    /**
+     * A private Free debate the publication check refused (BLOCK or UNSURE): it stays private for good (0189's owner-scoped
+     * identity.read_free_debate_refused_by_check). False for every other debate, and when the connection is not the owner's.
+     */
+    keptPrivate: boolean;
   }> | null> {
     const result = await this.pool.query<{
       state: "PRIVATE" | "PUBLISHED";
       publication_ref: string | null;
       dig: boolean;
+      kept_private: boolean;
     }>(`
       SELECT COALESCE(latest.state,'PRIVATE') AS state,
         CASE WHEN latest.state='PUBLISHED' THEN latest.publication_ref ELSE NULL END AS publication_ref,
-        identity.read_run_is_dig($3,run.run_id) IS TRUE AS dig
+        identity.read_run_is_dig($3,run.run_id) IS TRUE AS dig,
+        COALESCE(latest.state,'PRIVATE')='PRIVATE'
+          AND identity.read_free_debate_refused_by_check($3,run.run_id) IS TRUE AS kept_private
       FROM core.run AS run
       JOIN identity."user" AS identity_user
         ON identity_user.user_id=$2 AND identity_user.owner_ref=$3
@@ -563,7 +571,8 @@ export class PostgresPublicationRepository {
     return row === undefined ? null : Object.freeze({
       state: row.state,
       publicRef: row.publication_ref,
-      dig: row.dig
+      dig: row.dig,
+      keptPrivate: row.kept_private
     });
   }
 

@@ -3673,10 +3673,10 @@
       ]
     },
     {
-      "roleName": "debateai_runtime",
-      "source": "migrations/0188_recovery_permit.sql",
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0189_free_debate_refused_by_check.sql",
       "grants": [
-        "EXECUTE ON FUNCTION staff.read_audit_page_v3(jsonb,text,integer,timestamptz,uuid)"
+        "EXECUTE ON FUNCTION identity.read_free_debate_refused_by_check(uuid,uuid)"
       ]
     }
   ],

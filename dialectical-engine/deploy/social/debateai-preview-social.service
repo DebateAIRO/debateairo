@@ -1,0 +1,56 @@
+# The social sign-in relay on the dezbatere.ro server (the preview layout). Install with deploy/social/PREVIEW-INSTALL.md.
+# Install only after creating debateai-preview-social and the debateai-preview-social-clients group.
+# Only debateai-preview-api joins clients; it cannot read the systemd credential or the source file.
+# The relay runs from its own root-owned folder, not from a release folder: the release archive tool knows the
+# Turnstile relay's release folder and would not know this one's, so a release must never be what it runs from.
+[Unit]
+Description=Dialectical Engine social sign-in relay (preview layout)
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+User=debateai-preview-social
+Group=debateai-preview-social-clients
+WorkingDirectory=/opt/debateai-v3-preview/social
+Environment=NODE_ENV=production
+# The API accepts this socket path only (apps/api/src/social-providers/provider.ts, UnixSocialTransport).
+Environment=SOCIAL_SOCKET_PATH=/run/debateai-social/identity.sock
+LoadCredential=social-providers:/etc/debateai-v3-preview/social/providers.json
+ExecStart=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/social/social-relay.mjs
+RuntimeDirectory=debateai-social
+RuntimeDirectoryMode=0750
+UMask=0077
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/run/debateai-social
+# An explicit deny for all identity, KEK/DEK, provider and database material. The relay gets only its private
+# systemd credential (not the root source file).
+InaccessiblePaths=-/etc/debateai -/etc/debateai-v3-preview -/var/lib/debateai -/var/lib/debateai-v3-preview -/var/lib/postgresql -/run/postgresql -/var/run/postgresql -/run/debateai-v3-preview -/run/debateai-preview-turnstile
+NoNewPrivileges=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LimitNOFILE=256
+TasksMax=32
+[Install]
+WantedBy=multi-user.target

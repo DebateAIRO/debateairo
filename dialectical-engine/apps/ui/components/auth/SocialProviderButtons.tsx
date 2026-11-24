@@ -16,6 +16,9 @@ export function SocialProviderButtons({ client, catalog, navigate = (url: string
     const flight = useRef(false);
     useEffect(() => {
         let active = true;
+        // A return from the company that did not complete lands here as ?social=failed (the /v1 return route).
+        if (new URLSearchParams(window.location.search).get('social') === 'failed')
+            setError(true);
         if (client.authProviders)
             void client.authProviders().then(value => {
                 const parsed = AuthProvidersResponseSchema.safeParse(value);

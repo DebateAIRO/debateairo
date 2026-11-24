@@ -29,6 +29,7 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 
 import { V4PublicMark, V4PublicMarkFor } from "../../apps/ui/components/v4/V4PublicMark.js";
 import type { PublicStage } from "../../apps/ui/lib/v4/publicState.js";
+import { createBrowserContractClient } from "@/lib/api";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -47,6 +48,18 @@ async function show(stage: PublicStage | null): Promise<HTMLDivElement> {
 }
 const line = (): HTMLElement | null => host!.querySelector(".v4PublicMark");
 const clipboard = { writeText: vi.fn() };
+/** What the API answers its owner for a Free debate the publication check refused (migration 0189). */
+const KEPT_PRIVATE_ANSWER = Object.freeze({ state: "PRIVATE", public_ref: null, public_stage: "KEPT_PRIVATE" });
+/**
+ * The website's own browser client (the same-origin proxy and the contract's strict read) over one canned API answer, so
+ * the page meets the field exactly as the API sends it. Records each address the page asked.
+ */
+function websiteClientAnswering(body: unknown, asked: string[]) {
+  return createBrowserContractClient(async (input) => {
+    asked.push(String(input));
+    return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+  });
+}
 
 beforeEach(() => {
   clipboard.writeText = vi.fn(async () => undefined);
@@ -149,6 +162,23 @@ describe("the globe line", () => {
     await act(async () => root!.render(<V4PublicMarkFor runId={null} catalog={CATALOG} />));
     expect(line()).toBeNull();
   });
+
+  it("the owner's Free debate the check kept private: the API's own answer, read through the website's client, shows the kept-private line", async () => {
+    const asked: string[] = [];
+    const client = websiteClientAnswering(KEPT_PRIVATE_ANSWER, asked);
+    visibility.read = vi.fn((runId: string) => client.readRunVisibility(runId));
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    const runId = "11111111-1111-4111-8111-111111111111";
+    await act(async () => root!.render(<V4PublicMarkFor runId={runId} catalog={CATALOG} />));
+    await flush();
+    expect(asked).toHaveLength(1);
+    expect(asked[0]!.endsWith(`/v1/runs/${runId}/visibility`)).toBe(true);
+    expect(line()!.getAttribute("data-public-stage")).toBe("KEPT_PRIVATE");
+    expect(line()!.textContent).toBe("Kept private: it did not pass the check, so it has no public page.");
+    expect(line()!.querySelector("a")).toBeNull();
+  });
 });
 
 describe("on the map", () => {
@@ -195,6 +225,25 @@ describe("on the map", () => {
     visibility.read = vi.fn(async () => ({ state: "PRIVATE", public_stage: "KEPT_PRIVATE" }));
     await mountMap(1600, runId);
     await settle();
+    await openPath(PATHS.renew);
+    await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    expect(panel().querySelector("[data-public-will-be]")).toBeNull();
+    expect(page().textContent).not.toContain(CATALOG["v4.publicMark.addsToPublic"]);
+  });
+
+  it("the owner's map of a Free debate the check kept private: the API's own answer puts the kept-private line under the question, and nothing says it will be public", async () => {
+    harness.planTier = "free";
+    const runId = crypto.randomUUID();
+    harness.answer = seededAnswer(runId, {}, "FREE");
+    const asked: string[] = [];
+    const client = websiteClientAnswering(KEPT_PRIVATE_ANSWER, asked);
+    visibility.read = vi.fn((id: string) => client.readRunVisibility(id));
+    await mountMap(1600, runId);
+    await settle();
+    expect(asked.some((address) => address.endsWith(`/v1/runs/${runId}/visibility`))).toBe(true);
+    const mark = page().querySelector(".v4PublicMark")!;
+    expect(mark.getAttribute("data-public-stage")).toBe("KEPT_PRIVATE");
+    expect(mark.textContent).toBe(CATALOG["v4.publicMark.KEPT_PRIVATE"]);
     await openPath(PATHS.renew);
     await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
     expect(panel().querySelector("[data-public-will-be]")).toBeNull();

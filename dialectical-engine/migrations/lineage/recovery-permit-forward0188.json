@@ -8,22 +8,11 @@
   },
   "migration": {
     "name": "0188_recovery_permit.sql",
-    "sha256": "21c24685379a3c0433032febf0f100235da2c0ea24fe4f7b71cd1d2178ffc0b1"
+    "sha256": "2707414176cb1e4898d823a1c8ef2e969008562380c64fc4a83e79843f754c31"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",
     "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
-  "amendsPostconditionsOf": [
-    {
-      "step": "0186_preview_buyers.sql",
-      "relations": [
-        "staff.audit_event"
-      ],
-      "constraints": [
-        "audit_event_funded_event_type_check"
-      ],
-      "field": "constraint_definition"
-    }
-  ]
+  "amendsPostconditionsOf": []
 }

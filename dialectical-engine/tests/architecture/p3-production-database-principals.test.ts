@@ -1792,8 +1792,7 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": ["EXECUTE ON FUNCTION identity.read_consumer_passkey_allow_credentials(text,text)"]
 },
 // 0188: the Owner's permit for a locked-out account. The Owner's list and the one door are the API's billing role's alone, which the
-// runner's login does not hold; the audit page beside 0186's goes where 0142's went. The person's steps go to the email route's role,
-// which this manifest does not list.
+// runner's login does not hold. The person's steps go to the email route's role, which this manifest does not list.
 {
   "roleName": "debateai_billing_runtime",
   "source": "migrations/0188_recovery_permit.sql",
@@ -1802,10 +1801,12 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION staff.recovery_permit_act(jsonb,uuid,jsonb,jsonb,jsonb)"
   ]
 },
+// 0189: whether the publication check kept one Free debate of the owner's private. The API's billing role's alone, as 0171's
+// identity.read_run_is_dig: the visibility read asks it on the request login, inside the owner's own request.
 {
-  "roleName": "debateai_runtime",
-  "source": "migrations/0188_recovery_permit.sql",
-  "grants": ["EXECUTE ON FUNCTION staff.read_audit_page_v3(jsonb,text,integer,timestamptz,uuid)"]
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0189_free_debate_refused_by_check.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_free_debate_refused_by_check(uuid,uuid)"]
 }
 ]);
     expect(manifest.privilegeRevocations).toEqual([
@@ -2305,7 +2306,7 @@ it("discloses exactly 0124's grants to the runtime and the API's billing role (s
   expect(declared.some(grant => /\bON register\.settings_/u.test(grant))).toBe(false);
 });
 
-it("discloses exactly 0188's grants to the request logins: the Owner's list and door to the API's billing role, the audit page beside 0186's to the runtime", async () => {
+it("discloses exactly 0188's grants to the request logins: the Owner's list and door to the API's billing role, and nothing to the runtime", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
   const sql = await readFile("migrations/0188_recovery_permit.sql", "utf8");
   const disclosed = "debateai_runtime|debateai_billing_runtime|debateai_rls_all_accounts";
@@ -2319,8 +2320,9 @@ it("discloses exactly 0188's grants to the request logins: the Owner's list and 
   const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0188_recovery_permit.sql")
     .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
   expect(actual).toEqual(declared);
-  // Three functions, no table grant: the four tables are no login's, and the person's steps go to the email route's role alone.
-  expect(declared).toHaveLength(3);
+  // Two functions, no table grant: the four tables are no login's, and the person's steps go to the email route's role alone.
+  expect(declared).toHaveLength(2);
+  expect(declared.every(grant => grant.endsWith(" TO debateai_billing_runtime;"))).toBe(true);
   expect(statements.some(statement => /\bON (?:identity|staff)\.recovery_permit\w*\b(?!\()/u.test(statement))).toBe(false);
   expect(statements.filter(statement => /identity\.recovery_permit_(?:prepare|start|request|finish|cancel|claim_notice|expire)\b/u.test(statement))
     .every(statement => statement.endsWith(" TO debateai_mfa_recovery_runtime;"))).toBe(true);
@@ -2359,6 +2361,23 @@ it("discloses exactly 0187's grant: the passkey sign-in's list of the bound acco
   expect(actual).toEqual(declared);
   // One function, the marker's alone: no request role, no table grant.
   expect(declared).toEqual(["GRANT EXECUTE ON FUNCTION identity.read_consumer_passkey_allow_credentials(text,text) TO debateai_rls_all_accounts;"]);
+});
+
+it("discloses exactly 0189's grant: whether the publication check kept a Free debate private, to the API's billing role alone", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0189_free_debate_refused_by_check.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_authorization_runtime|debateai_rls_all_accounts";
+  // As for 0187: every GRANT line naming one of the disclosed roles names it alone.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0189_free_debate_refused_by_check.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // One function, the billing role's alone (as 0171's identity.read_run_is_dig): no runtime, no marker, no table grant.
+  expect(declared).toEqual(["GRANT EXECUTE ON FUNCTION identity.read_free_debate_refused_by_check(uuid,uuid) TO debateai_billing_runtime;"]);
 });
 
 it("discloses exactly 0125's grants to the API's billing role and the export worker (italy-clause-approval S01)", async () => {
