@@ -1816,17 +1816,6 @@ const synthesisPublishGate = createSynthesisPublishGate({
   check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs, inFlightWindowMs: synthesisCheckWindow,
   clock: () => new Date(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 });
-// The same gate for a finished Free debate, asked by the sweep before it publishes. It runs in the background, so its own
-// check takes the background time; it never waits for a check running elsewhere (an owner's Publish, or an attempt a
-// restart left without an answer), so one debate never holds the sweep's pass: that debate is asked again on a later pass.
-const sweepSynthesisPublishGate = createSynthesisPublishGate({
-  repository: synthesisCheckRepository,
-  approvalCovers: input => publicationReviewRepository.approvalCovers(input),
-  readAnswerVersions: readSynthesisAnswerVersions,
-  check: { ...synthesisCheckDeps, deadlineMs: backgroundCheckDeadlineMs }, deadlineMs: backgroundCheckDeadlineMs,
-  inFlightWindowMs: backgroundCheckDeadlineMs, inFlightWaitMs: 0,
-  clock: () => new Date(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-});
 // The worker checks each finished debate in the background: on the gate it may also wait out the gate's slot queue, and it
 // checks one debate at a time there, so it holds at most one of the gate's slots. Its day-pot read and its spend record are
 // the publish gate's own (synthesisCheckDeps); only the time differs.
@@ -2508,12 +2497,25 @@ if (publications !== undefined) {
   const inTurn = checksInTurn(judgeGate);
   const sweepContentCheck = inTurn.check;
   const sweepReportCheck = { check: (request: Parameters<typeof judgeGate.check>[0]) => inTurn.check.check({ runId: `${REPORT_CHECK_PREFIX}${request.runId}`, snapshot: request.snapshot }) };
+  // The gate an owner's Publish passes, for a finished Free debate, asked by the sweep before it publishes. It runs in the
+  // background, so its own check takes the background time; it never waits for a check running elsewhere (an owner's
+  // Publish, or an attempt a restart left without an answer): that debate is asked again on a later pass. A decision already
+  // stored is read at once; only the gate's own check, which calls the model, is asked in the debate's turn, so one that
+  // cannot be checked waits its own time, and a pass waits for at most one such check that fails.
+  const sweepSynthesisPublishGate = createSynthesisPublishGate({
+    repository: synthesisCheckRepository,
+    approvalCovers: input => publicationReviewRepository.approvalCovers(input),
+    readAnswerVersions: readSynthesisAnswerVersions,
+    check: { ...synthesisCheckDeps, deadlineMs: backgroundCheckDeadlineMs }, deadlineMs: backgroundCheckDeadlineMs,
+    inFlightWindowMs: backgroundCheckDeadlineMs, inFlightWaitMs: 0,
+    ownCheckInTurn: (runId, check) => inTurn.checkBefore(runId, check, (decision) => decision === "UNAVAILABLE"),
+    clock: () => new Date(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+  });
   // A finished Free debate goes public only when the end-of-debate check allows it, as an owner's Publish does: the
-  // answer's hold first, then the gate, asked in the debate's own turn, so one that cannot be checked waits its own time.
+  // answer's hold first, then the gate.
   const freeEndCheck: FreeEndCheck = {
     stateOf: (target) => synthesisAnswerAccess.stateOf(target),
-    decide: async (target) => await inTurn.checkBefore(target.runId, () => sweepSynthesisPublishGate.decide(target),
-      (decision) => decision === "UNAVAILABLE") ?? "UNAVAILABLE"
+    decide: (target) => sweepSynthesisPublishGate.decide(target)
   };
   const triggerPublicPage = createSingleFlightErasureReconciler(() => inTurn.pass(async () => {
     await sweepPublicPage({ pool, page: publicPage, contributions: publicContributions, tree: publicTreeRepository, contentCheck: sweepContentCheck, reportContentCheck: sweepReportCheck,

@@ -557,6 +557,35 @@ describe("the synthesis check through the Anthropic gate", () => {
     expect({ slept, ownAttempts, portReads }).toEqual({ slept: 120_000, ownAttempts: 0, portReads: 0 });
   });
 
+  it("the Free sweep's gate starts its own check only in the debate's turn: not its turn, no attempt and no call; a stored decision is read without the turn", async () => {
+    let ownAttempts = 0;
+    let portReads = 0;
+    const turnsAsked: string[] = [];
+    let records: unknown[] = [];
+    const repository = {
+      ownerRefOfRun: async () => "owner", readRecords: async () => records, readInFlightAttempts: async () => [],
+      startPublishAttempt: async () => { ownAttempts += 1; return { attemptId: "33333333-3333-4333-8333-333333333333", startedAt: new Date() }; },
+      insertResult: async () => "INSERTED" as const
+    };
+    const check: SynthesisCheckDeps = { port: () => { portReads += 1; return null; }, deadlineMs: 120_000, recordSpend: async () => undefined,
+      priceOf: () => null, clock: () => new Date(), log: () => undefined };
+    const gate = createSynthesisPublishGate({
+      repository: repository as never, readAnswerVersions: async () => new Map([[1, "The town should build the pier."]]),
+      check, deadlineMs: 120_000, inFlightWindowMs: 120_000, inFlightWaitMs: 0,
+      ownCheckInTurn: async (runId) => { turnsAsked.push(runId); return null; },
+      clock: () => new Date(), sleep: async () => undefined });
+    const decide = () => gate.decide({ runId: RUN, answer: { answer_id: RUN, answer_version: 1 } as never,
+      contentLease: { run: (use) => use(), readAnswer: async () => null }, startedAt: new Date() });
+    // No verdict stored: the gate would run its own check, but the debate's turn has not come.
+    expect(await decide()).toBe("UNAVAILABLE");
+    expect({ turnsAsked, ownAttempts, portReads }).toEqual({ turnsAsked: [RUN], ownAttempts: 0, portReads: 0 });
+    // A verdict stored by the worker: read at once, with no turn asked.
+    records = [{ resultId: "r", attemptId: "a", runId: RUN, answerId: RUN, answerVersion: 1, synthesisOriginVersion: 1, final: true,
+      outcome: { verdict: "CLEAR", categories: [] }, modelProviderRef: "anthropic", modelId: "claude-haiku-5-5", checkedAt: new Date() }];
+    expect(await decide()).toBe("PROCEED");
+    expect({ turnsAsked, ownAttempts, portReads }).toEqual({ turnsAsked: [RUN], ownAttempts: 0, portReads: 0 });
+  });
+
   it("a call the gate holds past the check's time is a DEADLINE, cancelled before the gate sends it", async () => {
     const gate = await standInGate({ queueMs: 600, vendor: clear });
     const { run } = synthesis(gate.fetch, 150);

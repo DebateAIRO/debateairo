@@ -240,47 +240,78 @@ describe("one item whose check always fails holds back no other, in any of the s
     expect(calls).toEqual(["a", "b", "a", "a"]);
   });
 
-  it("a Free debate's end-of-debate check takes the debate's turn: one it cannot answer waits its own doubling time and holds back no other; its other answers never end the publication check's wait", async () => {
+  /**
+   * The Free debates' sweep as main.ts composes it, over `waiting` in list order: a decision of the end-of-debate check
+   * already stored (`stored`) is read at once; with none, the gate's own check runs in the debate's turn (`ownCheck`), then
+   * the publication check. `everyMs` apart, until `untilMs`.
+   */
+  async function freeSweepWorld(input: Readonly<{
+    waiting: string[]; stored: ReadonlySet<string>; ownCheck: (runId: string) => "PROCEED" | "UNAVAILABLE";
+    judgeDown: ReadonlySet<string>; ownCheckMs?: number; untilMs: number;
+  }>) {
     let clock = 0;
     const endAsked: [string, number][] = [];
     const judged: [string, number][] = [];
     const published: [string, number][] = [];
     const shared = backedOffContentCheck({ check: async ({ runId }) => {
       judged.push([runId, clock]);
-      return runId === "f-judge-down" ? { outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" } : { outcome: "ALLOW" };
+      return input.judgeDown.has(runId) ? { outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" } : { outcome: "ALLOW" };
     } }, { now: () => clock });
     const turn = checksInTurn(shared, { now: () => clock });
-    const waiting = ["f-end-down", "f-judge-down", "f-ok"];
     const pass = () => turn.pass(() => sweepFreePublications({
-      contributions: { readFreeToPublish: async () => waiting.map((name) => ({ run_id: name, owner_ref: "o", notice_at: "2026-11-24T08:00:00.000Z" })), refuseFree: async () => "REFUSED" as never },
-      // As publishFreeDebate with main.ts's end check: the end-of-debate check first, in the debate's turn, then the publication check.
+      contributions: { readFreeToPublish: async () => input.waiting.map((name) => ({ run_id: name, owner_ref: "o", notice_at: "2026-11-24T08:00:00.000Z" })), refuseFree: async () => "REFUSED" as never },
       publishOne: async (row) => {
-        const decision = await turn.checkBefore(row.run_id, async () => {
+        const decision = input.stored.has(row.run_id) ? "PROCEED" : await turn.checkBefore(row.run_id, async () => {
           endAsked.push([row.run_id, clock]);
-          return row.run_id === "f-end-down" ? "UNAVAILABLE" : "PROCEED";
+          clock += input.ownCheckMs ?? 0;
+          return input.ownCheck(row.run_id);
         }, (answer) => answer === "UNAVAILABLE") ?? "UNAVAILABLE";
         if (decision !== "PROCEED") return "CHECK_UNAVAILABLE";
         if ((await turn.check.check({ runId: row.run_id, snapshot: {} as PublicDebate })).outcome !== "ALLOW") return "CHECK_UNAVAILABLE";
-        waiting.splice(waiting.indexOf(row.run_id), 1);
+        input.waiting.splice(input.waiting.indexOf(row.run_id), 1);
         published.push([row.run_id, clock]);
         return "PUBLISHED";
       }
     }));
-    while (clock < 10 * 60_000) {
+    const passes: number[] = [];
+    while (clock < input.untilMs) {
+      passes.push(clock);
       await pass();
       clock += PUBLIC_PAGE_SWEEP_DEFAULTS.everyMs;
     }
     const at = (entries: readonly [string, number][], name: string) => entries.filter(([entry]) => entry === name).map(([, time]) => time);
-    // The debate behind both failing ones goes public a minute in, when the shared wait after the publication check's failure ends.
-    expect(published).toEqual([["f-ok", 60_000]]);
-    // The end-of-debate check that cannot answer is asked again after 1, 2 and 4 minutes of its own wait; its debate never
-    // reaches the publication check.
-    expect(at(endAsked, "f-end-down")).toEqual([0, 75_000, 195_000, 435_000]);
-    expect(at(judged, "f-end-down")).toEqual([]);
+    return { endAsked: (name: string) => at(endAsked, name), judged: (name: string) => at(judged, name), published, passes };
+  }
+
+  it("a Free debate's end-of-debate check takes the debate's turn: one it cannot answer waits its own doubling time and holds back no other; its other answers never end the publication check's wait", async () => {
+    const world = await freeSweepWorld({
+      waiting: ["f-end-down", "f-judge-down", "f-ok"], stored: new Set(["f-ok"]),
+      ownCheck: (runId) => runId === "f-end-down" ? "UNAVAILABLE" : "PROCEED", judgeDown: new Set(["f-judge-down"]), untilMs: 10 * 60_000
+    });
+    // The debate whose verdict is stored needs no call of the end-of-debate check: it goes public in the first pass, behind
+    // both failing ones.
+    expect(world.published).toEqual([["f-ok", 0]]);
+    // The end-of-debate check that cannot answer is asked again after its own wait of 1, 2 and 4 minutes, each time once
+    // the publication check's shared wait has ended too; its debate never reaches the publication check.
+    expect(world.endAsked("f-end-down")).toEqual([0, 75_000, 210_000, 465_000]);
+    expect(world.judged("f-end-down")).toEqual([]);
     // The end-of-debate check allows the other failing one each time, and that never shortens the doubling of its own
-    // publication check's wait: 1, 2 and then 4 minutes.
-    expect(at(judged, "f-judge-down")).toEqual([0, 90_000, 210_000, 450_000]);
-    expect(at(endAsked, "f-judge-down")).toEqual([0, 90_000, 210_000, 450_000]);
+    // publication check's wait: 1, 2 and then 4 minutes. It is never asked in a pass where the other one's check failed.
+    expect(world.judged("f-judge-down")).toEqual([15_000, 90_000, 225_000, 480_000]);
+    expect(world.endAsked("f-judge-down")).toEqual([15_000, 90_000, 225_000, 480_000]);
+  });
+
+  it("a pass waits for at most one end-of-debate check that fails: each may take the whole background time, so the others are asked on the next passes, and a debate whose verdict is stored still goes public at once", async () => {
+    const world = await freeSweepWorld({
+      waiting: ["f-down-1", "f-down-2", "f-down-3", "f-stored"], stored: new Set(["f-stored"]),
+      ownCheck: () => "UNAVAILABLE", ownCheckMs: 2 * 60_000, judgeDown: new Set(), untilMs: 5 * 60_000
+    });
+    // Each pass asks one of them, which fails after two minutes; the next pass asks the next one.
+    expect(world.passes).toEqual([0, 135_000, 270_000]);
+    expect(world.endAsked("f-down-1")).toEqual([0]);
+    expect(world.endAsked("f-down-2")).toEqual([135_000]);
+    expect(world.endAsked("f-down-3")).toEqual([270_000]);
+    expect(world.published).toEqual([["f-stored", 120_000]]);
   });
 });
 

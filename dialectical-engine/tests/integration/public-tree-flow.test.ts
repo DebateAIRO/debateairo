@@ -1370,8 +1370,9 @@ describe("Free debates go public when finished", () => {
 
 /*
  * The Free sweep as main.ts composes it, with seconds for minutes: the answer's hold over the end-of-debate check's window, then
- * the gate an owner's Publish passes (its own check with the background time, never waiting for a check running elsewhere),
- * asked in the debate's turn; then the publication check (here a stand-in that allows); then, under the run's lease, the publish.
+ * the gate an owner's Publish passes (a stored decision read at once; else its own check with the background time, asked in
+ * the debate's turn, and never beside a check running elsewhere); then the publication check (here a stand-in that allows);
+ * then, under the run's lease, the publish.
  */
 describe("a Free debate goes public only when the end-of-debate check allows it", () => {
   const BACKGROUND_MS = 6_000;
@@ -1464,11 +1465,12 @@ describe("a Free debate goes public only when the end-of-debate check allows it"
         } },
         deadlineMs: BACKGROUND_MS, recordSpend: async () => undefined, priceOf: (model) => previewModelRow(model) ?? null, clock: () => new Date(), log: () => undefined
       },
-      deadlineMs: BACKGROUND_MS, inFlightWindowMs: BACKGROUND_MS, inFlightWaitMs: 0, clock: () => new Date(), sleep
+      deadlineMs: BACKGROUND_MS, inFlightWindowMs: BACKGROUND_MS, inFlightWaitMs: 0,
+      ownCheckInTurn: (runId, check) => inTurn.checkBefore(runId, check, (decision) => decision === "UNAVAILABLE"),
+      clock: () => new Date(), sleep
     });
     const access = createSynthesisAnswerAccess({ repository: checks(), deadlineMs: WINDOW_MS });
-    const endCheck: FreeEndCheck = { stateOf: (target) => access.stateOf(target),
-      decide: async (target) => await inTurn.checkBefore(target.runId, () => gate.decide(target), (decision) => decision === "UNAVAILABLE") ?? "UNAVAILABLE" };
+    const endCheck: FreeEndCheck = { stateOf: (target) => access.stateOf(target), decide: (target) => gate.decide(target) };
     const pass = async (...debates: FreeDebate[]): Promise<void> => {
       for (const debate of debates) ours.set(debate.run, debate);
       await inTurn.pass(() => sweepFreePublications({ contributions: new PostgresPublicDebateRunnerRepository(runner),
@@ -1618,9 +1620,9 @@ describe("a Free debate goes public only when the end-of-debate check allows it"
     expect(restarted.modelCalls).toEqual([]);
     expect(await askOf(debate)).toEqual({ outcome: null });
     expect(await isPublic(debate)).toBe(false);
-    // Once that attempt is older than any check may run, and the debate's own wait has passed, the sweep checks it itself.
+    // A check running elsewhere is no failure of the debate's own: no wait of its own started. Once that attempt is older
+    // than any check may run, the next pass checks the answer itself.
     await sleep(BACKGROUND_MS + 300 - (Date.now() - startedAt));
-    restarted.wait(60_000);
     await restarted.pass(debate);
     expect(restarted.outcomeOf(debate)).toBe("PUBLISHED");
     expect(restarted.modelCalls).toHaveLength(1);

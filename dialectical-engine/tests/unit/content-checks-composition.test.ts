@@ -186,8 +186,8 @@ describe("main.ts wires the route, the times, the calls at once and the sweeps' 
     expect(main.split("judgeGate.check(").length - 1).toBe(0);
   });
 
-  it("a finished Free debate passes the end-of-debate check first: the answer's hold, then the gate an owner's Publish passes, in the debate's turn, never waiting for a check running elsewhere", () => {
-    const gate = expression("sweepSynthesisPublishGate", "\n});");
+  it("a finished Free debate passes the end-of-debate check first: the answer's hold, then the gate an owner's Publish passes, its own check in the debate's turn, never waiting for a check running elsewhere", () => {
+    const gate = expression("sweepSynthesisPublishGate", "\n  });");
     // The same gate and its rule (createSynthesisPublishGate), the same approval and answer reads as the owner's Publish.
     expect(gate).toContain("createSynthesisPublishGate({");
     expect(gate).toContain("approvalCovers: input => publicationReviewRepository.approvalCovers(input),");
@@ -196,9 +196,12 @@ describe("main.ts wires the route, the times, the calls at once and the sweeps' 
     // It runs in the background: the background time for its own check, and no wait for one running elsewhere.
     expect(gate).toContain("check: { ...synthesisCheckDeps, deadlineMs: backgroundCheckDeadlineMs }, deadlineMs: backgroundCheckDeadlineMs,");
     expect(gate).toContain("inFlightWindowMs: backgroundCheckDeadlineMs, inFlightWaitMs: 0,");
-    // The hold of the answer the owner's reads use, then the gate in the debate's turn; one it cannot decide is unavailable.
+    // Only its own check, which calls the model, waits for the debate's turn; one that cannot answer starts the debate's own wait.
+    expect(gate).toContain("ownCheckInTurn: (runId, check) => inTurn.checkBefore(runId, check, (decision) => decision === \"UNAVAILABLE\"),");
+    expect(main.indexOf("const inTurn = checksInTurn(judgeGate);")).toBeLessThan(main.indexOf("const sweepSynthesisPublishGate = "));
+    // The hold of the answer the owner's reads use, then the gate.
     expect(main).toContain("stateOf: (target) => synthesisAnswerAccess.stateOf(target),");
-    expect(main).toContain("decide: async (target) => await inTurn.checkBefore(target.runId, () => sweepSynthesisPublishGate.decide(target),\n      (decision) => decision === \"UNAVAILABLE\") ?? \"UNAVAILABLE\"");
+    expect(main).toContain("decide: (target) => sweepSynthesisPublishGate.decide(target)");
     expect(main).toContain("endCheck: freeEndCheck, source: { ip: \"\", userAgent: \"\", requestId: \"free-publication-sweep\" }, lease,");
     expect(main.split("sweepSynthesisPublishGate.decide(").length - 1).toBe(1);
   });

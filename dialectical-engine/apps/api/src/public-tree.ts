@@ -606,6 +606,9 @@ export async function sweepPublicPage(deps: PublicPageSweepDeps): Promise<Readon
  * a pass did not ask is forgotten (published, refused, given up or erased), and a restart starts again from the lists' own order.
  * A Free debate's end-of-debate check goes before its publication check, in the same turn and under the same key
  * (`checkBefore`): when it cannot answer, the debate waits its own doubling time as when the publication check cannot.
+ * Such a check may take the whole background time (two minutes on the gate) before it fails, and the pass holds every
+ * other sweep's work while it runs. So once one has failed in a pass, no other `checkBefore` is asked in that pass: those
+ * debates are left owed, as during the shared wait, and the next pass asks them. A pass waits for at most one that fails.
  */
 export type ChecksInTurn = Readonly<{
   /** One pass of the sweeps: every check they ask through `check` belongs to it. */
@@ -613,9 +616,10 @@ export type ChecksInTurn = Readonly<{
   check: PublicationContentCheck;
   /**
    * Another check that goes before an item's publication check (a Free debate's end-of-debate check), asked in the same
-   * turns under the same key. Null: the item's turn has not come, and nothing was asked. An answer `failed` calls a failure
-   * starts or doubles the item's own wait, as an unavailable publication check does. Any other answer changes nothing:
-   * only the publication check's own answer ends an item's wait and tells the turns that the judge has answered.
+   * turns under the same key. Null: the item's turn has not come, or another such check already failed in this pass, and
+   * nothing was asked. An answer `failed` calls a failure starts or doubles the item's own wait, as an unavailable
+   * publication check does. Any other answer changes nothing: only the publication check's own answer ends an item's wait
+   * and tells the turns that the judge has answered.
    */
   checkBefore: <T>(key: string, check: () => Promise<T>, failed: (answer: T) => boolean) => Promise<T | null>;
 }>;
@@ -630,6 +634,8 @@ export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ no
   let owedBefore = Number.POSITIVE_INFINITY;
   let owed = Number.POSITIVE_INFINITY;
   let answered = false;
+  /** Whether a `checkBefore` has failed in this pass: the pass then asks no other. */
+  let beforeFailed = false;
   let asked = new Set<string>();
   const fail = (key: string): void => {
     const before = failed.get(key)?.wait;
@@ -644,7 +650,7 @@ export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ no
     const record = failed.get(key);
     if (record !== undefined && now() < record.until) return null;
     const turn = record?.turn ?? 0;
-    if (shared.resting() || (!answered && turn > owedBefore)) {
+    if (shared.resting() || (!answered && turn > owedBefore) || (!judge && beforeFailed)) {
       owed = Math.min(owed, turn);
       return null;
     }
@@ -653,10 +659,13 @@ export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ no
       answer = await ask();
     } catch (error) {
       fail(key);
+      if (!judge) beforeFailed = true;
       throw error;
     }
-    if (failedAnswer(answer)) fail(key);
-    else if (judge) {
+    if (failedAnswer(answer)) {
+      fail(key);
+      if (!judge) beforeFailed = true;
+    } else if (judge) {
       failed.delete(key);
       answered = true;
     }
@@ -666,6 +675,7 @@ export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ no
     pass: async <T>(sweeps: () => Promise<T>): Promise<T> => {
       owed = Number.POSITIVE_INFINITY;
       answered = false;
+      beforeFailed = false;
       asked = new Set();
       try {
         return await sweeps();
