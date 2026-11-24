@@ -36,6 +36,7 @@ import {
   Judge,
   JudgeContentRefusedError,
   JudgementRepository,
+  NodeReviewContentRefusedError,
   insertPreparedNodeReview,
   translateNodeReviewFailure,
   applyCorrelatedErrorDiscount,
@@ -9154,25 +9155,26 @@ export class WalkingSkeletonRunner {
     // invariant; reviewer assignment may change because rotation observes the
     // latest landed review, and that behaviour change is deliberately declared.
     const reviewScheduledNodeIds = new Set<string>();
+    /**
+     * Per node, the makers whose reply to its review was refused after every repair (`NodeReviewContentRefusedError`).
+     * Such a reply is its reviewer's, not the point's: the point is offered to another reviewer, never to these makers
+     * again, and only when no other maker may take it does the review end as unavailable (`offeredToAnotherReviewer`).
+     */
+    const refusedReviewers = new Map<string, Set<string>>();
     /** The reviewer seat chosen for one node, with the member it calls first. */
     interface ReviewerChoice {
       readonly seat: RunSeat;
       readonly maker: string;
       readonly plan: ReturnType<typeof seatCallPlan>;
     }
-    /**
-     * Today's reviewer choice for ONE node, given the latest reviewer of its author's maker. "MEMBERS_SAT_OUT" ends
-     * the arguing (`membersSatOutStop`); a node no maker but its author's could review throws, as always.
-     */
-    const chooseReviewer = (authoredNode: AuthoredDebateNode, latestReviewerMaker: string | null):
-      | { readonly kind: "MEMBERS_SAT_OUT" }
-      | { readonly kind: "REVIEW"; readonly reviewer: ReviewerChoice } => {
-      // Reclaim resume: a node an earlier copy saved from the same reply keeps that copy's review site (`siteNodeId`).
-      const reviewCallSiteKey = `JUDGE:review:${replayBook.siteNodeId(authoredNode.nodeId)}`;
+    /** The reviewer seats in the order one node tries them, and those that may still review it, each with its first member. */
+    const reviewerCandidatesOf = (authoredNode: AuthoredDebateNode, reviewCallSiteKey: string) => {
       // A15 (R5): reviewers come from the REVIEWER seats, and a seat may review
       // only through a member of a different maker than the author — checked
-      // per member, so whichever member answers is held to the same rule.
-      const differentMaker = (member: SeatIdentity): boolean => member.maker !== authoredNode.maker;
+      // per member, so whichever member answers is held to the same rule. Nor
+      // through a maker whose reply to this node's review was refused.
+      const refused = refusedReviewers.get(authoredNode.nodeId);
+      const differentMaker = (member: SeatIdentity): boolean => member.maker !== authoredNode.maker && refused?.has(member.maker) !== true;
       // Final review I2 (REVIEWER): on an assigned run the maker rotation below
       // starts at a SITE-PURE offset (`seatRotationOffset`), so no listed reviewer
       // seat can sit idle for a whole run — two seats of one maker, or a third
@@ -9181,12 +9183,30 @@ export class WalkingSkeletonRunner {
         ? rotateSeats(seatBook.reviewer, seatRotationOffset({ runId: run.runId, role: "REVIEWER", callSiteKey: reviewCallSiteKey }))
         : seatBook.reviewer;
       // Fix (d): a seat whose members all sit out is never chosen to review.
-      const reviewerCandidates = reviewerSeats.flatMap((seat) => {
+      const candidates = reviewerSeats.flatMap((seat) => {
         if (seatSitsOut(seat)) return [];
         const planned = seatCallPlan(seat, reviewCallSiteKey, differentMaker);
         const first = seatCaller.plan(seat, reviewCallSiteKey, planned.options);
         return first === null ? [] : [{ seat, maker: first.maker, plan: planned }];
       });
+      return { reviewerSeats, candidates };
+    };
+    /** Today's failure of a node no reviewer could review. */
+    const reviewUnavailable = (authoredNode: AuthoredDebateNode): TypedDomainError => new TypedDomainError(
+      "NODE_REVIEW_UNAVAILABLE",
+      `No valid cross-maker review was recorded for node ${authoredNode.nodeId}`
+    );
+    /**
+     * Today's reviewer choice for ONE node, given the latest reviewer of its author's maker. "MEMBERS_SAT_OUT" ends
+     * the arguing (`membersSatOutStop`); a node no maker but its author's could review throws, as always, and so does a
+     * node whose every other reviewer's reply was refused (NODE_REVIEW_UNAVAILABLE, as before such a node was offered on).
+     */
+    const chooseReviewer = (authoredNode: AuthoredDebateNode, latestReviewerMaker: string | null):
+      | { readonly kind: "MEMBERS_SAT_OUT" }
+      | { readonly kind: "REVIEW"; readonly reviewer: ReviewerChoice } => {
+      // Reclaim resume: a node an earlier copy saved from the same reply keeps that copy's review site (`siteNodeId`).
+      const reviewCallSiteKey = `JUDGE:review:${replayBook.siteNodeId(authoredNode.nodeId)}`;
+      const { reviewerSeats, candidates: reviewerCandidates } = reviewerCandidatesOf(authoredNode, reviewCallSiteKey);
       // Fix (d): every reviewer that could judge this node sits out — the same state as too few members left, so
       // the arguing ends here and the node keeps its own panel's footing (`membersSatOutStop`), never a dead run.
       // Finding 3 (review, 2026-10-12): only when a reviewer seat's member actually sat out; a node that never had a
@@ -9200,17 +9220,42 @@ export class WalkingSkeletonRunner {
         membersSatOutStop = true;
         return { kind: "MEMBERS_SAT_OUT" };
       }
+      if (reviewerCandidates.length === 0 && refusedReviewers.has(authoredNode.nodeId)) throw reviewUnavailable(authoredNode);
       return {
         kind: "REVIEW",
         reviewer: selectDifferentMakerReviewer(run.runId, authoredNode.maker, reviewerCandidates, latestReviewerMaker)
       };
     };
+    /**
+     * A node whose reviewer's reply was refused after every repair: that maker is set aside for this node, and the node is
+     * offered to another reviewer, as a node whose reviewer sat out is, when another may still take it and
+     * enough members are left to argue. False: no other reviewer can, and the review ends as it always has.
+     */
+    const offeredToAnotherReviewer = (authoredNode: AuthoredDebateNode, refusedMaker: string): boolean => {
+      const refused = refusedReviewers.get(authoredNode.nodeId) ?? new Set<string>();
+      refused.add(refusedMaker);
+      refusedReviewers.set(authoredNode.nodeId, refused);
+      const reviewCallSiteKey = `JUDGE:review:${replayBook.siteNodeId(authoredNode.nodeId)}`;
+      return !tooFewLeftToArgue() && reviewerCandidatesOf(authoredNode, reviewCallSiteKey).candidates.length > 0;
+    };
+    /**
+     * Whether a node offered to another reviewer after a refused reply had its next reviewer's call refused unsent at
+     * the call site's allowance (CALL_BUDGET_EXHAUSTED). Unless the gateway counts each maker's attempts apart (the
+     * preview's call policy), every reviewer of a node shares that allowance, and the refused reply spent it: no other
+     * reviewer can take the node, so its review ends as a refused reply's always did (NODE_REVIEW_UNAVAILABLE), never as
+     * a step's tries used up.
+     */
+    const allowanceSpentByRefusedReply = (authoredNode: AuthoredDebateNode, error: unknown): boolean =>
+      refusedReviewers.has(authoredNode.nodeId) && error instanceof TypedDomainError && error.code === "CALL_BUDGET_EXHAUSTED";
     /** How one node's review call ended (nothing recorded yet): `recordReviewOutcome` records it in review order. */
     type ReviewCallOutcome =
       // V4 start step, Task 53b: `reviewerMaker` is the maker of the member that ANSWERED (the one the ledger names as its reviewer).
       | { readonly kind: "REVIEWED"; readonly review: Awaited<ReturnType<Judge["review"]>>; readonly callSiteKey: string; readonly reviewerMaker: string }
       | { readonly kind: "HIDDEN"; readonly record: HaltedExpansionRecord }
-      /** Fix (d): the reviewer itself sat out during the call; the node is offered to another reviewer after this pass. */
+      /**
+       * The reviewer itself sat out during the call, or its reply was refused after every repair
+       * (`offeredToAnotherReviewer`); the node is offered to another reviewer after this pass.
+       */
       | { readonly kind: "GIVEN_BACK" }
       /** C1: a spend refusal stopped the reviewing (`runBodyBudgetStop`). */
       | { readonly kind: "STOPPED" };
@@ -9220,6 +9265,12 @@ export class WalkingSkeletonRunner {
       // V4 start step, Task 53 (item wait-d1): a path's point is CHECKING once its review is sent.
       const pointPath = pointPathIds.get(authoredNode.nodeId);
       if (pointPath !== undefined) pathMarks.point(pointPath, authoredNode.nodeId, "CHECKING");
+      /**
+       * The seat member asked last: a refused reply is that member's maker's. A call moved to a cheaper maker never
+       * brings that maker's refused reply here: the move goes on to the next maker, and when none serves the planned
+       * maker's money refusal travels (`callBodyRoleWithFallback`), a stop, never a refused reply.
+       */
+      const asked: { member: SeatMember | null } = { member: null };
       try {
         // B9: a review that has to move never moves onto the node's ACTUAL author.
         reviewAuthorMakers.set(callSiteKey, authoredNode.maker);
@@ -9234,7 +9285,7 @@ export class WalkingSkeletonRunner {
             seat: reviewer.seat,
             callSiteKey,
             ...reviewer.plan.options,
-            call: (member, memberCallSiteKey) => member.judge.review({
+            call: (member, memberCallSiteKey) => (asked.member = member).judge.review({
               runId: run.runId,
               subjectItemId: claimed.workItemId,
               callSiteKey: memberCallSiteKey,
@@ -9265,6 +9316,7 @@ export class WalkingSkeletonRunner {
         return { kind: "REVIEWED", review: reviewAttempt.value.value, callSiteKey: reviewAttempt.value.callSiteKey,
           reviewerMaker: reviewAttempt.value.member.maker };
       } catch (error) {
+        if (allowanceSpentByRefusedReply(authoredNode, error)) throw reviewUnavailable(authoredNode);
         const outcome = reviewFailureOutcome(error);
         if (outcome.kind === "RETHROW") throw error;
         // C1: a spend refusal stops REVIEWING, it does not fail the run. The
@@ -9275,10 +9327,11 @@ export class WalkingSkeletonRunner {
           runBodyBudgetStop = outcome.stop;
           return { kind: "STOPPED" };
         }
-        throw new TypedDomainError(
-          "NODE_REVIEW_UNAVAILABLE",
-          `No valid cross-maker review was recorded for node ${authoredNode.nodeId}`
-        );
+        // A reply still refused after every repair is its reviewer's, not the node's: the node is offered to another
+        // reviewer, as one whose reviewer sat out is. Only when no other reviewer can take it does the review end here.
+        if (error instanceof NodeReviewContentRefusedError
+          && offeredToAnotherReviewer(authoredNode, asked.member?.maker ?? reviewer.maker)) return { kind: "GIVEN_BACK" };
+        throw reviewUnavailable(authoredNode);
       }
     };
     /** Records one node's landed review (or its hidden one); called in review order. */
@@ -9336,7 +9389,8 @@ export class WalkingSkeletonRunner {
       if (runBodyBudgetStop !== null) return;
       // Run resilience (spec 2026-10-12, fix (d)): too few members left to argue ends the reviews with the arguing.
       if (tooFewLeftToArgue()) return;
-      // Fix (d): nodes whose reviewer sat out during their review, to be given another reviewer below.
+      // Nodes whose reviewer sat out during their review, or whose reviewer's reply was refused, to be given another
+      // reviewer below.
       let reviewerSatOut = false;
       for (const authoredNode of authoredNodes.values()) {
         if (reviewScheduledNodeIds.has(authoredNode.nodeId)) continue;
@@ -9357,7 +9411,8 @@ export class WalkingSkeletonRunner {
         }
         await recordReviewOutcome(authoredNode, outcome);
       }
-      // Fix (d): each pass that gives a node back marks one more member as sitting out, so this ends.
+      // Each pass that gives a node back marks one more member as sitting out, or sets one more maker aside for that
+      // node (`refusedReviewers`), so this ends.
       if (reviewerSatOut) await reviewPendingAuthoredNodes();
     };
 
@@ -9407,7 +9462,10 @@ export class WalkingSkeletonRunner {
       readonly latest: Map<string, string | null>;
       /** Every earlier batch is over: its reviews recorded and its given-back nodes offered again. */
       readonly ready: Promise<void>;
-      /** Fix (d): the nodes whose reviewer sat out during the call, in review order, offered again after the batch. */
+      /**
+       * The nodes whose reviewer sat out during the call, or whose reviewer's reply was refused, in review order, offered
+       * again after the batch.
+       */
       readonly givenBack: AuthoredDebateNode[];
       /**
        * V4 start step, Task 53b: on a path debate, the path (its root's index) whose batch this is; its turn book reads that path's
@@ -9485,11 +9543,11 @@ export class WalkingSkeletonRunner {
       });
     };
     /**
-     * Fix (d), kept: the nodes a batch gave back are offered again — together, each to a reviewer chosen in review
-     * order — once that batch is over; each pass that gives one back marks one more member as sitting out, so this
-     * ends. Each pass is a batch of its own, read off the ledger again, as today's recursion reads it. `rank` places a
-     * failure here after everything the batch itself did; it is thrown once every chain has settled. V4 start step, Task 53b:
-     * on a path debate a pass is one path's (`path`), read off that path's own turn ledger.
+     * The nodes a batch gave back are offered again — together, each to a reviewer chosen in review order — once that
+     * batch is over; each pass that gives one back marks one more member as sitting out, or sets one more maker aside for
+     * that node (`refusedReviewers`), so this ends. Each pass is a batch of its own, read off the ledger again, as today's
+     * recursion reads it. `rank` places a failure here after everything the batch itself did; it is thrown once every
+     * chain has settled. On a path debate a pass is one path's (`path`), read off that path's own turn ledger.
      */
     const reviewGivenBack = async (givenBack: readonly AuthoredDebateNode[], rank: ChainRank, path: number | null = null): Promise<void> => {
       let pending = givenBack;

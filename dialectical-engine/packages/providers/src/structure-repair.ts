@@ -17,6 +17,11 @@
  * structure-repair call, no REPAIR:STRUCTURE row, its artifact PARSED with A1's drops among its repairs. Otherwise the
  * call goes on exactly as above.
  *
+ * One bracket slip code puts right the same way, with no call: a list closed one key too late, when no object reads at
+ * all (`listCloserMoved`, LIST_CLOSER_MOVED). Code moves that one `]` only under its rule, and the mended object counts
+ * only when the step's own check accepts it; otherwise the reply goes on exactly as any reply no object reads. The
+ * word-for-word check below stays as it is, so a repair model's copy of such a reply is checked exactly as any other.
+ *
  * Refused-repair salvage (2026-10-16, B; spec §6 option iii): when the repair call does not do (its copy refused, the repair
  * model unavailable, its gate halted, a transport death), its failure never leaves the wrapper. The ORIGINAL AI gets one
  * short follow-up (`structureFollowUpFor`), the same call's second POST on its own gateway: PATCH asks only the members the
@@ -565,6 +570,9 @@ export function structureRepairKeepsWords(brokenReply: string, repaired: unknown
  * value. Its result counts only when the word-for-word check (`structureRepairKeepsWords`) still holds and the step's own
  * check accepts it with no repair that changes a value. When the step still refuses it, the object A1 built is handed on
  * (PARTIAL) for the follow-up to the original AI to finish.
+ *
+ * One bracket slip is put right too, when no object reads at all: a list closed one key too late (`listCloserMoved`). It
+ * moves one `]` and nothing else, only under its rule; any other closed-late reply is left as it came.
  * ---------------------------------------------------------------------------------------------------------------------- */
 
 /** Why A1 left a reply as it was (each its own guard). */
@@ -682,6 +690,174 @@ function readReplyTree(text: string): ReplyTree | null {
     // A reply nested past the engine's call stack is no tree A1 reads.
     return null;
   }
+}
+
+/**
+ * A list closed one key too late, put right in code: `{"reasons":["…"],"edge_bearings":[0.85]}` written as
+ * `{"reasons":["…","edge_bearings":[0.85]]}`, which no reader of the engine reads. The rule, whole: code writes one `]`
+ * and removes one `]` when every condition below holds, and otherwise returns null and mends nothing.
+ *  · The reply, trimmed (or its one code fence's body), opens with `{`; every `}` and `]` before the first `:` written
+ *    inside a list closes what is open; that `:` comes right after a string (the moved key) that itself comes right after
+ *    one of that list's commas; and the list is the value of a key of the object holding it (the holder).
+ *  · The answer form states the moved key at the holder's place, and states no key of that name inside the list
+ *    (`formLeavesKeyOnePlace`).
+ *  · With a `]` written right before that comma, the `]` code removes is the misplaced closer of that list: read on from
+ *    the moved key, the first closer that stands where the holder is the innermost open container, at the same nesting
+ *    depth as at the moved key; every closer before it closes a list or object opened after the moved key, so nothing
+ *    of another object or list is closed between the moved key and it (`lateListCloser`).
+ *  · The value written right before that `]` is a list, or stands under a key the form does not state as a list.
+ *  · The result is strict JSON, one object, that writes no key twice in any object, no dotted key, and each key at a
+ *    place the form states (`keysAtStatedPlaces`).
+ * The last two are there for a second fault beside the slip: a one-entry list that lost its `[` (that `]` may be its
+ * closer), and a `}` written too late (a member then stands inside another object). Under these conditions the mended
+ * text differs from the reply (trimmed, out of its fence) only by the position of that one `]`, and parses to an object
+ * holding every key and value the reply holds, in the same order.
+ */
+function listCloserMoved(text: string, answerForm: string): string | null {
+  const trimmed = text.trim();
+  const body = (modelJsonFenceBody(trimmed) ?? trimmed).trim();
+  if (!body.startsWith("{")) return null;
+  type Frame = { object: boolean; key: string | null; expectKey: boolean; lastComma: number };
+  const stack: Frame[] = [];
+  /** The last string read outside every text: where its opening quote stands, and its value. */
+  let lastString: Readonly<{ at: number; value: string }> | null = null;
+  let stop: Readonly<{ comma: number; key: number; name: string; holderPath: readonly string[]; listKey: string }> | null = null;
+  for (let index = 0; index < body.length && stop === null; index += 1) {
+    const character = body[index]!;
+    if (JSON_BLANKS.includes(character)) continue;
+    const top = stack.at(-1);
+    if (character === "\"") {
+      let end = index + 1;
+      while (end < body.length && body[end] !== "\"") end += body[end] === "\\" ? 2 : 1;
+      if (end >= body.length) return null;
+      let value: unknown;
+      try { value = JSON.parse(body.slice(index, end + 1)); } catch { return null; }
+      if (typeof value !== "string") return null;
+      if (top?.object === true && top.expectKey) { top.key = value; top.expectKey = false; }
+      lastString = { at: index, value };
+      index = end;
+      continue;
+    }
+    if (character === ":" && top !== undefined && !top.object) {
+      // A key in an open list: it must follow one of the list's own commas, and the list must be its holder's key's value.
+      const holder = stack.at(-2);
+      if (lastString === null || top.lastComma < 0 || holder === undefined || !holder.object || holder.key === null) return null;
+      let before = lastString.at - 1;
+      while (before >= 0 && JSON_BLANKS.includes(body[before]!)) before -= 1;
+      if (before !== top.lastComma) return null;
+      const holderPath = stack.slice(0, -2).flatMap((frame) => frame.object && frame.key !== null ? [frame.key] : []);
+      stop = { comma: top.lastComma, key: lastString.at, name: lastString.value, holderPath, listKey: holder.key };
+      continue;
+    }
+    if (character === "{" || character === "[") stack.push({ object: character === "{", key: null, expectKey: character === "{", lastComma: -1 });
+    else if (character === "}" || character === "]") {
+      // Any closer that does not close what is open before the stop is another fault: not this mend.
+      if (top === undefined || top.object !== (character === "}")) return null;
+      stack.pop();
+    } else if (character === ",") {
+      if (top === undefined) return null;
+      top.lastComma = index;
+      if (top.object) top.expectKey = true;
+    }
+  }
+  if (stop === null) return null;
+  const { places, lists } = formShape(answerForm);
+  if (!formLeavesKeyOnePlace(places, stop.holderPath, stop.listKey, stop.name)) return null;
+  const closed = `${body.slice(0, stop.comma)}]${body.slice(stop.comma)}`;
+  const holderPath = stop.holderPath;
+  const late = lateListCloser(closed, stop.key + 1, (key) => lists.has([...holderPath, ...keyParts(key)].join(".")));
+  if (late < 0) return null;
+  const mended = `${closed.slice(0, late)}${closed.slice(late + 1)}`;
+  try {
+    if (!isPlainObject(JSON.parse(mended))) return null;
+  } catch {
+    return null;
+  }
+  const tree = readReplyTree(mended);
+  return tree !== null && !hasDottedKey(tree) && !writesAKeyTwice(tree) && keysAtStatedPlaces(tree, places) ? mended : null;
+}
+
+/**
+ * The mend's own reading of the answer form, used by `listCloserMoved` alone: whether the form (its `places`) states
+ * `name` as a key at the place of the object holding a list (`holderPath`) and states no key of that name inside the list
+ * written under `listKey`. A name that is not exactly one key part (`keyParts`) never qualifies.
+ */
+function formLeavesKeyOnePlace(places: ReadonlySet<string>, holderPath: readonly string[], listKey: string, name: string): boolean {
+  const nameParts = keyParts(name);
+  if (nameParts.length !== 1) return false;
+  return places.has([...holderPath, ...nameParts].join(".")) && !places.has([...holderPath, ...keyParts(listKey), ...nameParts].join("."));
+}
+
+/**
+ * Where the misplaced closer of the list stands in `text`, the reply with a `]` written right before the moved key's
+ * comma, read on from the moved key at `from`, where the object holding the list is the innermost open container. It is
+ * the first closer that stands where that object is innermost again, when that closer is a `]`, every closer before it
+ * closed a list or object opened after the moved key, and the value written right before it is a list or stands under a
+ * key `isList` does not name. Else -1: that object's `}` comes first, or a closer that closes nothing opened after the
+ * moved key, or no such `]` at all, or a value that is no list under a key `isList` names.
+ */
+function lateListCloser(text: string, from: number, isList: (key: string) => boolean): number {
+  /** The closers of the lists and objects opened after the moved key and still open. */
+  const opened: string[] = [];
+  /** At the holder's depth: the last key read, whether the next string is a key, whether the next value is its value. */
+  let key: string | null = null;
+  let keyNext = true;
+  let valueNext = false;
+  let valueIsList = false;
+  for (let index = from; index < text.length; index += 1) {
+    const character = text[index]!;
+    if (JSON_BLANKS.includes(character)) continue;
+    const atHolder = opened.length === 0;
+    if (atHolder && valueNext) { valueIsList = character === "["; valueNext = false; }
+    if (character === "\"") {
+      let end = index + 1;
+      while (end < text.length && text[end] !== "\"") end += text[end] === "\\" ? 2 : 1;
+      if (end >= text.length) return -1;
+      if (atHolder && keyNext) {
+        let read: unknown;
+        try { read = JSON.parse(text.slice(index, end + 1)); } catch { return -1; }
+        if (typeof read !== "string") return -1;
+        key = read;
+        keyNext = false;
+        valueIsList = false;
+      }
+      index = end;
+      continue;
+    }
+    if (character === "{" || character === "[") opened.push(character === "{" ? "}" : "]");
+    else if (character === "}" || character === "]") {
+      if (!atHolder) {
+        if (opened.pop() !== character) return -1;
+        continue;
+      }
+      if (character === "}") return -1;
+      return key !== null && isList(key) && !valueIsList ? -1 : index;
+    } else if (atHolder && character === ",") keyNext = true;
+    else if (atHolder && character === ":") valueNext = true;
+  }
+  return -1;
+}
+
+/** Whether every key of the tree stands at a place `places` holds (a list position adds nothing to a place, as in `formShape`). */
+function keysAtStatedPlaces(node: ReplyTree, places: ReadonlySet<string>, path: readonly string[] = []): boolean {
+  if (node.kind === "scalar") return true;
+  if (node.kind === "list") return node.entries.every((entry) => keysAtStatedPlaces(entry, places, path));
+  return node.members.every((member) => member.key !== null && places.has([...path, member.key].join("."))
+    && keysAtStatedPlaces(member.value, places, [...path, member.key]));
+}
+
+/** Whether an object of the tree writes one key twice. */
+function writesAKeyTwice(node: ReplyTree): boolean {
+  if (node.kind === "scalar") return false;
+  if (node.kind === "list") return node.entries.some(writesAKeyTwice);
+  const seen = new Set<string>();
+  return node.members.some((member) => {
+    if (member.key !== null) {
+      if (seen.has(member.key)) return true;
+      seen.add(member.key);
+    }
+    return writesAKeyTwice(member.value);
+  });
 }
 
 /** Whether any key of the tree names a place by its parts (`"evidence.quality"`). */
@@ -846,6 +1022,8 @@ function shapeReplyTree(tree: ReplyTree & { kind: "object" }, answerForm: string
  * `structureRepairKeepsWords` holds and then the step's own `classify` (run LAST, on the exact string returned) accepts it
  * with no value-changing repair: ACCEPTED, its drops named after the step's own repairs, the first drop the headline. A
  * step refusal hands the base on (PARTIAL) with that refusal; nothing readable is NO_OBJECT.
+ *
+ * When nothing decodes either, a list closed one key too late may be put right (`listCloserSalvage`).
  */
 export function salvageStructureReply(input: Readonly<{ content: string; reply: ModelReplyFacts | undefined; answerForm: string;
   textsKept: StructureRepairTextsKept; classify: (content: string, reply?: ModelReplyFacts) => ContentClassification }>): StructureSalvage {
@@ -855,7 +1033,7 @@ export function salvageStructureReply(input: Readonly<{ content: string; reply: 
   let drops: readonly StructureSalvageRepair[] = [];
   if (tree === null || tree.kind !== "object") {
     const decoded = decodeModelJson(input.content, input.reply);
-    if (!decoded.ok || !isPlainObject(decoded.value)) return Object.freeze({ kind: "NO_OBJECT" });
+    if (!decoded.ok || !isPlainObject(decoded.value)) return listCloserSalvage(input);
     base = decoded.value;
   } else {
     if (hasDottedKey(tree)) return refused("DOTTED_KEY");
@@ -876,6 +1054,35 @@ export function salvageStructureReply(input: Readonly<{ content: string; reply: 
   if (drops.length === 0) return refused("NOTHING_TO_DROP");
   return Object.freeze({ kind: "ACCEPTED", content, classification: parsedWithRepairs([...stepRepairs, ...drops], drops[0]!),
     repairs: Object.freeze(drops) });
+}
+
+/**
+ * The salvage of a reply no object reads (`salvageStructureReply`), when its fault is a list closed one key too late
+ * (`listCloserMoved`, LIST_CLOSER_MOVED): ACCEPTED when the step's own `classify` (on the exact string returned) accepts the
+ * mended object with no value-changing repair. In every other case NO_OBJECT, exactly as with no mend, so the follow-up
+ * to the original AI (`structureFollowUpFor`) and the structure-repair call go on as for any reply no object reads: the
+ * one thing the mend adds is a mended object the step accepts. The word check reads the mended text as the broken reply:
+ * read as it came, the reply holds the moved key's name as a text of the still-open list, so the check would refuse every
+ * mend; the mend's own rule is what shows that nothing but that one `]` moved.
+ */
+function listCloserSalvage(input: Parameters<typeof salvageStructureReply>[0]): StructureSalvage {
+  const unread: StructureSalvage = Object.freeze({ kind: "NO_OBJECT" });
+  const mended = listCloserMoved(input.content, input.answerForm);
+  if (mended === null) return unread;
+  try {
+    const base = JSON.parse(mended) as Record<string, unknown>;
+    if (!structureRepairKeepsWords(mended, base, input.answerForm, { textsKept: input.textsKept })) return unread;
+    const content = JSON.stringify(base);
+    const classification = input.classify(content, input.reply);
+    if (classification.parseStatus !== "PARSED") return unread;
+    const stepRepairs = contentRepairsOf(classification);
+    if (stepRepairs.some((repair) => VALUE_CHANGING_REPAIRS.has(repair))) return unread;
+    const repairs: readonly StructureSalvageRepair[] = Object.freeze(["LIST_CLOSER_MOVED"]);
+    return Object.freeze({ kind: "ACCEPTED", content, classification: parsedWithRepairs([...stepRepairs, ...repairs], repairs[0]!), repairs });
+  } catch {
+    // A step check that throws on the mended object: as with no mend, where it never read one.
+    return unread;
+  }
 }
 
 /** A structured step with its own check and a readable frame, not the evaluator lane, not a structure-repair call. */
