@@ -66,6 +66,10 @@ tests/integration/staff-security-acceptance.test.ts
 tests/integration/staff-webauthn-database.test.ts
 # 0184: a staff member's one key under a new site name, only with an operator's permit (and never without one).
 tests/integration/staff-rekey-permit.test.ts
+# 0186: the preview's approved buyers: only the Owner, the proof bound under TEAM_GRANT to the change, the cap, the locked tools,
+# the grants and the erasure on real Postgres; and the four Owner routes over HTTP on fake data ports.
+tests/integration/preview-buyers-0186.test.ts
+tests/integration/preview-buyers-http.test.ts
 tests/integration/owner-one-key.test.ts
 # Spawns one tsx child under a 5 s commit deadline (kill-ceremony case): the only timing-bounded case on this list.
 tests/integration/owner-bootstrap-recovery.test.ts
