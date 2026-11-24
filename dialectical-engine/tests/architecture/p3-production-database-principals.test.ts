@@ -1807,6 +1807,16 @@ describe("P3-01 production database-principal manifest", () => {
   "roleName": "debateai_billing_runtime",
   "source": "migrations/0189_free_debate_refused_by_check.sql",
   "grants": ["EXECUTE ON FUNCTION identity.read_free_debate_refused_by_check(uuid,uuid)"]
+},
+// 0190: the takedown of a public debate the end-of-debate check deletes, and the Free debates' list read from a place. The
+// cross-account marker's, as 0171 gave it 0137's Free publish and list: the API calls both on its system login outside any request.
+{
+  "roleName": "debateai_rls_all_accounts",
+  "source": "migrations/0190_check_deletes_public_debate.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.take_down_check_deleted_debates(integer)",
+    "EXECUTE ON FUNCTION identity.read_free_debates_to_publish_after(integer,timestamptz,uuid)"
+  ]
 }
 ]);
     expect(manifest.privilegeRevocations).toEqual([
@@ -2378,6 +2388,27 @@ it("discloses exactly 0189's grant: whether the publication check kept a Free de
   expect(actual).toEqual(declared);
   // One function, the billing role's alone (as 0171's identity.read_run_is_dig): no runtime, no marker, no table grant.
   expect(declared).toEqual(["GRANT EXECUTE ON FUNCTION identity.read_free_debate_refused_by_check(uuid,uuid) TO debateai_billing_runtime;"]);
+});
+
+it("discloses exactly 0190's grants: the takedown and the Free list read from a place, to the cross-account marker alone", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0190_check_deletes_public_debate.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_authorization_runtime|debateai_rls_all_accounts|debateai_erasure_runtime";
+  // As for 0189: every GRANT line naming one of the disclosed roles names it alone.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0190_check_deletes_public_debate.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Two functions, the marker's alone (as 0171's Free publish and list); nothing for the erasure login, whose functions the release
+  // before counts at its start; the page's closing is granted only to the takedown's owner, inside the step's DO block.
+  expect(declared).toEqual([
+    "GRANT EXECUTE ON FUNCTION core.take_down_check_deleted_debates(integer) TO debateai_rls_all_accounts;",
+    "GRANT EXECUTE ON FUNCTION identity.read_free_debates_to_publish_after(integer,timestamptz,uuid) TO debateai_rls_all_accounts;"
+  ]);
 });
 
 it("discloses exactly 0125's grants to the API's billing role and the export worker (italy-clause-approval S01)", async () => {

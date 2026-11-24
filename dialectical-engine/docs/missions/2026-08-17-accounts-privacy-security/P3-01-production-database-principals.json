@@ -3678,6 +3678,14 @@
       "grants": [
         "EXECUTE ON FUNCTION identity.read_free_debate_refused_by_check(uuid,uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_rls_all_accounts",
+      "source": "migrations/0190_check_deletes_public_debate.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION core.take_down_check_deleted_debates(integer)",
+        "EXECUTE ON FUNCTION identity.read_free_debates_to_publish_after(integer,timestamptz,uuid)"
+      ]
     }
   ],
   "privilegeRevocations": [

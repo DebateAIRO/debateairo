@@ -1,0 +1,71 @@
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import type { PoolClient } from "pg";
+import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
+
+/**
+ * 0190, the check deletes a public debate and the Free sweep reads past waiting debates (expand; migrations/lineage/README.md
+ * "The check deletes a public debate, and the Free sweep reads past waiting debates (0190)"): three definers.
+ * core.take_down_check_deleted_debates takes the page of a public debate down when the end-of-debate check's deletion verdict
+ * is about what the page shows, so that 0126's unchanged prepare then erases it; identity.close_public_page_of_deleted_debate
+ * ends what was running on that page and deletes the page's sealed copies (the takedown's owner's alone);
+ * identity.read_free_debates_to_publish_after is 0137's list of waiting Free debates read from a place. The two the API calls
+ * are the cross-account marker's, never the erasure login's, whose functions the release before counts at its start. No
+ * table, column or table right is added, and no earlier function changes. It keeps 0130's verifier and amends no earlier step.
+ */
+const NAME = "0190_check_deletes_public_debate.sql";
+const VERSION = "check-deletes-public-debate-forward0190-v1";
+const MANIFEST_PATH = "lineage/check-deletes-public-debate-forward0190.json";
+const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
+const PREVIOUS = "0189_free_debate_refused_by_check.sql";
+const FUNCTIONS: readonly string[] = [
+  "core.take_down_check_deleted_debates(integer)",
+  "identity.close_public_page_of_deleted_debate(uuid)",
+  "identity.read_free_debates_to_publish_after(integer,timestamp with time zone,uuid)"
+];
+const AMENDS: readonly never[] = [];
+const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0190_${detail}`); };
+const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
+const exactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+  && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+const digest = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
+
+/** The three functions: owner, definer, settings, volatility, body and ACL. */
+async function postconditionEvidence(client: PoolClient): Promise<string> {
+  const functions = (await client.query(`
+    SELECT signature,pg_get_userbyid(p.proowner) owner,p.prosecdef definer,p.proconfig config,p.provolatile volatility,
+      encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') definition,
+      (SELECT jsonb_agg(g.item ORDER BY g.item) FROM (SELECT coalesce(pg_get_userbyid(nullif(a.grantee,0)),'PUBLIC')||':'||a.privilege_type||':'||a.is_grantable::text item FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a) g) acl
+    FROM unnest($1::text[]) signature JOIN pg_proc p ON p.oid=to_regprocedure(signature) ORDER BY signature`, [FUNCTIONS])).rows;
+  if (functions.length !== FUNCTIONS.length) return fail("POSTCONDITION_OBJECTS");
+  return sha(JSON.stringify({ functions }));
+}
+
+export async function loadForward0190(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {
+  const directory = new URL("../../../migrations/", import.meta.url);
+  const bytes = await readFile(new URL(MANIFEST_PATH, directory));
+  const raw: unknown = JSON.parse(bytes.toString("utf8"));
+  if (!exactKeys(raw, ["version", "baseRecipeSha256", "previous", "migration", "verifier", "amendsPostconditionsOf"])
+    || raw.version !== VERSION || raw.baseRecipeSha256 !== anchor.baseRecipeSha256
+    || !exactKeys(raw.previous, ["name", "manifestSha256", "verifierSha256"])
+    || raw.previous.name !== PREVIOUS || anchor.previousName !== PREVIOUS
+    || raw.previous.manifestSha256 !== anchor.previousManifestSha256
+    || raw.previous.verifierSha256 !== anchor.previousVerifierSha256
+    || !exactKeys(raw.migration, ["name", "sha256"]) || raw.migration.name !== NAME
+    || !digest(raw.migration.sha256)
+    || !exactKeys(raw.verifier, ["path", "sha256"]) || raw.verifier.path !== VERIFIER_PATH
+    || !digest(raw.verifier.sha256) || JSON.stringify(raw.amendsPostconditionsOf) !== JSON.stringify(AMENDS)) return fail("MANIFEST");
+  const sqlBytes = await readFile(new URL(NAME, directory));
+  if (sha(sqlBytes) !== raw.migration.sha256) return fail("SOURCE_DIGEST");
+  const verifierBytes = await readFile(new URL(VERIFIER_PATH, directory));
+  if (sha(verifierBytes) !== raw.verifier.sha256) return fail("VERIFIER_DIGEST");
+  return Object.freeze({
+    name: NAME, version: VERSION, manifestSha256: sha(bytes), sourceSha256: raw.migration.sha256,
+    sql: sqlBytes.toString("utf8"), previousName: PREVIOUS,
+    previousManifestSha256: anchor.previousManifestSha256,
+    previousVerifierSha256: anchor.previousVerifierSha256,
+    verifierPath: VERIFIER_PATH, verifierSha256: raw.verifier.sha256,
+    verifierSql: verifierBytes.toString("utf8"), postconditionEvidence, amendsPostconditionsOf: AMENDS
+  });
+}
