@@ -564,6 +564,7 @@ apps/ui/app/social/complete/page.tsx
 apps/ui/app/terms/page.tsx
 apps/ui/app/terms/versions/[sha256]/page.tsx
 apps/ui/app/terms/versions/page.tsx
+apps/ui/app/v1/auth/social/[provider]/callback/route.ts
 apps/ui/app/v4/debate/[id]/page.tsx
 apps/ui/app/v4/debate/[id]/report/page.tsx
 apps/ui/app/v4/debate/[id]/report/pdf/route.ts

@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { createPrivateKey, sign } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { constants } from 'node:fs';
 import { chmod, lstat, open } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -102,12 +103,54 @@ export function socialRelayEnvironment(source) {
     || typeof source.CREDENTIALS_DIRECTORY !== 'string' || !source.CREDENTIALS_DIRECTORY.startsWith('/') || source.CREDENTIALS_DIRECTORY.split('/').some(p => p === '..' || p === '.') || source.CREDENTIALS_DIRECTORY.includes('\0')) throw new TypeError('SOCIAL_CUSTODY_INVALID');
   return { socketPath: source.SOCIAL_SOCKET_PATH, credentialsPath: join(source.CREDENTIALS_DIRECTORY, 'social-providers') };
 }
-export async function loadSocialCredentials(path) {
-  const parent = await lstat(join(path, '..'));
-  if (!parent.isDirectory() || parent.isSymbolicLink() || (parent.mode & 0o077) !== 0 || parent.uid !== process.getuid?.()) throw new TypeError('SOCIAL_CUSTODY_INVALID');
-  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+const custodyInvalid = () => { throw new TypeError('SOCIAL_CUSTODY_INVALID'); };
+function exactCredentialAcl(acl, uid, permissions) {
+  if (!acl || Object.keys(acl).sort().join(',') !== 'entries,version' || acl.version !== 2 || !Array.isArray(acl.entries) || acl.entries.length !== 5) return false;
+  const expected = [[1, permissions, 4294967295], [2, permissions, uid], [4, 0, 4294967295], [16, permissions, 4294967295], [32, 0, 4294967295]];
+  return acl.entries.every((entry, i) => entry && Object.keys(entry).sort().join(',') === 'id,permissions,tag'
+    && entry.tag === expected[i][0] && entry.permissions === expected[i][1] && entry.id === expected[i][2]);
+}
+/**
+ * The two accepted shapes of the credential folder and file, decided as the Turnstile relay decides its secret's
+ * (deploy/turnstile/siteverify-relay.mjs, relaySecretCustody): the relay's own user owns both and nobody else may
+ * read them, or systemd's LoadCredential= shape: root's 0550 folder and 0440 file, each carrying exactly one
+ * named-user ACL entry, for this relay's user (read and enter the folder, read the file).
+ */
+export function socialCredentialCustody(parent, metadata, uid, acl = null) {
+  if (!Number.isSafeInteger(uid) || uid < 0 || !parent.isDirectory() || parent.isSymbolicLink() || !metadata.isFile()
+    || metadata.nlink !== 1 || metadata.size < 2 || metadata.size > 32768) custodyInvalid();
+  if (parent.uid === uid && metadata.uid === uid && (parent.mode & 0o077) === 0 && (metadata.mode & 0o077) === 0) return 'owned';
+  if (uid > 0 && parent.uid === 0 && parent.gid === 0 && (parent.mode & 0o7777) === 0o550
+    && metadata.uid === 0 && metadata.gid === 0 && (metadata.mode & 0o7777) === 0o440
+    && acl && Object.keys(acl).sort().join(',') === 'file,parent' && exactCredentialAcl(acl.parent, uid, 5) && exactCredentialAcl(acl.file, uid, 4)) return 'systemd';
+  return custodyInvalid();
+}
+// Node reads no ACL; the same fixed, isolated Python the Turnstile relay runs reads both through the open handles.
+const ACL_METADATA_PROGRAM = `import os,struct,json
+result={}
+for name,fd in (("parent",3),("file",4)):
+ raw=os.getxattr(fd,"system.posix_acl_access")
+ if len(raw)!=44:raise ValueError()
+ result[name]={"version":struct.unpack("<I",raw[:4])[0],"entries":[dict(zip(("tag","permissions","id"),struct.unpack("<HHI",raw[i:i+8]))) for i in range(4,44,8)]}
+print(json.dumps(result,separators=(",",":")))
+`;
+function credentialAclMetadata(parentFd, fileFd) {
+  let result;
   try {
-    const stat = await file.stat(); if (!stat.isFile() || stat.uid !== process.getuid?.() || (stat.mode & 0o077) !== 0 || stat.size < 2 || stat.size > 32768) throw new TypeError('SOCIAL_CUSTODY_INVALID');
+    if (process.platform !== 'linux') custodyInvalid();
+    result = spawnSync('/usr/bin/python3', ['-I', '-S', '-c', ACL_METADATA_PROGRAM], { env: {}, timeout: 1000, maxBuffer: 2048, stdio: ['ignore', 'pipe', 'pipe', parentFd, fileFd] });
+    if (result.error || result.signal || result.status !== 0 || result.stderr?.length || !result.stdout?.length || result.stdout.length > 2048) custodyInvalid();
+    return JSON.parse(result.stdout.toString('utf8'));
+  } catch { return custodyInvalid(); }
+}
+export async function loadSocialCredentials(path) {
+  const parentHandle = await open(join(path, '..'), constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+  let file;
+  try {
+    const parent = await parentHandle.stat();
+    file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const stat = await file.stat(), uid = process.getuid?.();
+    socialCredentialCustody(parent, stat, uid, parent.uid === 0 && stat.uid === 0 && uid !== 0 ? credentialAclMetadata(parentHandle.fd, file.fd) : null);
     const input = JSON.parse(await file.readFile('utf8'));
     if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length > 4) throw new TypeError('SOCIAL_CUSTODY_INVALID');
     for (const [provider, config] of Object.entries(input)) {
@@ -117,7 +160,7 @@ export async function loadSocialCredentials(path) {
       else if (!exact(config, ['clientId', 'appScope', 'callback', 'access', 'clientSecret']) || !scalar(config.clientSecret, 2048)) throw new TypeError('SOCIAL_CUSTODY_INVALID');
     }
     return input;
-  } finally { await file.close(); }
+  } finally { await file?.close(); await parentHandle.close(); }
 }
 async function main() {
   const config = socialRelayEnvironment(process.env); for (const key of Object.keys(process.env)) delete process.env[key];
