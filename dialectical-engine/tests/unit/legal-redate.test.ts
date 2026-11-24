@@ -106,11 +106,20 @@ describe("the plan on the drafts as they are", () => {
     const asked: string[] = [];
     const result = plan(next, { isReleased: (path) => (asked.push(path), false) });
     const archive = manifest().archive;
-    const currentCopies = (["PRIVACY", "TERMS"] as const).flatMap((kind) => Object.entries(archive[kind])
-      .flatMap(([, entries]) => Object.values(entries).filter((entry) => entry.version === "1.1").map((entry) => entry.path)));
-    expect(currentCopies).toHaveLength(6);
-    expect(result.archiveRemovals.map((removal) => removal.path).sort()).toEqual([...currentCopies].sort());
-    expect(asked.sort()).toEqual([...currentCopies].sort());
+    const copies = (version: string) => (["PRIVACY", "TERMS"] as const).flatMap((kind) => Object.entries(archive[kind])
+      .flatMap(([code, entries]) => Object.values(entries).filter((entry) => entry.version === version).map((entry) => ({ kind, code, path: entry.path }))));
+    // The archive holds the 1.1 texts of all 35 languages, one per document and language; only English, French and
+    // Romanian also hold 1.0 (the launch texts), since the other 32 languages were first released at 1.1.
+    const currentCopies = copies("1.1");
+    expect(currentCopies).toHaveLength(2 * CODES.length);
+    for (const kind of ["PRIVACY", "TERMS"] as const) {
+      expect(currentCopies.filter((copy) => copy.kind === kind).map((copy) => copy.code).sort(), kind).toEqual(CODES);
+      expect(copies("1.0").filter((copy) => copy.kind === kind).map((copy) => copy.code).sort(), kind).toEqual(["en", "fr", "ro"]);
+    }
+    const currentPaths = currentCopies.map((copy) => copy.path).sort();
+    expect(result.archiveRemovals.map((removal) => removal.path).sort()).toEqual(currentPaths);
+    expect(asked.sort()).toEqual(currentPaths);
+    for (const { path } of copies("1.0")) expect(asked, path).not.toContain(path);
   });
 
   it("changes nothing for the day the texts already carry", () => {
@@ -195,8 +204,10 @@ describe("the command on a copy of the legal files", () => {
     expect(tree()).toEqual(before);
   });
 
-  it("re-dates every draft, keeps the 1.0 copies byte for byte, makes the 1.1 copies again and passes the release check", () => {
+  it("re-dates every draft, keeps the 1.0 copies byte for byte, makes the 1.1 copies of all 35 languages again and passes the release check", () => {
     const oneZero = Object.fromEntries(archived("1.0").map((path) => [path, sha(readFileSync(join(copy, path)))]));
+    // The launch texts: English, French and Romanian only.
+    expect(Object.keys(oneZero).map((path) => path.split("/")[4]).sort()).toEqual(["en", "en", "fr", "fr", "ro", "ro"]);
     const result = redate("--date", day);
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(result.stdout).toContain("Legal texts: ready for release.");
@@ -207,8 +218,9 @@ describe("the command on a copy of the legal files", () => {
     const record = JSON.parse(readFileSync(join(copy, "apps/ui/legal/translated-from.json"), "utf8")) as LegalTranslations;
     for (const kind of ["PRIVACY", "TERMS"] as const) {
       const english = readFileSync(join(copy, "apps/ui/legal/en", DRAFT[kind]), "utf8");
-      for (const code of ["fr", "ro"]) expect(record[kind][code], `${kind} ${code}`).toEqual({ version: "1.1", sha256: sha(english) });
-      for (const code of ["en", "fr", "ro"]) {
+      // Every translation is recorded again as following the re-dated English text, and every language's text is archived again.
+      for (const code of CODES.filter((code) => code !== "en")) expect(record[kind][code], `${kind} ${code}`).toEqual({ version: "1.1", sha256: sha(english) });
+      for (const code of CODES) {
         const text = readFileSync(join(copy, "apps/ui/legal", code, DRAFT[kind]), "utf8");
         expect(after.archive[kind][code]![sha(text)], `${kind} ${code}`).toEqual({ version: "1.1", path: `apps/ui/legal/archive/${code}/${sha(text)}.md` });
         expect(readFileSync(join(copy, `apps/ui/legal/archive/${code}/${sha(text)}.md`), "utf8")).toBe(text);
