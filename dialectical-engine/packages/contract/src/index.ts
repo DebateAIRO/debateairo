@@ -1431,13 +1431,21 @@ export const PublicationTransitionSchema = z.object({
   public_ref: z.uuid().nullable()
 }).strict();
 /**
+ * The stages beside PRIVATE that the website's public mark names (apps/ui/lib/v4/publicState.ts): before the check (WILL_BE_PUBLIC,
+ * BEING_CHECKED) and after it (KEPT_PRIVATE). Exactly the website's list, because the visibility read below is strict.
+ */
+export const RUN_VISIBILITY_PUBLIC_STAGES = ["WILL_BE_PUBLIC", "BEING_CHECKED", "KEPT_PRIVATE"] as const;
+/**
  * GET /v1/runs/{id}/visibility: the publish's own two fields and, security review F2, `dig`: sent (true) only for a dig, which is never published,
  * so the page offers no Publish for it. The publish's 201 keeps the two fields alone.
+ * `public_stage`: sent only to the owner, and only as KEPT_PRIVATE, for a private Free debate the publication check refused (BLOCK or UNSURE,
+ * migration 0189): it stays private for good. The API sends neither stage before the check; the page shows nothing more than private without one.
  */
 export const RunVisibilitySchema = z.object({
   state: z.enum(["PRIVATE", "PUBLISHED"]),
   public_ref: z.uuid().nullable(),
-  dig: z.boolean().optional()
+  dig: z.boolean().optional(),
+  public_stage: z.enum(RUN_VISIBILITY_PUBLIC_STAGES).optional()
 }).strict();
 export type RunVisibility = z.infer<typeof RunVisibilitySchema>;
 

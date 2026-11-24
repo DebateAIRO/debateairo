@@ -445,7 +445,10 @@ export interface PublicationApplication {
     authenticated: AuthenticatedSession;
     requestId: string | undefined;
   }>): Promise<boolean>;
-  /** Security review F2: `dig` (true) only for a dig, which is never published, so the page offers no Publish. */
+  /**
+   * Security review F2: `dig` (true) only for a dig, which is never published, so the page offers no Publish.
+   * `public_stage` KEPT_PRIVATE only for a private Free debate the publication check refused, which stays private for good.
+   */
   readOwnedVisibility(input: Readonly<{
     runId: string;
     authenticated: AuthenticatedSession;
@@ -453,6 +456,7 @@ export interface PublicationApplication {
     state: "PRIVATE" | "PUBLISHED";
     public_ref: string | null;
     dig?: boolean;
+    public_stage?: "KEPT_PRIVATE";
   }> | null>;
   /**
    * Security review F2 (migration 0171): is this debate of the session's owner a dig? The owner decided that a dig is never published; the route
@@ -656,6 +660,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
     state: "PRIVATE" | "PUBLISHED";
     public_ref: string | null;
     dig?: boolean;
+    public_stage?: "KEPT_PRIVATE";
   }> | null> {
     const visibility = await this.repository.readOwnedVisibility(
       input.runId,
@@ -666,7 +671,10 @@ export class PostgresPublicationApplication implements PublicationApplication {
       state: visibility.state,
       public_ref: visibility.publicRef,
       // Security review F2: said only of a dig, so a debate that is none reads as before.
-      ...(visibility.dig === true ? { dig: true } : {})
+      ...(visibility.dig === true ? { dig: true } : {}),
+      // Said only of a private Free debate the publication check refused (0189), so the owner's page can say it stays
+      // private for good. Every other debate reads as before; the stages before the check are not sent.
+      ...(visibility.state === "PRIVATE" && visibility.keptPrivate === true ? { public_stage: "KEPT_PRIVATE" as const } : {})
     });
   }
 

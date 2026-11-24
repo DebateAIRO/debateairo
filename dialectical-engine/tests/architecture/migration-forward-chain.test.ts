@@ -401,7 +401,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "verify-effective-capabilities-111.sql", "packages/db/src/migration-forward0118.ts", "replayVerifierSql",
       "ledger.record_language_check_spend", "LANGUAGE_CHECK", "MIGRATION_FORWARD0118_", "`STEPS`", "renumber"
     ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
-    expect(readme.replace(/\s+/gu, " ")).toContain("the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth");
+    expect(readme.replace(/\s+/gu, " ")).toContain("the debate shape's map (0117, below) the seventh, the language check (0118, below) the eighth");
   });
 
   it("documents the reclaim resume 0119 as the step after 0118, with its manifest, its loader and the verifier it keeps", async () => {
@@ -413,7 +413,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "core.map_position_repoint", "core.reject_node_mutation_except_retire()", "reject_mutation_except_retire",
       "generation_status", "NODE_RETIRE_AFTER_ANSWER", "MIGRATION_FORWARD0119_", "`STEPS`", "renumber"
     ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
-    expect(readme.replace(/\s+/gu, " ")).toContain("the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth");
+    expect(readme.replace(/\s+/gu, " ")).toContain("the language check (0118, below) the eighth, the reclaim resume (0119, below) the ninth");
   });
 
   it("documents the reply measures 0120 as the step after 0119, with its manifest, its loader and the verifier it keeps", async () => {
@@ -952,9 +952,11 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains the recovery permit 0188 after 0187 as an expand step that keeps 0130's verifier and changes nothing an earlier step checks, and documents it", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
-    // The chain head: four tables and twenty-six functions; no earlier object is changed.
-    expect(names.slice(-2)).toEqual(["0187_passkey_allow_credentials.sql", "0188_recovery_permit.sql"]);
-    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    // Four tables and twenty-six functions; no earlier object is changed. Found by name: a Free debate the publication
+    // check kept private (0189) follows it.
+    const at = names.indexOf("0188_recovery_permit.sql");
+    expect(names.slice(at - 1, at + 1)).toEqual(["0187_passkey_allow_credentials.sql", "0188_recovery_permit.sql"]);
+    const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
     expect(JSON.parse((await bytesOf("lineage/recovery-permit-forward0188.json")).toString("utf8"))).toEqual({
       version: "recovery-permit-forward0188-v1",
       baseRecipeSha256: plan.recipeSha256,
@@ -1002,6 +1004,58 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     ]) expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
       "the passkeys a sign-in after the first step may use (0187, below) the seventy-seventh, and the recovery permit (0188, below) the seventy-eighth");
+  });
+
+  it("chains a Free debate the publication check kept private 0189 after 0188 as an expand step that keeps 0130's verifier, and documents it", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    // The chain head: one function of the API's billing role, its owner set by one reviewed DO block.
+    expect(names.slice(-2)).toEqual(["0188_recovery_permit.sql", "0189_free_debate_refused_by_check.sql"]);
+    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    expect(JSON.parse((await bytesOf("lineage/free-debate-refused-by-check-forward0189.json")).toString("utf8"))).toEqual({
+      version: "free-debate-refused-by-check-forward0189-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: { name: "0188_recovery_permit.sql", manifestSha256: sha256(await bytesOf("lineage/recovery-permit-forward0188.json")), verifierSha256: previous.verifierSha256 },
+      migration: { name: "0189_free_debate_refused_by_check.sql", sha256: sha256(await bytesOf("0189_free_debate_refused_by_check.sql")) },
+      verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) },
+      amendsPostconditionsOf: []
+    });
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/free-debate-refused-by-check-forward0189.json")));
+    expect(step.previousName).toBe(previous.name);
+    expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+    expect(step.previousVerifierSha256).toBe(previous.verifierSha256);
+    expect(step.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
+    expect(step.replayVerifierSql).toBeUndefined();
+    expect(step.amendsPostconditionsOf ?? []).toEqual([]);
+    // One new function, its owner, its revoke and its one grant; nothing earlier replaced, nothing of billing.
+    const statements = step.sql.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("--")).join("\n");
+    expect(statements.match(/^(?:CREATE|ALTER|REVOKE|GRANT|DROP|INSERT|UPDATE|DELETE|DO)\b.*$/gmu)).toEqual([
+      "CREATE OR REPLACE FUNCTION identity.read_free_debate_refused_by_check(p_owner_ref uuid, p_run_id uuid) RETURNS boolean",
+      "DO $free_debate_refused_by_check_owner$",
+      "REVOKE ALL ON FUNCTION identity.read_free_debate_refused_by_check(uuid,uuid)",
+      "GRANT EXECUTE ON FUNCTION identity.read_free_debate_refused_by_check(uuid,uuid) TO debateai_billing_runtime;"
+    ]);
+    expect(statements).not.toMatch(/\bbilling\./u);
+    const earlier = (await readdir(MIGRATIONS)).filter((name) => /^\d{4}_.*\.sql$/u.test(name) && name < step.name);
+    for (const name of earlier) expect((await bytesOf(name)).toString("utf8"), name).not.toContain("read_free_debate_refused_by_check");
+    const lines = step.sql.split("\n");
+    const reviewed = lines.findIndex((line) => line.startsWith("-- n1: reviewed "));
+    expect(lines.filter((line) => line.startsWith("-- n1: reviewed "))).toHaveLength(1);
+    expect(lines[reviewed + 1]).toBe("DO $free_debate_refused_by_check_owner$");
+    const loader = await readFile(new URL("migration-forward0189.ts", DB_SOURCE), "utf8");
+    expect(loader).toContain('const FUNCTIONS: readonly string[] = ["identity.read_free_debate_refused_by_check(uuid,uuid)"];');
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## A Free debate the publication check kept private (0189)"));
+    expect(section.startsWith("## A Free debate the publication check kept private (0189)")).toBe(true);
+    for (const needle of ["0188", "0189_free_debate_refused_by_check.sql", "free-debate-refused-by-check-forward0189.json", "packages/db/src/migration-forward0189.ts",
+      "MIGRATION_FORWARD0189_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "verify-effective-capabilities-130.sql", "replayVerifierSql",
+      "previous.manifestSha256", "migration.sha256", "renumber", "identity.read_free_debate_refused_by_check(uuid,uuid)",
+      "identity.read_run_is_dig", "debateai_billing_runtime", "serve.publication_check_record", "public_stage", "KEPT_PRIVATE",
+      "tests/integration/free-debate-refused-by-check-0189.test.ts"
+    ]) expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "the recovery permit (0188, below) the seventy-eighth, and a Free debate the publication check kept private (0189, below) the seventy-ninth");
   });
 
   // The release before refuses, at its restart on a database ahead of it, an amendment recorded by a step it does not
