@@ -270,6 +270,7 @@
   "staff.previewBuyers.hint": "While the whole site is open and payments are in test mode, the team and the accounts below can buy a plan. Everyone else sees the plans and prices, and is told at the last button that buying is open only to invited accounts. This list counts only while the site is open that way.",
   "staff.previewBuyers.notNow": "This list counts only while the whole site is open with test payments. It counts for nothing right now.",
   "staff.previewBuyers.count": "{count} of {cap} accounts can buy, the team included.",
+  "staff.previewBuyers.countIdle": "Accounts on this list: {count}.",
   "staff.previewBuyers.empty": "No account is on this list.",
   "staff.previewBuyers.since": "allowed on {date}",
   "staff.previewBuyers.unreadable": "address not readable now",

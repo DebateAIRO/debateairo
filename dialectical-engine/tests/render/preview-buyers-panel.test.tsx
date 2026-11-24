@@ -152,6 +152,17 @@ describe("the list", () => {
     expect(host.querySelector("form[data-preview-buyers-form]")).toBeNull();
     expect(button("Remove", row(ANA))).toBeDefined();
   });
+  it("while the list counts for nothing, counts only who is on it and does not say they can buy", async () => {
+    await mount(server({ ...basePage, applies: false }));
+    expect(host.querySelector("[data-preview-buyers-count]")?.textContent).toBe("Accounts on this list: 2.");
+    expect(text()).not.toContain("accounts can buy");
+  });
+  it("while the list counts for nothing and nobody is on it, says only that", async () => {
+    await mount(server({ ...basePage, applies: false, buyers: [] }));
+    expect(host.querySelector("[data-preview-buyers-count]")).toBeNull();
+    expect(text()).toContain("No account is on this list.");
+    expect(text()).not.toContain("accounts can buy");
+  });
 });
 
 describe("allowing an account to buy", () => {

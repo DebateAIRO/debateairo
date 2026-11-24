@@ -2367,14 +2367,15 @@ the two staff name lines. With the lines naming the other name the API refuses t
   to copy, and both releases of a side-by-side upload read the same list at every pay button. Removing an account
   there works at any time, during an upload too. Adding one waits from SB3 until the upload is over (SB14, or the day
   you decide not to go back), like BUYERS. The reason is its security alert: an addition sends one to your alert
-  address within a minute or two, and a release older than the one that carries the list does not know that alert.
-  Its alert sender runs only while its release is the current one, so during the upload it never touches the alert;
-  but after a way back to it (WB2) it would drop an alert still waiting to go out. So, before any WB2 to such a
-  release, check that the alert of every addition you made that day has arrived; if one has not, wait a few minutes,
-  then ask. After such a way back, accounts you allowed on the Team page are refused at the pay button (the team line
-  still buys), that release's Team page has no box for the list, and its audit history on the Team page shows an
-  error while the list's changes are in it. The list stays in the database and counts again, while 6b is open, once a
-  release that carries it is the current one.
+  address within a minute or two, as does a removal made while the team tools are unlocked, and a release older than
+  the one that carries the list does not know that alert. Its alert sender runs only while its release is the current
+  one, so during the upload it never touches the alert; but after a way back to it (WB2) it would drop an alert still
+  waiting to go out. So, before any WB2 to such a release, check that the alert of every addition, and every removal
+  made with the tools unlocked, that day has arrived; if one has not, wait a few minutes, then ask. After such a way
+  back, accounts you allowed on the Team page are refused at the pay button (the team line still buys), that
+  release's Team page has no box for the list, and its audit history on the Team page shows an error while the list's
+  changes are in it. The list stays in the database and counts again, while 6b is open, once a release that carries
+  it is the current one.
 - If you watch a later upload's switch from the Mac (the release guide's SB13 watcher), write `machine dezbatere.ro`
   in `~/.config/debateai-preview.netrc` and `https://dezbatere.ro/login` in the watch line.
 - While payments are real, 7.12 adds two rules to every later upload. Once real payments were ever on, its LIVEAFTER
@@ -3790,7 +3791,8 @@ button. A plan it holds goes on until it is withdrawn or cancelled, as "Taking a
   window or by an account's erasure; read the box again and repeat.
 - "The team tools are locked, so nothing was added. …": UNLOCK (5.7, step 3), then again.
 - "Adding works only while the whole site is open with test payments. …": 6b is not open (or it closed): the box
-  then says that the list counts for nothing right now, and offers only **Remove**.
+  then says that the list counts for nothing right now, counts only the accounts on it ("Accounts on this list: …"),
+  and offers only **Remove**.
 - "Nothing changed.": the key's prompt was closed or timed out; press the button again.
 - "This did not go through. …": read the box again; if it says it twice, ask.
 
@@ -4040,9 +4042,11 @@ The brakes are those of 6.5, fastest first:
   lets anyone signed in buy on the sandbox). rbD-B puts back the database copy made at DR3: every account, debate and
   mail written since, strangers' included, is lost (part 9).
 - From the release that carries the Team page's list to the release before it (WB2; both carry 6b, so 6b may stay
-  open): first check that the security alert of every addition you made that day has arrived at your alert address
-  (5.6). After the switch, the accounts on the Team page's list are refused at the pay button and the team line still
-  buys: it fails closed. To list a buyer on that release, BUYERS (6b.3b).
+  open): first check that the security alert of every addition, and every removal made with the tools unlocked, that
+  day has arrived at your alert address (5.6). After the switch, the accounts on the Team page's list are refused at
+  the pay button and the team line still buys: it fails closed. That release's Team page has no box for the list, and
+  its audit history there shows an error while the list's changes are in it, until the next upload brings back a
+  release that carries the list (5.6). To list a buyer on that release, BUYERS (6b.3b).
 
 ### 6b.6 Before part 7
 

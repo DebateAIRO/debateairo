@@ -192,7 +192,9 @@ export function PreviewBuyersPanel({ client, catalog = staffEnglish, locale = "e
       <h2 className="staffSectionTitle" id="preview-buyers-title">{t(catalog, `${K}.title`)}</h2>
       <p className="setCardHint">{t(catalog, `${K}.hint`)}</p>
       {page.applies ? null : <p className="setCardHint" data-preview-buyers-not-now>{t(catalog, `${K}.notNow`)}</p>}
-      <p data-preview-buyers-count>{t(catalog, `${K}.count`, { count: String(count), cap: String(page.cap) })}</p>
+      {/* While the list counts for nothing its accounts cannot buy through it, so the line only counts who is on it. */}
+      {page.applies ? <p data-preview-buyers-count>{t(catalog, `${K}.count`, { count: String(count), cap: String(page.cap) })}</p>
+        : page.buyers.length === 0 ? null : <p data-preview-buyers-count>{t(catalog, `${K}.countIdle`, { count: String(page.buyers.length) })}</p>}
       {page.buyers.length === 0 ? <p className="setCardHint" data-preview-buyers-empty>{t(catalog, `${K}.empty`)}</p> : <ul className="staffAuditList" data-preview-buyers-list>
         {page.buyers.map(buyer => <li key={buyer.ref} data-preview-buyer={buyer.ref}>
           <strong id={rowName(buyer.ref)}>{shown(buyer.masked_address)}</strong>

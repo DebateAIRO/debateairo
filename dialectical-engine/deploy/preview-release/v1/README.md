@@ -5321,9 +5321,9 @@ back to a release older than that one (WB2 included) come MAIN-SITE.md's PWON, t
 the first line of MAIN-SITE.md's names file, then run its OPENCHECK. The Team page's list of approved buyers
 (MAIN-SITE.md 6b.3, on a release that carries it) is in the database, so both releases read the same one and nothing
 is copied. Removing an account there works at any time; adding one waits from SB3 until the upload is over, and before
-a WB2 to a release older than the one that carries the list, the security alert of every addition made that day must
-have arrived (MAIN-SITE.md 5.6): that release does not know the alert, and once current again it would drop one still
-waiting to go out.
+a WB2 to a release older than the one that carries the list, the security alert of every addition, and every removal
+made with the tools unlocked, that day must have arrived (MAIN-SITE.md 5.6): that release does not know the alert, and
+once current again it would drop one still waiting to go out.
 
 **The upload that first carries the partner rule** (`docs/legal/2026-11-24-partner-model-out.md`): before its SB1,
 QWENOUT ("Taking Qwen out of the live line-up") must print `QWENOUT_DONE`. While the active version seats Qwen, its SB2

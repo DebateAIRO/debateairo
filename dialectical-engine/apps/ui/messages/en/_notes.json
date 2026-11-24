@@ -66,6 +66,7 @@
   "billing.pricing.faqWithdrawAnswer": "The quoted label must be the exact label of the Settings button in the same language (billing.subscription.withdraw). The refund is measured by the plan's credit used, never by days.",
   "staff.previewBuyers.title": "The Owner's box on the Team page: the accounts that may buy a plan while payments run on NETOPIA's test system. Only the Owner sees it.",
   "staff.previewBuyers.confirmAdd": "{address} is the shortened address the page shows (for example ste•••n.n•••our@example.com): never translate or change it. The second sentence is a rule for the Owner: each test plan is withdrawn or cancelled within 14 days, before real payments start.",
+  "staff.previewBuyers.countIdle": "Shown instead of the count of who can buy while the list counts for nothing; {count} is how many accounts are on the list.",
   "staff.previewBuyers.since": "Shown under a shortened address in the list; {date} is the day the account was allowed, already written in the reader's language.",
   "staff.previewBuyers.locked": "The team tools are unlocked by the server's operator for one hour; adding needs them unlocked, removing does not. Keep both halves."
 }

@@ -715,8 +715,11 @@ describe('the words of 6b', () => {
     expect(guide).toContain('before any way back to a release older than that one (WB2 included) come MAIN-SITE.md\'s PWON, then ASKS_CLOSE');
     // The Team page's list: nothing to copy, additions wait from SB3, and its alerts arrive before a way back to a release without it.
     expect(guide).toContain('Removing an account there works at any time; adding one waits from SB3 until the upload is over');
-    expect(guide).toContain('the security alert of every addition made that day must have arrived (MAIN-SITE.md 5.6)');
+    expect(guide).toContain('the security alert of every addition, and every removal made with the tools unlocked, that day must have arrived (MAIN-SITE.md 5.6)');
     expect(guide).toContain('never change the list (MAIN-SITE.md\'s BUYERS, and additions on its Team page\'s list) from SB3 on');
-    expect(flat).toContain('before any WB2 to such a release, check that the alert of every addition you made that day has arrived');
+    expect(flat).toContain('before any WB2 to such a release, check that the alert of every addition, and every removal made with the tools unlocked, that day has arrived');
+    expect(flat).toContain('first check that the security alert of every addition, and every removal made with the tools unlocked, that day has arrived at your alert address (5.6)');
+    // After that way back, the older release's audit history on the Team page answers an error while the list's changes are in it.
+    expect(flat).toContain('its audit history there shows an error while the list\'s changes are in it, until the next upload brings back a release that carries the list (5.6)');
   });
 });
