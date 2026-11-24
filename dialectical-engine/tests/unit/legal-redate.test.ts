@@ -14,15 +14,18 @@ import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
  * `pnpm run legal:redate --date YYYY-MM-DD` (apps/ui/scripts/legal-redate.mjs) sets the day the current Terms of
  * Service and Privacy Policy take effect, everywhere the repository's rules need it, in one command. These tests pin:
  *  - the day in each language's words, for other months too;
- *  - the plan on the real drafts: exactly the eyebrow and the version line of every draft, the "last updated" sentence
- *    of the languages that follow the current English text, the archive copies of the current version only, the
- *    translations to record again, and a document whose current version was released kept as it is;
+ *  - the plan on the real drafts, with the release the site runs as it is (every archive copy but the Privacy Policy's
+ *    current ones): the Terms kept as they are, since their current version was released, and in every language's
+ *    Privacy Policy exactly the eyebrow, the version line and the "last updated" sentence, the archive copies of the
+ *    current version only, and every translation recorded again;
  *  - the refusals: a day before today, a day not after the previous version's, a day that would re-date only released
  *    versions, a document whose translation in a language the release offers follows an older English text, a draft
  *    whose day does not match;
+ *  - every translation follows the current English text of each document;
  *  - the whole command on a copy of the legal files, with git standing in for the live release: it refuses while a
- *    translation the release offers lags and writes nothing, --dry-run writes nothing, and, once those translations
- *    follow the English texts, a run leaves the release check passing and the released copies byte for byte.
+ *    translation the release offers lags and writes nothing, --dry-run writes nothing, and a run re-dates the Privacy
+ *    Policy, keeps the Terms, makes the Privacy Policy's current copies again from the re-dated texts, leaves the
+ *    released copies byte for byte and the release check passing.
  */
 
 const root = process.cwd();
@@ -41,7 +44,7 @@ const TRANSLATED = CODES.filter((code) => code !== "en");
 /** A copy this file may write to: the record's and the manifest's own types are read-only. */
 type Writable<T> = { -readonly [K in keyof T]: Writable<T[K]> };
 /**
- * The record of translations once every translation follows the current English texts, as it must before an upload
+ * The record of translations when every translation follows the current English texts, as it must before an upload
  * re-dates them. The plan reads only the record, not the translations' words.
  */
 const caughtUp = (): Writable<LegalTranslations> => {
@@ -51,8 +54,12 @@ const caughtUp = (): Writable<LegalTranslations> => {
   }
   return record;
 };
-/** Whether every translation follows the current English texts in the repository as it is. */
-const translationsFollow = KINDS.every((kind) => TRANSLATED.every((code) => translations()[kind][code]?.sha256 === sha(readDraft("en", kind))));
+/**
+ * The archive copies in the release the site runs: every copy but the Privacy Policy's current ones, which the release
+ * step made from the final texts and no upload has carried yet. The Terms' current version was released.
+ */
+const releasedCopies = () => KINDS.flatMap((kind) => Object.values(manifest().archive[kind]).flatMap((entries) => Object.values(entries)
+  .filter((entry) => kind !== "PRIVACY" || entry.version !== currentOf("PRIVACY").version).map((entry) => entry.path)));
 const dayAfter = (day: { year: number; month: number; day: number }, days: number) => {
   const date = new Date(Date.UTC(day.year, day.month - 1, day.day + days));
   return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() };
@@ -101,6 +108,10 @@ describe("the day in each language's words", () => {
 describe("the plan on the drafts as they are", () => {
   const next = dayAfter(current.day, 1);
 
+  it("starts from a record in which every translation follows the current English text of each document", () => {
+    expect(translations()).toEqual(caughtUp());
+  });
+
   it("refuses a document whose translation in a language the release offers follows an older English text", () => {
     const behind = caughtUp();
     behind.PRIVACY.ro = { version: "1.0", sha256: "1".repeat(64) };
@@ -108,38 +119,23 @@ describe("the plan on the drafts as they are", () => {
       `LEGAL_REDATE_REFUSED: the Privacy Policy in ro follows an older English text: translate it and record it (generate-legal-data.mjs --translated) first, or the archive would keep the untranslated text as version ${current.version}`);
   });
 
-  it("keeps a released document as it is, and changes every other draft's eyebrow and version line, and the last-updated sentence where the text follows English", () => {
-    const released = new Set(KINDS.flatMap((kind) => Object.values(manifest().archive[kind])
-      .flatMap((entries) => Object.values(entries).map((entry) => entry.path))));
-    const result = plan(next, { translations: caughtUp(), isReleased: (path) => released.has(path) });
-    // Every archive copy is in the release: the documents whose current version has a copy keep their day.
-    const keptKinds = KINDS.filter((kind) => Object.values(manifest().archive[kind])
-      .some((entries) => Object.values(entries).some((entry) => entry.version === currentOf(kind).version)));
-    expect(keptKinds.length, "one document at least is re-dated").toBeLessThan(KINDS.length);
-    expect(result.kept.map((entry) => entry.kind)).toEqual(keptKinds);
-    const dated = KINDS.filter((kind) => !keptKinds.includes(kind));
-    expect(result.drafts.map((draft) => draft.path).sort()).toEqual(
-      CODES.flatMap((code) => dated.map((kind) => `apps/ui/legal/${code}/${DRAFT[kind]}`)).sort());
+  it("keeps the released Terms as they are, and changes every Privacy Policy's eyebrow, version line and last-updated sentence", () => {
+    const released = new Set(releasedCopies());
+    const result = plan(next, { isReleased: (path) => released.has(path) });
+    expect(result.kept.map((entry) => entry.kind)).toEqual(["TERMS"]);
+    expect(result.drafts.map((draft) => draft.path).sort()).toEqual(CODES.map((code) => `apps/ui/legal/${code}/${DRAFT.PRIVACY}`).sort());
     for (const draft of result.drafts) {
       const code = draft.path.split("/")[3]!;
-      const kind = draft.path.endsWith(DRAFT.PRIVACY) ? "PRIVACY" : "TERMS";
-      const before = currentOf(kind);
       expect(draft.lines.map((line) => line.before.slice(0, 9)).slice(0, 2), draft.path).toEqual(["eyebrow: ", "**Version"]);
-      // The Privacy Policy's last-updated sentence changes too where it gives the day: every translation is recorded as
-      // made from the current English text here, but only a text whose body was translated from it carries its day.
-      // Some languages' day ends in a full stop of its own ("26 ноември 2026 г."), so it is looked for outside the two lines.
-      const lastUpdated = kind === "PRIVACY" && readDraft(code, kind).split("\n")
-        .some((line) => !line.startsWith("eyebrow: ") && !line.startsWith("**Version ") && line.includes(legalDayText(code, before.day, "line")));
-      expect(draft.lines, draft.path).toHaveLength(lastUpdated ? 3 : 2);
-      if (lastUpdated) {
-        expect(draft.lines[2]!.before).toContain(legalDayText(code, before.day, "line"));
-        expect(draft.lines[2]!.after).toContain(legalDayText(code, next, "line"));
-      }
-      expect(draft.after).toContain(`**Version ${before.version} · Effective ${legalDayText(code, next, "line")} · `);
+      // Every translation follows the current English text, so each carries its day in the last-updated sentence too.
+      expect(draft.lines, draft.path).toHaveLength(3);
+      expect(draft.lines[2]!.before).toContain(legalDayText(code, current.day, "line"));
+      expect(draft.lines[2]!.after).toContain(legalDayText(code, next, "line"));
+      expect(draft.after).toContain(`**Version ${current.version} · Effective ${legalDayText(code, next, "line")} · `);
       expect(draft.after).toContain(legalDayText(code, next, "eyebrow"));
       expect(draft.after.split("\n").length).toBe(readFileSync(resolve(root, draft.path), "utf8").split("\n").length);
     }
-    for (const kind of KINDS) expect(result.retranslate[kind], kind).toEqual(dated.includes(kind) ? TRANSLATED : []);
+    expect(result.retranslate).toEqual({ PRIVACY: TRANSLATED, TERMS: [] });
   });
 
   it("removes the archive copies of the current version only; the copies of older versions are never touched or asked about", () => {
@@ -227,9 +223,6 @@ describe("the command on a copy of the legal files", () => {
   const day = "2099-01-15";
   const to = parseLegalDay(day);
 
-  /** Every archive copy, of every version, of the two documents. */
-  const allCopies = () => KINDS.flatMap((kind) => Object.values(manifest().archive[kind])
-    .flatMap((entries) => Object.values(entries).map((entry) => entry.path)));
   /** The archive copies of each document's current version. */
   const currentCopies = () => KINDS.flatMap((kind) => Object.values(manifest().archive[kind])
     .flatMap((entries) => Object.values(entries).filter((entry) => entry.version === currentOf(kind).version).map((entry) => entry.path)));
@@ -245,7 +238,7 @@ describe("the command on a copy of the legal files", () => {
   };
 
   it("refuses while a translation the release offers follows an older English text, and writes nothing", () => {
-    liveRelease(allCopies());
+    liveRelease(releasedCopies());
     const behind = caughtUp();
     behind.PRIVACY.ro = { version: "1.0", sha256: "1".repeat(64) };
     withRecord(behind, () => {
@@ -257,55 +250,47 @@ describe("the command on a copy of the legal files", () => {
     });
   });
 
-  it("with --dry-run keeps a released document, prints the other's changed lines and writes nothing", () => {
-    // Every archive copy is in the release: a document whose current version has one keeps its day.
-    const keptKinds = KINDS.filter((kind) => Object.values(manifest().archive[kind])
-      .some((entries) => Object.values(entries).some((entry) => entry.version === currentOf(kind).version)));
-    const dated = KINDS.filter((kind) => !keptKinds.includes(kind));
-    withRecord(caughtUp(), () => {
-      const before = tree();
-      const result = redate("--date", day, "--dry-run");
-      expect(result.status, result.stderr).toBe(0);
-      for (const kind of keptKinds) {
-        expect(result.stdout).toContain(`${kind === "PRIVACY" ? "Privacy Policy" : "Terms of Service"}: released, keeps ${legalDayText("en", currentOf(kind).day, "line")}`);
-      }
-      if (dated.includes("PRIVACY")) {
-        expect(result.stdout).toContain(`  + **Version ${currentOf("PRIVACY").version} · Effective ${legalDayText("en", to, "line")} · Previous versions at dezbatere.ro/privacy/versions`);
-      }
-      expect(result.stdout).toContain(`dry run: ${dated.length * CODES.length} draft(s) would change; nothing was written`);
-      expect(tree()).toEqual(before);
-    });
+  it("with --dry-run keeps the released Terms, prints the Privacy Policy's changed lines and writes nothing", () => {
+    liveRelease(releasedCopies());
+    const before = tree();
+    const result = redate("--date", day, "--dry-run");
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain(`Terms of Service: released, keeps ${legalDayText("en", currentOf("TERMS").day, "line")}`);
+    expect(result.stdout).toContain(`Privacy Policy: from ${legalDayText("en", current.day, "line")} to ${legalDayText("en", to, "line")}; translations recorded again: ${TRANSLATED.join(", ")}`);
+    expect(result.stdout).toContain(`  + **Version ${current.version} · Effective ${legalDayText("en", to, "line")} · Previous versions at dezbatere.ro/privacy/versions`);
+    expect(result.stdout).toContain(`dry run: ${CODES.length} draft(s) would change; nothing was written`);
+    expect(tree()).toEqual(before);
   });
 
-  // A full run archives the texts of the languages the release offers, so it is only possible once those translations
-  // follow the current English texts; until then the refusal above is what the command does.
-  it.runIf(translationsFollow)("re-dates every draft, keeps the older copies byte for byte, makes the current copies again and passes the release check", () => {
-    git("rm", "-q", "--cached", "--", ...currentCopies());
-    liveRelease(allCopies().filter((path) => !currentCopies().includes(path)));
-    const older = Object.fromEntries(allCopies().filter((path) => !currentCopies().includes(path)).map((path) => [path, sha(readFileSync(join(copy, path)))]));
+  it("re-dates every Privacy Policy, keeps the Terms and every released copy byte for byte, makes the Privacy Policy's current copies again and passes the release check", () => {
+    liveRelease(releasedCopies());
+    const kept = Object.fromEntries(releasedCopies().map((path) => [path, sha(readFileSync(join(copy, path)))]));
+    const terms = Object.fromEntries(CODES.map((code) => [code, sha(readDraft(code, "TERMS"))]));
+    const remade = currentCopies().filter((path) => !releasedCopies().includes(path));
+    expect(remade, "the Privacy Policy's current copies, one per language").toHaveLength(CODES.length);
     const result = redate("--date", day);
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(result.stdout).toContain("Legal texts: ready for release.");
-    expect(result.stdout).toContain(`LEGAL_REDATE_DONE: the Privacy Policy and the Terms of Service take effect on ${legalDayText("en", to, "line")}`);
+    expect(result.stdout).toContain(`LEGAL_REDATE_DONE: the Privacy Policy takes effect on ${legalDayText("en", to, "line")}`);
     const after = JSON.parse(readFileSync(join(copy, "packages/legal-manifest/src/manifest.json"), "utf8")) as LegalManifest;
-    for (const [path, hash] of Object.entries(older)) expect(sha(readFileSync(join(copy, path))), path).toBe(hash);
-    for (const path of currentCopies()) expect(existsSync(join(copy, path)), path).toBe(false);
+    for (const [path, hash] of Object.entries(kept)) expect(sha(readFileSync(join(copy, path))), path).toBe(hash);
+    for (const path of remade) expect(existsSync(join(copy, path)), path).toBe(false);
     const record = JSON.parse(readFileSync(join(copy, RECORD), "utf8")) as LegalTranslations;
-    for (const kind of KINDS) {
-      const { version } = currentOf(kind);
-      const english = readFileSync(join(copy, "apps/ui/legal/en", DRAFT[kind]), "utf8");
-      // Every translation is recorded again as following the re-dated English text, and every language's text is archived again.
-      for (const code of TRANSLATED) expect(record[kind][code], `${kind} ${code}`).toEqual({ version, sha256: sha(english) });
-      for (const code of CODES) {
-        const text = readFileSync(join(copy, "apps/ui/legal", code, DRAFT[kind]), "utf8");
-        expect(after.archive[kind][code]![sha(text)], `${kind} ${code}`).toEqual({ version, path: `apps/ui/legal/archive/${code}/${sha(text)}.md` });
-        expect(readFileSync(join(copy, `apps/ui/legal/archive/${code}/${sha(text)}.md`), "utf8")).toBe(text);
-      }
-      for (const code of CODES) {
-        const text = readFileSync(join(copy, "apps/ui/legal", code, DRAFT[kind]), "utf8");
-        expect(text, `${kind} ${code}`).toContain(`**Version ${version} · Effective ${legalDayText(code, to, "line")} · `);
-        expect(text, `${kind} ${code}`).not.toContain(legalDayText(code, currentOf(kind).day, "eyebrow"));
-      }
+    const { version } = current;
+    const english = readFileSync(join(copy, "apps/ui/legal/en", DRAFT.PRIVACY), "utf8");
+    for (const code of TRANSLATED) {
+      // Every translation is recorded again as following the re-dated English Privacy Policy; the Terms' record stays.
+      expect(record.PRIVACY[code], code).toEqual({ version, sha256: sha(english) });
+      expect(record.TERMS[code], code).toEqual(translations().TERMS[code]);
+    }
+    for (const code of CODES) {
+      const text = readFileSync(join(copy, "apps/ui/legal", code, DRAFT.PRIVACY), "utf8");
+      expect(after.archive.PRIVACY[code]![sha(text)], code).toEqual({ version, path: `apps/ui/legal/archive/${code}/${sha(text)}.md` });
+      expect(Object.values(after.archive.PRIVACY[code]!).filter((entry) => entry.version === version), code).toHaveLength(1);
+      expect(readFileSync(join(copy, `apps/ui/legal/archive/${code}/${sha(text)}.md`), "utf8")).toBe(text);
+      expect(text, code).toContain(`**Version ${version} · Effective ${legalDayText(code, to, "line")} · `);
+      expect(text, code).not.toContain(legalDayText(code, current.day, "eyebrow"));
+      expect(sha(readFileSync(join(copy, "apps/ui/legal", code, DRAFT.TERMS))), code).toBe(terms[code]);
     }
     expect(readFileSync(join(copy, "apps/ui/legal/en/privacy-policy.md"), "utf8")).toContain(`This policy was last updated on ${legalDayText("en", to, "line")}.`);
     expect(readFileSync(join(copy, "apps/ui/lib/privacyPolicy.ts"), "utf8")).toContain(legalDayText("en", to, "eyebrow"));

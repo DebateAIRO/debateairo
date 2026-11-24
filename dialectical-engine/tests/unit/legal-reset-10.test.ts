@@ -19,13 +19,13 @@ import { legalEffectiveDay, legalText, type LegalKind as ResetKind } from "../su
  * translated from the English 1.1 texts and archived at 1.1 (the other 32 languages were first released at 1.1). The
  * Privacy Policy is now at 1.2, written in English first, with two changes: help getting back into an account, and what
  * the AI checks of public text receive and decide. Every language's Privacy Policy says 1.2 and its day in the eyebrow,
- * end marker and version line, and each translation is recorded as made from the English text it follows. Each
+ * end marker and version line, and every translation is recorded as made from the current English text. Each
  * document's number and day change for all its languages together, the day with legal-redate.mjs; a released version
  * keeps its own day. The Privacy Policy carries both change summaries, 1.2's first, in each language's own words (the
  * launch languages word for word); the floors stay 1.0, so nobody who accepted 1.0 or 1.1 is asked again; the archive
- * holds exactly the 1.1 texts of all 35 languages and the 1.0 texts of English, French and Romanian, and the Privacy
- * Policy's 1.2 of all 35 once the release step archives it; /terms/versions lists 1.1, in force, and 1.0, linked to its
- * archived English text.
+ * holds exactly the 1.1 texts of all 35 languages, the 1.0 texts of English, French and Romanian, and the Privacy
+ * Policy's 1.2 of all 35, which the release step made from the final texts; /terms/versions lists 1.1, in force, and
+ * 1.0, linked to its archived English text.
  */
 
 const root = process.cwd();
@@ -64,8 +64,6 @@ const RELEASED: Readonly<Record<ResetKind, Readonly<Record<string, Readonly<Reco
 };
 const archivedEnglish = (kind: ResetKind, version: string): string =>
   readFileSync(resolve(root, "apps/ui/legal/archive/en", `${RELEASED[kind].en![version]}.md`), "utf8");
-/** The English version an offered language's text follows: the current one for English, the recorded one otherwise. */
-const follows = (kind: ResetKind, code: string): string => (code === "en" ? CURRENT[kind] : translations()[kind]![code]!.version);
 /** How each change summary opens, by the version it introduced, in the languages that carry it. */
 const REPLACED: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   "1.1": {
@@ -124,15 +122,14 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.1 
     expect(terms[4], "it names the section it changed").toMatch(/(?<![\d.])8(?!\d|\.\d)/u);
     // The Privacy Policy's summaries, newest first. 1.2's names the model that now checks a debate's public text, so the
     // model's own number is left out when the versions are counted.
-    const twelve = documentVersionAtLeast(follows("PRIVACY", code), "1.2");
     const summaries = privacy[2]!.replaceAll("Claude Haiku 5.5", "");
-    expect(named(summaries, "1.2"), "1.2 is named in its own summary only").toBe(twelve ? 1 : 0);
-    expect(named(summaries, "1.1"), "1.1 is named by both summaries, or by its own only").toBe(twelve ? 2 : 1);
+    expect(named(summaries, "1.2"), "1.2 is named in its own summary only").toBe(1);
+    expect(named(summaries, "1.1"), "1.1 is named by both summaries").toBe(2);
     expect(named(summaries, "1.0"), "1.0 is named once").toBe(1);
     expect(summaries, "and no other version").not.toMatch(/(?<![\d.])(?!1\.[012](?!\d))\d\.\d+(?!\d)/u);
     expect(summaries, "1.1's names the company its change is about").toContain("DeepInfra");
     expect(privacy[2], "the sections 1.1 changed").toMatch(/(?<![\d.])5(?!\d|\.\d).*(?<![\d.])4(?!\d|\.\d)/u);
-    if (twelve) expect(privacy[2], "1.2's names the model that checks the public text").toContain("Claude Haiku 5.5");
+    expect(privacy[2], "1.2's names the model that checks the public text").toContain("Claude Haiku 5.5");
     if (code in REPLACED["1.1"]!) {
       // The launch languages' wording, word for word.
       expect(terms[4]!.startsWith(REPLACED["1.1"]![code]!), "the Terms' summary").toBe(true);
@@ -174,12 +171,8 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.1 
         .toContain(`**Version ${CURRENT[kind]} · Effective ${legalDayText(code, day, "line")} · `);
     }
     if (kind !== "PRIVACY") return;
-    // The offered languages' Privacy Policy says it was last updated on the day of the English text it follows.
-    for (const code of OFFERED) {
-      const followed = follows(kind, code);
-      const followedDay = followed === CURRENT[kind] ? day : englishVersionAndDay(archivedEnglish(kind, followed)).day;
-      expect(section14(draft(kind, code))[2], code).toContain(legalDayText(code, followedDay, "line"));
-    }
+    // Every language's Privacy Policy says it was last updated on the day it takes effect.
+    for (const code of CODES) expect(section14(draft(kind, code))[2], code).toContain(legalDayText(code, day, "line"));
   });
 
   it("keeps both re-acceptance floors at 1.0: an acceptance of 1.0, 1.1, or of any pre-launch draft, owes nothing", () => {
@@ -190,7 +183,7 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.1 
     }
   });
 
-  it("the archive holds exactly the 1.1 texts of all 35 languages, the 1.0 texts of English, French and Romanian, and the Privacy Policy's 1.2 of all 35 once the release step archives it", () => {
+  it("the archive holds exactly the 1.1 texts of all 35 languages, the 1.0 texts of English, French and Romanian, and the Privacy Policy's 1.2 of all 35", () => {
     const { archive } = manifest();
     const files = readdirSync(resolve(root, "apps/ui/legal/archive"), { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile())
@@ -204,7 +197,7 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.1 
       for (const code of CODES) {
         const entries = Object.entries(archive[kind]![code]!);
         // The released texts: the launch languages' pinned 1.0 and 1.1, the others' one text at 1.1. The Privacy Policy's 1.2
-        // was never released; the release step may have archived it already.
+        // is not released yet; the release step archived it from the final texts.
         const released = entries.filter(([, entry]) => kind === "TERMS" || entry.version !== CURRENT.PRIVACY);
         const pinned = RELEASED[kind][code];
         if (pinned !== undefined) {
@@ -220,16 +213,14 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.1 
           expect(text, `${kind} ${code}: ${version} says ${version}`).toMatch(new RegExp(`^\\*\\*Version ${version.replace(".", "\\.")} · Effective `, "mu"));
           listed.push(path);
         }
-        // A current version the release has not carried yet is archived by the release step, once its translations follow it.
-        const current = sha(draft(kind, code));
+        // Each document's current version is archived once per language, and that copy is the current text.
         const atCurrent = entries.filter(([, entry]) => entry.version === CURRENT[kind]).map(([hash]) => hash);
-        if (atCurrent.length > 0) expect(atCurrent, `${kind} ${code}: the current text is the archived one`).toEqual([current]);
-        else expect(entries.map(([hash]) => hash), `${kind} ${code}: ${CURRENT[kind]} is not archived yet`).not.toContain(current);
+        expect(atCurrent, `${kind} ${code}: the current text is the archived one`).toEqual([sha(draft(kind, code))]);
         if (kind === "PRIVACY") privacyCurrent += atCurrent.length;
       }
     }
-    // The release step archives every language the release offers at once, so the Privacy Policy's 1.2 is archived in none or in all 35.
-    expect([0, CODES.length], "the Privacy Policy's 1.2 copies").toContain(privacyCurrent);
+    // The release step archives every language the release offers at once: the Privacy Policy's 1.2 in all 35.
+    expect(privacyCurrent, "the Privacy Policy's 1.2 copies").toBe(CODES.length);
     expect(listed).toHaveLength(2 * (CODES.length + 3) + privacyCurrent);
     expect(files).toEqual(listed.sort());
   });
