@@ -207,10 +207,13 @@ describe('the runbook says what really happens to a Free debate and a report, an
 
   it('an unchecked Free debate stays private and waits, retried by the API, on no staff screen: never "a publication review on the Team page"', () => {
     expect(flat).not.toContain('publication review on the Team page');
-    expect(flat).toContain('nothing goes public: the finished debate stays private and waits. The API tries its check again by itself, a minute after a failure, then after longer and longer waits, up to an hour. No staff screen lists a Free debate that waits for a check, and no staff member can publish one by hand: it goes public by itself once the checks allow it, unless too many older Free debates wait ahead of it (the warning below).');
-    expect(flat).toContain('Each finished one stays private and waits; the API tries its checks again by itself, and the debate goes public once the checks allow it, unless 100 older Free debates wait ahead of it (5.1b). No staff screen lists the waiting ones, and no staff member can publish one by hand.');
+    expect(flat).toContain('nothing goes public: the finished debate stays private and waits. The API tries its check again by itself, a minute after a failure, then after longer and longer waits, up to an hour. No staff screen lists a Free debate that waits for a check, and no staff member can publish one by hand: it goes public by itself once the checks allow it, however many older Free debates wait (the point on the waiting list below).');
+    expect(flat).toContain('Each finished one stays private and waits; the API tries its checks again by itself, and the debate goes public once the checks allow it, however many older Free debates wait (5.1b). No staff screen lists the waiting ones, and no staff member can publish one by hand.');
     expect(flat).not.toContain('nobody can publish one by hand');
-    // No sentence promises that a waiting Free debate goes public however long it waits: the list the API reads ends.
+    // The API reads the waiting list from where its last try stopped (0190), so no number of older ones holds a newer one back; no sentence
+    // says otherwise, and none promises a time after the debate finished.
+    expect(flat).not.toContain('unless too many older Free debates wait ahead of it');
+    expect(flat).not.toContain('unless 100 older Free debates wait ahead of it');
     expect(flat).not.toContain('however long after it finished');
   });
 
@@ -281,18 +284,24 @@ describe('the runbook says what the end-of-debate check does by itself on this s
     expect(read('apps/api/src/staff/routes.ts')).toContain("{ route: 'POST /v1/admin/publication-reviews/{reviewRef}/approve', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW'");
   });
 
-  it('5.1b: a Free debate waits for the end-of-debate check, a flagged one waits for a staff approval its owner is not shown, and a public one is not deleted', () => {
+  it('5.1b: a Free debate waits for the end-of-debate check, a flagged one waits for a staff approval its owner is not shown, and a public one comes down and is deleted', () => {
     expect(byItself).toContain('- **Free debates go public.** On the Free plan, a finished debate goes public by itself when two AI checks allow it, in this order: the end-of-debate check (below), then the AI check for publication.');
     expect(byItself).toContain('A Free debate waits for that approval too. Its own way to the public page (the first point above) asks this check first: a clear answer, or a flag that a staff approval covers, lets it go on to the AI check for publication.');
     expect(byItself).toContain('A Free debate this check flagged is never refused for good: it stays private and waits, and once a staff member approves it, it goes public on a later try of the API (usually within a minute; longer while the checks wait after a failure or the gate is busy) if the AI check for publication allows it.');
     expect(byItself).toContain('Its owner sees nothing of this on the debate\'s page (`/v4/debate/<id>`): no flag, no "waiting" and no **Cereți aprobarea**. Only the older page `/debate/<id>`, which no V4 page links to, shows the flag and the button.');
-    expect(byItself).toContain('The API looks at the 100 oldest waiting Free debates on each try, and cannot look past them. A flagged one stays among them until it is approved, and so does one whose deletion cannot finish yet. So once 100 such debates wait, no newer Free debate goes public, and nobody is told.');
+    expect(byItself).toContain('The API looks at the waiting Free debates 100 at a time. Each try goes on from where the one before stopped, and after the newest it starts again from the oldest.');
+    expect(byItself).toContain('However many of them wait, every waiting debate is looked at once in each round of the list (one try for each 100 that wait), so a newer one is never held back by them. A flagged one a staff member approved goes public on its next turn, with nobody pressing anything.');
+    expect(byItself).not.toContain('cannot look past them');
     expect(byItself).toContain('if that count keeps rising while none went public in the last day, ask.');
     expect(byItself).toContain('If you see that line, ask. Hide now can take the page down only while the staff screens are on (STAFFCHECK says `staff tools are on`, and after the rename only once 5.7 is done).');
     expect(byItself).not.toContain('Hide now takes the page down; ask before anything else.');
-    expect(byItself).toContain('A debate that is already public when this check asks for its deletion is not deleted.');
-    expect(byItself).toContain('the API\'s log repeats `[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED` every 30 seconds for as long as it is public.');
-    expect(byItself).toContain('Meanwhile its owner is treated as if it were deleted: it leaves their list, their Publish answers that it is gone, and they see "We deleted this debate".');
+    expect(byItself).toContain('A debate that is already public when this check asks for its deletion is deleted too, its public page first.');
+    expect(byItself).not.toContain('is not deleted');
+    expect(byItself).toContain('On the API\'s next erasure pass (every 30 seconds) its page and its place in the list go, and the API\'s log says `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEN_DOWN]` once.');
+    expect(byItself).toContain('Other people\'s digs and reports leave the page with it; their own digs stay theirs, and nobody but the owner is told. Nothing is asked of you.');
+    expect(byItself).toContain('The one case it waits: the check\'s answer is for an older version of the debate\'s answer, whose conclusion is not the one the page shows.');
+    expect(byItself).toContain('its owner is treated as if it were deleted (it leaves their list, their Publish answers that it is gone, and they see "We deleted this debate"), and the API\'s log repeats `[SYNTHESIS_CHECK_ERASURE_WAITING] NOT_SHOWN` every 30 seconds.');
+    expect(byItself).not.toContain('`[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED`');
     // The sweep asks the owner's Publish gate first, waits on a flag without refusing, and publishes only an answer still shown.
     const publications = read('apps/api/src/publications.ts');
     expect(publications).toContain('if (decision === "APPROVAL_REQUIRED") return "WAITING_FOR_APPROVAL";');
@@ -328,7 +337,7 @@ describe('the runbook says what the end-of-debate check does by itself on this s
 
   it('6b: decision 1, the AICHECK reading and the test of 6b.2 step 4 say that a Free debate waits for the end-of-debate check', () => {
     expect(decision).toContain('- On (AICHECK ends with `AICHECK_DONE`): a stranger\'s finished Free debate goes public by itself when the end-of-debate check and then the AI check for publication allow it, and anyone with its link can read it. One the end-of-debate check flagged stays private until a staff approval (5.1b).');
-    expect(flat).toContain('It also counts a debate that was already public when the check asked for its deletion, which is not deleted (5.1b).');
+    expect(flat).toContain('It also counts a debate that was already public when the check asked for its deletion: its page comes down and it is deleted too (5.1b).');
     expect(flat).toContain('the end-of-debate check answers first (at most two minutes after the debate finished), then the AI check for publication.');
     expect(flat).toContain('If it does not show and AICHECK has no `UNAVAILABLE` lines, the end-of-debate check may have flagged it: that account sees the flag only on `/debate/<id>` (5.1b). Ask.');
   });
