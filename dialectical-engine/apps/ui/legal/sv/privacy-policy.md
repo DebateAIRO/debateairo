@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: INTEGRITETSPOLICY · v1.1 · GÄLLER FRÅN 24 NOVEMBER 2026
+eyebrow: INTEGRITETSPOLICY · v1.2 · GÄLLER FRÅN 25 NOVEMBER 2026
 title: Vad vi lagrar och varför
 lede: Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.
-endMarker: SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v1.1
+endMarker: SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v1.2
 bodyLabel: Integritetspolicyns text
 annexTitle: Bilaga B — Regionala integritetsvillkor
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 1.1 · Effective 24 november 2026 · Tidigare versioner på dezbatere.ro/privacy/versions · Personuppgiftsansvarig: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 25 november 2026 · Tidigare versioner på dezbatere.ro/privacy/versions · Personuppgiftsansvarig: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Vi samlar in det som behövs för ett konto och det du skriver i dina debatter. Det du skriver till supportassistenten skickas till dess AI-modell så att den kan svara dig, och vi behåller ingenting av det. Dina frågor skickas till de AI-leverantörer som anges i vårt register, främst DeepInfra, i USA. Villkoren hos DeepInfra, Anthropic och Perplexity tillåter dem inte att träna modeller på det du skriver; avsnitt 5 anger för vilket företag vi ännu inte har bekräftat detta. Vår värdleverantör lagrar ditt konto och dina debatter i London i Storbritannien; avsnitt 5 anger vart dina uppgifter i övrigt skickas. På det kostnadsfria abonnemanget är debatter offentliga när de är klara, efter en AI-kontroll; på ett betalabonnemang är de privata om du inte publicerar dem. När du raderar ditt konto förstörs nycklarna till dina privata uppgifter på vår server, men de krypterade kopiorna i vår separata lagring för säkerhetskopior raderas inte automatiskt (avsnitt 7); offentliga debatter förblir offentliga, och din pseudonym tas bort från dem. Du kan nå oss på privacy@dezbatere.ro, och personer som nämns i en debatt kan skriva till oss utan att ha ett konto.
 

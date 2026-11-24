@@ -92,7 +92,7 @@ describe("the rows are the companies the API answers (addition D24)", () => {
       // the support chat's row (the same model and contract) also names the two checks; otherwise it is the plain row.
       // Privacy 3.12: the two jobs before a debate starts that run on Claude Haiku as well.
       if (keys.includes("claude")) expect(entries.at(-1)).toBe(SUPPORT_PROVIDER);
-      else expect(entries.at(-1)).toEqual({ ...SUPPORT_PROVIDER, purposes: ["synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support"] });
+      else expect(entries.at(-1)).toEqual({ ...SUPPORT_PROVIDER, purposes: ["synthesisCheck", "publicationCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support"] });
       if (keys.includes("claude")) expect(entries.find((entry) => entry.key === "claude")).toBe(ANTHROPIC_PREVIEW_PROVIDER);
       if (keys.includes("deepinfra")) expect(entries.find((entry) => entry.key === "deepinfra")).toBe(DEEPINFRA_PROVIDER);
       // No row for a partner of DeepInfra: no model DeepInfra forwards to one is seated.

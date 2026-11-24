@@ -127,6 +127,7 @@
   "legal.providers.purpose.judging": "토론 텍스트 — 논거를 심사하고 검증하기 위해",
   "legal.providers.purpose.story": "완료된 토론 — 판정에 이르는 흐름을 작성하기 위해",
   "legal.providers.purpose.synthesisCheck": "완료된 토론의 종합 — 네 가지 범주에 대해 검사하기 위해",
+  "legal.providers.purpose.publicationCheck": "A debate's public text before it goes public, and what is added to a public debate — to check it against our rule on content",
   "legal.providers.purpose.reportCheck": "신고 버튼으로 낸 신고와 토론의 공개 텍스트 — 신고를 검사하기 위해",
   "legal.providers.purpose.questionCheck": "토론이 시작되기 전의 질문 — 토론을 시작해도 되는지 검사하기 위해",
   "legal.providers.purpose.clarifyQuestions": "토론이 시작되기 전: 확인 질문 제안",

@@ -92,14 +92,14 @@ describe("Privacy Policy 3.11 names SmartBill, Quaderno, RO e-Factura and the ba
       expect(authorities, `${code}: public authorities name ${name}`).toContain(name);
     }
 
-    // Section 14's one change summary (1.1) is about DeepInfra's partner, so it repeats none of these names.
+    // Section 14's change summaries (1.1 and 1.2) are about the AI providers, so they repeat none of these names.
     expect(section(code, 14), `${code}: section 14 names no recipient`).not.toMatch(/SmartBill|Quaderno/u);
 
     const generated = await generatedSectionFive(code);
     for (const name of ["SmartBill", "Quaderno", "Recrea Systems, S.L.", "RO e-Factura", "ANAF"]) {
       expect(generated, `${code}: the generated data names ${name}`).toContain(name);
     }
-    expect(markdown(code), `${code}: now version 1.1`).toMatch(/v1\.1 /u);
+    expect(markdown(code), `${code}: now version 1.2`).toMatch(/v1\.2 /u);
   });
 
   it("every one of the 35 languages", () => {

@@ -8,8 +8,8 @@
  * The effective day is the upload day. A day before the upload would read as a change made retroactive, which the
  * Terms promise never to do. The upload day is known only once the upload is fixed, so the drafts carry a working day
  * until then and this command puts the real one everywhere the repository's rules need it:
- *   - every draft, in every language and both documents: the day in the eyebrow and in the version line, in that
- *     language's words (`legalDayText`);
+ *   - every draft of each document that takes the day, in every language: the day in the eyebrow and in the version
+ *     line, in that language's words (`legalDayText`);
  *   - English, and each translation recorded as following the current English text (apps/ui/legal/translated-from.json):
  *     the same day wherever else the text gives it (the Privacy Policy's "last updated" sentence). A translation that
  *     follows an older English text keeps its body as it is;
@@ -18,16 +18,19 @@
  *   - generate-legal-data.mjs: the modules and the manifest, the record of each translation that followed the English
  *     text before (`--translated`), then the archive (`--archive`);
  *   - last, legal-release-check.mjs, whose exit code this command returns.
+ * A document whose current version was released keeps its day and is left as it is: its archive copy is in the commit
+ * of the release the site runs, which tests/n1-baseline.json names, and a released text is kept as it was, so a change
+ * to it needs a new version number. So when only one document has a new version, only that one takes the day, and the
+ * command says which document kept which day.
  * Before writing anything it refuses:
  *   - a day that is not YYYY-MM-DD, a day before today (Romanian time), or a day that is not after the day the
  *     document's previous version took effect (read from that version's archived English text);
- *   - a current version that was released: its archive copy is in the commit of the release the site runs, which
- *     tests/n1-baseline.json names. A released text is kept as it was, so a change to it needs a new version number.
- *     That file is the only record of the live release in the repository, and it lags: it names a new release only
- *     once the pull request after that upload is merged. Until then this refusal does not see the new release, so a
- *     version an upload has just carried must not be re-dated after that upload;
+ *   - a day that no document can take, because each document's current version was released and carries another
+ *     day. tests/n1-baseline.json is the only record of the live release in the repository, and it lags: it names a
+ *     new release only once the pull request after that upload is merged. Until then this command does not see the
+ *     new release, so a version an upload has just carried must not be re-dated after that upload;
  *   - a draft whose eyebrow or version line does not carry the current day in the words this command would write.
- * The tests read the day from the English Privacy Policy's version line (tests/support/legalText.ts), so they need no
+ * The tests read each document's day from its English version line (tests/support/legalText.ts), so they need no
  * edit when the day changes.
  */
 
@@ -159,7 +162,8 @@ function redateDraft(path, code, markdown, from, to, wholeText) {
  *   - `isReleased(path)`: whether that archive copy is in the release the site runs (throws when that cannot be told);
  *   - `today`: Romania's day; `locales`: every language when left out.
  * Returns the days before, each draft that changes (its new text and changed lines), the archive copies of the
- * current version to remove, and per document the translations to record again from the re-dated English text.
+ * current version to remove, per document the translations to record again from the re-dated English text, and the
+ * documents whose released current version keeps its day.
  */
 export function planLegalRedate({ to, today, readDraft, manifest, translations, readArchived, isReleased, locales = LOCALES.map(({ code }) => code) }) {
   if (order(to) < order(today)) {
@@ -170,6 +174,7 @@ export function planLegalRedate({ to, today, readDraft, manifest, translations, 
   const archiveRemovals = [];
   const retranslate = {};
   const from = {};
+  const kept = [];
   for (const { kind, name, draft } of LEGAL_REDATE_DOCUMENTS) {
     const englishText = readDraft("en", kind);
     const current = englishVersionAndDay(englishText);
@@ -185,15 +190,15 @@ export function planLegalRedate({ to, today, readDraft, manifest, translations, 
       retranslate[kind] = Object.freeze([]);
       continue;
     }
-    for (const [code, entries] of Object.entries(manifest.archive?.[kind] ?? {})) {
-      for (const [sha256, entry] of Object.entries(entries)) {
-        if (entry.version !== current.version) continue;
-        if (isReleased(entry.path)) {
-          throw refused(`the ${name} ${current.version} (${entry.path}) is in the release the site runs (tests/n1-baseline.json): a released text keeps its day, so a change to it needs a new version number`);
-        }
-        archiveRemovals.push(Object.freeze({ kind, code, sha256, path: entry.path }));
-      }
+    const currentCopies = Object.entries(manifest.archive?.[kind] ?? {}).flatMap(([code, entries]) => Object.entries(entries)
+      .filter(([, entry]) => entry.version === current.version).map(([sha256, entry]) => Object.freeze({ kind, code, sha256, path: entry.path })));
+    const released = currentCopies.find((copy) => isReleased(copy.path));
+    if (released !== undefined) {
+      kept.push(Object.freeze({ kind, name, version: current.version, day: current.day, path: released.path }));
+      retranslate[kind] = Object.freeze([]);
+      continue;
     }
+    archiveRemovals.push(...currentCopies);
     const englishSha256 = legalDraftSha256(englishText);
     const following = codes.filter((code) => code !== "en" && translations[kind]?.[code]?.sha256 === englishSha256);
     retranslate[kind] = Object.freeze(following);
@@ -202,12 +207,17 @@ export function planLegalRedate({ to, today, readDraft, manifest, translations, 
       drafts.push(redateDraft(path, code, code === "en" ? englishText : readDraft(code, kind), current.day, to, code === "en" || following.includes(code)));
     }
   }
+  if (kept.length === LEGAL_REDATE_DOCUMENTS.length) {
+    const [{ name, version, path }] = kept;
+    throw refused(`the ${name} ${version} (${path}) is in the release the site runs (tests/n1-baseline.json): a released text keeps its day, so a change to it needs a new version number`);
+  }
   return Object.freeze({
     to,
     from: Object.freeze(from),
     drafts: Object.freeze(drafts),
     archiveRemovals: Object.freeze(archiveRemovals),
-    retranslate: Object.freeze(retranslate)
+    retranslate: Object.freeze(retranslate),
+    kept: Object.freeze(kept)
   });
 }
 
@@ -274,8 +284,13 @@ export function main(argv, now = new Date()) {
     return 1;
   }
   const day = legalDayText("en", plan.to, "line");
+  const keptKinds = new Set(plan.kept.map(({ kind }) => kind));
   for (const { kind, name } of LEGAL_REDATE_DOCUMENTS) {
+    if (keptKinds.has(kind)) continue;
     process.stdout.write(`${name}: from ${legalDayText("en", plan.from[kind], "line")} to ${day}; translations recorded again: ${plan.retranslate[kind].join(", ") || "none"}\n`);
+  }
+  for (const { name, version, day: keptDay } of plan.kept) {
+    process.stdout.write(`${name} ${version}: in the release the site runs (tests/n1-baseline.json), so it keeps its day, ${legalDayText("en", keptDay, "line")}\n`);
   }
   for (const draft of plan.drafts) {
     process.stdout.write(`${draft.path}\n${draft.lines.map((line) => `  - ${line.before}\n  + ${line.after}\n`).join("")}`);
@@ -306,14 +321,18 @@ export function main(argv, now = new Date()) {
       }
     }
   } else {
-    process.stdout.write(`both texts already take effect on ${day}: nothing to change\n`);
+    process.stdout.write(`no text takes a new day: nothing to change\n`);
   }
   const status = run("legal-release-check.mjs", []);
   if (status !== 0) {
     process.stderr.write("LEGAL_REDATE_NOT_DONE: the release check refused (above)\n");
     return status;
   }
-  process.stdout.write(`LEGAL_REDATE_DONE: the Terms of Service and the Privacy Policy take effect on ${day}; commit what changed\n`);
+  const dated = LEGAL_REDATE_DOCUMENTS.filter(({ kind }) => !keptKinds.has(kind)).map(({ name }) => name);
+  const keptWords = plan.kept.map(({ name, day: keptDay }) => `; the ${name} keeps ${legalDayText("en", keptDay, "line")}`).join("");
+  process.stdout.write(dated.length === LEGAL_REDATE_DOCUMENTS.length
+    ? `LEGAL_REDATE_DONE: the Terms of Service and the Privacy Policy take effect on ${day}; commit what changed\n`
+    : `LEGAL_REDATE_DONE: the ${dated.join(" and the ")} takes effect on ${day}${keptWords}; commit what changed\n`);
   return 0;
 }
 

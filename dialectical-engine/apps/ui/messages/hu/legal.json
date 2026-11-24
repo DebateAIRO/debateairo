@@ -127,6 +127,7 @@
   "legal.providers.purpose.judging": "A vita szövege — az érvek elbírálásához és ellenőrzéséhez",
   "legal.providers.purpose.story": "A befejezett vita — az ítélet történetének megírásához",
   "legal.providers.purpose.synthesisCheck": "Egy befejezett vita szintézise — a négy kategória szempontjából való ellenőrzéséhez",
+  "legal.providers.purpose.publicationCheck": "A debate's public text before it goes public, and what is added to a public debate — to check it against our rule on content",
   "legal.providers.purpose.reportCheck": "A Bejelentés gombbal tett bejelentés, és a vita nyilvános szövege — a bejelentés ellenőrzéséhez",
   "legal.providers.purpose.questionCheck": "Egy kérdés egy vita elindulása előtt — annak ellenőrzéséhez, hogy a vita elindulhat-e",
   "legal.providers.purpose.clarifyQuestions": "Egy vita elindulása előtt: pontosító kérdések javaslata",

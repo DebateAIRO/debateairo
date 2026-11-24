@@ -127,6 +127,7 @@
   "legal.providers.purpose.judging": "Текст дебатів — щоб оцінити й перевірити аргументи",
   "legal.providers.purpose.story": "Завершені дебати — щоб написати історію вердикту",
   "legal.providers.purpose.synthesisCheck": "Синтез завершених дебатів — щоб перевірити його за чотирма категоріями",
+  "legal.providers.purpose.publicationCheck": "A debate's public text before it goes public, and what is added to a public debate — to check it against our rule on content",
   "legal.providers.purpose.reportCheck": "Повідомлення, зроблене кнопкою «Повідомити», і загальнодоступний текст дебатів — щоб перевірити повідомлення",
   "legal.providers.purpose.questionCheck": "Запитання до початку дебатів — щоб перевірити, чи можуть дебати початися",
   "legal.providers.purpose.clarifyQuestions": "До початку дебатів: пропозиції уточнювальних питань",

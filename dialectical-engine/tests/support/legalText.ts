@@ -24,14 +24,22 @@ export const legalText = (kind: LegalKind, code: string): string =>
 export const legalLines = (kind: LegalKind, code: string): string[] => legalText(kind, code).split("\n");
 
 /**
- * The day the current texts take effect, as the English Privacy Policy's version line gives it (`<day> <Month> <year>`).
- * apps/ui/scripts/legal-redate.mjs sets it in every draft at once, so a test reads it here instead of typing it;
- * tests/unit/legal-reset-10.test.ts holds every draft of both documents to it.
+ * The day a document's current version takes effect, as its English version line gives it (`<day> <Month> <year>`).
+ * apps/ui/scripts/legal-redate.mjs sets it in every draft of that document at once, so a test reads it here instead of
+ * typing it; tests/unit/legal-reset-10.test.ts holds every draft of each document to it. The two documents carry
+ * different days when only one of them has a version the site does not run yet.
  */
-export const legalEffectiveDay = (): string => {
-  const day = /^\*\*Version \d+\.\d+ · Effective (\d{1,2} [A-Z][a-z]+ \d{4}) · /mu.exec(legalText("PRIVACY", "en"))?.[1];
-  if (day === undefined) throw new Error("the English Privacy Policy's version line gives no day");
+export const legalEffectiveDay = (kind: LegalKind): string => {
+  const day = /^\*\*Version \d+\.\d+ · Effective (\d{1,2} [A-Z][a-z]+ \d{4}) · /mu.exec(legalText(kind, "en"))?.[1];
+  if (day === undefined) throw new Error(`the English ${kind} text's version line gives no day`);
   return day;
+};
+
+/** A document's current version, as its English version line gives it (`N.M`). */
+export const legalCurrentVersion = (kind: LegalKind): string => {
+  const version = /^\*\*Version (\d+\.\d+) · /mu.exec(legalText(kind, "en"))?.[1];
+  if (version === undefined) throw new Error(`the English ${kind} text's version line gives no version`);
+  return version;
 };
 
 /** Where numbered section `section` starts: the index of its `## <section>. …` heading. */

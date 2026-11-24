@@ -127,6 +127,7 @@
   "legal.providers.purpose.judging": "Текстът на дебата — за оценяване и проверка на аргументите",
   "legal.providers.purpose.story": "Завършеният дебат — за написване на историята на присъдата",
   "legal.providers.purpose.synthesisCheck": "Синтезът на приключил дебат — за проверка за четири категории",
+  "legal.providers.purpose.publicationCheck": "A debate's public text before it goes public, and what is added to a public debate — to check it against our rule on content",
   "legal.providers.purpose.reportCheck": "Сигналът, подаден с бутона Сигнализиране, и публичният текст на дебата — за проверка на сигнала",
   "legal.providers.purpose.questionCheck": "Въпросът преди началото на дебат — за проверка дали дебатът може да започне",
   "legal.providers.purpose.clarifyQuestions": "Преди началото на дебат: предлагане на уточняващи въпроси",

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
+import { RELEASE_LEGAL_LOCALES } from "../../apps/ui/scripts/generate-legal-data.mjs";
 import { cells, legalLines, sectionLine } from "../support/legalText.js";
 
 /**
@@ -27,7 +28,7 @@ describe("the Report button and the six months in the legal texts", () => {
     const reportsRow = privacy("en").find((line) => line.startsWith("| **Reports you make** |"));
     expect(cells(reportsRow!)[1]).toContain("Only admins who review can see your name");
     expect(read("en", "privacy-policy.md")).not.toMatch(/two people/iu);
-    expect(sectionLine(privacy("en"), 5, 2)).toContain("If you use the Report button on a public debate, we send the words of your report and the public text of the debate to an AI, which checks the report; we add nothing that identifies you or your account.");
+    expect(sectionLine(privacy("en"), 5, 2)).toContain("If you use the Report button on a public debate, we send the words of your report and the public text of the debate to Claude Haiku 5.5, which checks the report; we add nothing that identifies you or your account.");
   });
 
   it("nothing in the English live text still calls it a control or a link", () => {
@@ -53,13 +54,26 @@ describe("the Report button and the six months in the legal texts", () => {
     expect(cells(kept(28)).join(" "), `${code}: decision 36's six months`).toContain("6");
     expect(cells(kept(29)).join(" "), `${code}: the notices' twelve months`).toContain("12");
     expect(sectionLine(policy, 4, 21), `${code}: section 4 points at section 5`).toMatch(/5/u);
-    // The paragraph still names the model for the two other checks, so the marker is the count: the report sentence, which comes last, adds no third mention.
     const section5 = sectionLine(policy, 5, 2);
     const mentions = [...section5.matchAll(/Claude Haiku 5\.5/gu)].map((match) => match.index);
-    expect(mentions, `${code}: section 5 names the model for the synthesis and the question checks only`).toHaveLength(2);
-    expect(section5.match(/Haiku/gu), `${code}: no other spelling of the model`).toHaveLength(2);
-    // ...and the report sentence is still there after the last mention: what follows it is longer than the stretch between the two mentions. Without the sentence it is at most 0.7 of that in every language, with it at least 1.36.
-    expect(section5.length - mentions[1]!, `${code}: the report sentence follows the question check's`).toBeGreaterThan(mentions[1]! - mentions[0]!);
+    if ((RELEASE_LEGAL_LOCALES as readonly string[]).includes(code)) {
+      // The paragraph names the model once for each of its four checks, in this order: the synthesis, the question, the
+      // public text before it goes public, and the report, whose sentence comes last.
+      expect(mentions, `${code}: section 5 names the model for the synthesis, question, publication and report checks`).toHaveLength(4);
+      expect(section5.match(/Haiku/gu), `${code}: no other spelling of the model`).toHaveLength(4);
+      // The publication check's description, which names the parts of the public text, is the longest stretch between two mentions.
+      expect(mentions[3]! - mentions[2]!, `${code}: the publication check's sentences sit before the report's`)
+        .toBeGreaterThan(Math.max(mentions[2]! - mentions[1]!, mentions[1]! - mentions[0]!));
+      // ...and the report sentence ends the paragraph: what follows its mention is shorter than the publication check's stretch.
+      expect(section5.length - mentions[3]!, `${code}: the report sentence comes last`).toBeLessThan(mentions[3]! - mentions[2]!);
+    } else {
+      // A language this release does not offer follows an older English text, which names the model for the synthesis and
+      // the question checks only, so the marker is the count: the report sentence, which comes last, adds no third mention.
+      expect(mentions, `${code}: section 5 names the model for the synthesis and the question checks only`).toHaveLength(2);
+      expect(section5.match(/Haiku/gu), `${code}: no other spelling of the model`).toHaveLength(2);
+      // ...and the report sentence is still there after the last mention: what follows it is longer than the stretch between the two mentions.
+      expect(section5.length - mentions[1]!, `${code}: the report sentence follows the question check's`).toBeGreaterThan(mentions[1]! - mentions[0]!);
+    }
     // Terms 1.0 is the first published text and carries no change log (owner's decision of 19 November 2026).
     expect(contract.join("\n"), `${code}: no Terms change log`).not.toMatch(/replaced (version )?2\.\d+|2\.12/u);
     expect(contract.filter((line) => line.includes("support@dezbatere.ro")).length).toBeGreaterThan(0);

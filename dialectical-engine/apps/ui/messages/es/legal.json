@@ -127,6 +127,7 @@
   "legal.providers.purpose.judging": "Texto del debate — para juzgar y verificar los argumentos",
   "legal.providers.purpose.story": "El debate terminado — para redactar la historia del veredicto",
   "legal.providers.purpose.synthesisCheck": "La síntesis de un debate terminado — para comprobarla respecto de cuatro categorías",
+  "legal.providers.purpose.publicationCheck": "A debate's public text before it goes public, and what is added to a public debate — to check it against our rule on content",
   "legal.providers.purpose.reportCheck": "Una denuncia hecha con el botón Denunciar y el texto público del debate — para verificar la denuncia",
   "legal.providers.purpose.questionCheck": "Una pregunta antes de que empiece un debate — para comprobar si el debate puede empezar",
   "legal.providers.purpose.clarifyQuestions": "Antes de que empiece un debate: sugerir preguntas aclaratorias",

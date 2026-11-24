@@ -14,12 +14,14 @@ import { legalEffectiveDay, legalText, type LegalKind as ResetKind } from "../su
 /**
  * Launch started both legal texts at 1.0: the pre-launch drafts were never offered, so neither text carried a change
  * history and both re-acceptance floors are 1.0, which every acceptance of a draft written before launch clears. The
- * first change after launch is 1.1 (DeepInfra runs on its own servers every model a debate is given through it): every
- * language's Terms of Service and Privacy Policy say 1.1 in their eyebrow, end marker and version line, and the same
- * effective day (the number and the day change for all languages together, the day with legal-redate.mjs); the
- * languages the release offers carry one change summary, "Version
- * 1.1 replaced version 1.0", and the others none, since their text still follows an older English one; the floors stay
- * 1.0, so nobody who accepted 1.0 is asked again; the archive holds exactly the 1.0 and 1.1 texts of the languages the
+ * first change after launch is 1.1 of both (DeepInfra runs on its own servers every model a debate is given through
+ * it); the second is the Privacy Policy's 1.2 (what the publication check receives), and the Terms stay at 1.1. Every
+ * language's draft of a document says that document's current version in its eyebrow, end marker and version line,
+ * and that document's effective day (the number and the day change for all languages together, the day with
+ * legal-redate.mjs); the languages the release offers carry the change summaries, newest first ("Version 1.2 replaced
+ * version 1.1", then "Version 1.1 replaced version 1.0" in the Privacy Policy, "Version 1.1 replaced version 1.0" in the
+ * Terms), and the others none, since their text still follows an older English one; the floors stay 1.0, so nobody who
+ * accepted 1.0 is asked again; the archive holds exactly the released texts and the current ones of the languages the
  * release offers; /terms/versions lists 1.1, in force, and 1.0, linked to its archived English text.
  */
 
@@ -49,23 +51,39 @@ const LAUNCH: Readonly<Record<ResetKind, Readonly<Record<string, string>>>> = {
     ro: "f5f5e9aae947daa2d85b6908e4fc96fa769bd642b4d0c557d5db3f99e3da8109"
   }
 };
-/** Each offered language's change summary opens with these words: version 1.1 replaced version 1.0. */
+/** Each document's current version. */
+const CURRENT: Readonly<Record<ResetKind, string>> = { PRIVACY: "1.2", TERMS: "1.1" };
+/** The Privacy Policy 1.1 texts the site released, by language: their hashes, which a released text keeps for good. */
+const PRIVACY_1_1: Readonly<Record<string, string>> = {
+  en: "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515",
+  fr: "2c639718616db98b874948e323503ddb1f5ff23e2cd1edf12f22fe42b9f741a0",
+  ro: "e23b9600b4afff3ed81bba87c655cdcefd4f61f3f28bbbdd2a86d605e3ff6fe5"
+};
+/** Each offered language's Privacy Policy 1.2 summary opens with these words. */
+const REPLACED_1_1: Readonly<Record<string, string>> = {
+  en: "Version 1.2 replaced version 1.1: ",
+  fr: "La version 1.2 a remplacé la version 1.1 : ",
+  ro: "Versiunea 1.2 a înlocuit versiunea 1.1: "
+};
+/** Each offered language's change summary of 1.1 opens with these words: version 1.1 replaced version 1.0. */
 const REPLACED: Readonly<Record<string, string>> = {
   en: "Version 1.1 replaced version 1.0: ",
   fr: "La version 1.1 a remplacé la version 1.0 : ",
   ro: "Versiunea 1.1 a înlocuit versiunea 1.0: "
 };
 
-describe("the Terms of Service and the Privacy Policy: 1.0 at launch, 1.1 now", () => {
-  it.each(KINDS.flatMap((kind) => CODES.map((code) => [kind, code] as const)))("%s %s: the draft says 1.1, and the manifest holds it", (kind, code) => {
+describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.1 and Privacy Policy 1.2 now", () => {
+  it.each(KINDS.flatMap((kind) => CODES.map((code) => [kind, code] as const)))("%s %s: the draft says its current version, and the manifest holds it", (kind, code) => {
     const text = draft(kind, code);
     const lines = text.split("\n");
-    expect(lines.find((line) => line.startsWith("eyebrow: ")), "the eyebrow").toMatch(/ · v1\.1 · /u);
-    expect(lines.find((line) => line.startsWith("endMarker: ")), "the end marker").toMatch(/ · v1\.1$/u);
-    expect(lines.find((line) => line.startsWith("**Version ")), "the version line").toMatch(/^\*\*Version 1\.1 · Effective /u);
-    expect(text, "no line names a pre-launch number as current").not.toMatch(/ v(3\.1[0-9]|3\.[0-9]|2\.\d+|1\.[02-9])( ·|$)|\*\*Version (3|2)\.\d+ · |\*\*Version 1\.[02-9]/mu);
-    expect(manifest().documents[kind]![code]).toEqual({ version: "1.1", sha256: sha(text) });
-    expect(currentDocument(kind, code)).toEqual({ version: "1.1", sha256: sha(text) });
+    const version = CURRENT[kind];
+    expect(lines.find((line) => line.startsWith("eyebrow: ")), "the eyebrow").toContain(` · v${version} · `);
+    expect(lines.find((line) => line.startsWith("endMarker: ")), "the end marker").toMatch(new RegExp(` · v${version.replace(".", "\\.")}$`, "u"));
+    expect(lines.find((line) => line.startsWith("**Version ")), "the version line").toMatch(new RegExp(`^\\*\\*Version ${version.replace(".", "\\.")} · Effective `, "u"));
+    expect([...text.matchAll(/ v(\d+\.\d+)(?: ·|$)|^\*\*Version (\d+\.\d+) · /gmu)].map((match) => match[1] ?? match[2]), "no line names another number as current")
+      .toEqual([version, version, version]);
+    expect(manifest().documents[kind]![code]).toEqual({ version, sha256: sha(text) });
+    expect(currentDocument(kind, code)).toEqual({ version, sha256: sha(text) });
   });
 
   it.each(CODES.map((code) => [code]))("%s: one change summary in the languages the release offers, none in the others", (code) => {
@@ -81,10 +99,14 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, 1.1 now", 
       expect(terms, "the Terms' section 14 and its summary").toHaveLength(5);
       expect(terms[4]!.startsWith(REPLACED[code]!), "the Terms' summary").toBe(true);
       expect(terms[4], "it names the section it changed").toMatch(/ 8 /u);
-      // One sentence on the update, then the summary; no older history.
-      expect(privacy[2]!.split(REPLACED[code]!), "the Privacy Policy's summary, once").toHaveLength(2);
-      expect(privacy[2], "it names the sections it changed").toMatch(/ 5 .* 4 /u);
-      expect(privacy[2], "and names no other version").not.toMatch(/(?<![\d.])(?!1\.[01](?!\d))\d\.\d+(?!\d)/u);
+      // One sentence on the update, then the summaries, newest first; no history before 1.0.
+      const last = privacy[2]!;
+      expect(last.split(REPLACED_1_1[code]!), "the Privacy Policy's 1.2 summary, once").toHaveLength(2);
+      expect(last.split(REPLACED[code]!), "the Privacy Policy's 1.1 summary, once").toHaveLength(2);
+      expect(last.indexOf(REPLACED_1_1[code]!), "newest first").toBeLessThan(last.indexOf(REPLACED[code]!));
+      expect(last.slice(last.indexOf(REPLACED_1_1[code]!), last.indexOf(REPLACED[code]!)), "1.2's names the parts it changed").toMatch(/ 5 .* B\.6 /u);
+      expect(last.slice(last.indexOf(REPLACED[code]!)), "1.1's names the sections it changed").toMatch(/ 5 .* 4 /u);
+      expect(last.replaceAll("Claude Haiku 5.5", ""), "and names no other version").not.toMatch(/(?<![\d.])(?!1\.[012](?!\d))\d\.\d+(?!\d)/u);
     } else {
       expect(terms, "the Terms' section 14").toHaveLength(4);
       expect(privacy[2], "and no version").not.toMatch(/(?<![\d.])\d\.\d+(?![\d])/u);
@@ -93,30 +115,32 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, 1.1 now", 
     }
   });
 
-  it("the English pages say 1.1, in force from the effective day", () => {
-    expect([TERMS_OF_SERVICE.version, PRIVACY_POLICY.version]).toEqual(["1.1", "1.1"]);
-    expect(TERMS_OF_SERVICE.eyebrow).toBe(`TERMS OF SERVICE · v1.1 · EFFECTIVE ${legalEffectiveDay().toUpperCase()}`);
-    expect(PRIVACY_POLICY.eyebrow).toBe(`PRIVACY POLICY · v1.1 · EFFECTIVE ${legalEffectiveDay().toUpperCase()}`);
+  it("the English pages say their current version, in force from its effective day", () => {
+    expect([TERMS_OF_SERVICE.version, PRIVACY_POLICY.version]).toEqual(["1.1", "1.2"]);
+    expect(TERMS_OF_SERVICE.eyebrow).toBe(`TERMS OF SERVICE · v1.1 · EFFECTIVE ${legalEffectiveDay("TERMS").toUpperCase()}`);
+    expect(PRIVACY_POLICY.eyebrow).toBe(`PRIVACY POLICY · v1.2 · EFFECTIVE ${legalEffectiveDay("PRIVACY").toUpperCase()}`);
     expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v1.1");
-    expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v1.1");
+    expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v1.2");
   });
 
-  it("every draft of both documents takes effect on the same day, in its own words, after 1.0's day", () => {
-    const day = englishVersionAndDay(draft("PRIVACY", "en")).day;
-    expect(legalDayText("en", day, "line")).toBe(legalEffectiveDay());
-    // A later version takes effect after the day 1.0 did (read from its archived English text), never on it or before.
-    const launched = englishVersionAndDay(readFileSync(resolve(root, "apps/ui/legal/archive/en", `${LAUNCH.PRIVACY.en}.md`), "utf8")).day;
-    expect(legalDayIso(day) > legalDayIso(launched), `${legalDayIso(day)} after ${legalDayIso(launched)}`).toBe(true);
-    for (const kind of KINDS) {
-      for (const code of CODES) {
-        const lines = draft(kind, code).split("\n");
-        expect(lines.find((line) => line.startsWith("eyebrow: ")), `${kind} ${code}: the eyebrow`).toContain(legalDayText(code, day, "eyebrow"));
-        expect(lines.find((line) => line.startsWith("**Version ")), `${kind} ${code}: the version line`)
-          .toContain(`**Version 1.1 · Effective ${legalDayText(code, day, "line")} · `);
-      }
+  it.each(KINDS)("every draft of the %s takes effect on one day, in its own words, after its previous version's day", (kind) => {
+    const day = englishVersionAndDay(draft(kind, "en")).day;
+    expect(legalDayText("en", day, "line")).toBe(legalEffectiveDay(kind));
+    // A later version takes effect after the day each earlier one did (read from its archived English text), never on it or before.
+    const earlier = Object.values(manifest().archive[kind]!.en!).filter((entry) => entry.version !== CURRENT[kind]);
+    expect(earlier.length, "an earlier version is archived").toBeGreaterThan(0);
+    for (const entry of earlier) {
+      const before = englishVersionAndDay(readFileSync(resolve(root, entry.path), "utf8")).day;
+      expect(legalDayIso(day) > legalDayIso(before), `${legalDayIso(day)} after ${entry.version}'s ${legalDayIso(before)}`).toBe(true);
+    }
+    for (const code of CODES) {
+      const lines = draft(kind, code).split("\n");
+      expect(lines.find((line) => line.startsWith("eyebrow: ")), `${kind} ${code}: the eyebrow`).toContain(legalDayText(code, day, "eyebrow"));
+      expect(lines.find((line) => line.startsWith("**Version ")), `${kind} ${code}: the version line`)
+        .toContain(`**Version ${CURRENT[kind]} · Effective ${legalDayText(code, day, "line")} · `);
     }
     // The offered languages' Privacy Policy says it was last updated that day.
-    for (const code of OFFERED) expect(section14(draft("PRIVACY", code))[2], code).toContain(legalDayText(code, day, "line"));
+    if (kind === "PRIVACY") for (const code of OFFERED) expect(section14(draft("PRIVACY", code))[2], code).toContain(legalDayText(code, day, "line"));
   });
 
   it("keeps both re-acceptance floors at 1.0: an acceptance of 1.0, or of any pre-launch draft, owes nothing", () => {
@@ -127,7 +151,7 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, 1.1 now", 
     }
   });
 
-  it("the archive holds exactly the 1.0 and 1.1 texts of the languages the release offers, and nothing else", () => {
+  it("the archive holds exactly the released texts and the current ones of the languages the release offers, and nothing else", () => {
     const { archive } = manifest();
     const files = readdirSync(resolve(root, "apps/ui/legal/archive"), { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile())
@@ -139,14 +163,22 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, 1.1 now", 
       for (const code of RELEASE_LEGAL_LOCALES) {
         const text = draft(kind, code);
         const launch = LAUNCH[kind][code]!;
+        const released = kind === "PRIVACY" ? { [PRIVACY_1_1[code]!]: { version: "1.1", path: `apps/ui/legal/archive/${code}/${PRIVACY_1_1[code]!}.md` } } : {};
         expect(archive[kind]![code], `${kind} ${code}`).toEqual({
           [launch]: { version: "1.0", path: `apps/ui/legal/archive/${code}/${launch}.md` },
-          [sha(text)]: { version: "1.1", path: `apps/ui/legal/archive/${code}/${sha(text)}.md` }
+          ...released,
+          [sha(text)]: { version: CURRENT[kind], path: `apps/ui/legal/archive/${code}/${sha(text)}.md` }
         });
+        for (const path of Object.keys(released)) {
+          const oneOne = readFileSync(resolve(root, "apps/ui/legal/archive", code, `${path}.md`), "utf8");
+          expect(sha(oneOne), `${kind} ${code}: 1.1 byte for byte`).toBe(path);
+          expect(oneOne, `${kind} ${code}: 1.1 says 1.1`).toMatch(/^\*\*Version 1\.1 · Effective /mu);
+          listed.push(`apps/ui/legal/archive/${code}/${path}.md`);
+        }
         expect(readFileSync(resolve(root, "apps/ui/legal/archive", code, `${sha(text)}.md`), "utf8"), `${kind} ${code}`).toBe(text);
-        const released = readFileSync(resolve(root, "apps/ui/legal/archive", code, `${launch}.md`), "utf8");
-        expect(sha(released), `${kind} ${code}: 1.0 byte for byte`).toBe(launch);
-        expect(released, `${kind} ${code}: 1.0 says 1.0`).toMatch(/^\*\*Version 1\.0 · Effective /mu);
+        const oneZero = readFileSync(resolve(root, "apps/ui/legal/archive", code, `${launch}.md`), "utf8");
+        expect(sha(oneZero), `${kind} ${code}: 1.0 byte for byte`).toBe(launch);
+        expect(oneZero, `${kind} ${code}: 1.0 says 1.0`).toMatch(/^\*\*Version 1\.0 · Effective /mu);
         listed.push(`apps/ui/legal/archive/${code}/${launch}.md`, `apps/ui/legal/archive/${code}/${sha(text)}.md`);
       }
     }
@@ -157,7 +189,7 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, 1.1 now", 
     const record = JSON.parse(readFileSync(resolve(root, "apps/ui/legal/translated-from.json"), "utf8")) as Record<string, Record<string, { version: string; sha256: string }>>;
     for (const kind of KINDS) {
       for (const code of ["fr", "ro"]) {
-        expect(record[kind]![code], `${kind} ${code}`).toEqual({ version: "1.1", sha256: sha(draft(kind, "en")) });
+        expect(record[kind]![code], `${kind} ${code}`).toEqual({ version: CURRENT[kind], sha256: sha(draft(kind, "en")) });
       }
     }
   });

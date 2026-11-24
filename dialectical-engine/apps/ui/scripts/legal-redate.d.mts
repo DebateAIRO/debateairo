@@ -14,6 +14,8 @@ export type LegalRedatePlan = Readonly<{
   drafts: ReadonlyArray<Readonly<{ path: string; after: string; lines: ReadonlyArray<Readonly<{ before: string; after: string }>> }>>;
   archiveRemovals: ReadonlyArray<Readonly<{ kind: LegalManifestKind; code: string; sha256: string; path: string }>>;
   retranslate: Readonly<Record<LegalManifestKind, readonly string[]>>;
+  /** The documents whose current version is in the release the site runs: each keeps its day. */
+  kept: ReadonlyArray<Readonly<{ kind: LegalManifestKind; name: string; version: string; day: LegalDay; path: string }>>;
 }>;
 export function planLegalRedate(input: Readonly<{
   to: LegalDay;

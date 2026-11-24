@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: GİZLİLİK POLİTİKASI · v1.1 · YÜRÜRLÜK TARİHİ 24 KASIM 2026
+eyebrow: GİZLİLİK POLİTİKASI · v1.2 · YÜRÜRLÜK TARİHİ 25 KASIM 2026
 title: Neleri neden saklıyoruz?
 lede: GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.
-endMarker: POLİTİKANIN SONU · GDPR (EU) 2016/679 · v1.1
+endMarker: POLİTİKANIN SONU · GDPR (EU) 2016/679 · v1.2
 bodyLabel: Gizlilik Politikası metni
 annexTitle: Ek B — Bölgesel gizlilik hükümleri
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 ÇEREZLER
 -->
 
-**Version 1.1 · Effective 24 Kasım 2026 · Önceki sürümler: dezbatere.ro/privacy/versions · Veri sorumlusu: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 25 Kasım 2026 · Önceki sürümler: dezbatere.ro/privacy/versions · Veri sorumlusu: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Bir hesabın ihtiyaç duyduğu bilgileri ve tartışmalarınıza yazdıklarınızı toplarız. Destek asistanına yazdıklarınız, size yanıt verebilmesi için onun yapay zekâ modeline gider ve bunların hiçbirini saklamayız. Sorularınız Sicilimizde listelenen yapay zekâ sağlayıcılarına, ağırlıklı olarak Amerika Birleşik Devletleri'ndeki DeepInfra'ya gider. DeepInfra, Anthropic ve Perplexity'nin koşulları, yazdıklarınızla model eğitmelerine izin vermez; hangi şirket için bunu henüz teyit etmediğimizi bölüm 5 anlatır. Barındırma sağlayıcımız hesabınızı ve tartışmalarınızı Birleşik Krallık'taki Londra'da saklar; verilerinizin başka nerelere gittiğini bölüm 5 anlatır. Ücretsiz plandaki tartışmalar, tamamlandığında ve bir yapay zekâ kontrolünden geçtikten sonra herkese açık olur; ücretli planda ise siz yayımlamadıkça gizlidirler. Hesabınızı silmek sunucumuzdaki özel verilerinizin anahtarlarını imha eder, ancak ayrı yedek depolama alanımızdaki şifreli kopyalar otomatik olarak silinmez (bölüm 7); herkese açık tartışmalar herkese açık kalır ve bunlardan takma adınız kaldırılır. Bize privacy@dezbatere.ro adresinden ulaşabilirsiniz; bir tartışmada adı geçen kişiler de hesapları olmadan bize yazabilir.
 
