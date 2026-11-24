@@ -1,140 +1,140 @@
 {
   "PRIVACY": {
     "ar": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "bg": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "cs": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "da": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "de": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "el": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "es": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "et": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "fi": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "fr": {
       "version": "1.2",
       "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "ga": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "he": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "hi": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "hr": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "hu": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "id": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "it": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "ja": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "ko": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "lt": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "lv": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "mt": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "nl": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "pl": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "pt": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "ro": {
       "version": "1.2",
       "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "ru": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "sk": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "sl": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "sv": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "tr": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "uk": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "vi": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     },
     "zh": {
-      "version": "1.1",
-      "sha256": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515"
+      "version": "1.2",
+      "sha256": "c21991fc27f6de364b4abef12f38c6ad60860ce6a5078fd3718f8f2bbc85e028"
     }
   },
   "TERMS": {

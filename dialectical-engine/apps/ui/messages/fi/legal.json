@@ -127,6 +127,7 @@
   "legal.providers.purpose.judging": "Väittelyn teksti — argumenttien arvioimiseen ja tarkistamiseen",
   "legal.providers.purpose.story": "Valmis väittely — tuomion tarinan kirjoittamiseen",
   "legal.providers.purpose.synthesisCheck": "Päättyneen väittelyn synteesi — sen tarkistamiseen neljän luokan osalta",
+  "legal.providers.purpose.publicationCheck": "Väittelyn julkinen teksti ennen kuin se tulee julkiseksi sekä se, mitä julkiseen väittelyyn lisätään — sen tarkistamiseen sisältöä koskevan sääntömme mukaisesti",
   "legal.providers.purpose.reportCheck": "Ilmoita-painikkeella tehty ilmoitus ja väittelyn julkinen teksti — ilmoituksen tarkistamiseen",
   "legal.providers.purpose.questionCheck": "Kysymys ennen väittelyn alkua — sen tarkistamiseen, saako väittely alkaa",
   "legal.providers.purpose.clarifyQuestions": "Ennen väittelyn alkua: tarkentavien kysymysten ehdottaminen",

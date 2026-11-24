@@ -127,6 +127,7 @@
   "legal.providers.purpose.judging": "辩论文本 — 用于评判和核查论点",
   "legal.providers.purpose.story": "已完成的辩论 — 用于撰写裁决经过",
   "legal.providers.purpose.synthesisCheck": "已完成辩论的综合结论 — 用于检查四类内容",
+  "legal.providers.purpose.publicationCheck": "辩论公开之前的公开文本，以及添加到公开辩论中的内容 — 用于按照我们关于内容的规则进行检查",
   "legal.providers.purpose.reportCheck": "通过举报按钮提交的举报和该辩论的公开文本 — 用于检查该举报",
   "legal.providers.purpose.questionCheck": "辩论开始前的问题 — 用于检查该辩论是否可以开始",
   "legal.providers.purpose.clarifyQuestions": "辩论开始前：提出澄清性问题",
