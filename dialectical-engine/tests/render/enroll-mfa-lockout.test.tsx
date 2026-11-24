@@ -91,3 +91,22 @@ it('social sign-up sends the person straight on when recovery codes already exis
   expect(document.body.textContent).not.toContain(TITLE);
   expect(state.assign).toHaveBeenCalledWith('/settings');
 });
+// A passkey as the only sign-in step: the recovery codes are the one way back if it is lost, so the card asks for
+// them and has no Later; the person is not sent on until they continue from it.
+const passkeyOnly = { methods: [{ factor_id: '11111111-1111-4111-8111-111111111111', type: 'passkey', label: null, created_at: '2026-10-01T10:00:00Z', last_used_at: null, removable: false }], recovery_codes_remaining: 0, available_step_up_methods: ['passkey'], step_up_providers: [] };
+it('a passkey sign-up shows the save-your-codes card with no Later, and does not send the person on', async () => {
+  state.authMethods.mockResolvedValue(passkeyOnly);
+  await enroll();
+  expect(cardHeading()?.textContent).toBe('Save your recovery codes');
+  expect(document.activeElement).toBe(cardHeading());
+  expect([...document.querySelectorAll('button')].map(x => x.textContent)).toContain('Save recovery codes');
+  expect([...document.querySelectorAll('button')].map(x => x.textContent)).not.toContain('Later');
+  expect(state.assign).not.toHaveBeenCalled();
+});
+it('an authenticator app and a passkey together send the person straight on', async () => {
+  state.authMethods.mockResolvedValue({ ...passkeyOnly, methods: [...passkeyOnly.methods, totp(0).methods[0]] });
+  await enroll();
+  expect(document.body.textContent).not.toContain(TITLE);
+  expect(document.body.textContent).not.toContain('Save your recovery codes');
+  expect(state.assign).toHaveBeenCalledWith('/new');
+});

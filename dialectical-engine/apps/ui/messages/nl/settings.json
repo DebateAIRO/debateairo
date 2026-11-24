@@ -209,6 +209,7 @@
   "settings.security.codesRemaining": "Herstelcodes: {count}",
   "settings.security.regenerate": "Nieuwe herstelcodes genereren",
   "settings.security.lockoutReminder": "U hebt nog geen herstelcodes of passkey. Als u uw telefoon kwijtraakt, komt u daarmee meteen weer binnen.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "De beveiligingsgegevens konden niet worden vernieuwd. Laad de pagina opnieuw.",
   "settings.security.pendingRecovery.title": "Iemand is begonnen uw authenticator-app te vervangen",
   "settings.security.pendingRecovery.body": "Iemand heeft uw wachtwoord en een e-maillink gebruikt om de authenticator-app van dit account te gaan vervangen. U kunt de vervanging vanaf {time} afronden.",

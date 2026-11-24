@@ -210,6 +210,7 @@
   "settings.security.codesRemaining": "Coduri de recuperare: {count}",
   "settings.security.regenerate": "Generați coduri noi de recuperare",
   "settings.security.lockoutReminder": "Încă nu aveți coduri de recuperare sau o cheie de acces. Dacă vă pierdeți telefonul, acestea vă permit să reveniți imediat în contul dumneavoastră.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "Detaliile de securitate nu au putut fi reîmprospătate. Reîncărcați pagina.",
   "settings.security.pendingRecovery.title": "Cineva a început înlocuirea aplicației dumneavoastră de autentificare",
   "settings.security.pendingRecovery.body": "Cineva a folosit parola dumneavoastră și un link primit prin e-mail pentru a începe înlocuirea aplicației de autentificare a acestui cont. Puteți încheia înlocuirea începând cu {time}.",

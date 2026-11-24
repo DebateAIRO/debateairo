@@ -209,6 +209,7 @@
   "settings.security.codesRemaining": "Gendannelseskoder: {count}",
   "settings.security.regenerate": "Generér nye gendannelseskoder",
   "settings.security.lockoutReminder": "Du har endnu ingen gendannelseskoder eller adgangsnøgle. Hvis du mister din telefon, kommer du ind igen med det samme med dem.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "Sikkerhedsoplysningerne kunne ikke opdateres. Genindlæs siden.",
   "settings.security.pendingRecovery.title": "Nogen er begyndt at erstatte din godkendelsesapp",
   "settings.security.pendingRecovery.body": "Nogen har brugt din adgangskode og et e-maillink til at begynde at erstatte godkendelsesappen på denne konto. Du kan afslutte erstatningen fra {time}.",

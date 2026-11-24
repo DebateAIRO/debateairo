@@ -210,6 +210,7 @@
   "settings.security.codesRemaining": "קודי שחזור: {count}",
   "settings.security.regenerate": "יצירת קודי שחזור חדשים",
   "settings.security.lockoutReminder": "עדיין אין לכם קודי שחזור או מפתח גישה. אם הטלפון יאבד, הם יאפשרו לכם להיכנס שוב מיד.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "לא ניתן היה לרענן את פרטי האבטחה. יש לטעון מחדש את הדף.",
   "settings.security.pendingRecovery.title": "מישהו התחיל להחליף את אפליקציית האימות שלכם",
   "settings.security.pendingRecovery.body": "מישהו השתמש בסיסמה שלכם ובקישור שנשלח בדוא״ל כדי להתחיל להחליף את אפליקציית האימות בחשבון הזה. אפשר לסיים את ההחלפה החל מ-{time}.",

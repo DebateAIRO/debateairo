@@ -76,3 +76,40 @@ it('can cancel passkey preparation before dispatch without letting its stale fai
  const {host,root}=await mount(<LoginFlow client={client as any} browser={browser as any} onAuthenticated={done}/>);
  try{await input(host,'[name=email]','person@example.test');await input(host,'[name=password]','password');await act(async()=>host.querySelector('form')!.requestSubmit());const described=host.querySelector('[name=code]')!.getAttribute('aria-describedby');expect(host.querySelector('#'+described)?.textContent).toContain('authenticator app');await click(host,'Sign in with a passkey');await click(host,'Use a recovery code');await input(host,'[name=code]','saved-code');await act(async()=>host.querySelector('form')!.requestSubmit());await act(async()=>rejectOptions(new Error('cancelled old options')));expect(host.querySelector<HTMLInputElement>('[name=code]')?.disabled).toBe(true);expect(host.querySelector('[role=alert]')).toBeNull();await act(async()=>finish({status:'authenticated'}));expect(done).toHaveBeenCalledOnce();expect(client.completePasskeyLogin).not.toHaveBeenCalled();}finally{await unmount(root,host);}
 });
+
+// After a passkey sign-in the browser is given the account's email as the passkey's name (older passkeys carry the
+// server's placeholder), using the user handle the passkey answered with; then the person goes on.
+const assertion={id:'credential-id',rawId:'AQI',type:'public-key',response:{clientDataJSON:'Aw',authenticatorData:'BA',signature:'BQ',userHandle:'dXNlcg'},clientExtensionResults:{}};
+const flush=()=>act(async()=>{await new Promise(resolve=>setTimeout(resolve,0));});
+it('a passkey sign-in renames the passkey with the account email before moving on',async()=>{
+ const signalCurrentUserDetails=vi.fn().mockResolvedValue(undefined);vi.stubGlobal('PublicKeyCredential',{signalCurrentUserDetails});
+ const client={beginLogin:vi.fn(),completeLogin:vi.fn(),beginPasskeyLogin:vi.fn().mockResolvedValue({challenge_handle:'a'.repeat(43),options:{}}),completePasskeyLogin:vi.fn().mockResolvedValue({status:'authenticated'}),readAccountEmail:vi.fn().mockResolvedValue({email:'person@example.com',recovery_email:null,pending:null})};
+ const browser={supportsConditional:vi.fn().mockResolvedValue(false),authenticate:vi.fn().mockResolvedValue(assertion),cancel:vi.fn()},done=vi.fn();
+ const {host,root}=await mount(<LoginFlow client={client as any} browser={browser as any} onAuthenticated={done}/>);
+ try{
+  await click(host,'Sign in with a passkey');await flush();
+  expect(signalCurrentUserDetails).toHaveBeenCalledWith({rpId:'localhost',userId:'dXNlcg',name:'person@example.com',displayName:'person@example.com'});
+  expect(done).toHaveBeenCalledOnce();
+ }finally{await unmount(root,host);}
+});
+it('without the browser rename call, a passkey sign-in reads no email and goes straight on',async()=>{
+ const client={beginLogin:vi.fn(),completeLogin:vi.fn(),beginPasskeyLogin:vi.fn().mockResolvedValue({challenge_handle:'a'.repeat(43),options:{}}),completePasskeyLogin:vi.fn().mockResolvedValue({status:'authenticated'}),readAccountEmail:vi.fn()};
+ const browser={supportsConditional:vi.fn().mockResolvedValue(false),authenticate:vi.fn().mockResolvedValue(assertion),cancel:vi.fn()},done=vi.fn();
+ const {host,root}=await mount(<LoginFlow client={client as any} browser={browser as any} onAuthenticated={done}/>);
+ try{await click(host,'Sign in with a passkey');expect(done).toHaveBeenCalledOnce();expect(client.readAccountEmail).not.toHaveBeenCalled();}finally{await unmount(root,host);}
+});
+it('a rename that never answers does not hold the sign-in up',async()=>{
+ vi.useFakeTimers();
+ try{
+  vi.stubGlobal('PublicKeyCredential',{signalCurrentUserDetails:vi.fn()});
+  const client={beginLogin:vi.fn(),completeLogin:vi.fn(),beginPasskeyLogin:vi.fn().mockResolvedValue({challenge_handle:'a'.repeat(43),options:{}}),completePasskeyLogin:vi.fn().mockResolvedValue({status:'authenticated'}),readAccountEmail:vi.fn().mockReturnValue(new Promise(()=>{}))};
+  const browser={supportsConditional:vi.fn().mockResolvedValue(false),authenticate:vi.fn().mockResolvedValue(assertion),cancel:vi.fn()},done=vi.fn();
+  const {host,root}=await mount(<LoginFlow client={client as any} browser={browser as any} onAuthenticated={done}/>);
+  try{
+   await click(host,'Sign in with a passkey');
+   expect(done).not.toHaveBeenCalled();
+   await act(async()=>{vi.advanceTimersByTime(1000);});
+   expect(done).toHaveBeenCalledOnce();
+  }finally{await unmount(root,host);}
+ }finally{vi.useRealTimers();}
+});

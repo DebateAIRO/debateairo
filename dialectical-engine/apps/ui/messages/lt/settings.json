@@ -211,6 +211,7 @@
   "settings.security.codesRemaining": "Atkūrimo kodai: {count}",
   "settings.security.regenerate": "Generuoti naujus atkūrimo kodus",
   "settings.security.lockoutReminder": "Dar neturite atkūrimo kodų ar prieigos rakto. Jei pamesite telefoną, su jais iškart vėl prisijungsite.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "Nepavyko atnaujinti saugumo duomenų. Įkelkite puslapį iš naujo.",
   "settings.security.pendingRecovery.title": "Kažkas pradėjo pakeisti jūsų autentifikavimo programėlę",
   "settings.security.pendingRecovery.body": "Kažkas panaudojo jūsų slaptažodį ir el. pašto nuorodą, kad pradėtų šios paskyros autentifikavimo programėlės keitimą. Baigti galite nuo {time}.",

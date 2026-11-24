@@ -211,6 +211,7 @@
   "settings.security.codesRemaining": "Коди відновлення: {count}",
   "settings.security.regenerate": "Створити нові коди відновлення",
   "settings.security.lockoutReminder": "У вас ще немає кодів відновлення чи ключа доступу. Якщо ви втратите телефон, з ними ви одразу ввійдете знову.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "Не вдалося оновити відомості про безпеку. Перезавантажте сторінку.",
   "settings.security.pendingRecovery.title": "Хтось почав заміну вашого застосунку автентифікації",
   "settings.security.pendingRecovery.body": "Хтось використав ваш пароль і посилання з листа, щоб почати заміну застосунку автентифікації для цього облікового запису. Завершити її можна з {time}.",

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { AuthenticationResponse, ContractClient, TotpEnrollmentResponse } from '@debateai/contract';
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
+import { namePasskeysForAccount } from '@/lib/passkeyNames';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
 import { readSixDigitCode } from '@/lib/sixDigitCode';
 import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
@@ -27,8 +28,8 @@ export type EnrollmentAuthority = {
     availableMethods: readonly ('passkey' | 'totp')[];
     totpUnavailableReason?: 'PASSWORD_UNAVAILABLE' | null;
 };
-export type EnrollmentClient = Pick<ContractClient, 'beginPasskeyEnrollment' | 'completePasskeyEnrollment' | 'beginTotpEnrollment' | 'completeTotpEnrollment' | 'beginRecoveryEnrollment' | 'completeRecoveryEnrollment'>;
-export function SecurityEnrollment({ authority, client = contractClient, catalog = authEnglish, browser: provided, onAuthenticated, onEnrolled, onExpired, availableMethods, deadline }: {
+export type EnrollmentClient = Pick<ContractClient, 'beginPasskeyEnrollment' | 'completePasskeyEnrollment' | 'beginTotpEnrollment' | 'completeTotpEnrollment' | 'beginRecoveryEnrollment' | 'completeRecoveryEnrollment'> & Partial<Pick<ContractClient, 'readAccountEmail'>>;
+export function SecurityEnrollment({ authority, client = contractClient, catalog = authEnglish, browser: provided, onAuthenticated, onEnrolled, onExpired, availableMethods, deadline, accountLabel }: {
     authority: EnrollmentAuthority;
     client?: EnrollmentClient;
     catalog?: MessageCatalog;
@@ -42,6 +43,8 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
      * with the set-up's own, so one warning is shown; the caller still ends the step when it passes.
      */
     deadline?: string;
+    /** The account's email, when the page knows it: the name the browser shows for the new passkey. */
+    accountLabel?: string;
 }) {
     const browser = useRef(provided ?? createConsumerWebAuthnBrowser()).current;
     const sequence = useRef(0);
@@ -160,12 +163,18 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
                 return;
             if (!('options' in options))
                 throw new Error('PASSKEY_OPTIONS_INVALID');
-            const credential = await browser.register(options.options);
+            const credential = await browser.register(options.options, undefined, accountLabel);
             if (owner !== sequence.current)
                 return;
             dispatched.current = true;
             setCompleting(true);
             const result = authority.kind === 'recovery' ? await client.completeRecoveryEnrollment({ recovery_capability: authority.token, challenge_handle: options.challenge_handle, credential }) : await client.completePasskeyEnrollment({ challenge_handle: options.challenge_handle, credential });
+            // A sign-up or recovery page may not know the account's email before the passkey is made (or knows it
+            // only as typed); once the session exists, the browser is given the account's own email as the passkey's
+            // name. A signed-in page that passed the email has nothing to fix.
+            const naming = result.status === 'authenticated' || !accountLabel ? namePasskeysForAccount(client, options.options.user?.id) : null;
+            if (naming)
+                await naming;
             if (owner === sequence.current)
                 finish(result);
         }
@@ -273,7 +282,8 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
                 void beginTotp();
             }}>{t(catalog, "auth.enroll.startAgain")}</button> : null}
     <p>{t(catalog, "auth.enroll.passkeyPreferred")}</p>
-    {allowed.includes('passkey') ? <p id="enrollment-passkey-help">{t(catalog, "auth.enroll.passkeyExplanation")}</p> : null}
+    {/* At sign-up a passkey is followed by recovery codes to save (the "Don't get locked out" card), so the choice says so. */}
+    {allowed.includes('passkey') ? <p id="enrollment-passkey-help">{t(catalog, "auth.enroll.passkeyExplanation")}{authority.kind === 'pending' ? <> {t(catalog, "auth.enroll.passkeyRecoveryCodesNext")}</> : null}</p> : null}
     {allowed.includes('passkey') ? <button type="button" className="authPrimary" aria-describedby="enrollment-passkey-help" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.create")}</button> : null}
     {allowed.includes('totp') ? <button type="button" className="authTextButton" disabled={completing} onClick={() => void beginTotp()}>{t(catalog, "auth.enroll.useAuthenticator")}</button> : null}
     {authority.kind === 'recovery' && authority.totpUnavailableReason === 'PASSWORD_UNAVAILABLE' ? <p>{t(catalog, "auth.recovery.passwordUnavailable")}</p> : null}
