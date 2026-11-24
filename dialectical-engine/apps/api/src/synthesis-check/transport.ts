@@ -3,6 +3,9 @@ import type { SynthesisCheckFailureCode } from "../../../../packages/contract/sr
 import type { PromptPacket } from "../../../../packages/providers/src/index.js";
 import { createSupportModelAdapter, type SupportModelTarget, type SupportModelUsage } from "../support/model.js";
 import { localOffFlagPath } from "../publication-check/judge-transport.js";
+import {
+  CONTENT_CHECK_GATE_MODEL, CONTENT_CHECK_GATE_PROVIDER_REF, ContentCheckGateFailure, createContentCheckGateCall
+} from "../publication-check/gate-transport.js";
 
 const ADAPTER_BACKSTOP_MARGIN_MS = 10_000;
 
@@ -57,6 +60,39 @@ export function createSynthesisCheckTransport(target: SupportModelTarget, option
         return await adapter.complete({ ...input, language: "en" });
       } catch (error) {
         throw new SynthesisCheckFailure(synthesisCheckFailureCode(error, input.signal, httpStatus), httpStatus !== undefined);
+      }
+    }
+  };
+}
+
+/**
+ * The synthesis check on the gate route (publication-check/gate-transport.ts). `responded` is the gate route's word for "this
+ * call may have been charged". A refusal the app can tell reserved nothing (busy, cooling, not served, the day used up) is never
+ * recorded as spent, so a full day or a busy gate cannot fill the site's day pot with calls nobody paid for. A refusal it cannot
+ * tell from a failure after a reservation (the gate's opaque stop, a halted gate, a line closed without an answer) is recorded
+ * at the check's estimate, as a call that may have been paid: the site's day is then counted a little high, never low. The
+ * check's own day-pot read and its spend record are the same on both routes.
+ */
+export function createPreviewSynthesisCheckTransport(options: Readonly<{
+  fetch: typeof fetch;
+  reportDiagnostic?: (diagnostic: Readonly<{ code: string }>) => void;
+}>): SynthesisCheckPort {
+  const send = createContentCheckGateCall({ fetch: options.fetch,
+    reportDiagnostic: (code) => options.reportDiagnostic?.({ code: `SYNTHESIS_CHECK:${code}` }) });
+  return {
+    providerRef: CONTENT_CHECK_GATE_PROVIDER_REF,
+    modelId: CONTENT_CHECK_GATE_MODEL,
+    async complete(input) {
+      try {
+        return await send(input);
+      } catch (error) {
+        const failure = error instanceof ContentCheckGateFailure ? error : new ContentCheckGateFailure("SEND_FAILED", true);
+        const code: SynthesisCheckFailureCode = failure.kind === "DOOR_REFUSED" ? "DOOR_REFUSED"
+          : input.signal.aborted ? "DEADLINE"
+          : failure.kind === "TRUNCATED" ? "ANSWER_NOT_JSON"
+          : failure.kind === "HTTP_STATUS" ? "HTTP_STATUS"
+          : "TRANSPORT_FAILED";
+        throw new SynthesisCheckFailure(code, failure.billed);
       }
     }
   };

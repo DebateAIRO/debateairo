@@ -50,7 +50,7 @@ async function readBoundedReply(response: Response): Promise<string> {
 }
 
 /** The call's answer, or a rejection the moment `signal` aborts; the call itself goes on, and a late answer or failure is dropped. */
-function letGoOnAbort<T>(call: Promise<T>, signal: AbortSignal): Promise<T> {
+export function letGoOnAbort<T>(call: Promise<T>, signal: AbortSignal): Promise<T> {
   call.catch(() => undefined);
   if (signal.aborted) return Promise.reject(signal.reason);
   return new Promise<T>((resolve, reject) => {

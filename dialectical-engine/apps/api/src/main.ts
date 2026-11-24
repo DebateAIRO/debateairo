@@ -198,7 +198,7 @@ import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication, buildPublicDebateBody } from "./publications.js";
 import { PUBLIC_REVIEW_PURGE_EVERY_MS, sweepPublicReviewPurge } from "./public-flag.js";
-import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, publicReportCarrierMaker, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
+import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, checksInTurn, publicReportCarrierMaker, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
 import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
 import { composeQuestionCheck } from "./question-check/compose.js";
@@ -212,9 +212,10 @@ import { SynthesisCheckWorker } from "./synthesis-check/worker.js";
 import type { SynthesisCheckDeps } from "./synthesis-check/check.js";
 import { createSynthesisPublishGate } from "./synthesis-check/publish-gate.js";
 import { createSynthesisAnswerAccess } from "./synthesis-check/hold.js";
-import { createSynthesisCheckTransport, synthesisCheckOffFlagPath } from "./synthesis-check/transport.js";
+import { createPreviewSynthesisCheckTransport, createSynthesisCheckTransport, synthesisCheckOffFlagPath } from "./synthesis-check/transport.js";
 import { createLocalOffFlagSwitch } from "./publication-check/judge-transport.js";
 import { createPublicationJudgeSwitch, createPublicationJudgeTransport, publicationJudgeOffFlagPath } from "./publication-check/judge-transport.js";
+import { contentCheckBackgroundDeadlineMs, contentCheckCallsAtOnce, contentCheckRouteFor, createPreviewPublicationJudgeTransport } from "./publication-check/gate-transport.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "./stories.js";
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { MapChoiceRepository } from "@debateai/map";
@@ -625,7 +626,9 @@ const aiProviderCompanies = providerCompaniesOfTargets(declaredProviderTargets);
 const previewFetch = previewGate === undefined ? undefined : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewGate));
 // NV-58: the fast language check gives up at its own short limit (policy.fastCheck.timeoutMs, 1-15 s), far inside the
 // gate's 1,200 s; its ports half-close on that abort, so a check the gate already sent is delivered and dropped,
-// never a lost paid reply that halts the team's gate. Probes and every other caller keep `previewFetch`.
+// never a lost paid reply that halts the team's gate. The content checks (publication-check/gate-transport.ts) take
+// it for the same reason: their limits too are far inside the gate's, and one still in the gate's queue is cancelled
+// before it is sent. Probes and every other caller keep `previewFetch`.
 const previewLanguageCheckFetch = previewGate === undefined ? undefined
   : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewGate, { onAbort: "HALF_CLOSE" }));
 // Fresh-site estimate (owner rulings 2026-10-22): the estimate's trusted minimum and per-depth starting figures, sealed as
@@ -1678,40 +1681,60 @@ const supportModels = new Map<string,SupportModelPort>(supportModelTarget === un
 ] as const]);
 // Fix round 2 (Minor 6): the adapter holds its key now; the boot's one-read memo keeps no copy past this line.
 supportCredentialReads.clear();
-// hate-speech S02 (D-S02-12, D-S02-21): the publish check's judge is the support
-// chat's configured target, called through its own per-call adapter; absent,
-// every publish answers UNAVAILABLE `JUDGE_NOT_CONFIGURED`. SIGUSR2 toggles the
-// judge off and back on (SPEC-v2 §6 step 9) — it can only make publishing
-// refuse, never skip the check.
-// FIX-HS2-p1 sd-N5: only a LOCAL deployment has the switch — a flag file named by the API port (`touch` = off,
-// `rm` = on, read per attempt, so it survives a restart) and SIGUSR2, which writes the file. Hosted has neither.
-// sd-N6: the transport prefixes the judge's diagnostics `PUBLICATION_JUDGE:`.
-// ct-B4, and the owner's ruling of 2026-10-04: D, the check's deadline, is the register's publicationCheckPolicy
-// row, read at start-up (a version without it refuses here, PUBLICATION_CHECK_POLICY_UNRESOLVED) and wired into the
-// check and the judge transport's backstop (D + 10 s), never a literal.
+// The publish check's judge. With no preview gate it is the support chat's configured target, called through its own
+// per-call adapter; absent, every publish answers UNAVAILABLE `JUDGE_NOT_CONFIGURED`. On a preview the judge and the
+// synthesis check take the content checks' one route (publication-check/gate-transport.ts): Claude Haiku 5.5 through
+// the Anthropic gate when the env names its socket, with no key and the support target never read, and no judge at all
+// without that socket. The fetch there is the one whose gate ports half-close on an abort.
+// Only a LOCAL deployment has the off switch: a flag file named by the API port (`touch` = off, `rm` = on, read per
+// attempt, so it survives a restart) and SIGUSR2, which writes the file. It can only make publishing refuse, never skip
+// the check. Hosted has neither. The transports prefix the judge's diagnostics `PUBLICATION_JUDGE:`.
+// D, the check's deadline, is the register's publicationCheckPolicy row, read at start-up (a version without it refuses
+// here, PUBLICATION_CHECK_POLICY_UNRESOLVED) and wired into the checks and the support transport's backstop (D + 10 s),
+// never a literal. The checks that run in the background (the sweeps and the synthesis check's worker) may on the gate
+// also wait out its slot queue on top of D; an owner's Publish keeps D, which the website's publish wait is sized for.
+// On the gate a check also sends only a few of its calls at once (contentCheckCallsAtOnce), so it never queues a string
+// of them ahead of the debates' own calls and the question check, which share the gate's slots.
 const publicationCheckPolicy = await boot.run("publication-check-policy", () => readPublicationCheckPolicy(pool, environment.REGISTER_VERSION));
+const contentCheckRoute = contentCheckRouteFor(previewGate === undefined ? null
+  : { fetch: previewLanguageCheckFetch, anthropicSocket: previewProviderSocket(previewGate, "anthropic") });
+const backgroundCheckDeadlineMs = contentCheckBackgroundDeadlineMs(contentCheckRoute, publicationCheckPolicy.deadlineMs);
 const publicationJudgeOffFlag = environment.DEPLOYMENT_MODE === "hosted" ? null : publicationJudgeOffFlagPath(environment.API_PORT);
-const publicationJudgeSwitch = createPublicationJudgeSwitch(supportModelTarget === undefined
+const publicationJudgeSwitch = createPublicationJudgeSwitch(contentCheckRoute.kind === "GATE"
+  ? createPreviewPublicationJudgeTransport({ fetch: contentCheckRoute.fetch, reportDiagnostic: reportSupportDiagnostic })
+  : contentCheckRoute.kind === "OFF" || supportModelTarget === undefined
   ? null
   : createPublicationJudgeTransport(supportModelTarget, {
     readAuthorizationHeader: readCustodyAuthorizationHeader,
     reportDiagnostic: reportSupportDiagnostic,
     deadlineMs: publicationCheckPolicy.deadlineMs
   }), { offFlagPath: publicationJudgeOffFlag });
+// An owner's Publish: D.
 const publicationContentCheck = createPublicationContentCheck({
   judge: publicationJudgeSwitch.current,
   recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "RUN", subjectId: row.subject_id, attemptedAt: row.attempted_at, calls: row.judge_call_count, inputTokens: row.input_tokens, outputTokens: row.output_tokens, costUsd: row.cost_usd }),
   recorder: new PostgresPublicationCheckRecordRepository(pool),
   clock: () => new Date(),
-  deadlineMs: publicationCheckPolicy.deadlineMs
+  deadlineMs: publicationCheckPolicy.deadlineMs,
+  ...contentCheckCallsAtOnce(contentCheckRoute, "PUBLISH")
 });
-// Decision 13: the same judge on a report on a public debate; its record names the report (0149).
+// The same check in the sweeps (a finished Free debate, a contribution): it runs in the background.
+const sweepPublicationContentCheck = createPublicationContentCheck({
+  judge: publicationJudgeSwitch.current,
+  recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "RUN", subjectId: row.subject_id, attemptedAt: row.attempted_at, calls: row.judge_call_count, inputTokens: row.input_tokens, outputTokens: row.output_tokens, costUsd: row.cost_usd }),
+  recorder: new PostgresPublicationCheckRecordRepository(pool),
+  clock: () => new Date(),
+  deadlineMs: backgroundCheckDeadlineMs,
+  ...contentCheckCallsAtOnce(contentCheckRoute, "BACKGROUND")
+});
+// The same judge on a report on a public debate; its record names the report (0149). The sweep runs it.
 const publicReportContentCheck = createPublicationContentCheck({
   judge: publicationJudgeSwitch.current,
   recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "PUBLIC_REPORT", subjectId: row.subject_id, attemptedAt: row.attempted_at, calls: row.judge_call_count, inputTokens: row.input_tokens, outputTokens: row.output_tokens, costUsd: row.cost_usd }),
   recorder: { record: (row) => new PostgresPublicPageRepository(pool).recordReportCheck({ reportId: row.run_id, attemptedAt: row.attempted_at, outcome: row.outcome, failureCause: row.failure_cause, rules: row.rules, partKinds: row.part_kinds, ground: row.ground, judgeProviderRef: row.judge_provider_ref, judgeModelId: row.judge_model_id, policyVersion: row.policy_version, judgeCallCount: row.judge_call_count }) },
   clock: () => new Date(),
-  deadlineMs: publicationCheckPolicy.deadlineMs
+  deadlineMs: backgroundCheckDeadlineMs,
+  ...contentCheckCallsAtOnce(contentCheckRoute, "BACKGROUND")
 });
 const REPORT_CHECK_PREFIX = "report:";
 const questionCheckPolicy = await boot.run("question-check-policy", () =>
@@ -1741,7 +1764,11 @@ const questionCheck = await boot.run("question-check", () => composeQuestionChec
   preview: previewGate === undefined ? null : { fetch: previewFetch, anthropicSocket: previewProviderSocket(previewGate, "anthropic") }
 }));
 const synthesisCheckOffFlag = environment.DEPLOYMENT_MODE === "hosted" ? null : synthesisCheckOffFlagPath(environment.API_PORT);
-const synthesisCheckSwitch = createLocalOffFlagSwitch(supportModelTarget === undefined ? null
+// The end-of-debate synthesis check takes the judge's route: the gate on a preview that names its socket, no check on a
+// preview without it, and with no preview the support target when it is set.
+const synthesisCheckSwitch = createLocalOffFlagSwitch(contentCheckRoute.kind === "GATE"
+  ? createPreviewSynthesisCheckTransport({ fetch: contentCheckRoute.fetch, reportDiagnostic: reportSupportDiagnostic })
+  : contentCheckRoute.kind === "OFF" || supportModelTarget === undefined ? null
   : createSynthesisCheckTransport(supportModelTarget, {
     readAuthorizationHeader: readCustodyAuthorizationHeader,
     reportDiagnostic: reportSupportDiagnostic,
@@ -1749,7 +1776,8 @@ const synthesisCheckSwitch = createLocalOffFlagSwitch(supportModelTarget === und
   }), { offFlagPath: synthesisCheckOffFlag });
 const synthesisCheckRepository = new SynthesisCheckRepository(pool);
 const publicationReviewRepository = new PublicationReviewRepository(pool);
-const synthesisAnswerAccess = createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: publicationCheckPolicy.deadlineMs });
+// The answer is held while the worker's check may still run, so its hold follows the worker's deadline.
+const synthesisAnswerAccess = createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: backgroundCheckDeadlineMs });
 const synthesisCheckDeps: SynthesisCheckDeps = {
   port: synthesisCheckSwitch.current,
   deadlineMs: publicationCheckPolicy.deadlineMs,
@@ -1780,14 +1808,16 @@ const synthesisPublishGate = createSynthesisPublishGate({
     if (texts === null) throw new Error("SYNTHESIS_ANSWER_UNREADABLE");
     return texts;
   },
-  check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs,
+  check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs, inFlightWindowMs: backgroundCheckDeadlineMs,
   clock: () => new Date(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 });
+// The worker checks each finished debate in the background: on the gate it may also wait out the gate's slot queue. Its
+// day-pot read and its spend record are the publish gate's own (synthesisCheckDeps); only the time differs.
 const synthesisCheckWorker = new SynthesisCheckWorker({
   repository: synthesisCheckRepository, erasure: synthesisCheckErasure,
   withContentLease: (runId, use) => application.withContentLease(runId, use),
-  readAnswer: readSynthesisAnswer, check: synthesisCheckDeps,
-  deadlineMs: publicationCheckPolicy.deadlineMs,
+  readAnswer: readSynthesisAnswer, check: { ...synthesisCheckDeps, deadlineMs: backgroundCheckDeadlineMs },
+  deadlineMs: backgroundCheckDeadlineMs,
   log: (line) => console.error(`[${line}]`)
 });
 // Row-level security (X28, merge onto synthesis-flag S02): a staff review reads, leases and copies the debate of its
@@ -2455,10 +2485,12 @@ if (publications !== undefined) {
   const publicTreeRepository = new PostgresPublicTreeRepository(pool);
   // One wait for all three: they ask the same judge.
   const judgeGate = backedOffContentCheck({ check: async (request) => request.runId.startsWith(REPORT_CHECK_PREFIX)
-    ? publicReportContentCheck.check({ runId: request.runId.slice(REPORT_CHECK_PREFIX.length), snapshot: request.snapshot }) : publicationContentCheck.check(request) });
-  const sweepContentCheck = judgeGate;
-  const sweepReportCheck = { check: (request: Parameters<typeof judgeGate.check>[0]) => judgeGate.check({ runId: `${REPORT_CHECK_PREFIX}${request.runId}`, snapshot: request.snapshot }) };
-  const triggerPublicPage = createSingleFlightErasureReconciler(async () => {
+    ? publicReportContentCheck.check({ runId: request.runId.slice(REPORT_CHECK_PREFIX.length), snapshot: request.snapshot }) : sweepPublicationContentCheck.check(request) });
+  // Every check of a pass in turn, so one item whose own check keeps failing holds back no other in any list.
+  const inTurn = checksInTurn(judgeGate);
+  const sweepContentCheck = inTurn.check;
+  const sweepReportCheck = { check: (request: Parameters<typeof judgeGate.check>[0]) => inTurn.check.check({ runId: `${REPORT_CHECK_PREFIX}${request.runId}`, snapshot: request.snapshot }) };
+  const triggerPublicPage = createSingleFlightErasureReconciler(() => inTurn.pass(async () => {
     await sweepPublicPage({ pool, page: publicPage, contributions: publicContributions, tree: publicTreeRepository, contentCheck: sweepContentCheck, reportContentCheck: sweepReportCheck,
       withPublicationKey: (publicationRef, use) => publications.withPublicationKey(publicationRef, use) });
     await sweepFreePublications({ contributions: publicContributions, publishOne: async (waiting) => {
@@ -2480,7 +2512,7 @@ if (publications !== undefined) {
           publish: (input) => publicContributions.publishFree({ runId: input.runId, publicationRef: input.publicationRef, grantTokenHash: input.grantTokenHash, content: input.content, presentedAt: input.presentedAt }),
           refuse: (runId) => publicContributions.refuseFree(runId) } });
     } });
-  }, () => console.error("[PUBLIC_PAGE_WORK_PENDING]"));
+  }), () => console.error("[PUBLIC_PAGE_WORK_PENDING]"));
   publicPageTimer = gatedInterval(releaseWatcher, triggerPublicPage, PUBLIC_PAGE_SWEEP_DEFAULTS.everyMs);
   // Decision 36: sealed originals and reports' words past their six months.
   publicReviewPurgeTimer = gatedInterval(releaseWatcher, () => { void sweepPublicReviewPurge({ repository: publicFlagRepository, withKey: (publicationRef, runId, use) => publications.withReviewKey(publicationRef, runId, use),

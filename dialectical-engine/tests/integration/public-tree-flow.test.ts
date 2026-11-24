@@ -16,20 +16,22 @@ import {
   MAIN_ANSWER_UPDATE_CARRIER, PATH_REWRITE_CARRIER, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, RUN_PURPOSE_LINES_CARRIER, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository,
   PostgresDigPicksRepository, PostgresInvestigationRepository, PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresPublicTreeRunnerRepository, PostgresPublicationRepository, PostgresStartPathsStore, PostgresTreeUpdateRepository, configureContentEncryption, contentCipherFor, createPool,
   decryptContentForRun, migrate, PostgresModerationStatementRepository, PostgresPublicFlagMailRepository, withRunContentLease, type Pool, type PublicFlagLimits,
-  PUBLIC_REPORT_CARRIER_MARK, RunRepository, withOwnerAskAdmissionLease
+  PUBLIC_REPORT_CARRIER_MARK, PostgresPublicationCheckRecordRepository, RunRepository, withOwnerAskAdmissionLease
 } from "@debateai/db";
 import { ServeRepository } from "@debateai/serve";
 import { renderMail } from "@debateai/mail-templates";
 import { MemoryTemplatedMailSender } from "../../apps/api/src/mail-channel.js";
 import { ModerationStatementReconciler, PublicFlagAnswerReconciler } from "../../apps/api/src/moderation-statements.js";
 import { createPostgresProviderGateway } from "@debateai/runner";
-import { readPromptFrame, type PromptPacket } from "@debateai/providers";
+import { createPreviewGuardedFetch, readPromptFrame, type PreviewBudgetExecution, type PromptPacket } from "@debateai/providers";
 import { StoryRepository, type StoryWriteInput } from "@debateai/story";
 import { buildApi, contributionStateOf, type ApiOptions } from "../../apps/api/src/index.js";
 import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
 import type { PublicationContentCheck } from "../../apps/api/src/publication-check/check.js";
+import { createPublicationContentCheck } from "../../apps/api/src/publication-check/check.js";
+import { contentCheckBackgroundDeadlineMs, contentCheckCallsAtOnce, createPreviewPublicationJudgeTransport } from "../../apps/api/src/publication-check/gate-transport.js";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
-import { admitPublicDig, joinPublicDigAtStart, pressPublicReport, publicReportCarrierMaker, sweepPublicPage, type PublicDigAdmission } from "../../apps/api/src/public-tree.js";
+import { admitPublicDig, backedOffContentCheck, checksInTurn, joinPublicDigAtStart, pressPublicReport, publicReportCarrierMaker, sweepPublicPage, type PublicDigAdmission } from "../../apps/api/src/public-tree.js";
 import { postgresInvestigationCloseSources } from "../../apps/runner/src/investigation-close-sources.js";
 import { PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL, composePathRewrite } from "../../apps/runner/src/path-rewrite-composition.js";
 import { pathUpdateIdOf } from "../../apps/runner/src/path-climb.js";
@@ -179,6 +181,30 @@ function vendors(script: Script = {}) {
 }
 
 const allowEverything: PublicationContentCheck = { check: async () => ({ outcome: "ALLOW" }) };
+/**
+ * The test site's Anthropic gate behind the real guarded fetch (the API holds no key there): it answers each call for the
+ * vendor with `answer(call)`, where `call` is the one-time value the call's frame carries, in a message as the gate passes it on.
+ */
+function anthropicGate(answer: (call: string) => string) {
+  const executed: PreviewBudgetExecution[] = [];
+  const port = { async execute(input: PreviewBudgetExecution) {
+    executed.push(input);
+    const call = /DEBATEAI-FENCE-([0-9a-f]{32})/u.exec(input.requestBody)![1]!;
+    return { status: 200, body: JSON.stringify({ id: "msg_1", type: "message", role: "assistant", model: "claude-haiku-5-5", stop_reason: "end_turn",
+      content: [{ type: "text", text: answer(call) }], usage: { input_tokens: 900, output_tokens: 40 } }) };
+  } };
+  const fetch = createPreviewGuardedFetch({ anthropic: port });
+  return { executed, fetch, judge: createPreviewPublicationJudgeTransport({ fetch }) };
+}
+/** A request the Anthropic gate takes: Claude Haiku 5.5 at the gate's lowest level, and no key anywhere in it. */
+function asTheGateTakesIt(executed: readonly PreviewBudgetExecution[]): void {
+  expect(executed.length).toBeGreaterThan(0);
+  for (const input of executed) {
+    expect(JSON.parse(input.requestBody)).toMatchObject({ model: "claude-haiku-5-5", max_tokens: 16_000, output_config: { effort: "low" } });
+    expect(input.requestBody).not.toMatch(/sk-ant-|x-api-key/u);
+    expect(Number(input.reservedUsd)).toBeGreaterThan(0);
+  }
+}
 /** Task 57p: the made-up settings version the world's runner holds for every run. */
 const PIECE_VERSION = 7;
 const versionsOf = async (sql: string, params: readonly unknown[]): Promise<number[]> =>
@@ -1271,6 +1297,26 @@ describe("Free debates go public when finished", () => {
     expect((await new PostgresPublicDebateRunnerRepository(runner).readFreeToPublish(50)).map((row) => row.run_id)).not.toContain(refused);
     expect((await database.pool.query("SELECT 1 FROM core.run_visibility_event WHERE run_id=$1", [refused])).rowCount).toBe(0);
   });
+
+  it("on the test site the check goes through the Anthropic gate: a finished Free debate goes public, and its record names the gate's model", async () => {
+    const ana = await account();
+    const run = await finishedFree(ana);
+    const gate = anthropicGate((call) => JSON.stringify({ call, verdict: "ALLOW", rules: [], parts: [], possibly_illegal: false }));
+    // As main.ts composes the Free sweep's check on the test site: the background time and one call at a time, the shared
+    // wait, the sweeps' turn, inside one pass.
+    const route = { kind: "GATE", fetch: gate.fetch } as const;
+    const sweepCheck = createPublicationContentCheck({ judge: () => gate.judge, recorder: new PostgresPublicationCheckRecordRepository(api), clock: () => new Date(),
+      deadlineMs: contentCheckBackgroundDeadlineMs(route, 60_000), ...contentCheckCallsAtOnce(route, "BACKGROUND") });
+    const inTurn = checksInTurn(backedOffContentCheck(sweepCheck));
+    const answer = answerOf(run);
+    expect(await inTurn.pass(() => application().publishFreeDebate({ runId: run, answer, owner: { userId: ana.userId, ownerRef: ana.ownerRef }, purposeLines: null,
+      source: { ip: "", userAgent: "", requestId: "test" }, contentCheck: inTurn.check, store: freeStore(), lease: stageLease(answer) }))).toBe("PUBLISHED");
+    const ref = (await database.pool.query<{ publication_ref: string }>("SELECT publication_ref FROM identity.free_public_ask WHERE run_id=$1", [run])).rows[0]!.publication_ref;
+    expect((await page(ref)).question).toBe(QUESTION);
+    asTheGateTakesIt(gate.executed);
+    const records = (await database.pool.query("SELECT outcome,judge_provider_ref,judge_model_id,judge_call_count FROM serve.publication_check_record WHERE run_id=$1", [run])).rows;
+    expect(records).toEqual([{ outcome: "ALLOW", judge_provider_ref: "anthropic", judge_model_id: "claude-haiku-5-5", judge_call_count: gate.executed.length }]);
+  });
 });
 
 describe("over HTTP", () => {
@@ -2123,6 +2169,23 @@ async function delegate(): Promise<Actor> {
   const agree = (quote = POINT_TEXT) => scriptedJudge(() => JSON.stringify({ verdict: "AGREE", reason: "PERSONAL", quote }));
   const notFound = () => scriptedJudge(() => JSON.stringify({ verdict: "NOT_FOUND", reason: null, quote: null }));
   const flagsOf = async (ref: string) => (await q().query("SELECT * FROM identity.public_flag WHERE publication_ref=$1 ORDER BY created_at", [ref])).rows as Record<string, unknown>[];
+
+  it("on the test site the Report button's check goes through the Anthropic gate: an AGREE hides at once, once, and the next press goes to a person unasked", async () => {
+    const [ana, rea, sam] = [await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const gate = anthropicGate(() => JSON.stringify({ verdict: "AGREE", reason: "PERSONAL", quote: POINT_TEXT }));
+    expect(await press(rea, debate.ref, undefined, gate.judge as never)).toBe("HIDDEN");
+    expect(await application().readPublicDebate(debate.ref)).toBeNull();
+    const [flag] = await flagsOf(debate.ref);
+    expect(flag).toMatchObject({ state: "HIDDEN", verdict: "AGREE", reason: "PERSONAL", judge_provider_ref: "anthropic", judge_model_id: "claude-haiku-5-5",
+      input_tokens: 900, output_tokens: 40, cost_usd: null });
+    const events = (await q().query("SELECT action FROM identity.public_review_event WHERE publication_ref=$1", [debate.ref])).rows;
+    expect(events).toEqual([{ action: "HIDE" }]);
+    // One automatic hide, ever: a report of the hidden debate goes to a person, and the gate is not asked.
+    expect(await press(sam, debate.ref, undefined, gate.judge as never)).toBe("WITH_A_PERSON");
+    expect(gate.executed).toHaveLength(1);
+    asTheGateTakesIt(gate.executed);
+  }, 120_000);
 
   it("a press the check agrees with hides at once through decision 33's hide, once; both hear of it; a re-published debate only goes to a person", async () => {
     const [ana, rea, sam] = [await account(), await account(), await account()];

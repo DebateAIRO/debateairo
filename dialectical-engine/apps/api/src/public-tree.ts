@@ -402,14 +402,18 @@ export const PUBLIC_PAGE_SWEEP_DEFAULTS = Object.freeze({ everyMs: 15_000, giveU
  * A judge that is down is no cost loop. Every sweep's check goes through this one: after an UNAVAILABLE (or a check that threw) no judge is called until a wait has passed, doubling from a minute
  * to an hour; the first answer the judge gives ends it. While the wait runs the sweeps read "unavailable" with no call, so each row's own give-up still comes by its age.
  */
-export function backedOffContentCheck(check: PublicationContentCheck, input: Readonly<{ now?: () => number; firstWaitMs?: number; longestWaitMs?: number }> = {}): PublicationContentCheck {
+export type BackedOffContentCheck = PublicationContentCheck & Readonly<{
+  /** True while the wait runs: a check asked now calls no judge and reads "unavailable". */
+  resting(): boolean;
+}>;
+export function backedOffContentCheck(check: PublicationContentCheck, input: Readonly<{ now?: () => number; firstWaitMs?: number; longestWaitMs?: number }> = {}): BackedOffContentCheck {
   const now = input.now ?? Date.now;
   const first = input.firstWaitMs ?? 60_000;
   const longest = input.longestWaitMs ?? 60 * 60_000;
   let wait = 0;
   let until = 0;
   const failed = (): void => { wait = wait === 0 ? first : Math.min(wait * 2, longest); until = now() + wait; };
-  return { check: async (request) => {
+  return { resting: () => now() < until, check: async (request) => {
     if (now() < until) return { outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" };
     let result: PublicationCheckResult;
     try {
@@ -577,6 +581,85 @@ export async function sweepPublicPage(deps: PublicPageSweepDeps): Promise<Readon
     }
   }
   return Object.freeze({ settled, copied, reports, skipped });
+}
+
+/**
+ * THE SWEEPS' CHECKS IN TURN. Each sweep pass asks its checks list by list (sweepPublicPage's contributions, page updates and
+ * AI-written reports, then sweepFreePublications' Free debates), each list oldest first, and all of them share one wait after
+ * any failure (backedOffContentCheck). Alone, that lets one item whose own check always fails (an answer cut off or
+ * unreadable each time) hold back every other: it is the first asked each time the wait ends, fails again and starts the
+ * next wait, so nothing after it in any list is checked until it reaches its own give-up (6 h for a contribution, 24 h for
+ * a report, none for a Free debate). So here:
+ * - an item whose own check failed is not asked again until its own wait has passed, doubling from a minute to an hour as
+ *   the shared wait does; an answer for it ends its wait;
+ * - when the shared wait ends, the call goes first to the items the previous pass left unasked although they were due: one
+ *   that never failed before one that failed, an older failure before a newer one. Once the judge has answered in a pass,
+ *   every due item is asked in its list's order.
+ * An item not asked reads "unavailable" and calls nothing, as during the shared wait, so each row's own give-up still comes
+ * by its age. While the judge itself is down the shared wait still bounds the calls: one per wait, the items in turn.
+ * Kept in memory and keyed by the id each check names (a report's carries its prefix, main.ts): an item a pass did not ask
+ * is forgotten (published, refused, given up or erased), and a restart starts again from the lists' own order.
+ */
+export type ChecksInTurn = Readonly<{
+  /** One pass of the sweeps: every check they ask through `check` belongs to it. */
+  pass: <T>(sweeps: () => Promise<T>) => Promise<T>;
+  check: PublicationContentCheck;
+}>;
+export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ now?: () => number; firstWaitMs?: number; longestWaitMs?: number }> = {}): ChecksInTurn {
+  const now = input.now ?? Date.now;
+  const first = input.firstWaitMs ?? 60_000;
+  const longest = input.longestWaitMs ?? 60 * 60_000;
+  /** Each item whose own check last failed: the turn of that failure, and its own wait. */
+  const failed = new Map<string, Readonly<{ turn: number; wait: number; until: number }>>();
+  let failures = 0;
+  /** The earliest turn the previous pass left owed (0: an item that never failed; Infinity: none), and this pass's so far. */
+  let owedBefore = Number.POSITIVE_INFINITY;
+  let owed = Number.POSITIVE_INFINITY;
+  let answered = false;
+  let asked = new Set<string>();
+  const fail = (key: string): void => {
+    const before = failed.get(key)?.wait;
+    const wait = before === undefined ? first : Math.min(before * 2, longest);
+    failures += 1;
+    failed.set(key, Object.freeze({ turn: failures, wait, until: now() + wait }));
+  };
+  return Object.freeze({
+    pass: async <T>(sweeps: () => Promise<T>): Promise<T> => {
+      owed = Number.POSITIVE_INFINITY;
+      answered = false;
+      asked = new Set();
+      try {
+        return await sweeps();
+      } finally {
+        owedBefore = owed;
+        for (const key of [...failed.keys()]) if (!asked.has(key)) failed.delete(key);
+      }
+    },
+    check: Object.freeze({ check: async (request: Parameters<PublicationContentCheck["check"]>[0]): Promise<PublicationCheckResult> => {
+      const key = request.runId.toLowerCase();
+      asked.add(key);
+      const record = failed.get(key);
+      if (record !== undefined && now() < record.until) return { outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" };
+      const turn = record?.turn ?? 0;
+      if (shared.resting() || (!answered && turn > owedBefore)) {
+        owed = Math.min(owed, turn);
+        return { outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" };
+      }
+      let result: PublicationCheckResult;
+      try {
+        result = await shared.check(request);
+      } catch (error) {
+        fail(key);
+        throw error;
+      }
+      if (result.outcome === "UNAVAILABLE") fail(key);
+      else {
+        failed.delete(key);
+        answered = true;
+      }
+      return result;
+    } })
+  });
 }
 
 /**

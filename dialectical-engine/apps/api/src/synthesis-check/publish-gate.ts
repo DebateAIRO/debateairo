@@ -29,6 +29,12 @@ export function createSynthesisPublishGate(input: Readonly<{
   check: SynthesisCheckDeps;
   approvalCovers?(input: Readonly<{ runId: string; answerId: string; originVersion: number }>): Promise<boolean>;
   deadlineMs: number;
+  /**
+   * How long another attempt (the worker's) may still be running, when that is longer than this gate's own D: on the preview
+   * gate the worker also waits out the gate's slot queue. A Publish then waits for that check, within its own D, rather than
+   * calling the model a second time beside it. Without it, D.
+   */
+  inFlightWindowMs?: number;
   clock(): Date;
   sleep(ms: number): Promise<void>;
 }>): SynthesisPublishGate {
@@ -62,7 +68,7 @@ export function createSynthesisPublishGate(input: Readonly<{
         while (input.clock().getTime() < deadlineAt.getTime()) {
           const inFlight = await input.repository.readInFlightAttempts({
             answerId: target.answer.answer_id, maxVersion: target.answer.answer_version,
-            deadlineMs: input.deadlineMs
+            deadlineMs: input.inFlightWindowMs ?? input.deadlineMs
           });
           if (!inFlight.some((attempt) => originVersionOf(texts, attempt.answerVersion) === synthesisOriginVersion)) break;
           waitedForCheck = true;

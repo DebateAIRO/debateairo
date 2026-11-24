@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PublicDebate } from "@debateai/contract";
 import type { PublicationCheckResult, PublicationContentCheck } from "../../apps/api/src/publication-check/check.js";
-import { backedOffContentCheck } from "../../apps/api/src/public-tree.js";
+import { PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, checksInTurn, sweepFreePublications } from "../../apps/api/src/public-tree.js";
 import { crisisWordsOf } from "../../apps/ui/lib/v4/askText.js";
 
 const request = { runId: "11111111-1111-4111-8111-111111111111", snapshot: {} as PublicDebate };
@@ -56,6 +56,147 @@ describe("a judge that is down is no cost loop", () => {
     expect(calls).toBe(1);
     clock += 60_000;
     await expect(gated.check(request)).rejects.toThrow("X");
+  });
+});
+
+/**
+ * The sweeps as main.ts runs them: every 15 seconds one pass, sweepPublicPage's lists (contributions, then AI-written reports)
+ * and then the Free sweep, each list oldest first, every check through the one shared wait, and with `inTurn` through
+ * checksInTurn as well. A row of sweepPublicPage's lists behaves as that sweep treats it: an answer settles it (it leaves the
+ * list), an unavailable check keeps it until its give-up (6 h for a contribution, 24 h for a report). A Free debate is what
+ * publishFreeDebate does with the answer: ALLOW publishes it, an unavailable check keeps it, with no give-up. An item is
+ * named by its list's letter: c a contribution, r a report, f a Free debate.
+ */
+function sweepsWorld(input: Readonly<{ rows: readonly string[]; failing: (name: string) => boolean; inTurn: boolean }>) {
+  let clock = 0;
+  const asked: string[] = [];
+  const done: string[] = [];
+  const judge: PublicationContentCheck = { check: async ({ runId }) => {
+    asked.push(runId);
+    return input.failing(runId) ? { outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" } : { outcome: "ALLOW" };
+  } };
+  const shared = backedOffContentCheck(judge, { now: () => clock });
+  const turn = input.inTurn ? checksInTurn(shared, { now: () => clock }) : undefined;
+  const check = turn?.check ?? shared;
+  const waiting = [...input.rows];
+  const listOf = (letter: string) => waiting.filter((name) => name.startsWith(letter));
+  const leave = (name: string) => { waiting.splice(waiting.indexOf(name), 1); done.push(name); };
+  /** One of sweepPublicPage's lists, as it treats a row's check. */
+  const pageList = async (letter: string, giveUpMs: number) => {
+    for (const name of listOf(letter)) {
+      const result = await check.check({ runId: name, snapshot: {} as PublicDebate });
+      if (result.outcome !== "UNAVAILABLE" || clock >= giveUpMs) leave(name);
+    }
+  };
+  const sweeps = async () => {
+    await pageList("c", PUBLIC_PAGE_SWEEP_DEFAULTS.giveUpMs);
+    await pageList("r", PUBLIC_PAGE_SWEEP_DEFAULTS.reportGiveUpMs);
+    await sweepFreePublications({
+      contributions: { readFreeToPublish: async () => listOf("f").map((name) => ({ run_id: name, owner_ref: "o", notice_at: "2026-11-24T08:00:00.000Z" })), refuseFree: async () => "REFUSED" as never },
+      publishOne: async (row) => {
+        const result = await check.check({ runId: row.run_id, snapshot: {} as PublicDebate });
+        if (result.outcome !== "ALLOW") return "CHECK_UNAVAILABLE";
+        leave(row.run_id);
+        return "PUBLISHED";
+      }
+    });
+  };
+  /** One pass every 15 s up to `minutes` from the start, the first at once. */
+  const runUntil = async (minutes: number) => {
+    while (clock < minutes * 60_000) {
+      await (turn === undefined ? sweeps() : turn.pass(sweeps));
+      clock += PUBLIC_PAGE_SWEEP_DEFAULTS.everyMs;
+    }
+  };
+  return { runUntil, asked, done, waiting };
+}
+const timesAsked = (asked: readonly string[], name: string) => asked.filter((entry) => entry === name).length;
+
+describe("one item whose check always fails holds back no other, in any of the sweeps' lists", () => {
+  it.each([
+    ["a contribution", "c-bad"],
+    ["an AI-written report", "r-bad"],
+    ["a Free debate", "f-bad"]
+  ] as const)("%s: with the shared wait alone nothing behind it is checked for 6 hours; in turn, all of it a minute after its first failure", async (_name, bad) => {
+    const rows = ["c-bad", "c-ok", "r-bad", "r-ok", "f-bad", "f-ok", "f-ok2"].filter((name) => !name.endsWith("-bad") || name === bad);
+    const behind = rows.slice(rows.indexOf(bad) + 1);
+    const failing = (name: string) => name === bad;
+    const before = sweepsWorld({ rows, failing, inTurn: false });
+    await before.runUntil(6 * 60);
+    for (const name of behind) expect(timesAsked(before.asked, name), name).toBe(0);
+    expect(before.waiting).toEqual([bad, ...behind]);
+    const after = sweepsWorld({ rows, failing, inTurn: true });
+    await after.runUntil(1.25);
+    expect(after.waiting).toEqual([bad]);
+    // The failing item is still tried, after its own wait, and never more often than the shared wait alone would try it.
+    await after.runUntil(6 * 60);
+    expect(after.waiting).toEqual([bad]);
+    expect(timesAsked(after.asked, bad)).toBeGreaterThan(5);
+    expect(timesAsked(after.asked, bad)).toBeLessThanOrEqual(timesAsked(before.asked, bad));
+  });
+
+  it("when the wait ends the call goes first to an item that never failed, then to the oldest failure", async () => {
+    const world = sweepsWorld({ rows: ["c-bad", "f-new"], failing: (name) => name === "c-bad", inTurn: true });
+    await world.runUntil(1.5);
+    // At 0 the contribution failed and the Free debate waited; at 1:00 the Free debate went first; at 1:15 the
+    // contribution's turn came.
+    expect(world.asked).toEqual(["c-bad", "f-new", "c-bad"]);
+    expect(world.done).toEqual(["f-new"]);
+  });
+
+  it("a judge that is down is still no cost loop: one call per wait, the items in turn instead of the oldest each time", async () => {
+    const rows = ["c-1", "r-1", "f-1"];
+    const before = sweepsWorld({ rows, failing: () => true, inTurn: false });
+    await before.runUntil(10);
+    const after = sweepsWorld({ rows, failing: () => true, inTurn: true });
+    await after.runUntil(10);
+    // Waits of 1, 2, 4 and 8 minutes: calls at 0, 1, 3 and 7 minutes, with the turn or without it.
+    expect(before.asked).toEqual(["c-1", "c-1", "c-1", "c-1"]);
+    expect(after.asked).toEqual(["c-1", "r-1", "f-1", "c-1"]);
+    expect(after.done).toEqual([]);
+  });
+
+  it("once the judge answers again, the item whose turn it is goes first and every other one in the next pass", async () => {
+    let down = true;
+    const world = sweepsWorld({ rows: ["c-1", "r-1", "f-1", "f-2"], failing: () => down, inTurn: true });
+    await world.runUntil(4);
+    expect(world.asked).toEqual(["c-1", "r-1", "f-1"]);
+    down = false;
+    // The wait that began at 3 minutes ends at 7:00, when f-2, which never failed, has the turn; the rest follow at 7:15.
+    await world.runUntil(7.25);
+    expect(world.done).toEqual(["f-2"]);
+    await world.runUntil(7.5);
+    expect(world.done).toEqual(["f-2", "c-1", "r-1", "f-1"]);
+  });
+
+  it("a check skipped while the judge rests calls nothing and sets no wait of the item's own; an item a pass did not ask is forgotten", async () => {
+    let clock = 0;
+    let failing = new Set(["a", "b"]);
+    const calls: string[] = [];
+    const shared = backedOffContentCheck({ check: async ({ runId }) => {
+      calls.push(runId);
+      return failing.has(runId) ? { outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" } : { outcome: "ALLOW" };
+    } }, { now: () => clock });
+    const turn = checksInTurn(shared, { now: () => clock });
+    const pass = (...names: string[]) => turn.pass(async () => { for (const runId of names) await turn.check.check({ runId, snapshot: {} as PublicDebate }); });
+    await pass("a", "b");
+    expect(calls).toEqual(["a"]);
+    clock += 60_000;
+    failing = new Set(["a"]);
+    // b was skipped while the judge rested, so it is due with no wait of its own, and its turn comes before a's.
+    await pass("a", "b");
+    expect(calls).toEqual(["a", "b"]);
+    await pass("a");
+    expect(calls).toEqual(["a", "b", "a"]);
+    // The shared wait (back to a minute after b's answer) is over, but a's own wait, now two minutes, is not.
+    clock += 60_000;
+    await pass("a");
+    expect(calls).toEqual(["a", "b", "a"]);
+    // a leaves the lists for a pass: forgotten, its own wait with it.
+    await pass();
+    failing = new Set();
+    await pass("a");
+    expect(calls).toEqual(["a", "b", "a", "a"]);
   });
 });
 
