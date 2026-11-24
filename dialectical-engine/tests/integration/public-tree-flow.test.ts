@@ -454,6 +454,49 @@ describe("a stranger's dig on a public debate", () => {
     expect(fieldsOf(writer).get("path")).not.toContain("CLIMB-MARK");
   });
 
+  it("a dig's page updates take their own turns in the sweeps: the older one's check always failing holds back no newer one of the same dig, and both checks name the dig", async () => {
+    const [ana, dan, eve] = [await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const world = vendors();
+    const first = await dig(dan, debate, world);
+    await settleAll(world);
+    const contribution = (await page(debate.ref)).contributions!.find((entry) => entry.own_rewrite === true)!;
+    const next = vendors();
+    const run = await dig(eve, { ref: debate.ref, position: contribution.dig_paths![0]!.position_ref, parentRunId: first }, next);
+    // Eve's dig is allowed and its own rewrite copied; then its climb and the main answer it writes wait for their checks.
+    await pageSweep();
+    await sweepPublicTree({ ...next.composed.publicTree, reports: next.reports, staleMs: 0 });
+    const repository = new PostgresPublicPageRepository(api);
+    const owedOfEve = async () => (await repository.readPageOwed()).filter((row) => row.dig_run_id === run && !(row.kind === "PATH" && row.step === 0));
+    const owed = await owedOfEve();
+    expect(owed.length).toBeGreaterThanOrEqual(2);
+    const [older, newer] = owed;
+    // The judge's answer for the older update is cut off every time; every other update of the dig is allowed.
+    const isOlder = (snapshot: PublicDebate) => older!.kind === "MAIN_ANSWER" ? snapshot.main_answer_update !== undefined
+      : snapshot.contributions?.[0]?.position_ref === (older!.position_ref ?? older!.source_id);
+    let clock = 0;
+    const seen: Readonly<{ runId: string; older: boolean }>[] = [];
+    const judge: PublicationContentCheck = { check: async ({ runId, snapshot }) => {
+      seen.push({ runId, older: isOlder(snapshot) });
+      return isOlder(snapshot) ? { outcome: "UNAVAILABLE", cause: "JUDGE_ANSWER_NOT_JSON" } : { outcome: "ALLOW" };
+    } };
+    const inTurn = checksInTurn(backedOffContentCheck(judge, { now: () => clock }), { now: () => clock });
+    // Only Eve's rows, so what earlier tests left owed takes no turn here.
+    const onlyEve = { readChecksPassed: async () => [], readReportsOwed: async () => [], readPageOwed: owedOfEve,
+      recordSkip: repository.recordSkip.bind(repository), recordReportCopy: repository.recordReportCopy.bind(repository) };
+    // One pass every 15 s for two minutes, as main.ts runs them.
+    for (; clock <= 120_000; clock += 15_000) await inTurn.pass(() => pageSweep(inTurn.check, { page: onlyEve }));
+    const copied = async (sourceId: string) => Number((await database.pool.query<{ total: string }>(
+      "SELECT count(*)::text AS total FROM identity.public_debate_update WHERE update_id=$1", [sourceId])).rows[0]!.total);
+    expect(await copied(newer!.source_id)).toBe(1);
+    expect(await copied(older!.source_id)).toBe(0);
+    expect(seen.filter((entry) => !entry.older).length).toBeGreaterThanOrEqual(1);
+    expect(seen.filter((entry) => entry.older).length).toBe(2);
+    // Each check's record names the dig, as before: only the turn is the update's own.
+    expect(new Set(seen.map((entry) => entry.runId))).toEqual(new Set([run]));
+    expect((await owedOfEve()).map((row) => row.source_id)).toEqual([older!.source_id]);
+  });
+
   it("a check that cannot run keeps it private and leaves the path free", async () => {
     const [ana, dan, eve] = [await account(), await account(), await account()];
     const debate = await publishedDebate(ana);

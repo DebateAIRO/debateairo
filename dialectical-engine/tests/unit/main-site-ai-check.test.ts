@@ -110,6 +110,7 @@ function aicheck(dir: string) {
     "  *serve.publication_check_record*) printf 'ALLOW - 4\\nUNAVAILABLE JUDGE_TRANSPORT_FAILED 1\\n';;",
     "  *identity.public_flag*) printf 'NOT_FOUND 1\\n';;",
     "  *identity.free_public_ask*) echo '2 1 0';;",
+    "  *serve.synthesis_check_result*) echo 'answered 3, UNAVAILABLE DEADLINE 1, deleted 1';;",
     '  *) echo "unexpected query" >&2; return 1;; esac; }'
   ];
   const result = bash(swapped(script('AICHECK'), {
@@ -159,6 +160,7 @@ describe('AICHECK reads the gate the check goes through, and what the checks did
     expect(result.lines).toContain('UNAVAILABLE JUDGE_TRANSPORT_FAILED 1');
     expect(result.lines).toContain('NOT_FOUND 1');
     expect(result.lines).toContain('Free debates (waiting, public in the last day, kept private in the last day): 2 1 0');
+    expect(result.lines).toContain('end-of-debate checks in the last day: answered 3, UNAVAILABLE DEADLINE 1, deleted 1');
     expect(result.last).toBe('AICHECK_DONE');
     // Names, states and counts only: none of the gate's or the GO's amounts.
     for (const amount of ['7.77', '1.234567', '6.535433', '0.000000', 'usd', 'cost']) expect(result.out, amount).not.toContain(amount);
@@ -211,13 +213,16 @@ describe('the runbook says what really happens to a Free debate and a report, an
 
   it('says the checks take the gate\'s slots from the debates\' calls and the question check, as many as the code sends at once', () => {
     const decision = flat.slice(flat.indexOf('1. **The AI check for publication and reports**'), flat.indexOf('2. **Your numbers**'));
-    expect(decision).toContain('and they take the gate\'s few slots (`max_concurrent_calls` in its GO) from those calls. A check sends one call at a time (an owner\'s Publish two)');
+    expect(decision).toContain('and they take the gate\'s few slots (`max_concurrent_calls` in its GO) from those calls. A check that runs by itself sends one call at a time: a Free debate\'s, a contribution\'s or an AI-written report\'s check one call, and the end-of-debate check one finished debate at a time. An owner\'s Publish sends two. So one check holds at most one slot (an owner\'s Publish two). But the checks run apart from each other: when two run at the same moment (for example the end-of-debate check and a Free debate\'s check), they hold two slots together, all that a gate of two has, for the few seconds a call takes.');
     expect(decision).toContain('a debate\'s call or a person\'s question check may wait in the gate\'s queue for one of its calls to end, and on a gate whose slots are all taken such a call is refused after the gate\'s wait of a minute');
     expect(decision).toContain('A Free debate, a contribution or an AI-written report whose check keeps failing is tried again by itself, after its first hour about once an hour, and each try\'s calls count in the day\'s calls.');
     // The numbers the runbook gives are the code's.
     const route = read(ROUTE_FILE);
     expect(route).toMatch(/const CONTENT_CHECK_GATE_BACKGROUND_CALLS_AT_ONCE = 1;/u);
     expect(route).toMatch(/const CONTENT_CHECK_GATE_PUBLISH_CALLS_AT_ONCE = 2;/u);
+    // The end-of-debate check's worker takes the background number on the gate, and four at once without it.
+    expect(read('apps/api/src/synthesis-check/worker.ts')).toMatch(/const SYNTHESIS_CHECK_MAX_IN_FLIGHT = 4;/u);
+    expect(read('apps/api/src/main.ts')).toMatch(/const synthesisCheckWorker = new SynthesisCheckWorker\(\{[^]*?\.\.\.contentCheckCallsAtOnce\(contentCheckRoute, "BACKGROUND"\),[^]*?\n\}\);/u);
     expect(read('packages/providers/ops/preview_budget_authority.py')).toMatch(/^SLOT_WAIT_SECONDS = 60$/mu);
     expect(flat).toContain('A debate whose own check keeps failing is tried again less and less often, and holds back no other debate, contribution or report.');
   });
@@ -236,5 +241,58 @@ describe('the runbook says what really happens to a Free debate and a report, an
     expect(say('ro', 'WITH_A_PERSON')).toContain('O persoană o va citi');
     expect(say('en', 'WITH_A_PERSON')).toContain('A person will read this');
     expect(flat).toContain('("Nu am dat curs acestei raportări", in English "We have not acted on this report"). "O persoană o va citi" ("A person will read this") means the check did not answer or was unsure.');
+  });
+});
+
+describe('the runbook says what the end-of-debate check does by itself on this server, and what a used-up gate stops', () => {
+  const byItself = flat.slice(flat.indexOf('**What still happens by itself:**'), flat.indexOf('**Never open the site to everyone (part 8)'));
+  const decision = flat.slice(flat.indexOf('1. **The AI check for publication and reports**'), flat.indexOf('2. **Your numbers**'));
+  const say = (language: string, file: string, key: string) => (JSON.parse(read(`apps/ui/messages/${language}/${file}.json`)) as Record<string, string>)[key]!;
+
+  it('5.1b: the answer held until the check answers, the deletion with no person, and the staff approval and where it is given', () => {
+    expect(byItself).toContain('- **The end-of-debate check.** It runs on this server too, through the Anthropic gate, whenever the AI check above is on (STAFFCHECK, 1.6).');
+    expect(byItself).toContain('A finished debate\'s answer is held ("checking") until the check answers: usually a few seconds, at most about two minutes on a busy gate. If the check cannot answer (the gate refused it, was busy, or its day is used up), the answer shows unchecked, nothing is deleted, and the check runs again when the owner presses Publish.');
+    expect(byItself).toContain('A debate it finds touching "tendencies to suicide or harming other people" is deleted for good, with no person involved. The Terms (section 9) say so, and the owner sees the notice the site shows ("Am șters această dezbatere", in English "We deleted this debate"). Nobody can bring it back.');
+    expect(byItself).toContain('Any of its other flags means that the owner\'s Publish of that debate needs a staff approval. The owner presses **Cereți aprobarea** ("Ask for approval") on the debate\'s page. A staff member with the Publication reviews permission decides on the **Publication reviews** page (Cereri de publicare)');
+    expect(byItself).toContain('That works only while the staff screens are on and your staff key works under the name the site answers as: STAFFCHECK says `staff tools are on`, and after the rename only once 5.7 is done. Until then the request waits, and nobody can decide it.');
+    expect(byItself).toContain('A Free debate does not wait for that approval. Its own way to the public page (the first point above) reads the AI check for publication, not this check\'s flags: a Free debate this check flagged for anything but the deletion still goes public by itself when that AI check allows it.');
+    // The words quoted are the website's, and the hold's bound is the check's own time on the gate: D (at most 60 s) and the gate's slot wait.
+    expect(say('ro', 'home', 'home.removal.title')).toBe('Am șters această dezbatere');
+    expect(say('en', 'home', 'home.removal.title')).toBe('We deleted this debate');
+    expect(say('ro', 'public', 'public.publicationReview.askButton')).toBe('Cereți aprobarea');
+    expect(say('en', 'public', 'public.publicationReview.askButton')).toBe('Ask for approval');
+    expect(say('ro', 'staff', 'staff.reviews.link')).toBe('Cereri de publicare');
+    expect(say('en', 'staff', 'staff.reviews.link')).toBe('Publication reviews');
+    expect(read('packages/register/src/publication-check-policy.ts')).toContain('deadline_ms: z.number().int().min(1_000).max(60_000)');
+    expect(read('apps/api/src/main.ts')).toContain('createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: backgroundCheckDeadlineMs })');
+    expect(read('packages/contract/src/synthesis-check.ts')).toContain('return outcome.verdict === "FLAGGED" && outcome.categories.includes("SUICIDE_OR_HARM_TO_OTHERS");');
+    expect(read('apps/api/src/staff/routes.ts')).toContain("{ route: 'POST /v1/admin/publication-reviews/{reviewRef}/approve', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW'");
+  });
+
+  it('decision 1: the end-of-debate check comes with the AI check, and a used-up gate stops new questions, the debates\' Claude Haiku calls and the checks until its next day', () => {
+    expect(decision).toContain('The end-of-debate check comes with it, the same way: it holds each finished debate\'s answer until it answers, deletes a debate it finds touching "tendencies to suicide or harming other people", and sends an owner\'s Publish of a debate with another flag to a staff approval (5.1b says all of it).');
+    expect(decision).toContain('When the gate\'s pot or its day\'s calls are used up, everything that goes through the gate stops until its next day (midnight, Bucharest time). Nobody can ask a new question: the question check answers "unavailable". The debates\' Claude Haiku calls are refused. And the checks fail closed: no Free debate goes public, every report waits for a person, the end-of-debate check deletes nothing and finished answers show unchecked, and an owner\'s Publish answers that the check is not available.');
+    // The gate refuses every caller on its day's two limits, and its day is Bucharest's; the question check then answers 503 "unavailable".
+    const gate = read('packages/providers/ops/preview_budget_authority.py');
+    expect(gate).toMatch(/day = bucharest_day\(moment\)\n\s+ledger = store\.ledger\(day\)/u);
+    expect(gate).toContain("raise SafetyError('DAILY_CALL_LIMIT_REACHED')");
+    expect(gate).toContain("raise SafetyError('TEAM_DAILY_BUDGET_REACHED')");
+    expect(read('apps/api/src/question-check/ask-gate.ts')).toContain('body: { error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" }');
+  });
+
+  it('AICHECK names every cause a publication check\'s UNAVAILABLE line can carry, and explains its end-of-debate line', () => {
+    const causes = /export type JudgeFailureCause = ([^;]+);/u.exec(read('apps/api/src/publication-check/check.ts'))![1]!.match(/JUDGE_[A-Z_]+/gu)!;
+    expect(causes.length).toBe(8);
+    // Each one in code type, alone or after `UNAVAILABLE `.
+    for (const cause of causes) expect(flat, cause).toMatch(new RegExp(`[\` ]${cause}\``, 'u'));
+    expect(flat).toContain('With every one of them nothing is published and nothing is hidden, and the API tries again.');
+    expect(flat).toContain('- `end-of-debate checks in the last day` (5.1b): `answered` counts the checks that gave an answer. The answer itself (clear, flagged, or no conclusion to read) is sealed with each debate\'s own key, so this line cannot tell them apart.');
+    const codes = read('packages/contract/src/synthesis-check.ts');
+    for (const code of ['DEADLINE', 'TRANSPORT_FAILED', 'HTTP_STATUS', 'ANSWER_NOT_JSON', 'ANSWER_SCHEMA', 'MONEY_REFUSED', 'NOT_CONFIGURED']) {
+      expect(codes, code).toContain(`"${code}"`);
+      expect(flat, code).toContain(`\`${code}\``);
+    }
+    expect(flat).toContain('`deleted` counts the debates the check deleted for touching "tendencies to suicide or harming other people".');
+    expect(flat).toContain('The end-of-debate checks count your test debate among the `answered` ones (`answered 0` with `UNAVAILABLE` causes: ask).');
   });
 });

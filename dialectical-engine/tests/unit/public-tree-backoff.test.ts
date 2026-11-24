@@ -169,6 +169,47 @@ describe("one item whose check always fails holds back no other, in any of the s
     expect(world.done).toEqual(["f-2", "c-1", "r-1", "f-1"]);
   });
 
+  it("two page updates of one dig take their own turns: the older one always failing holds back no newer one, though both checks name the dig", async () => {
+    /** Page updates as sweepPublicPage asks them: each check names the dig's run, and its turn key is the update's own. */
+    const run = async (byRow: boolean, hours: number) => {
+      let clock = 0;
+      const asked: string[] = [];
+      const runIds = new Set<string>();
+      const judge: PublicationContentCheck = { check: async ({ runId, snapshot }) => {
+        const update = (snapshot as unknown as { update: string }).update;
+        asked.push(update);
+        runIds.add(runId);
+        return update === "older" ? { outcome: "UNAVAILABLE", cause: "JUDGE_ANSWER_NOT_JSON" } : { outcome: "ALLOW" };
+      } };
+      const turn = checksInTurn(backedOffContentCheck(judge, { now: () => clock }), { now: () => clock });
+      const waiting = ["older", "newer"];
+      const settled: Record<string, number> = {};
+      while (clock < hours * 60 * 60_000) {
+        await turn.pass(async () => {
+          for (const update of [...waiting]) {
+            const result = await turn.check.check({ runId: "dig-1", snapshot: { update } as unknown as PublicDebate, ...(byRow ? { turnKey: `page:${update}` } : {}) });
+            if (result.outcome === "ALLOW" || clock >= PUBLIC_PAGE_SWEEP_DEFAULTS.giveUpMs) {
+              waiting.splice(waiting.indexOf(update), 1);
+              settled[update] = clock;
+            }
+          }
+        });
+        clock += PUBLIC_PAGE_SWEEP_DEFAULTS.everyMs;
+      }
+      return { asked, runIds, settled };
+    };
+    // Keyed by the dig's run alone, the newer update is never asked: it gives up with the older one at 6 hours.
+    const shared = await run(false, 7);
+    expect(timesAsked(shared.asked, "newer")).toBe(0);
+    expect(shared.settled.newer).toBe(PUBLIC_PAGE_SWEEP_DEFAULTS.giveUpMs);
+    // Keyed by the row, it is asked when the shared wait after the older one's failure ends, and goes on the page.
+    const own = await run(true, 7);
+    expect(timesAsked(own.asked, "newer")).toBe(1);
+    expect(own.settled.newer).toBeLessThanOrEqual(75_000);
+    expect(timesAsked(own.asked, "older")).toBeLessThanOrEqual(timesAsked(shared.asked, "older"));
+    expect([...own.runIds]).toEqual(["dig-1"]);
+  });
+
   it("a check skipped while the judge rests calls nothing and sets no wait of the item's own; an item a pass did not ask is forgotten", async () => {
     let clock = 0;
     let failing = new Set(["a", "b"]);

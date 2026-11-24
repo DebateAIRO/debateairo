@@ -70,8 +70,10 @@ export function createSynthesisCheckTransport(target: SupportModelTarget, option
  * call may have been charged". A refusal the app can tell reserved nothing (busy, cooling, not served, the day used up) is never
  * recorded as spent, so a full day or a busy gate cannot fill the site's day pot with calls nobody paid for. A refusal it cannot
  * tell from a failure after a reservation (the gate's opaque stop, a halted gate, a line closed without an answer) is recorded
- * at the check's estimate, as a call that may have been paid: the site's day is then counted a little high, never low. The
- * check's own day-pot read and its spend record are the same on both routes.
+ * at the check's estimate, as a call that may have been paid: when nobody paid for it, the site's day is counted a little
+ * high. An answered call is recorded with the vendor's input count and the check's fixed output size (check.ts), not the
+ * vendor's output count, which on the gate also counts the model's thinking: that record can be a little low. The gate keeps
+ * its own exact count. The check's own day-pot read and its spend record are the same on both routes.
  */
 export function createPreviewSynthesisCheckTransport(options: Readonly<{
   fetch: typeof fetch;

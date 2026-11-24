@@ -2038,6 +2038,24 @@ payments are real (part 7). The site password keeps it small: only people who kn
   per debate). If it finds nothing on the page that bears the report out, the report is closed by itself and the
   person who sent it is told so. When the check is off, does not answer within its 20 seconds, or is unsure, the report
   waits for a person, and nobody can act on it until the staff screens come back.
+- **The end-of-debate check.** It runs on this server too, through the Anthropic gate, whenever the AI check above is
+  on (STAFFCHECK, 1.6). Claude Haiku 5.5 reads each finished debate's conclusion for the four things the Terms
+  (section 8) name. By itself:
+  - A finished debate's answer is held ("checking") until the check answers: usually a few seconds, at most about two
+    minutes on a busy gate. If the check cannot answer (the gate refused it, was busy, or its day is used up), the
+    answer shows unchecked, nothing is deleted, and the check runs again when the owner presses Publish.
+  - A debate it finds touching "tendencies to suicide or harming other people" is deleted for good, with no person
+    involved. The Terms (section 9) say so, and the owner sees the notice the site shows ("Am șters această
+    dezbatere", in English "We deleted this debate"). Nobody can bring it back.
+  - Any of its other flags means that the owner's Publish of that debate needs a staff approval. The owner presses
+    **Cereți aprobarea** ("Ask for approval") on the debate's page. A staff member with the Publication reviews
+    permission decides on the **Publication reviews** page (Cereri de publicare), which opens from the link on the Team
+    page once the staff key is verified (1.6, step 3). That works only while the staff screens are on and your staff
+    key works under the name the site answers as: STAFFCHECK says `staff tools are on`, and after the rename only once
+    5.7 is done. Until then the request waits, and nobody can decide it.
+  - A Free debate does not wait for that approval. Its own way to the public page (the first point above) reads the AI
+    check for publication, not this check's flags: a Free debate this check flagged for anything but the deletion still
+    goes public by itself when that AI check allows it.
 - **Staff mails.** You still get the mails that say a report waits, or that a debate was hidden
   by itself. You cannot open them in the app until the staff screens come back. That is expected. (The threat report
   screen and its mail are gone since this upload: 1.6.)
@@ -3701,13 +3719,26 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
 **Your decisions, before you open.**
 1. **The AI check for publication and reports** (STAFFCHECK's `the AI check for publication and reports`, 1.6, and
    AICHECK below). It is Claude Haiku 5.5 through the Anthropic gate: the API holds no key for it, and the API file's
-   `SUPPORT_MODEL_TARGET_JSON` stays absent. Its calls count in the Anthropic gate's pot and day's calls, beside the
-   debates' own Claude Haiku calls and the question check, and they take the gate's few slots (`max_concurrent_calls`
-   in its GO) from those calls. A check sends one call at a time (an owner's Publish two), so it holds at most one or
-   two slots; while it runs, a debate's call or a person's question check may wait in the gate's queue for one of its
-   calls to end, and on a gate whose slots are all taken such a call is refused after the gate's wait of a minute. A
-   Free debate, a contribution or an AI-written report whose check keeps failing is tried again by itself, after its
-   first hour about once an hour, and each try's calls count in the day's calls.
+   `SUPPORT_MODEL_TARGET_JSON` stays absent. The end-of-debate check comes with it, the same way: it holds each finished
+   debate's answer until it answers, deletes a debate it finds touching "tendencies to suicide or harming other
+   people", and sends an owner's Publish of a debate with another flag to a staff approval (5.1b says all of it).
+   Their calls count in the Anthropic gate's pot and day's calls, beside the debates' own Claude Haiku calls and the
+   question check, and they take the gate's few slots (`max_concurrent_calls` in its GO) from those calls. A check that
+   runs by itself sends one call at a time: a Free debate's, a contribution's or an AI-written report's check one call,
+   and the end-of-debate check one finished debate at a time. An owner's Publish sends two. So one check holds at most
+   one slot (an owner's Publish two). But the checks run apart from each other: when two run at the same moment (for
+   example the end-of-debate check and a Free debate's check), they hold two slots together, all that a gate of two
+   has, for the few seconds a call takes.
+   While a check runs, a debate's call or a person's question check may wait in the gate's queue for one of its calls
+   to end, and on a gate whose slots are all taken such a call is refused after the gate's wait of a minute. A Free
+   debate, a contribution or an AI-written report whose check keeps failing is tried again by itself, after its first
+   hour about once an hour, and each try's calls count in the day's calls.
+
+   When the gate's pot or its day's calls are used up, everything that goes through the gate stops until its next day
+   (midnight, Bucharest time). Nobody can ask a new question: the question check answers "unavailable". The debates'
+   Claude Haiku calls are refused. And the checks fail closed: no Free debate goes public, every report waits for a
+   person, the end-of-debate check deletes nothing and finished answers show unchecked, and an owner's Publish answers
+   that the check is not available.
    - On (AICHECK ends with `AICHECK_DONE`): a stranger's finished Free debate goes public by itself when the AI check
      allows it, and anyone with its link can read it. A report the check agrees with hides the debate at once (once per
      debate).
@@ -3775,6 +3806,7 @@ db "SELECT concat_ws(' ', outcome, coalesce(failure_cause, '-'), count(*)) FROM 
 echo "Report button checks in the last day (verdict, count):"
 db "SELECT concat_ws(' ', coalesce(verdict, 'not yet'), count(*)) FROM identity.public_flag WHERE created_at > clock_timestamp() - interval '1 day' GROUP BY verdict ORDER BY verdict"
 echo "Free debates (waiting, public in the last day, kept private in the last day): $(db "SELECT concat_ws(' ', count(*) FILTER (WHERE outcome IS NULL), count(*) FILTER (WHERE outcome = 'PUBLISHED' AND decided_at > clock_timestamp() - interval '1 day'), count(*) FILTER (WHERE outcome = 'REFUSED' AND decided_at > clock_timestamp() - interval '1 day')) FROM identity.free_public_ask")"
+echo "end-of-debate checks in the last day: $(db "SELECT concat_ws(', ', 'answered ' || (SELECT count(*) FROM serve.synthesis_check_result WHERE final AND checked_at > clock_timestamp() - interval '1 day'), (SELECT string_agg('UNAVAILABLE ' || failure_code || ' ' || n, ', ' ORDER BY failure_code) FROM (SELECT failure_code, count(*) AS n FROM serve.synthesis_check_result WHERE NOT final AND checked_at > clock_timestamp() - interval '1 day' GROUP BY failure_code) AS unanswered), 'deleted ' || ((SELECT count(*) FROM serve.synthesis_check_removal_request WHERE requested_at > clock_timestamp() - interval '1 day') + (SELECT count(*) FROM identity.synthesis_check_erasure_binding WHERE created_at > clock_timestamp() - interval '1 day')))")"
 [ -z "$NO" ] || { echo "AICHECK_NOT_DONE: the check cannot go through the Anthropic gate (the lines above say why): ask"; exit 1; }
 echo AICHECK_DONE
 exit 0
@@ -3791,12 +3823,25 @@ Read the lines before the last one:
   check's answers; `UNSURE` means it was not sure, and like `BLOCK` it keeps what it checked private for good (a Free
   debate stays private, a contribution stays off the page). `UNAVAILABLE JUDGE_NOT_CONFIGURED` means the check is off; `UNAVAILABLE JUDGE_TRANSPORT_FAILED` or
   `JUDGE_DEADLINE` means the gate refused, was busy or did not answer in time: the debate waits, and the API tries
-  again. No line means no check ran in the last day.
+  again. The other causes an `UNAVAILABLE` line can carry: `JUDGE_HTTP_STATUS`, the AI company answered with an error,
+  which the gate passed on; `JUDGE_ANSWER_NOT_JSON`, the answer was cut off or could not be read; `JUDGE_ANSWER_SCHEMA`,
+  the answer could be read but was not in the form the check asks for; `JUDGE_ANSWER_UNKNOWN_PART`, the answer named a
+  part of the debate the check did not send; `JUDGE_DOOR_REFUSED`, the site's own guard would not send the text, so
+  nothing left the server. With every one of them nothing is published and nothing is hidden, and the API tries again.
+  No line means no check ran in the last day.
 - `Report button checks in the last day`: one line per verdict. `NOT_FOUND`, `UNSURE` and `AGREE` are the check's
   answers; `UNAVAILABLE` means it did not answer, and the report went to a person. `not yet` counts reports the check
   has given no verdict on: one it is still reading, or one that went to a person without it (for example a report on a
   debate that was already hidden once).
 - `Free debates`: how many wait (finished or not yet), and how many went public or were kept private in the last day.
+- `end-of-debate checks in the last day` (5.1b): `answered` counts the checks that gave an answer. The answer itself
+  (clear, flagged, or no conclusion to read) is sealed with each debate's own key, so this line cannot tell them apart.
+  `UNAVAILABLE` and a cause count the checks that gave none, and that debate's answer showed unchecked: `DEADLINE`, no
+  answer in time; `TRANSPORT_FAILED`, the gate refused the call (busy, halted, or its day used up) or the line failed;
+  `HTTP_STATUS`, the AI company answered with an error; `ANSWER_NOT_JSON` or `ANSWER_SCHEMA`, an answer cut off or not
+  in the form asked for; `MONEY_REFUSED`, the site's own day was used up; `NOT_CONFIGURED`, the check is off. Any other
+  cause: ask. `deleted` counts the debates the check deleted for touching "tendencies to suicide or harming other
+  people".
 
 ### 6b.2 The steps, in order
 
@@ -3824,8 +3869,9 @@ quiet minutes.
      20 seconds, usually that the report was stopped automatically ("Nu am dat curs acestei raportări", in English "We
      have not acted on this report"). "O persoană o va citi" ("A person will read this") means the check did not answer
      or was unsure. Run AICHECK again: `calls_today` has gone up, the publication checks show an `ALLOW -` line, and the
-     Report button checks show your report's verdict (`UNAVAILABLE` there means the check did not answer: ask). Hide
-     the test debate afterwards (Hide now) if it must not stay public.
+     Report button checks show your report's verdict (`UNAVAILABLE` there means the check did not answer: ask). The
+     end-of-debate checks count your test debate among the `answered` ones (`answered 0` with `UNAVAILABLE` causes:
+     ask). Hide the test debate afterwards (Hide now) if it must not stay public.
 5. REVIEW_CLOSE (5.8), if the review window is open.
 6. PWOFF1 (8.2), the hand edit of 8.2 (its two cases: the robots line is added only when PWOFF1 says the file sends
    none), then PWOFF2 (8.3). On any failed check PWOFF2 puts the password back by itself.

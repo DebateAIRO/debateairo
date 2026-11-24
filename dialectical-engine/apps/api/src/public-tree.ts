@@ -458,6 +458,9 @@ export function pathCopyOf(value: unknown, input: Readonly<{ ownRewrite: boolean
     own_rewrite: input.ownRewrite, written_at: input.writtenAt, on_ref: input.onRef, dig_paths: digPaths });
 }
 
+/** A page update's turn key (checksInTurn): the update's own id, apart from the run ids the other checks are keyed by. */
+const PAGE_UPDATE_TURN_PREFIX = "page:";
+
 /** One pass. Never rejects; logs codes and ids only. */
 export async function sweepPublicPage(deps: PublicPageSweepDeps): Promise<Readonly<{ settled: number; copied: number; reports: number; skipped: number }>> {
   const now = (deps.now ?? (() => new Date()))();
@@ -513,8 +516,9 @@ export async function sweepPublicPage(deps: PublicPageSweepDeps): Promise<Readon
         continue;
       }
       // A dig's own rewrite was checked before it was allowed; what the climb and the main answer wrote since has not been.
+      // The record names the dig's run; the sweeps' turn is this update's own, so a failing update of a dig holds back no later one of it.
       if (!(owed.kind === "PATH" && owed.step === 0)) {
-        const result = await deps.contentCheck.check({ runId: owed.dig_run_id, snapshot: owed.kind === "PATH"
+        const result = await deps.contentCheck.check({ runId: owed.dig_run_id, turnKey: `${PAGE_UPDATE_TURN_PREFIX}${owed.source_id}`, snapshot: owed.kind === "PATH"
           ? checkedPathSnapshot(content as PublicPathCopy, owed.position_ref ?? owed.source_id) : checkedAnswerSnapshot((content as PublicAnswerCopy).segments) });
         if (refused(result)) {
           await deps.page.recordSkip(owed.source_id, owed.publication_ref, owed.kind, "REFUSED");
@@ -597,8 +601,9 @@ export async function sweepPublicPage(deps: PublicPageSweepDeps): Promise<Readon
  *   every due item is asked in its list's order.
  * An item not asked reads "unavailable" and calls nothing, as during the shared wait, so each row's own give-up still comes
  * by its age. While the judge itself is down the shared wait still bounds the calls: one per wait, the items in turn.
- * Kept in memory and keyed by the id each check names (a report's carries its prefix, main.ts): an item a pass did not ask
- * is forgotten (published, refused, given up or erased), and a restart starts again from the lists' own order.
+ * Kept in memory and keyed by the row each check is for: its `turnKey` when it names one (a page update, whose run id is its
+ * dig's, shared by every page update of that dig), else the run id it names (a report's carries its prefix, main.ts). An item
+ * a pass did not ask is forgotten (published, refused, given up or erased), and a restart starts again from the lists' own order.
  */
 export type ChecksInTurn = Readonly<{
   /** One pass of the sweeps: every check they ask through `check` belongs to it. */
@@ -636,7 +641,7 @@ export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ no
       }
     },
     check: Object.freeze({ check: async (request: Parameters<PublicationContentCheck["check"]>[0]): Promise<PublicationCheckResult> => {
-      const key = request.runId.toLowerCase();
+      const key = (request.turnKey ?? request.runId).toLowerCase();
       asked.add(key);
       const record = failed.get(key);
       if (record !== undefined && now() < record.until) return { outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" };

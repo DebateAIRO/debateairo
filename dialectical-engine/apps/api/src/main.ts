@@ -1811,13 +1811,15 @@ const synthesisPublishGate = createSynthesisPublishGate({
   check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs, inFlightWindowMs: backgroundCheckDeadlineMs,
   clock: () => new Date(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 });
-// The worker checks each finished debate in the background: on the gate it may also wait out the gate's slot queue. Its
-// day-pot read and its spend record are the publish gate's own (synthesisCheckDeps); only the time differs.
+// The worker checks each finished debate in the background: on the gate it may also wait out the gate's slot queue, and it
+// checks one debate at a time there, so it holds at most one of the gate's slots. Its day-pot read and its spend record are
+// the publish gate's own (synthesisCheckDeps); only the time differs.
 const synthesisCheckWorker = new SynthesisCheckWorker({
   repository: synthesisCheckRepository, erasure: synthesisCheckErasure,
   withContentLease: (runId, use) => application.withContentLease(runId, use),
   readAnswer: readSynthesisAnswer, check: { ...synthesisCheckDeps, deadlineMs: backgroundCheckDeadlineMs },
   deadlineMs: backgroundCheckDeadlineMs,
+  ...contentCheckCallsAtOnce(contentCheckRoute, "BACKGROUND"),
   log: (line) => console.error(`[${line}]`)
 });
 // Row-level security (X28, merge onto synthesis-flag S02): a staff review reads, leases and copies the debate of its

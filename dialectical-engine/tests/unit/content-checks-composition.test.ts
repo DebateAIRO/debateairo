@@ -164,12 +164,13 @@ describe("main.ts wires the route, the times, the calls at once and the sweeps' 
     expect(deps).toContain('new PostgresModelSpendStore(crossAccountPool(pool, "X33")).recordSpend({ ...entry, spendId: randomUUID() })');
   });
 
-  it("on the gate a check sends a few calls at once: the sweeps' one at a time, an owner's Publish two", () => {
+  it("on the gate a check sends a few calls at once: the sweeps' one at a time, the end-of-debate check's worker one debate at a time, an owner's Publish two", () => {
     const check = (name: string) => expression(name, "\n});");
     expect(check("publicationContentCheck")).toContain('\n  ...contentCheckCallsAtOnce(contentCheckRoute, "PUBLISH")\n');
     expect(check("sweepPublicationContentCheck")).toContain('\n  ...contentCheckCallsAtOnce(contentCheckRoute, "BACKGROUND")\n');
     expect(check("publicReportContentCheck")).toContain('\n  ...contentCheckCallsAtOnce(contentCheckRoute, "BACKGROUND")\n');
-    expect(main.split("contentCheckCallsAtOnce(").length - 1).toBe(3);
+    expect(check("synthesisCheckWorker")).toContain('\n  ...contentCheckCallsAtOnce(contentCheckRoute, "BACKGROUND"),\n');
+    expect(main.split("contentCheckCallsAtOnce(").length - 1).toBe(4);
   });
 
   it("the Report button keeps the one judge switch, and every check of a sweep pass goes through the one turn", () => {

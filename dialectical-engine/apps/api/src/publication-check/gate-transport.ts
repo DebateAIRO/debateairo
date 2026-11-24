@@ -49,7 +49,8 @@ const CONTENT_CHECK_GATE_PUBLISH_CALLS_AT_ONCE = 2;
  * also serve the runner's Claude Haiku calls and the question check. A call that finds them full waits in the gate's
  * queue, in turn, and is refused after the gate's slot wait. With the check's own bound (publication-check/check.ts) a
  * long debate's check would put a string of calls in that queue at once, ahead of a debate's call or a person's
- * question, which could then be refused. So on the gate a check that runs in the background (the sweeps) sends one call
+ * question, which could then be refused. So on the gate a check that runs in the background (the sweeps, and the
+ * end-of-debate check's worker, which then checks one finished debate at a time: synthesis-check/worker.ts) sends one call
  * at a time and never holds more than one slot; it has the slot wait on top of D for its calls one after another. An
  * owner's Publish, which a person waits for within D, sends two: as many as the GO runs at once, so its calls never
  * queue behind each other, and at most one of them is ahead of anyone else's. Other routes keep the check's own bound.

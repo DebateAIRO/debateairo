@@ -23,6 +23,7 @@ import { pressPublicFlag, type PublicFlagPorts } from "../../apps/api/src/public
 import { runSynthesisCheck, type SynthesisCheckDeps } from "../../apps/api/src/synthesis-check/check.js";
 import { createSynthesisPublishGate } from "../../apps/api/src/synthesis-check/publish-gate.js";
 import { createPreviewSynthesisCheckTransport } from "../../apps/api/src/synthesis-check/transport.js";
+import { SynthesisCheckWorker } from "../../apps/api/src/synthesis-check/worker.js";
 
 const MARKER = /DEBATEAI-FENCE-([0-9a-f]{32})/u;
 const QUOTE = "Queues at the pier run long at rush hour.";
@@ -384,6 +385,58 @@ describe("the gate's few slots: a check never queues a string of calls ahead of 
     expect(waitOfOtherCall(after)).toBeLessThan(150);
     expect(after.state.sent).toBe(5);
   });
+
+  it("the end-of-debate check's worker checks one finished debate at a time on the gate, so a call that comes finds a slot free; with no gate four at once, as before", async () => {
+    const CLAIM = "It names a private person.";
+    const vendor = (body: string) => body.includes(CLAIM) ? agree() : clear(body);
+    /** One tick of the shipped worker over five finished debates, the database stood in for, its checks through the gate; and, if asked, a Report press 50 ms in. */
+    const tick = async (atOnce: (fetch: typeof globalThis.fetch) => Readonly<{ maxConcurrentCalls?: number }>, other: boolean) => {
+      const gate = await standInGate({ slots: 2, vendorMs: 250, vendor });
+      const port = createPreviewSynthesisCheckTransport({ fetch: gate.fetch });
+      const waiting = Array.from({ length: 5 }, (_, index) => `${String(index + 1)}1111111-1111-4111-8111-111111111111`);
+      const limits: number[] = [];
+      const checked: string[] = [];
+      const repository = {
+        claimNextRequests: async (limit: number) => {
+          limits.push(limit);
+          return waiting.splice(0, limit).map((id) => ({ attemptId: id, requestId: id, runId: id, answerId: id, answerVersion: 1, startedAt: new Date() }));
+        },
+        ownerRefOfRun: async () => "owner", readRecords: async () => [], readFinalResultId: async () => null,
+        insertResult: async (input: Readonly<{ answerId: string }>) => { checked.push(input.answerId); return "INSERTED" as const; },
+        purgeExpiredRemovalNotices: async () => 0
+      };
+      const worker = new SynthesisCheckWorker({
+        repository: repository as never, erasure: { reconcile: async () => [] }, withContentLease: (_runId, use) => use(),
+        readAnswer: async (_runId, _answerId, version) => version === 1 ? { serve_state: "COMPOSED", composed_text: [{ text: "The town should build the pier." }] } as never : null,
+        check: { port: () => port, deadlineMs: 5_000, recordSpend: async () => undefined, priceOf: (model) => previewModelRow(model) ?? null, clock: () => new Date(), log: () => undefined },
+        deadlineMs: 5_000, log: () => undefined, ...atOnce(gate.fetch)
+      });
+      await Promise.all([worker.runOnce(), other ? (async () => {
+        await new Promise((done) => setTimeout(done, 50));
+        await report(createPreviewPublicationJudgeTransport({ fetch: gate.fetch }));
+      })() : Promise.resolve()]);
+      await gate.settled();
+      return { limits, checked, left: waiting.length, peak: gate.state.peakOpen,
+        otherWaited: other ? gate.state.slotWaits.find((entry) => entry.requestBody.includes(CLAIM))!.waitedMs : null };
+    };
+    const onGate = (fetch: typeof globalThis.fetch) => contentCheckCallsAtOnce(route(fetch), "BACKGROUND");
+    const noGate = () => contentCheckCallsAtOnce({ kind: "SUPPORT_TARGET" }, "BACKGROUND");
+
+    // On the gate: four rounds of one, each claimed when the one before has answered; never two of its calls at the gate.
+    const alone = await tick(onGate, false);
+    expect(alone).toMatchObject({ limits: [1, 1, 1, 1], left: 1, peak: 1 });
+    expect(alone.checked).toHaveLength(4);
+    const beside = await tick(onGate, true);
+    expect(beside.checked).toHaveLength(4);
+    expect(beside.otherWaited).toBeLessThan(150);
+
+    // With no gate: one claim of four, checked together, as before; on a gate of two slots that queued the other call.
+    const before = await tick(noGate, true);
+    expect(before).toMatchObject({ limits: [4], left: 1 });
+    expect(before.checked).toHaveLength(4);
+    expect(before.peak).toBe(5);
+    expect(before.otherWaited).toBeGreaterThanOrEqual(300);
+  });
 });
 
 describe("the synthesis check through the Anthropic gate", () => {
@@ -398,11 +451,12 @@ describe("the synthesis check through the Anthropic gate", () => {
     return { run, records };
   }
 
-  it("checks through the gate, and records the call in the site's day as before, at the vendor's token counts", async () => {
+  it("checks through the gate, and records the call in the site's day as before: the vendor's input count and the check's fixed output size", async () => {
     const gate = await standInGate({ vendor: clear });
     const { run, records } = synthesis(gate.fetch);
     expect(await run()).toMatchObject({ outcome: { verdict: "CLEAR" }, modelProviderRef: "anthropic", modelId: "claude-haiku-5-5", callCount: 1 });
-    expect(records).toEqual([expect.objectContaining({ providerRef: "anthropic", inputTokens: 900 })]);
+    // The vendor reported 40 output tokens; the record keeps the check's fixed size instead. The gate keeps its own exact count.
+    expect(records).toEqual([expect.objectContaining({ providerRef: "anthropic", inputTokens: 900, outputTokens: 192 })]);
     await gate.settled();
     expect(realGateVerdicts(gate.state.envelopes)).toEqual([{ accepted: true, model: "claude-haiku-5-5" }]);
   });
@@ -423,7 +477,7 @@ describe("the synthesis check through the Anthropic gate", () => {
       expect(records, refuse).toEqual([]);
     }
     // Booked at its maximum by the gate; and the gate's opaque stop and a halted gate, which the guarded fetch cannot tell
-    // from a stop after a reservation: counted as possibly charged, so the site's day is counted high, never low.
+    // from a stop after a reservation: counted as possibly charged, at the check's estimate.
     for (const refuse of ["PROVIDER_CHARGE_BOOKED_MAX", "PREVIEW_TEST_AUTHORITY_STOPPED", "AUTHORITY_HALTED"]) {
       const gate = await standInGate({ refuse });
       const { run, records } = synthesis(gate.fetch);
