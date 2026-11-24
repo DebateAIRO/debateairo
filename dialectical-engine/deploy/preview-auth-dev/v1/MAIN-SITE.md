@@ -3934,7 +3934,7 @@ if [ -s "$M/asks/names.sh" ]; then . "$M/asks/names.sh"; AT=${ASKS_AT:-}; fi
 if [ -n "$J" ] && printf '%s\n' "$AT" | grep -qxE '[0-9]+'; then
   EVER=$( { for F in "$ASKS_ARCHIVE/api-$ASKS_LABEL.env.before-open" "$ASKS_ARCHIVE"/buyers-*/api-*.env.before "$A"; do [ ! -e "$F" ] || sed -n 's/^PREVIEW_TEAM_USER_IDS_JSON=//p' "$F"; done; } | jq -cs 'add | unique' 2>/dev/null || true)
 fi
-# The Team page's list (6b.3), on a database that holds it: how many accounts are on it; with the team line, how many may buy, against the cap read from this release's code, never printed; its changes since the opening. On a release that carries the list: whether the API's login may read it, and whether the API could not read it at a pay button since its start.
+# The Team page's list (6b.3), on a database that holds it: how many accounts are on it; with the team line, how many may buy, against the cap read from this release's code, never printed; its changes since the opening; the open sandbox plans of its accounts and how many days ago the oldest was bought, a reminder of the 14 days to withdraw each, never a failure. On a release that carries the list: whether the API's login may read it, and whether the API could not read it at a pay button since its start.
 LT=$(psqlq "SELECT to_regclass('staff.preview_buyer_event') IS NOT NULL" || true)
 TP=no; [ ! -f "$CAPI/dialectical-engine/apps/api/src/staff/preview-buyers.ts" ] || TP=yes
 LISTED="SELECT l.user_id FROM (SELECT DISTINCT ON (user_id) user_id, kind FROM staff.preview_buyer_event ORDER BY user_id, revision DESC) l WHERE l.kind = 'ADDED'"
@@ -3946,6 +3946,10 @@ if [ "$LT" = t ] && [ -n "$J" ] && [ -n "$EVER" ]; then
   if printf '%s\n' "$LN" | grep -qxE '[0-9]+' && printf '%s\n' "$MB" | grep -qxE '[0-9]+' && printf '%s\n' "$CH" | grep -qxE '[0-9]+ [0-9]+' && [ -n "$CAP" ]; then
     echo "accounts on the Team page's list: $LN; accounts that may buy, the team line included: $MB"
     echo "changes on the Team page's list since the opening: ${CH% *} added, ${CH#* } removed"
+    LP=$(psqlq "SELECT count(*) || ' ' || coalesce(max(floor(extract(epoch FROM now() - coalesce(a.bought, c.at)) / 86400))::bigint, 0) FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' LEFT JOIN LATERAL (SELECT min(b.at) AS bought FROM billing.subscription_event b WHERE b.subscription_id = s.subscription_id AND b.kind = 'ACTIVATED') a ON true WHERE jsonb_extract_path_text(c.data, 'payment_environment') = 'sandbox' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED', 'CREATED') AND EXISTS (SELECT 1 FROM identity.\"user\" u WHERE u.owner_ref = s.owner_ref AND u.user_id IN ($LISTED))" || true)
+    if ! printf '%s\n' "$LP" | grep -qxE '[0-9]+ [0-9]+'; then echo "open sandbox plans of accounts on the Team page's list: did not read (SANDBOXLIST, 3.3, lists every open sandbox plan)"
+    elif [ "${LP% *}" = 0 ]; then echo "open sandbox plans of accounts on the Team page's list: 0"
+    else echo "open sandbox plans of accounts on the Team page's list: ${LP% *}; the oldest was bought ${LP#* } day(s) ago (withdraw each within 14 days of its purchase, or its holder cancels it: 6b.1, 3.3)"; fi
     [ "$MB" -le "$CAP" ] || bad "more accounts may buy than PREVIEW_TEAM_MAX_MEMBERS allows: remove some on the Team page, then ask"
     if [ "$TP" = yes ]; then
       [ "$(psqlq "SELECT has_function_privilege('debateai_prod_api_runtime', 'staff.preview_buyer_listed(uuid)', 'EXECUTE')" || true)" = t ] || bad "the API's login may not read the Team page's list, so every account allowed there is refused at the pay button (503): ask"
@@ -3982,10 +3986,10 @@ exit 0
 ```
 
 Expect, in order: `listed buyers in the files: <how many>` (the team line), the gates' line, two mail lines (yesterday
-and today, UTC), on a database that holds the Team page's list its two lines (how many accounts are on it and how many
-may buy with the team line; its changes since the opening), the two lines about accounts not on the list, then
-`OPENCHECK_DONE`. It changes nothing, and it prints no address, no id and no amount of money: the mail lines are counts
-and a share of the limit.
+and today, UTC), on a database that holds the Team page's list its three lines (how many accounts are on it and how
+many may buy with the team line; its changes since the opening; the open sandbox plans of its accounts), the two lines
+about accounts not on the list, then `OPENCHECK_DONE`. It changes nothing, and it prints no address, no id and no
+amount of money: the mail lines are counts and a share of the limit.
 
 **What its counts mean.**
 - `open sandbox plans` and `unfinished payment pages` of accounts not on the list now: a plan or a page from before
@@ -4004,6 +4008,11 @@ and a share of the limit.
   `PREVIEW_TEAM_MAX_MEMBERS` (its value is read from the release, never printed); past it is a `CHECK_FAILED`: remove
   some on the Team page, then ask. `changes on the Team page's list since the opening`: compare them with what you
   did; a change you did not make: PWON now, then ask (and look at the security alerts at your alert address).
+- `open sandbox plans of accounts on the Team page's list`, and how many days ago the oldest was bought: a reminder,
+  never a failure. Withdraw each such plan with WITHDRAWOTHER (3.3, after you tell them) within 14 days of its
+  purchase, or its holder cancels it (6b.1, decision 5); after 14 days only its holder can cancel it. A plan counts
+  from its purchase, whatever the account's state; `did not read` means the database did not answer this one question:
+  SANDBOXLIST (3.3) lists every open sandbox plan.
 - `CHECK_FAILED: the API's login may not read the Team page's list …`: every account allowed there is refused at the
   pay button (503), and nothing is charged: the rule still holds, so no PWON is needed; ask.
 - `LOOK: since its start the API could not read the Team page's list …`: those purchases were refused with nothing

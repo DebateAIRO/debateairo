@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -21,6 +22,8 @@ import { importHistoricalRegisterFixture, registerFixtureRow } from "../support/
  * door: OPENCHECK, ASKS_OPEN, ASKS_CLOSE and CLOSED count it, OPENCHECK leaves it out of the accounts not on the list now,
  * and a start since the opening counts only when the account was on no team line since then and not on the Team page's
  * list at any moment of the two minutes before the charge. A charge of an account erased since is counted on its own.
+ * OPENCHECK also counts the open sandbox plans of the accounts on the Team page's list and how many days ago the oldest
+ * was bought, a reminder that each is withdrawn within 14 days of its purchase.
  */
 const RUNBOOK = readFileSync(resolve(import.meta.dirname, "../../deploy/preview-auth-dev/v1/MAIN-SITE.md"), "utf8");
 const PREVIEW = parsePreviewProviderTestConfig(JSON.stringify({
@@ -198,6 +201,39 @@ describe("the Team page's list in OPENCHECK, ASKS_OPEN, ASKS_CLOSE and CLOSED on
     for (const lines of [asksOpen, asksClose, closed, opencheck]) expect(await onList(lines)).toBe("0");
     const present = asked([lineOf(opencheck, "LT=$(psqlq")], {});
     expect(await single(present[0]!)).toBe("true");
+  });
+
+  it("OPENCHECK's reminder counts the open sandbox plans of the accounts on the list now and how many days ago the oldest was bought", async () => {
+    const owner = previewBuyerOwner(stack.database.pool);
+    const reminder = async () => {
+      const queries = asked([lineOf(opencheck, 'LISTED="SELECT'), lineOf(opencheck, "LP=$(psqlq")], {});
+      expect(queries).toHaveLength(1);
+      return single(queries[0]!);
+    };
+    // The list is empty: the removed subscriber's plan, the team line's plan and the earlier pages are not its accounts'.
+    expect(await reminder()).toBe("0 0");
+    const fresh = await stack.signUp("fresh.buyer@example.test", "DE");
+    const older = await stack.signUp("older.buyer@example.test", "DE");
+    const paging = await stack.signUp("paging.buyer@example.test", "DE");
+    // Allowed on the Team page, then bought a plan today through the API.
+    await owner.change("PREVIEW_BUYER_ADD", fresh.userId);
+    await stack.subscribe(fresh, "PLUS", "DE");
+    // Allowed, and holding a sandbox plan bought nine days ago, written as the billing log writes one.
+    await owner.change("PREVIEW_BUYER_ADD", older.userId);
+    await stack.database.pool.query(`INSERT INTO billing.subscription_event(event_id,subscription_id,owner_ref,kind,at,plan_id,period_anchor_at,data) VALUES
+      (gen_random_uuid(),$1,$2,'CREATED',clock_timestamp() - interval '9 days 1 hour','PLUS',NULL,'{"payment_provider":"netopia","payment_environment":"sandbox","currency":"EUR"}'),
+      (gen_random_uuid(),$1,$2,'ACTIVATED',clock_timestamp() - interval '9 days','PLUS',clock_timestamp() - interval '9 days','{}')`, [randomUUID(), older.ownerRef]);
+    // Allowed, with only an unfinished payment page: that is not a plan.
+    await owner.change("PREVIEW_BUYER_ADD", paging.userId);
+    const quote = await stack.quote(paging, "PLUS");
+    expect((await stack.checkout(paging, String(quote.body.quote_ref))).status).toBe(200);
+    // The age counts from the purchase (the plan's activation), not from when its payment page opened.
+    expect(await reminder()).toBe("2 9");
+    // Taken off the list, its plan is no longer one of the list's (OPENCHECK counts it with the accounts not on the list).
+    await owner.change("PREVIEW_BUYER_REMOVE", older.userId, { locked: true });
+    expect(await reminder()).toBe("1 0");
+    for (const person of [fresh, paging]) await owner.change("PREVIEW_BUYER_REMOVE", person.userId, { locked: true });
+    expect(await reminder()).toBe("0 0");
   });
 
   it("OPENCHECK's grant check says whether the API's login may read the list at the pay button", async () => {

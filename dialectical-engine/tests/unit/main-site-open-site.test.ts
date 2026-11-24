@@ -120,6 +120,8 @@ const STUBS = [
   '  *outbound_mail_daily_count*) cat "$D/mail";;',
   `  *"g.created_at >= to_timestamp("*) cat "$D/since";;`,
   `  *"WHERE s.owner_ref = '"*) cat "$D/held";;`,
+  // The open sandbox plans of the accounts on the Team page's list, and the age of the oldest; before the plans of accounts not on the list, whose text it shares.
+  '  *"u.user_id IN (SELECT l.user_id FROM"*) cat "$D/listed-plans";;',
   `  *"'ERASURE_STOPPED', 'CREATED')"*) cat "$D/plans";;`,
   `  *"g.kind IN ('INITIAL', 'UPGRADE') AND NOT EXISTS"*) cat "$D/pages";;`,
   '  *core.work_item*) echo 0;;', '  *staff.owner_designation*) echo 1;;',
@@ -169,7 +171,7 @@ function world(setup: Setup): World {
     login: '401', headers: `HTTP/2 200\r\n${ROBOTS}\r\nstrict-transport-security: max-age=31536000\r\n`, readyz: '404', edge: '200',
     'notify-now': '400', 'user-id': `${FRIEND}\n`, held: '0\n', plans: '0\n', pages: '0\n', since: '0\n',
     mail: '2026-11-23 120 6 false false\n2026-11-24 8 0 false false\n', tty: `${FRIEND_ADDRESS}\n`,
-    'buyer-table': 't\n', approved: '0\n', 'may-buy': '2\n', 'buyer-changes': '0 0\n', 'buyer-grant': 't\n', erased: '0\n',
+    'buyer-table': 't\n', approved: '0\n', 'may-buy': '2\n', 'buyer-changes': '0 0\n', 'buyer-grant': 't\n', erased: '0\n', 'listed-plans': '0 0\n',
     'm/name/notify-code.before-dezbatere': '400', Caddyfile: 'dezbatere.ro {\n}\n', 'm/password/Caddyfile.open': 'dezbatere.ro {\n}\n',
     ...setup.answers
   };
@@ -462,6 +464,7 @@ describe('OPENCHECK', () => {
     'mail on 2026-11-24 (UTC): 8 handed to the mail program, 0% of daily_limit; sign-up mail stopped: no; all mail stopped: no',
     'accounts on the Team page\'s list: 0; accounts that may buy, the team line included: 2',
     'changes on the Team page\'s list since the opening: 0 added, 0 removed',
+    'open sandbox plans of accounts on the Team page\'s list: 0',
     'accounts not on the list now: open sandbox plans 0, unfinished payment pages 0',
     'checkouts and upgrades started since the opening by accounts never on the list: 0', 'OPENCHECK_DONE'
   ];
@@ -529,11 +532,33 @@ describe('OPENCHECK', () => {
     expect(queries.find(query => query.includes('FILTER (WHERE'))).toContain('recorded_at >= to_timestamp(1795939200)');
     expect(queries.find(query => query.includes('has_function_privilege'))).toBe("SELECT has_function_privilege('debateai_prod_api_runtime', 'staff.preview_buyer_listed(uuid)', 'EXECUTE')");
     // Accounts not on the list now leave out the Team page's list too; a start since the opening leaves out an account on it in the two minutes before.
-    expect(queries.find(query => query.includes("'ERASURE_STOPPED', 'CREATED')"))).toContain('staff.preview_buyer_listed(u.user_id)');
+    expect(queries.find(query => query.includes("'ERASURE_STOPPED', 'CREATED')") && query.includes('jsonb_array_elements_text'))).toContain('staff.preview_buyer_listed(u.user_id)');
     expect(queries.find(query => query.includes('g.created_at >= to_timestamp(1795939200) AND EXISTS'))).toContain("n.recorded_at < g.created_at - interval '2 minutes'");
     // The cap is read from the release and never printed.
     expect(result.out).not.toMatch(new RegExp(`\\b${PREVIEW_TEAM_MAX_MEMBERS}\\b`, 'u'));
   }));
+
+  it('reminds of the open sandbox plans of the accounts on the Team page\'s list and the age of the oldest, and never fails on them', () => {
+    withWorld({ ...OPEN, answers: { login: '200', approved: '2\n', 'may-buy': '4\n', 'listed-plans': '2 9\n' } }, w => {
+      const result = run('OPENCHECK', w);
+      expect(result.lines).toContain('open sandbox plans of accounts on the Team page\'s list: 2; the oldest was bought 9 day(s) ago (withdraw each within 14 days of its purchase, or its holder cancels it: 6b.1, 3.3)');
+      expect(result.last).toBe('OPENCHECK_DONE');
+      // The plans of the accounts on the list now, by the list's own rows: no account id is in the question.
+      const asked = w.file('queries').split('\n').filter(query => query.includes('u.user_id IN (SELECT l.user_id FROM'));
+      expect(asked).toHaveLength(1);
+      for (const id of [OWNER, PARTNER, FRIEND]) expect(asked[0]).not.toContain(id);
+      expect(asked[0]).toContain("b.kind = 'ACTIVATED'");
+    });
+    for (const unread of ['', 'x 9\n', '2\n']) withWorld({ ...OPEN, answers: { login: '200', 'listed-plans': unread } }, w => {
+      const result = run('OPENCHECK', w);
+      expect(result.lines, unread).toContain('open sandbox plans of accounts on the Team page\'s list: did not read (SANDBOXLIST, 3.3, lists every open sandbox plan)');
+      expect(result.last, unread).toBe('OPENCHECK_DONE');
+    });
+    // An older database has no list, so nothing is asked about it.
+    withWorld({ ...OPEN, beforeList: true, answers: { login: '200', 'buyer-table': 'f\n' } }, w => {
+      expect(run('OPENCHECK', w).lines.filter(entry => entry.startsWith('open sandbox plans of accounts on the Team page'))).toEqual([]);
+    });
+  });
 
   it('fails past the cap and when the API\'s login may not read the list; looks at refusals the API logged and at purchases of accounts erased since', () => {
     withWorld({ ...OPEN, answers: { login: '200', 'may-buy': `${PREVIEW_TEAM_MAX_MEMBERS + 1}\n` } }, w => {
