@@ -209,6 +209,7 @@
   "settings.security.codesRemaining": "Κωδικοί ανάκτησης: {count}",
   "settings.security.regenerate": "Δημιουργία νέων κωδικών ανάκτησης",
   "settings.security.lockoutReminder": "Δεν έχετε ακόμη κωδικούς ανάκτησης ή κλειδί πρόσβασης. Αν χάσετε το τηλέφωνό σας, με αυτά μπαίνετε ξανά αμέσως.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "Δεν ήταν δυνατή η ανανέωση των στοιχείων ασφάλειας. Φορτώστε ξανά τη σελίδα.",
   "settings.security.pendingRecovery.title": "Κάποιος ξεκίνησε να αντικαθιστά την εφαρμογή ελέγχου ταυτότητας σας",
   "settings.security.pendingRecovery.body": "Κάποιος χρησιμοποίησε τον κωδικό πρόσβασής σας και έναν σύνδεσμο email για να ξεκινήσει την αντικατάσταση της εφαρμογής ελέγχου ταυτότητας αυτού του λογαριασμού. Μπορείτε να την ολοκληρώσετε από {time}.",

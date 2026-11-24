@@ -211,6 +211,7 @@
   "settings.security.codesRemaining": "Kody odzyskiwania: {count}",
   "settings.security.regenerate": "Wygeneruj nowe kody odzyskiwania",
   "settings.security.lockoutReminder": "Nie masz jeszcze kodów odzyskiwania ani klucza dostępu. Jeśli zgubisz telefon, dzięki nim od razu wrócisz do konta.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "Nie udało się odświeżyć danych bezpieczeństwa. Załaduj stronę ponownie.",
   "settings.security.pendingRecovery.title": "Ktoś rozpoczął wymianę Twojej aplikacji uwierzytelniającej",
   "settings.security.pendingRecovery.body": "Ktoś użył Twojego hasła i linku z e-maila, aby rozpocząć wymianę aplikacji uwierzytelniającej na tym koncie. Możesz ją zakończyć od {time}.",

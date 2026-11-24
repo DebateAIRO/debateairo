@@ -212,6 +212,7 @@
   "settings.security.codesRemaining": "Kodiċijiet ta’ rkupru: {count}",
   "settings.security.regenerate": "Iġġenera kodiċijiet ġodda ta’ rkupru",
   "settings.security.lockoutReminder": "Għad m’għandek l-ebda kodiċi ta’ rkupru jew ċavetta tal-aċċess. Jekk titlef it-telefon tiegħek, b’dawn terġa’ tidħol minnufih.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "Id-dettalji tas-sigurtà ma setgħux jiġu aġġornati. Erġa’ tella’ l-paġna.",
   "settings.security.pendingRecovery.title": "Xi ħadd beda jbiddel l-app tal-awtentikazzjoni tiegħek",
   "settings.security.pendingRecovery.body": "Xi ħadd uża l-password tiegħek u link bl-email biex beda jibdel l-app tal-awtentikazzjoni ta’ dan il-kont. Tista’ tlesti minn {time}.",

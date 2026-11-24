@@ -209,6 +209,7 @@
   "settings.security.codesRemaining": "Kurtarma kodları: {count}",
   "settings.security.regenerate": "Yeni kurtarma kodları oluştur",
   "settings.security.lockoutReminder": "Henüz kurtarma kodunuz veya geçiş anahtarınız yok. Telefonunuzu kaybederseniz bunlar sayesinde hemen yeniden giriş yapabilirsiniz.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "Güvenlik bilgileri yenilenemedi. Sayfayı yeniden yükleyin.",
   "settings.security.pendingRecovery.title": "Birisi kimlik doğrulama uygulamanızı değiştirmeye başladı",
   "settings.security.pendingRecovery.body": "Birisi, bu hesabın kimlik doğrulama uygulamasını değiştirmek için parolanızı ve bir e-posta bağlantısını kullandı. Değişikliği {time} itibarıyla tamamlayabilirsiniz.",

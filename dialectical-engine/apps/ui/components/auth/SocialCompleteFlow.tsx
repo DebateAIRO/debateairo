@@ -8,6 +8,7 @@ import type { ContractClient, LocaleCode, CatalogLocaleCode, StepUpResponse, Soc
 import { dobToIso, declaredRegionFromPick, ITALY_APPROVAL_REQUIRED, ITALY_COUNTRY, type DobParts } from '@debateai/kernel';
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
+import { namePasskeysForAccount } from '@/lib/passkeyNames';
 import { ownedPhoneCompletionDraft } from '@/lib/phoneCompletionDraft';
 import { retainSocialStepUp } from '@/lib/socialStepUpHandoff';
 import { safeSocialReturnPath } from '@/lib/returnPath';
@@ -385,6 +386,10 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
             const result = ownedKind === 'stepup'
                 ? await client.completeSocialStepUp({ continuation_token: ownedToken, challenge_handle: options.challenge_handle, credential })
                 : await client.completePasskeyLogin({ challenge_handle: options.challenge_handle, credential });
+            // A session exists now: the browser is given the account's email as this passkey's name.
+            const naming = ownedKind === 'stepup' || (result as AuthenticationResponse).status === 'authenticated' ? namePasskeysForAccount(client, credential.response?.userHandle) : null;
+            if (naming)
+                await naming;
             if (!owns(owner, ownedToken, ownedKind))
                 return;
             if (ownedKind === 'stepup')
@@ -494,7 +499,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                     setProof(null);
                     setError(t(catalog, "auth.pending.proofUnavailable"));
                 }}/> : null}<button type="submit" className="authPrimary" disabled={busy}>{t(catalog, "auth.continue")}</button>{signupAnnouncer.region}</form> : null}
- {token && kind === 'enroll' ? <SecurityEnrollment catalog={catalog} client={client} authority={{ kind: 'pending', token }} onAuthenticated={result => finish(result, true, true)}/> : null}
+ {token && kind === 'enroll' ? <SecurityEnrollment catalog={catalog} client={client} authority={{ kind: 'pending', token }} accountLabel={email || undefined} onAuthenticated={result => finish(result, true, true)}/> : null}
  {secured ? <LockoutPrompt catalog={catalog} client={client} onDone={navigateAuthenticated}/> : null}
  {token && (kind === 'login' || kind === 'stepup') ? <div>
  {methods.includes('passkey') ? <div className="authAltMethods"><button type="button" className="authSecondary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.use")}</button></div> : null}

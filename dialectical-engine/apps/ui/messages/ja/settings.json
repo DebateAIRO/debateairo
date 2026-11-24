@@ -208,6 +208,7 @@
   "settings.security.codesRemaining": "復旧コード：{count}",
   "settings.security.regenerate": "新しい復旧コードを生成",
   "settings.security.lockoutReminder": "復旧コードもパスキーもまだありません。スマートフォンをなくしても、これらがあればすぐにログインし直せます。",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "セキュリティ情報を更新できませんでした。ページを再読み込みしてください。",
   "settings.security.pendingRecovery.title": "誰かがあなたの認証アプリの置き換えを開始しました",
   "settings.security.pendingRecovery.body": "誰かがパスワードとメールのリンクを使い、このアカウントの認証アプリの置き換えを開始しました。{time} 以降に完了できます。",

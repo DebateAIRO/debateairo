@@ -19,6 +19,7 @@ import { EphemeralCodes } from './auth/EphemeralCodes';
 import { useFormAnnouncer } from './auth/InlineFieldMessage';
 import { useDeadlineWarning } from './auth/timedStep';
 import { focusIsLost } from '@/lib/focusGuard';
+import { lockoutNeed } from '@/lib/lockoutRisk';
 const providerName = (id: string) => id === 'google' ? 'Google' : id === 'apple' ? 'Apple' : id === 'facebook' ? 'Facebook' : 'X';
 export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, client = contractClient, resume: provided }: {
     catalog: MessageCatalog; authCatalog: MessageCatalog; publicCatalog: MessageCatalog; locale: LocaleCode; client?: ContractClient; resume?: SecurityResume | null;
@@ -126,6 +127,14 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
         recoveryReturn.current = false;
         if (focusIsLost()) (recoveryCancelledLine.current ?? pageTitle.current)?.focus();
     });
+    // The account's email names a new passkey in the browser's password manager. Without it the passkey is still
+    // made, and named right after instead.
+    const [accountEmail, setAccountEmail] = useState<string | undefined>(undefined);
+    useEffect(() => {
+        let current = true;
+        void Promise.resolve().then(() => client.readAccountEmail()).then(value => { if (current) setAccountEmail(value.email); }).catch(() => { /* The passkey is named after it is made. */ });
+        return () => { current = false; };
+    }, [client]);
     useEffect(() => {
         let current = true;
         void Promise.resolve().then(() => client.pendingMfaRecovery()).then(value => { if (current) setPendingRecovery(value.pending); }).catch(() => { /* No banner when the state cannot be read; nothing is changed. */ });
@@ -280,7 +289,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
         {returnToQuestion ? <p className="setListActions"><a className="setBtn setBtnPrimary" href="/new">{t(authCatalog, 'auth.continue')}</a></p> : null}
         <div className="setSectionHead"><h2 className="setSectionTitle" tabIndex={-1}>{t(authCatalog, 'auth.enroll.securityTitle')}</h2></div>
         <section className="setList">
-            {methods && methods.recovery_codes_remaining === 0 && !methods.methods.some(method => method.type === 'passkey') ? <p className="setStatus" data-lockout-reminder>{t(catalog, 'settings.security.lockoutReminder')}</p> : null}
+            {methods && lockoutNeed(methods) !== 'none' ? <p className="setStatus" data-lockout-reminder>{t(catalog, lockoutNeed(methods) === 'codes' ? 'settings.security.lockoutReminderPasskey' : 'settings.security.lockoutReminder')}</p> : null}
             {(methods?.methods ?? []).map(method => <div key={method.factor_id} className="setSessionRow"><div className="setSessionMain"><span className="setSessionDevice">{method.label ?? t(authCatalog, method.type === 'passkey' ? 'auth.passkey.use' : 'auth.login.useAuthenticatorCode')}</span>{!method.removable ? <p className="setSessionSeen">{t(catalog, 'settings.security.lastPath')}</p> : null}</div><button type="button" className="setBtn setBtnRevoke" data-remove-factor aria-label={removeMethodLabel(method)} disabled={busy || !method.removable} onClick={() => choose({ action: 'REMOVE_AUTH_METHOD', target_factor_id: method.factor_id })}>{t(catalog, 'settings.security.remove')}</button></div>)}
             <div className="setListActions">
                 <button type="button" className="setBtn" disabled={busy} onClick={() => choose({ action: 'ADD_PASSKEY' })}>{t(authCatalog, 'auth.passkey.create')}</button>
@@ -311,7 +320,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
             {warning ? <p className="setStatus">{t(authCatalog, 'auth.security.expiresSoon')}</p> : null}
             {selected.action === 'CHANGE_RECOVERY_EMAIL' ? <>{removeRecovery ? null : <div className="authField"><label htmlFor="security-recovery-email">{t(authCatalog, 'auth.recovery.emailTitle')}</label><input id="security-recovery-email" type="email" value={email} autoComplete="email" onChange={event => setEmail(event.target.value)}/></div>}
                 {held ? <button type="button" className="setBtn setBtnQuiet" onClick={() => setRemoveRecovery(!removeRecovery)}>{t(catalog, removeRecovery ? 'settings.email.change' : 'settings.security.remove')}</button> : null}</> : null}
-            {enrollment ? <><SecurityEnrollment authority={{ kind: 'grant', token: enrollment.token }} deadline={enrollment.expiresAt} availableMethods={selected.action === 'ADD_TOTP' ? ['totp'] : ['passkey']} catalog={authCatalog} client={client} onEnrolled={enrollmentFinished} onExpired={() => expire('auth.enroll.timedOut')}/><div className="setCardRow"><button type="button" className="setBtn setBtnQuiet" onClick={dismiss}>{t(authCatalog, 'auth.security.cancel')}</button></div></>
+            {enrollment ? <><SecurityEnrollment authority={{ kind: 'grant', token: enrollment.token }} deadline={enrollment.expiresAt} availableMethods={selected.action === 'ADD_TOTP' ? ['totp'] : ['passkey']} catalog={authCatalog} client={client} accountLabel={accountEmail} onEnrolled={enrollmentFinished} onExpired={() => expire('auth.enroll.timedOut')}/><div className="setCardRow"><button type="button" className="setBtn setBtnQuiet" onClick={dismiss}>{t(authCatalog, 'auth.security.cancel')}</button></div></>
                 : held ? <div className="setCardRow"><button type="button" className="setBtn setBtnPrimary" data-resumed-confirm disabled={busy || !allowed} onClick={() => void execute(held)}>{t(authCatalog, 'auth.security.confirm')}</button><button type="button" className="setBtn setBtnQuiet" onClick={dismiss}>{t(authCatalog, 'auth.security.cancel')}</button></div>
                 : <SecurityConfirmation catalog={authCatalog} client={client} authorization={selected} disabled={busy || !allowed} onConfirmed={execute} onCancel={dismiss}/>}
         </section> : null}

@@ -13,13 +13,14 @@ import type { TurnstilePublicConfig } from '@/lib/turnstile';
 import { ageConfirmationHref, ageConfirmationRequired } from '@/lib/ageConfirmation';
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
+import { namePasskeysForAccount } from '@/lib/passkeyNames';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
 import { readSixDigitCode, sixDigitCodeToSend } from '@/lib/sixDigitCode';
 import { signInEmailShape } from '@/lib/authFormValidation';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import { safeReturnPath } from '@/lib/returnPath';
 import authEnglish from '@/messages/en/auth.json';
-type LoginClient = Pick<ContractClient, 'beginLogin' | 'completeLogin'> & Partial<Pick<ContractClient, 'authProviders' | 'beginSocialLogin' | 'beginPasskeyLogin' | 'completePasskeyLogin' | 'resendVerification'>>;
+type LoginClient = Pick<ContractClient, 'beginLogin' | 'completeLogin'> & Partial<Pick<ContractClient, 'authProviders' | 'beginSocialLogin' | 'beginPasskeyLogin' | 'completePasskeyLogin' | 'resendVerification' | 'readAccountEmail'>>;
 async function navigateHome() {
     const next = new URLSearchParams(window.location.search).get('next');
     window.location.assign(await ageConfirmationRequired() ? ageConfirmationHref(next) : safeReturnPath(next));
@@ -139,6 +140,9 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 setCompleting(true);
                 setBusy(true);
                 const result = await client.completePasskeyLogin({ challenge_handle: options.challenge_handle, credential });
+                const naming = result.status === 'authenticated' ? namePasskeysForAccount(client, credential.response?.userHandle) : null;
+                if (naming)
+                    await naming;
                 if (owner === sequence.current && !abort.signal.aborted)
                     finish(result);
             }
@@ -178,6 +182,10 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
             dispatched.current = true;
             setCompleting(true);
             const result = await client.completePasskeyLogin({ challenge_handle: options.challenge_handle, credential });
+            // Signed in: the browser is given the account's email as this passkey's name (older passkeys carry a placeholder).
+            const naming = result.status === 'authenticated' ? namePasskeysForAccount(client, credential.response?.userHandle) : null;
+            if (naming)
+                await naming;
             if (owner === sequence.current)
                 finish(result);
         }
