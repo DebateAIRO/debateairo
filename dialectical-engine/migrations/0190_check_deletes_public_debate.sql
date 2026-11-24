@@ -85,7 +85,7 @@ BEGIN
     AND NOT EXISTS (SELECT 1 FROM identity.public_climb_done AS done WHERE done.dig_run_id = contribution.dig_run_id)
     AND EXISTS (SELECT 1 FROM identity."user" AS identity_user WHERE identity_user.owner_ref = contribution.owner_ref);
   GET DIAGNOSTICS v_step = ROW_COUNT; v_rows := v_rows + v_step;
-  -- A report being written: the page it was for is gone. What it spent stays spent.
+  -- A report being written: the page it was for is gone.
   UPDATE identity.public_report AS report SET outcome = 'FAILED', failure_code = 'PUBLIC_PAGE_DELETED', recorded_at = clock_timestamp()
   WHERE report.publication_ref = p_publication_ref AND report.outcome IS NULL;
   GET DIAGNOSTICS v_step = ROW_COUNT; v_rows := v_rows + v_step;

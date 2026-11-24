@@ -2096,6 +2096,9 @@ payments are real (part 7). The site password keeps it small: only people who kn
     also those of an earlier page of the same debate. Each person's own digs stay theirs. Nobody but the owner is
     told. A person whose dig had changed the page still reads "This changed the public page." on their dig, with a
     link to a page that is gone: the site has no line yet that says the page was deleted.
+    A debate that staff had hidden before the check deleted it still shows as hidden on the staff Public tab. Do not
+    press "Put back" on it: its page is gone and stays gone, and the people who had a part on it would be told that
+    their part is back on the page.
   - When it is not deleted, or waits:
     - The owner's account is being closed (its deletion has started), or was frozen by the age check. Then the debate
       is not deleted and its page stays public, and no log line says so. A closing account's own deletion takes the
