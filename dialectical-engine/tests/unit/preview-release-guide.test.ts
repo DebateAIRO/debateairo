@@ -1153,6 +1153,25 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(scripts['legal:redate']).toBe('node apps/ui/scripts/legal-redate.mjs');
   });
 
+  it('the legal texts\' day in the owner\'s runbook: a version the live site carries keeps its day, a new version takes the upload day', () => {
+    const runbook = read('deploy/preview-auth-dev/v1/MAIN-SITE.md').replace(/\s+/g, ' ');
+    // The old rule, that both texts show the upload day, is gone from all four places.
+    for (const gone of ['The legal texts\' date is the upload day in every case', 'that day is the upload day: they go live on the site at DR6',
+      '`Legal texts: ready for release.` with the upload day twice', 'It must print `Effective <today>` twice.']) expect(runbook, gone).not.toContain(gone);
+    expect(runbook).toContain('Each legal text\'s day follows its own rule in every case (step 3, and the release guide\'s section "The legal texts\' day"): one the live site already carries keeps its day, and a new version takes the upload day.');
+    expect(runbook).toContain('The day follows a rule for each text on its own (the release guide\'s section "The legal texts\' day", `deploy/preview-release/v1/README.md`): a text whose current version the live site already carries keeps its day, and a new version takes the upload day, because it goes live on the site at DR6. Today the Terms 1.1 are on the live site and keep 24 November 2026; a new Privacy Policy version takes the upload day.');
+    expect(runbook).toContain("grep -Ho 'Version [0-9.]* · Effective [0-9]* [A-Za-z]* 20[0-9]*' apps/ui/legal/en/terms-of-service.md apps/ui/legal/en/privacy-policy.md");
+    expect(runbook).toContain('The same version must show the same day. A newer version must show the upload day.');
+    expect(runbook).toContain('`Legal texts: ready for release.` with each text\'s day right (its live day for a version the site carries, the upload day for a new one: the release guide\'s section "The legal texts\' day")');
+    expect(runbook).toContain('**1. The texts\' days are still right** (Mac, the upload folder). Run the date line of 1.8, step 3, again. A version the live site already carries must show its live day (today the Terms 1.1: 24 November 2026), and a new version must show today (the release guide\'s section "The legal texts\' day", `deploy/preview-release/v1/README.md`).');
+    // PRECHECK still asks both texts for the upload day, and the runbook says so until that changes.
+    expect(guide).toContain('for T in terms-of-service privacy-policy; do grep -qF "Effective $DAY "');
+    expect(runbook).toContain('PRECHECK (step 14) still asks both texts to take effect today: on an upload day after 24 November its `legal-date` subject stops it while the Terms keep their day.');
+    // The section the runbook points to is there, and the line it greps is in both texts.
+    expect(guide).toContain('**The legal texts\' day.** An upload that carries a new version');
+    for (const text of ['terms-of-service', 'privacy-policy']) expect(read(`apps/ui/legal/en/${text}.md`), text).toMatch(/Version [0-9.]+ · Effective [0-9]{1,2} [A-Z][a-z]+ 20[0-9]{2}/u);
+  });
+
   it('the line-up and thinking changes are activations; T+1 moves the line-up out of the env (SA11, addition D15, D23, D24)', () => {
     const prose = section.replace(/\s+/g, ' ');
     // The two plan members, the reviewed menus, and the order for a model the gate has not switched on yet.

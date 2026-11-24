@@ -730,8 +730,9 @@ On any other last line, run nothing more, and ask.
 The practice spends from the gates' daily pots (a day is a Bucharest day). On the same day, the practice and the test
 debate after the switch (part 2: it serves both SB13b and the proof of the step before Start) share the same pots.
 POTS (step 9) and the gates' own refusals say whether room is left. A test debate refused for lack of room waits for
-the next day: the site is up and correct meanwhile, and only that proof waits. The legal texts' date is the upload day
-in every case (step 3).
+the next day: the site is up and correct meanwhile, and only that proof waits. Each legal text's day follows its own
+rule in every case (step 3, and the release guide's section "The legal texts' day"): one the live site already carries
+keeps its day, and a new version takes the upload day.
 
 **REV, the commit you upload.** REV is taken once, after every change for this upload is merged into dev. On the Mac:
 `git fetch origin dev && git rev-parse refs/remotes/origin/dev`. It prints 40 characters. From then until DR6 nothing
@@ -781,17 +782,22 @@ The first line must be REV; if it is not, stop and ask. The last line must start
 it says `NOT ready for release`, stop and ask: the lines above it say what is missing (for example a translation of the
 Terms or the Privacy Policy that is older than the English text), and only a new commit fixes that.
 
-The Terms and the Privacy Policy (version 1.0) name the day they take effect, and that day is the upload day: they go
-live on the site at DR6. Check the day, in the same folder:
+The Terms and the Privacy Policy each name their version and the day it takes effect. The day follows a rule for each
+text on its own (the release guide's section "The legal texts' day", `deploy/preview-release/v1/README.md`): a text
+whose current version the live site already carries keeps its day, and a new version takes the upload day, because it
+goes live on the site at DR6. Today the Terms 1.1 are on the live site and keep 24 November 2026; a new Privacy Policy
+version takes the upload day. Check both, in the same folder:
 
 ```sh
-grep -ho 'Effective [0-9]* [A-Za-z]* 2026' apps/ui/legal/en/terms-of-service.md apps/ui/legal/en/privacy-policy.md
+grep -Ho 'Version [0-9.]* · Effective [0-9]* [A-Za-z]* 20[0-9]*' apps/ui/legal/en/terms-of-service.md apps/ui/legal/en/privacy-policy.md
 ```
 
-It must print the same line twice, `Effective <the upload day>`, with the day written out (day, month name, year). If
-it prints another day, or the upload moves to another day, stop and ask: the day is part of the texts, so a new day
-needs a new commit. At your first sign-in after the upload, neither you nor the team is asked to accept the texts
-again: your earlier acceptances count.
+It prints one line for each text, with its version and its day written out (day, month name, year). Compare each with
+the same text on the live site (`/terms` and `/privacy`). The same version must show the same day. A newer version
+must show the upload day. If a line shows anything else, or the upload moves to another day while a new version waits,
+stop and ask: the day is part of the texts, so a new day needs a new commit (the release guide's section says how). At
+your first sign-in after the upload, neither you nor the team is asked to accept the texts again: your earlier
+acceptances count.
 
 **4. The Mac check, on REV.** In the upload folder: `zsh -lic 'node tools/upload-check/run.mjs --rev <REV>'`. It tries
 on the Mac three things the server does during an upload (the release guide's "Before an upload: the Mac check" says
@@ -937,8 +943,9 @@ so the upload's cold copy (DR3) holds the line. Expect `STAFFHBA_DONE`. Its way 
 as that guide says. REKEYCHECK (5.7) reads the line again after the upload.
 
 **Before part 2 starts** you have seen, in this order: REV in the upload folder with nothing edited,
-`Legal texts: ready for release.` with the upload day twice, `ALL PASSED`, `TRYDETACH_DONE` after a closed window,
-`SB1_DONE`, the staging up to `A7_DONE`, `SHAPEON_DONE`, `POTS_DONE` (and your decision if it said `no` or `NO
+`Legal texts: ready for release.` with each text's day right (its live day for a version the site carries, the upload
+day for a new one: the release guide's section "The legal texts' day"), `ALL PASSED`, `TRYDETACH_DONE` after a closed
+window, `SB1_DONE`, the staging up to `A7_DONE`, `SHAPEON_DONE`, `POTS_DONE` (and your decision if it said `no` or `NO
 ROOM`), `MAILTIME_DONE`, the practice's `PRACTICE_VERDICT PASS` lines with the rows matching, S-7's gates active, and
 `STAFFHBA_DONE`. If one is missing, part 2 waits.
 
@@ -987,8 +994,12 @@ text under that step, or the repair map (after step 23), or ask. Never put a `.b
 
 ### 2.1 Before the downtime (the site is up)
 
-**1. The texts' date is still today** (Mac, the upload folder). Run the date line of 1.8, step 3, again. It must print
-`Effective <today>` twice. If it prints another day, stop before piece 1 and ask.
+**1. The texts' days are still right** (Mac, the upload folder). Run the date line of 1.8, step 3, again. A version
+the live site already carries must show its live day (today the Terms 1.1: 24 November 2026), and a new version must
+show today (the release guide's section "The legal texts' day", `deploy/preview-release/v1/README.md`). If a line
+shows another day, stop before piece 1 and ask. PRECHECK (step 14) still asks both texts to take effect today: on an
+upload day after 24 November its `legal-date` subject stops it while the Terms keep their day. Ask before the upload
+day how that is settled.
 
 **2. GATESBEFORE** (server; the release guide's "Before piece 1"). It only reads: each older gate's start checks, run
 by hand as systemd would run them, then its state and its calls in flight. Expect one line per gate, `<gate>: start
@@ -2026,14 +2037,15 @@ These wait in the database; nothing is lost. This holds on both names, during th
 payments are real (part 7). The site password keeps it small: only people who know it can see a published debate.
 
 **What still happens by itself:**
-- **Free debates go public.** On the Free plan, a finished debate goes public by itself when an AI check allows it.
-  The page tells the person this before they ask. When STAFFCHECK (1.6) says `the AI check for publication and
-  reports: off`, or the check cannot answer (the Anthropic gate refuses the call, is halted or busy, or its day is used
-  up), nothing goes public: the finished debate stays private and waits. The API tries its check again by itself, a
-  minute after a failure, then after longer and longer waits, up to an hour. No staff screen lists a waiting Free
-  debate, and nobody can publish one by hand: it goes public by itself once the check allows it, however long after it
-  finished. The person is not told that it waits. A debate whose own check keeps failing is tried again less and less
-  often, and holds back no other debate, contribution or report.
+- **Free debates go public.** On the Free plan, a finished debate goes public by itself when two AI checks allow it,
+  in this order: the end-of-debate check (below), then the AI check for publication. The page tells the person this
+  before they ask. When STAFFCHECK (1.6) says `the AI check for publication and reports: off`, or a check cannot answer
+  (the Anthropic gate refuses the call, is halted or busy, or its day is used up), nothing goes public: the finished
+  debate stays private and waits. The API tries its check again by itself, a minute after a failure, then after longer
+  and longer waits, up to an hour. No staff screen lists a Free debate that waits for a check, and nobody can publish
+  one by hand: it goes public by itself once the checks allow it, however long after it finished. The person is not
+  told that it waits. A debate whose own check keeps failing is tried again less and less often, and holds back no
+  other debate, contribution or report.
 - **The Report button.** It needs no staff. If the same AI check agrees with a report, the debate hides at once (once
   per debate). If it finds nothing on the page that bears the report out, the report is closed by itself and the
   person who sent it is told so. When the check is off, does not answer within its 20 seconds, or is unsure, the report
@@ -2041,9 +2053,11 @@ payments are real (part 7). The site password keeps it small: only people who kn
 - **The end-of-debate check.** It runs on this server too, through the Anthropic gate, whenever the AI check above is
   on (STAFFCHECK, 1.6). Claude Haiku 5.5 reads each finished debate's conclusion for the four things the Terms
   (section 8) name. By itself:
-  - A finished debate's answer is held ("checking") until the check answers: usually a few seconds, at most about two
-    minutes on a busy gate. If the check cannot answer (the gate refused it, was busy, or its day is used up), the
-    answer shows unchecked, nothing is deleted, and the check runs again when the owner presses Publish.
+  - A finished debate's answer is held ("checking") until the check answers: usually a few seconds, and never more
+    than two minutes after the debate finished, however busy the gate. If the check cannot answer in that time (the
+    gate refused it, was busy, or its day is used up), the answer shows unchecked, nothing is deleted, and the check
+    runs again when the owner presses Publish, or, for a Free debate, when the API next tries to make it public. An
+    answer that comes later can no longer flag or delete anything.
   - A debate it finds touching "tendencies to suicide or harming other people" is deleted for good, with no person
     involved. The Terms (section 9) say so, and the owner sees the notice the site shows ("Am șters această
     dezbatere", in English "We deleted this debate"). Nobody can bring it back.
@@ -2053,9 +2067,22 @@ payments are real (part 7). The site password keeps it small: only people who kn
     page once the staff key is verified (1.6, step 3). That works only while the staff screens are on and your staff
     key works under the name the site answers as: STAFFCHECK says `staff tools are on`, and after the rename only once
     5.7 is done. Until then the request waits, and nobody can decide it.
-  - A Free debate does not wait for that approval. Its own way to the public page (the first point above) reads the AI
-    check for publication, not this check's flags: a Free debate this check flagged for anything but the deletion still
-    goes public by itself when that AI check allows it.
+  - A Free debate waits for that approval too. Its own way to the public page (the first point above) asks this check
+    first: a clear answer, or a flag that a staff approval covers, lets it go on to the AI check for publication. A
+    Free debate this check flagged is never refused for good: it stays private and waits, and once a staff member
+    approves it, it goes public on the API's next try (within a minute) if the AI check for publication allows it.
+    Its owner sees nothing of this on the debate's page (`/v4/debate/<id>`): no flag, no "waiting" and no **Cereți
+    aprobarea**. Only the older page `/debate/<id>`, which no V4 page links to, shows the flag and the button. So
+    unless you tell the owner, nobody asks, and the debate stays private.
+  - The API looks at the 20 oldest waiting Free debates on each try. A flagged one stays among them until it is
+    approved, so once 20 flagged ones wait, no newer Free debate goes public. AICHECK's `Free debates` line (6b.1)
+    counts them among the waiting: if that count stays at 20 or more, ask.
+  - A debate that is already public when this check asks for its deletion is not deleted. This can happen to a debate
+    published before the check existed, or to a later version of its answer. Its public page stays readable, and the
+    API's log repeats `[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED` every 30 seconds for as long as it is public.
+    Meanwhile its owner is treated as if it were deleted: it leaves their list, their Publish answers that it is
+    gone, and they see "We deleted this debate". If you see that line, Hide now takes the page down; ask before
+    anything else.
 - **Staff mails.** You still get the mails that say a report waits, or that a debate was hidden
   by itself. You cannot open them in the app until the staff screens come back. That is expected. (The threat report
   screen and its mail are gone since this upload: 1.6.)
@@ -3331,7 +3358,7 @@ together (the files hold one asks line), and ASKS_OPEN (6.1) is the step for bot
 **Before you open:** mail is open (part 4.3; friends need the verification mail to sign up), payments are the sandbox
 with billing on, and you have read 6.4 (what bounds spending) and 6.5 (the brakes). Do 5.7 first if you can, so
 your staff key works on dezbatere.ro and you can hide a debate by hand during the test. If you have not, tell
-friends that on the Free plan a finished debate goes public by itself when the AI check allows it (5.1b), and that
+friends that on the Free plan a finished debate goes public by itself when the AI checks allow it (5.1b), and that
 nobody can take it down by hand for now.
 
 **If friends buy test plans.** Every open sandbox plan blocks the live start (part 7), so decide this first:
@@ -3721,7 +3748,9 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
    AICHECK below). It is Claude Haiku 5.5 through the Anthropic gate: the API holds no key for it, and the API file's
    `SUPPORT_MODEL_TARGET_JSON` stays absent. The end-of-debate check comes with it, the same way: it holds each finished
    debate's answer until it answers, deletes a debate it finds touching "tendencies to suicide or harming other
-   people", and sends an owner's Publish of a debate with another flag to a staff approval (5.1b says all of it).
+   people", and sends an owner's Publish of a debate with another flag to a staff approval. A Free debate waits for
+   it before it can go public: one it flagged waits for that approval, and one it is still checking waits at most two
+   minutes after the debate finished (5.1b says all of it).
    Their calls count in the Anthropic gate's pot and day's calls, beside the debates' own Claude Haiku calls and the
    question check, and they take the gate's few slots (`max_concurrent_calls` in its GO) from those calls. A check that
    runs by itself sends one call at a time: a Free debate's, a contribution's or an AI-written report's check one call,
@@ -3739,11 +3768,12 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
    Claude Haiku calls are refused. And the checks fail closed: no Free debate goes public, every report waits for a
    person, the end-of-debate check deletes nothing and finished answers show unchecked, and an owner's Publish answers
    that the check is not available.
-   - On (AICHECK ends with `AICHECK_DONE`): a stranger's finished Free debate goes public by itself when the AI check
-     allows it, and anyone with its link can read it. A report the check agrees with hides the debate at once (once per
-     debate).
+   - On (AICHECK ends with `AICHECK_DONE`): a stranger's finished Free debate goes public by itself when the
+     end-of-debate check and then the AI check for publication allow it, and anyone with its link can read it. One the
+     end-of-debate check flagged stays private until a staff approval (5.1b). A report the check agrees with hides the
+     debate at once (once per debate).
    - Off, or the gate not letting it through (`AICHECK_NOT_DONE`): no Free debate goes public. Each finished one stays
-     private and waits; the API tries its check again by itself, and the debate goes public once the check allows it,
+     private and waits; the API tries its checks again by itself, and the debate goes public once the checks allow it,
      however long after it finished. No staff screen lists the waiting ones, and nobody can publish one by hand. Every
      report waits for you.
 
@@ -3841,7 +3871,8 @@ Read the lines before the last one:
   `HTTP_STATUS`, the AI company answered with an error; `ANSWER_NOT_JSON` or `ANSWER_SCHEMA`, an answer cut off or not
   in the form asked for; `MONEY_REFUSED`, the site's own day was used up; `NOT_CONFIGURED`, the check is off. Any other
   cause: ask. `deleted` counts the debates the check deleted for touching "tendencies to suicide or harming other
-  people".
+  people". It also counts a debate that was already public when the check asked for its deletion, which is not
+  deleted (5.1b).
 
 ### 6b.2 The steps, in order
 
@@ -3863,8 +3894,11 @@ quiet minutes.
      with the test card, and finishes NETOPIA's page;
    - the AI check (skip this if you open without it, decision 1): run AICHECK (6b.1) and note `calls_today`. A test
      account of yours on the Free plan asks a short question. A few minutes after its story is written, the debate
-     shows on the home page's **Public** tab. If AICHECK showed `UNAVAILABLE` lines just before, the API may still be
-     in its wait after those failures, and it can take up to an hour. Then, on a test public debate, press the Report button with a claim that is
+     shows on the home page's **Public** tab: the end-of-debate check answers first (at most two minutes after the
+     debate finished), then the AI check for publication. If AICHECK showed `UNAVAILABLE` lines just before, the API
+     may still be in its wait after those failures, and it can take up to an hour. If it does not show and AICHECK has
+     no `UNAVAILABLE` lines, the end-of-debate check may have flagged it: that account sees the flag only on
+     `/debate/<id>` (5.1b). Ask. Then, on a test public debate, press the Report button with a claim that is
      plainly not on its page (for example that it names someone's home address): the answer comes back within about
      20 seconds, usually that the report was stopped automatically ("Nu am dat curs acestei raportări", in English "We
      have not acted on this report"). "O persoană o va citi" ("A person will read this") means the check did not answer

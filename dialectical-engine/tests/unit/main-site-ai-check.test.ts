@@ -164,7 +164,7 @@ describe('AICHECK reads the gate the check goes through, and what the checks did
     expect(result.last).toBe('AICHECK_DONE');
     // Names, states and counts only: none of the gate's or the GO's amounts.
     for (const amount of ['7.77', '1.234567', '6.535433', '0.000000', 'usd', 'cost']) expect(result.out, amount).not.toContain(amount);
-    // The queries read outcomes, causes, verdicts and counts, never a cost or a token count.
+    // The queries read outcomes, causes, verdicts and counts, never an amount or a token count.
     expect(result.queries).not.toMatch(/cost_usd|_tokens|charge/u);
   }));
 
@@ -207,8 +207,8 @@ describe('the runbook says what really happens to a Free debate and a report, an
 
   it('an unchecked Free debate stays private and waits, retried by the API, on no staff screen: never "a publication review on the Team page"', () => {
     expect(flat).not.toContain('publication review on the Team page');
-    expect(flat).toContain('nothing goes public: the finished debate stays private and waits. The API tries its check again by itself, a minute after a failure, then after longer and longer waits, up to an hour. No staff screen lists a waiting Free debate, and nobody can publish one by hand');
-    expect(flat).toContain('Each finished one stays private and waits; the API tries its check again by itself, and the debate goes public once the check allows it, however long after it finished. No staff screen lists the waiting ones, and nobody can publish one by hand.');
+    expect(flat).toContain('nothing goes public: the finished debate stays private and waits. The API tries its check again by itself, a minute after a failure, then after longer and longer waits, up to an hour. No staff screen lists a Free debate that waits for a check, and nobody can publish one by hand: it goes public by itself once the checks allow it, however long after it finished.');
+    expect(flat).toContain('Each finished one stays private and waits; the API tries its checks again by itself, and the debate goes public once the checks allow it, however long after it finished. No staff screen lists the waiting ones, and nobody can publish one by hand.');
   });
 
   it('says the checks take the gate\'s slots from the debates\' calls and the question check, as many as the code sends at once', () => {
@@ -251,11 +251,11 @@ describe('the runbook says what the end-of-debate check does by itself on this s
 
   it('5.1b: the answer held until the check answers, the deletion with no person, and the staff approval and where it is given', () => {
     expect(byItself).toContain('- **The end-of-debate check.** It runs on this server too, through the Anthropic gate, whenever the AI check above is on (STAFFCHECK, 1.6).');
-    expect(byItself).toContain('A finished debate\'s answer is held ("checking") until the check answers: usually a few seconds, at most about two minutes on a busy gate. If the check cannot answer (the gate refused it, was busy, or its day is used up), the answer shows unchecked, nothing is deleted, and the check runs again when the owner presses Publish.');
+    expect(byItself).toContain('A finished debate\'s answer is held ("checking") until the check answers: usually a few seconds, and never more than two minutes after the debate finished, however busy the gate. If the check cannot answer in that time (the gate refused it, was busy, or its day is used up), the answer shows unchecked, nothing is deleted, and the check runs again when the owner presses Publish, or, for a Free debate, when the API next tries to make it public. An answer that comes later can no longer flag or delete anything.');
     expect(byItself).toContain('A debate it finds touching "tendencies to suicide or harming other people" is deleted for good, with no person involved. The Terms (section 9) say so, and the owner sees the notice the site shows ("Am șters această dezbatere", in English "We deleted this debate"). Nobody can bring it back.');
     expect(byItself).toContain('Any of its other flags means that the owner\'s Publish of that debate needs a staff approval. The owner presses **Cereți aprobarea** ("Ask for approval") on the debate\'s page. A staff member with the Publication reviews permission decides on the **Publication reviews** page (Cereri de publicare)');
     expect(byItself).toContain('That works only while the staff screens are on and your staff key works under the name the site answers as: STAFFCHECK says `staff tools are on`, and after the rename only once 5.7 is done. Until then the request waits, and nobody can decide it.');
-    expect(byItself).toContain('A Free debate does not wait for that approval. Its own way to the public page (the first point above) reads the AI check for publication, not this check\'s flags: a Free debate this check flagged for anything but the deletion still goes public by itself when that AI check allows it.');
+    expect(byItself).not.toContain('A Free debate does not wait for that approval.');
     // The words quoted are the website's, and the hold's bound is the check's own time on the gate: D (at most 60 s) and the gate's slot wait.
     expect(say('ro', 'home', 'home.removal.title')).toBe('Am șters această dezbatere');
     expect(say('en', 'home', 'home.removal.title')).toBe('We deleted this debate');
@@ -270,8 +270,41 @@ describe('the runbook says what the end-of-debate check does by itself on this s
     expect(read('apps/api/src/staff/routes.ts')).toContain("{ route: 'POST /v1/admin/publication-reviews/{reviewRef}/approve', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW'");
   });
 
+  it('5.1b: a Free debate waits for the end-of-debate check, a flagged one waits for a staff approval its owner is not shown, and a public one is not deleted', () => {
+    expect(byItself).toContain('- **Free debates go public.** On the Free plan, a finished debate goes public by itself when two AI checks allow it, in this order: the end-of-debate check (below), then the AI check for publication.');
+    expect(byItself).toContain('A Free debate waits for that approval too. Its own way to the public page (the first point above) asks this check first: a clear answer, or a flag that a staff approval covers, lets it go on to the AI check for publication.');
+    expect(byItself).toContain('A Free debate this check flagged is never refused for good: it stays private and waits, and once a staff member approves it, it goes public on the API\'s next try (within a minute) if the AI check for publication allows it.');
+    expect(byItself).toContain('Its owner sees nothing of this on the debate\'s page (`/v4/debate/<id>`): no flag, no "waiting" and no **Cereți aprobarea**. Only the older page `/debate/<id>`, which no V4 page links to, shows the flag and the button.');
+    expect(byItself).toContain('The API looks at the 20 oldest waiting Free debates on each try. A flagged one stays among them until it is approved, so once 20 flagged ones wait, no newer Free debate goes public.');
+    expect(byItself).toContain('A debate that is already public when this check asks for its deletion is not deleted.');
+    expect(byItself).toContain('the API\'s log repeats `[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED` every 30 seconds for as long as it is public.');
+    expect(byItself).toContain('Meanwhile its owner is treated as if it were deleted: it leaves their list, their Publish answers that it is gone, and they see "We deleted this debate".');
+    // The sweep asks the owner's Publish gate first, waits on a flag without refusing, and publishes only an answer still shown.
+    const publications = read('apps/api/src/publications.ts');
+    expect(publications).toContain('if (decision === "APPROVAL_REQUIRED") return "WAITING_FOR_APPROVAL";');
+    expect(publications).toContain('if (state !== "SHOW") return state === "REMOVED" ? "REMOVED" : "WAITING_FOR_CHECK";');
+    expect(read('apps/api/src/main.ts')).toContain('endCheck: freeEndCheck,');
+    // The hold: the background time on the gate (D of at most 60 s plus the gate's slot wait of 60 s), less a margin the hold adds back.
+    expect(read('packages/providers/src/preview-test.ts')).toContain('export const PREVIEW_GATE_SLOT_WAIT_MS = 60_000 as const;');
+    expect(read('packages/serve/src/synthesis-check.ts')).toContain('return Math.max(1_000, longestHoldMs - SYNTHESIS_CHECK_SEAL_MARGIN_MS);');
+    // The sweep's list is the 20 oldest waiting asks; the erasure waits while the debate is public, and says so in the log.
+    expect(read('packages/db/src/public-debates.ts')).toContain('async readFreeToPublish(limit = 20)');
+    expect(read('migrations/0126_synthesis_check.sql')).toContain("IF v_latest_visibility='PUBLISHED' THEN\n        RETURN QUERY SELECT 'PUBLISHED'::text,NULL::uuid,v_request.run_id;");
+    expect(read('packages/db/src/synthesis-check-erasure.ts')).toContain('this.log("[SYNTHESIS_CHECK_ERASURE_WAITING] " + prepared.outcome);');
+    // Only the older page offers the review; the V4 debate page has none.
+    expect(read('apps/ui/components/PublicationControl.tsx')).toContain('<PublicationReviewPanel');
+    expect(read('apps/ui/components/v4/V4DebateClient.tsx')).not.toMatch(/PublicationReview|publicationReview/u);
+  });
+
+  it('6b: decision 1, the AICHECK reading and the test of 6b.2 step 4 say that a Free debate waits for the end-of-debate check', () => {
+    expect(decision).toContain('- On (AICHECK ends with `AICHECK_DONE`): a stranger\'s finished Free debate goes public by itself when the end-of-debate check and then the AI check for publication allow it, and anyone with its link can read it. One the end-of-debate check flagged stays private until a staff approval (5.1b).');
+    expect(flat).toContain('It also counts a debate that was already public when the check asked for its deletion, which is not deleted (5.1b).');
+    expect(flat).toContain('the end-of-debate check answers first (at most two minutes after the debate finished), then the AI check for publication.');
+    expect(flat).toContain('If it does not show and AICHECK has no `UNAVAILABLE` lines, the end-of-debate check may have flagged it: that account sees the flag only on `/debate/<id>` (5.1b). Ask.');
+  });
+
   it('decision 1: the end-of-debate check comes with the AI check, and a used-up gate stops new questions, the debates\' Claude Haiku calls and the checks until its next day', () => {
-    expect(decision).toContain('The end-of-debate check comes with it, the same way: it holds each finished debate\'s answer until it answers, deletes a debate it finds touching "tendencies to suicide or harming other people", and sends an owner\'s Publish of a debate with another flag to a staff approval (5.1b says all of it).');
+    expect(decision).toContain('The end-of-debate check comes with it, the same way: it holds each finished debate\'s answer until it answers, deletes a debate it finds touching "tendencies to suicide or harming other people", and sends an owner\'s Publish of a debate with another flag to a staff approval. A Free debate waits for it before it can go public: one it flagged waits for that approval, and one it is still checking waits at most two minutes after the debate finished (5.1b says all of it).');
     expect(decision).toContain('When the gate\'s pot or its day\'s calls are used up, everything that goes through the gate stops until its next day (midnight, Bucharest time). Nobody can ask a new question: the question check answers "unavailable". The debates\' Claude Haiku calls are refused. And the checks fail closed: no Free debate goes public, every report waits for a person, the end-of-debate check deletes nothing and finished answers show unchecked, and an owner\'s Publish answers that the check is not available.');
     // The gate refuses every caller on its day's two limits, and its day is Bucharest's; the question check then answers 503 "unavailable".
     const gate = read('packages/providers/ops/preview_budget_authority.py');
