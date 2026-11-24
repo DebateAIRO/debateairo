@@ -75,14 +75,14 @@ function withServer<T>(server: Server, body: (dir: string) => T): T {
     writeFileSync(join(dir, 'etc/api-cur.env'), ['PUBLIC_APP_URL=https://dezbatere.ro', 'DEBATEAI_DEPLOYMENT_MODE=hosted',
       `PREVIEW_PROVIDER_TEST_CONFIG_JSON=${JSON.stringify(config)}`, 'STAFF_ACCESS_POLICY_VERSION=2', ...(server.extra ?? []), ''].join('\n'));
     const go = server.go === undefined ? { allowed_peer_uids: [API_UID, 992], enabled_models: ['claude-haiku-5-5'] } : server.go;
-    // The GO also holds the owner's figures; AICHECK reads only its callers and its models, and prints neither.
-    if (go !== null) writeFileSync(join(dir, 'go.json'), JSON.stringify({ provider: 'anthropic', daily_budget_usd: '7.77', max_paid_posts_per_day: 321, ...go }));
+    // The GO also holds the owner's figures, here marker strings; AICHECK reads only its callers and its models, and prints neither.
+    if (go !== null) writeFileSync(join(dir, 'go.json'), JSON.stringify({ provider: 'anthropic', daily_budget_usd: 'amount-mark-daily', max_paid_posts_per_day: 321, ...go }));
     const gate = server.gate ?? { state: 'active', window_open: true };
-    // The gate's status as the real one prints it, its amounts included.
+    // The gate's status with the real one's fields, each amount a marker string that must not reach AICHECK's output.
     writeFileSync(join(dir, 'status.json'), JSON.stringify({ ...gate, reason: null, provider: 'anthropic', enabled_models: ['claude-haiku-5-5'],
-      today: '2026-11-24', daily_budget_usd: '7.77', today_spend_usd: '1.234567', remaining_today_usd: '6.535433', today_posts: 12,
-      max_paid_posts_per_day: 321, today_unbilled_releases: 1, in_flight: 0, today_booked_max: 0, today_booked_max_usd: '0.000000',
-      today_by_model: { 'claude-haiku-5-5': { spend_usd: '1.234567', posts: 12 } } }));
+      today: '2026-11-24', daily_budget_usd: 'amount-mark-daily', today_spend_usd: 'amount-mark-spent', remaining_today_usd: 'amount-mark-remaining', today_posts: 12,
+      max_paid_posts_per_day: 321, today_unbilled_releases: 1, in_flight: 0, today_booked_max: 0, today_booked_max_usd: 'amount-mark-booked',
+      today_by_model: { 'claude-haiku-5-5': { spend_usd: 'amount-mark-spent', posts: 12 } } }));
     return body(dir);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -163,7 +163,7 @@ describe('AICHECK reads the gate the check goes through, and what the checks did
     expect(result.lines).toContain('end-of-debate checks in the last day: answered 3, UNAVAILABLE DEADLINE 1, deleted 1');
     expect(result.last).toBe('AICHECK_DONE');
     // Names, states and counts only: none of the gate's or the GO's amounts.
-    for (const amount of ['7.77', '1.234567', '6.535433', '0.000000', 'usd', 'cost']) expect(result.out, amount).not.toContain(amount);
+    for (const amount of ['amount-mark', 'usd', 'cost']) expect(result.out, amount).not.toContain(amount);
     // The queries read outcomes, causes, verdicts and counts, never an amount or a token count.
     expect(result.queries).not.toMatch(/cost_usd|_tokens|charge/u);
   }));
@@ -179,7 +179,7 @@ describe('AICHECK reads the gate the check goes through, and what the checks did
     const result = aicheck(dir);
     expect(result.lines).toContain(line);
     expect(result.last).toBe('AICHECK_NOT_DONE: the check cannot go through the Anthropic gate (the lines above say why): ask');
-    for (const amount of ['7.77', '1.234567']) expect(result.out, amount).not.toContain(amount);
+    expect(result.out).not.toContain('amount-mark');
   }));
 
   it('not ready without the GO file', () => withServer({ go: null }, dir => {
