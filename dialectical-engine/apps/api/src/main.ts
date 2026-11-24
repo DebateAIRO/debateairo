@@ -206,7 +206,7 @@ import { readQuestionSubjects } from "./question-check/subjects.js";
 import { startTeamLimitNotices } from "./staff/team-limit.js";
 import { startThreatReportErasure } from "./staff/threat-report-closure.js";
 import { accountEmailReader } from "./staff/account-email.js";
-import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, readSynthesisTexts, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
+import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, readSynthesisTexts, synthesisCheckWindowMs, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
 import { ownerSession, readOwnerAnswer } from "./owner-read.js";
 import { SynthesisCheckWorker } from "./synthesis-check/worker.js";
 import type { SynthesisCheckDeps } from "./synthesis-check/check.js";
@@ -1776,8 +1776,12 @@ const synthesisCheckSwitch = createLocalOffFlagSwitch(contentCheckRoute.kind ===
   }), { offFlagPath: synthesisCheckOffFlag });
 const synthesisCheckRepository = new SynthesisCheckRepository(pool);
 const publicationReviewRepository = new PublicationReviewRepository(pool);
-// The answer is held while the worker's check may still run, so its hold follows the worker's deadline.
-const synthesisAnswerAccess = createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: backgroundCheckDeadlineMs });
+// The end-of-debate check's window, counted from the moment the debate finished: the background time less the seal margin,
+// so the answer's hold, which adds that margin for a last answer to be stored, ends within the background time (two
+// minutes on the gate, D without it) however late the worker reached the debate.
+const synthesisCheckWindow = synthesisCheckWindowMs(backgroundCheckDeadlineMs);
+// The answer is held while the worker's check may still run, so its hold follows the worker's window.
+const synthesisAnswerAccess = createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: synthesisCheckWindow });
 const synthesisCheckDeps: SynthesisCheckDeps = {
   port: synthesisCheckSwitch.current,
   deadlineMs: publicationCheckPolicy.deadlineMs,
@@ -1808,7 +1812,7 @@ const synthesisPublishGate = createSynthesisPublishGate({
     if (texts === null) throw new Error("SYNTHESIS_ANSWER_UNREADABLE");
     return texts;
   },
-  check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs, inFlightWindowMs: backgroundCheckDeadlineMs,
+  check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs, inFlightWindowMs: synthesisCheckWindow,
   clock: () => new Date(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 });
 // The worker checks each finished debate in the background: on the gate it may also wait out the gate's slot queue, and it
@@ -1817,8 +1821,8 @@ const synthesisPublishGate = createSynthesisPublishGate({
 const synthesisCheckWorker = new SynthesisCheckWorker({
   repository: synthesisCheckRepository, erasure: synthesisCheckErasure,
   withContentLease: (runId, use) => application.withContentLease(runId, use),
-  readAnswer: readSynthesisAnswer, check: { ...synthesisCheckDeps, deadlineMs: backgroundCheckDeadlineMs },
-  deadlineMs: backgroundCheckDeadlineMs,
+  readAnswer: readSynthesisAnswer, check: { ...synthesisCheckDeps, deadlineMs: synthesisCheckWindow },
+  deadlineMs: synthesisCheckWindow,
   ...contentCheckCallsAtOnce(contentCheckRoute, "BACKGROUND"),
   log: (line) => console.error(`[${line}]`)
 });

@@ -9,7 +9,17 @@ import {
 import { randomUUID } from "node:crypto";
 
 const SYNTHESIS_CHECK_SEALED_BYTES = 1024;
+/** How long past the check's window an answer stays held while a check that started inside the window stores its answer. */
 const SYNTHESIS_CHECK_SEAL_MARGIN_MS = 2_000;
+
+/**
+ * The end-of-debate check's window, from the moment the debate finished, inside the longest time an answer may be held:
+ * that time less the seal margin, so the hold, margin included, never lasts longer than `longestHoldMs` after the debate
+ * finished. Never under one second.
+ */
+export function synthesisCheckWindowMs(longestHoldMs: number): number {
+  return Math.max(1_000, longestHoldMs - SYNTHESIS_CHECK_SEAL_MARGIN_MS);
+}
 export type SynthesisAnswerAccessState = "SHOW" | "HELD" | "REMOVED";
 
 type Payload = {
@@ -65,15 +75,19 @@ export class SynthesisCheckRepository {
     return result.rowCount === 1 ? "INSERTED" : "ALREADY_PRESENT";
   }
 
+  /**
+   * Claims requests younger than the window. Each claim carries its request's own time, because a check ends at the
+   * request's time plus the window however late it was claimed (the worker's deadline, the hold and insertResult's late test).
+   */
   async claimNextRequests(limit: number, deadlineMs: number): Promise<{
     attemptId: string; requestId: string; runId: string; answerId: string;
-    answerVersion: number; startedAt: Date;
+    answerVersion: number; startedAt: Date; requestedAt: Date;
   }[]> {
     if (!Number.isInteger(limit) || limit < 1) return [];
     return withWriteTransaction(this.pool, async (client) => {
       const claims: {
         attemptId: string; requestId: string; runId: string; answerId: string;
-        answerVersion: number; startedAt: Date;
+        answerVersion: number; startedAt: Date; requestedAt: Date;
       }[] = [];
       let cursor: { requestedAt: Date; requestId: string } | null = null;
       while (claims.length < limit) {
@@ -136,7 +150,8 @@ export class SynthesisCheckRepository {
           const row = inserted.rows[0];
           if (row !== undefined) claims.push({
             attemptId: row.attempt_id, requestId: row.request_id, runId: row.run_id,
-            answerId: row.answer_id, answerVersion: row.answer_version, startedAt: row.started_at
+            answerId: row.answer_id, answerVersion: row.answer_version, startedAt: row.started_at,
+            requestedAt: candidate.requested_at
           });
           if (claims.length >= limit) break;
         }
@@ -191,10 +206,14 @@ export class SynthesisCheckRepository {
   }): Promise<"INSERTED" | "ALREADY_FINAL" | "RUN_ERASED" | "LATE"> {
     try {
       return await withRunContentLease(this.pool, [input.runId], async () => {
+        // The worker's attempt is late from its request's own time plus the window, however late it was claimed, so an
+        // answer that comes after the hold ended neither allows nor deletes. A Publish's attempt has no request: from its start.
         const deadline = await this.pool.query<{ late: boolean }>(
-          `SELECT clock_timestamp() >= attempt.started_at
+          `SELECT clock_timestamp() >= LEAST(attempt.started_at,COALESCE(request.requested_at,attempt.started_at))
              + make_interval(secs => $2::double precision / 1000.0) AS late
-           FROM serve.synthesis_check_attempt AS attempt WHERE attempt.attempt_id=$1`,
+           FROM serve.synthesis_check_attempt AS attempt
+           LEFT JOIN serve.synthesis_check_request AS request ON request.request_id=attempt.request_id
+           WHERE attempt.attempt_id=$1`,
           [input.attemptId, input.deadlineMs]
         );
         if (deadline.rows.length !== 1) throw new Error("SYNTHESIS_CHECK_ATTEMPT_MISSING");
@@ -282,6 +301,11 @@ export class SynthesisCheckRepository {
     });
   }
 
+  /**
+   * HELD while the request's check may still answer: until the request's time plus the window, and for the seal margin
+   * after that when an attempt started inside the window. Every bound counts from the request, never from a claim, so an
+   * answer is held at most the window plus the margin after its debate finished, however late the worker reached it.
+   */
   async readAnswerAccess(input: {
     runId: string; answerId?: string; answerVersion?: number; deadlineMs: number;
   }): Promise<SynthesisAnswerAccessState> {
@@ -316,12 +340,14 @@ export class SynthesisCheckRepository {
                                AND inheritance.answer_version=request.answer_version)
              AND (
                clock_timestamp() < request.requested_at + make_interval(secs => $4::double precision / 1000.0)
-               OR EXISTS (
-                 SELECT 1 FROM serve.synthesis_check_attempt AS attempt
-                 WHERE attempt.answer_id=request.answer_id AND attempt.answer_version=request.answer_version
-                   AND attempt.started_at < request.requested_at + make_interval(secs => $4::double precision / 1000.0)
-                   AND clock_timestamp() < attempt.started_at
-                     + make_interval(secs => ($4::double precision + $5::double precision) / 1000.0)
+               OR (
+                 clock_timestamp() < request.requested_at
+                   + make_interval(secs => ($4::double precision + $5::double precision) / 1000.0)
+                 AND EXISTS (
+                   SELECT 1 FROM serve.synthesis_check_attempt AS attempt
+                   WHERE attempt.answer_id=request.answer_id AND attempt.answer_version=request.answer_version
+                     AND attempt.started_at < request.requested_at + make_interval(secs => $4::double precision / 1000.0)
+                 )
                )
              )
          ) THEN 'HELD' ELSE 'SHOW' END AS state`,

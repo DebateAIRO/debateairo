@@ -399,7 +399,7 @@ describe("the gate's few slots: a check never queues a string of calls ahead of 
       const repository = {
         claimNextRequests: async (limit: number) => {
           limits.push(limit);
-          return waiting.splice(0, limit).map((id) => ({ attemptId: id, requestId: id, runId: id, answerId: id, answerVersion: 1, startedAt: new Date() }));
+          return waiting.splice(0, limit).map((id) => ({ attemptId: id, requestId: id, runId: id, answerId: id, answerVersion: 1, startedAt: new Date(), requestedAt: new Date() }));
         },
         ownerRefOfRun: async () => "owner", readRecords: async () => [], readFinalResultId: async () => null,
         insertResult: async (input: Readonly<{ answerId: string }>) => { checked.push(input.answerId); return "INSERTED" as const; },

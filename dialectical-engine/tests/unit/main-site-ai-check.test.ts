@@ -264,7 +264,8 @@ describe('the runbook says what the end-of-debate check does by itself on this s
     expect(say('ro', 'staff', 'staff.reviews.link')).toBe('Cereri de publicare');
     expect(say('en', 'staff', 'staff.reviews.link')).toBe('Publication reviews');
     expect(read('packages/register/src/publication-check-policy.ts')).toContain('deadline_ms: z.number().int().min(1_000).max(60_000)');
-    expect(read('apps/api/src/main.ts')).toContain('createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: backgroundCheckDeadlineMs })');
+    expect(read('apps/api/src/main.ts')).toContain('createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: synthesisCheckWindow })');
+    expect(read('apps/api/src/main.ts')).toContain('const synthesisCheckWindow = synthesisCheckWindowMs(backgroundCheckDeadlineMs);');
     expect(read('packages/contract/src/synthesis-check.ts')).toContain('return outcome.verdict === "FLAGGED" && outcome.categories.includes("SUICIDE_OR_HARM_TO_OTHERS");');
     expect(read('apps/api/src/staff/routes.ts')).toContain("{ route: 'POST /v1/admin/publication-reviews/{reviewRef}/approve', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW'");
   });

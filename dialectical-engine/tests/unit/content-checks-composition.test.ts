@@ -152,11 +152,12 @@ describe("main.ts wires the route, the times, the calls at once and the sweeps' 
     expect(api).toMatch(/^\s+publicationContentCheck,$/mu);
     expect(main).toContain(": sweepPublicationContentCheck.check(request) });");
     expect(main).toContain("? publicReportContentCheck.check({ runId: request.runId.slice(REPORT_CHECK_PREFIX.length), snapshot: request.snapshot })");
-    // The synthesis check: its publish gate keeps D, and waits for a worker's check that may run for the background time;
-    // its worker and the answer's hold take the background time.
-    expect(check("synthesisPublishGate")).toContain("check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs, inFlightWindowMs: backgroundCheckDeadlineMs,");
-    expect(check("synthesisCheckWorker")).toContain("check: { ...synthesisCheckDeps, deadlineMs: backgroundCheckDeadlineMs },\n  deadlineMs: backgroundCheckDeadlineMs,");
-    expect(main).toContain("createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: backgroundCheckDeadlineMs })");
+    // The synthesis check: its publish gate keeps D, and waits for a worker's check that may run for the check's window; its
+    // worker and the answer's hold take that window, which with the seal margin fits in the background time.
+    expect(main).toContain("const synthesisCheckWindow = synthesisCheckWindowMs(backgroundCheckDeadlineMs);");
+    expect(check("synthesisPublishGate")).toContain("check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs, inFlightWindowMs: synthesisCheckWindow,");
+    expect(check("synthesisCheckWorker")).toContain("check: { ...synthesisCheckDeps, deadlineMs: synthesisCheckWindow },\n  deadlineMs: synthesisCheckWindow,");
+    expect(main).toContain("createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: synthesisCheckWindow })");
     // Its day-pot read and its spend record stay as they were, for both.
     const deps = main.slice(main.indexOf("const synthesisCheckDeps: SynthesisCheckDeps = {"), main.indexOf("\n};", main.indexOf("const synthesisCheckDeps: SynthesisCheckDeps = {")));
     expect(deps).toContain("deadlineMs: publicationCheckPolicy.deadlineMs,");

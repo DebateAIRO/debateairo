@@ -5,7 +5,7 @@ import { configureContentEncryption, contentCipherFor, createPool, encryptAttest
   migrate, withRunContentLease, type Pool } from "@debateai/db";
 import { FileRunContentKeyStore } from "@debateai/crypto";
 import { PostgresModelSpendStore } from "@debateai/budget";
-import { ServeRepository, SynthesisCheckRepository } from "@debateai/serve";
+import { ServeRepository, SynthesisCheckRepository, synthesisCheckWindowMs } from "@debateai/serve";
 import type { Answer } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import { readPromptFrame } from "../../packages/providers/src/prompt-frame.js";
@@ -117,6 +117,7 @@ async function workerFor(options: {
   readAnswer?: (_runId: string, answerId: string, version: number, ownerRef: string) => Promise<Answer | null>;
   log?: (line: string) => void;
   deadlineMs?: number;
+  maxConcurrentCalls?: number;
   recordSpend?: (entry: {
     spendSource: "SYNTHESIS_CHECK"; runId: string; providerRef: string; chargedOn: string;
     inputTokens: number; outputTokens: number; chargeMicros: number
@@ -138,6 +139,7 @@ async function workerFor(options: {
       clock: () => new Date(), log: () => {}
     },
     deadlineMs: options.deadlineMs ?? 60_000,
+    ...(options.maxConcurrentCalls === undefined ? {} : { maxConcurrentCalls: options.maxConcurrentCalls }),
     log: options.log ?? (() => {})
   });
 }
@@ -498,4 +500,94 @@ describe("synthesis check worker under debateai_runtime", () => {
     expect((await repository.readRecords({ ...answer, maxVersion: 1 }))[0]?.outcome)
       .toEqual({ verdict: "UNAVAILABLE", categories: [], failureCode: "DEADLINE" });
   });
+});
+
+describe("a finished answer is held at most the background time after its debate finished, however late the worker reaches it", () => {
+  // As main.ts composes it, in seconds instead of minutes: the background time is the longest an answer may be held; the
+  // worker's claims, its check and the hold take the window inside it, the background time less the 2 s seal margin.
+  const LONGEST_HOLD_MS = 10_000;
+  const WINDOW_MS = LONGEST_HOLD_MS - 2_000;
+  /** A busy gate: each call waits its turn in the gate's queue, 6 s in all, and the model then asks for the debate's removal. */
+  const BUSY_CALL_MS = 6_000;
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
+  const requestedAtOf = async (answerId: string): Promise<number> => (await runtime.query<{ requested_at: Date }>(
+    "SELECT requested_at FROM serve.synthesis_check_request WHERE answer_id=$1", [answerId])).rows[0]!.requested_at.getTime();
+
+  /**
+   * `count` debates finish together; one tick of the worker as on the gate (one check at a time) runs over them. Just after
+   * the longest hold from the last one's finish, while the tick may still be running, each answer's hold is read.
+   */
+  async function finishTogether(count: number) {
+    const answers = [];
+    for (let index = 0; index < count; index++) answers.push(await settledComponentsOnly());
+    for (const answer of answers) await repository.insertRequest(answer);
+    const finishedAt = await Promise.all(answers.map((answer) => requestedAtOf(answer.answerId)));
+    const called: number[] = [];
+    const worker = await workerFor({
+      text: "The synthesis urges harm.", deadlineMs: WINDOW_MS, maxConcurrentCalls: 1,
+      port: () => ({ ...modelPort([0, 0, 1, 0]), complete: async ({ packet }: { packet: PromptPacket; signal: AbortSignal }) => {
+        called.push(Date.now());
+        await sleep(BUSY_CALL_MS);
+        return { text: modelReply(packet, [0, 0, 1, 0]), usage: { input_tokens: 900, output_tokens: 40 } };
+      } })
+    });
+    const tick = worker.runOnce();
+    await sleep(Math.max(...finishedAt) + LONGEST_HOLD_MS + 300 - Date.now());
+    const holds = await Promise.all(answers.map((answer) => repository.readAnswerAccess({ ...answer, deadlineMs: WINDOW_MS })));
+    await tick;
+    const outcomes = await Promise.all(answers.map(async (answer) =>
+      (await repository.readRecords({ ...answer, maxVersion: 1 })).map((record) => record.outcome)));
+    const removed = await Promise.all(answers.map((answer) => repository.runRemovedByCheck(answer.runId)));
+    return { holds, outcomes, removed, called };
+  }
+
+  it("the composed window is the background time less the seal margin", () => {
+    expect(synthesisCheckWindowMs(LONGEST_HOLD_MS)).toBe(WINDOW_MS);
+    expect(synthesisCheckWindowMs(120_000)).toBe(118_000);
+    expect(synthesisCheckWindowMs(60_000)).toBe(58_000);
+  });
+
+  it("two debates finish together on a busy gate: the first is checked in time; the second, reached late, gets what is left of its window, its late answer deletes nothing, and neither is held past the background time", async () => {
+    const { holds, outcomes, removed, called } = await finishTogether(2);
+    expect(holds.map((hold) => hold === "HELD")).toEqual([false, false]);
+    // The first answered in its window: the removal it asked for stands.
+    expect(outcomes[0]).toEqual([{ verdict: "FLAGGED", categories: ["SUICIDE_OR_HARM_TO_OTHERS"] }]);
+    expect(removed[0]).toBe(true);
+    // The second was claimed when the first answered; its check ran out at its own finish plus the window, before the model
+    // answered, so the answer shows unchecked and nothing is deleted.
+    expect(called).toHaveLength(2);
+    expect(outcomes[1]).toEqual([{ verdict: "UNAVAILABLE", categories: [], failureCode: "DEADLINE" }]);
+    expect(removed[1]).toBe(false);
+  }, 30_000);
+
+  it("five debates finish together on a busy gate: no answer is held past the background time; those the worker never reached show unchecked", async () => {
+    const { holds, outcomes, removed, called } = await finishTogether(5);
+    expect(holds.filter((hold) => hold === "HELD")).toEqual([]);
+    expect(called).toHaveLength(2);
+    expect(outcomes[1]).toEqual([{ verdict: "UNAVAILABLE", categories: [], failureCode: "DEADLINE" }]);
+    expect(outcomes.slice(2)).toEqual([[], [], []]);
+    expect(holds.slice(1)).toEqual(["SHOW", "SHOW", "SHOW", "SHOW"]);
+    expect(removed).toEqual([true, false, false, false, false]);
+  }, 30_000);
+
+  it("an answer stored after its request's time plus the window, by a check claimed late, is stored as run out of time: it neither allows nor deletes", async () => {
+    const answer = await settledComponentsOnly();
+    await repository.insertRequest(answer);
+    const finishedAt = await requestedAtOf(answer.answerId);
+    // Claimed a second after the debate finished, inside a 2 s window.
+    await sleep(finishedAt + 1_000 - Date.now());
+    const [claim] = await repository.claimNextRequests(1, 2_000);
+    expect(claim?.answerId).toBe(answer.answerId);
+    // Past the request's own time plus the window, but not yet past the claim's.
+    await sleep(finishedAt + 2_300 - Date.now());
+    expect(await repository.insertResult({
+      attemptId: claim!.attemptId, runId: answer.runId, answerId: answer.answerId, answerVersion: 1, synthesisOriginVersion: 1,
+      outcome: { verdict: "FLAGGED", categories: ["SUICIDE_OR_HARM_TO_OTHERS"] }, modelProviderRef: "anthropic", modelId: "claude-haiku-5-5",
+      policyVersion: "synthesis.content-check.v1@0123456789abcdef", callCount: 1, deadlineMs: 2_000
+    })).toBe("LATE");
+    expect((await repository.readRecords({ ...answer, maxVersion: 1 })).map((record) => record.outcome))
+      .toEqual([{ verdict: "UNAVAILABLE", categories: [], failureCode: "DEADLINE" }]);
+    expect(await repository.runRemovedByCheck(answer.runId)).toBe(false);
+    expect(await repository.readAnswerAccess({ ...answer, deadlineMs: 2_000 })).toBe("SHOW");
+  }, 30_000);
 });

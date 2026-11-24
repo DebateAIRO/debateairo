@@ -28,8 +28,8 @@ export class SynthesisCheckWorker {
 
   /**
    * One tick: up to four finished debates checked. A round claims as many as may run at once and checks them; with fewer at
-   * once than four (the gate), the next round claims only when the last one has answered, so each claim's own time starts
-   * when it is checked. With four at once there is one round, as before.
+   * once than four (the gate), the next round claims only when the last one has answered, so nothing claimed waits behind
+   * another check. Every check still ends at its request's time plus the window. With four at once there is one round, as before.
    */
   async runOnce(): Promise<void> {
     try {
@@ -81,10 +81,12 @@ export class SynthesisCheckWorker {
             return false;
           }
         }
+        // The check ends at its request's own time plus the window, as the hold does: a debate claimed late (on the gate the
+        // worker checks one at a time) gets what is left of its window, not a new window of its own.
         const result = await runSynthesisCheck(this.deps.check, {
           runId: claim.runId, answerId: claim.answerId, answerVersion: claim.answerVersion,
           synthesisText: texts.get(claim.answerVersion) ?? null,
-          deadlineAt: new Date(claim.startedAt.getTime() + this.deps.deadlineMs)
+          deadlineAt: new Date(Math.min(claim.requestedAt.getTime(), claim.startedAt.getTime()) + this.deps.deadlineMs)
         });
         const inserted = await this.deps.repository.insertResult({
           attemptId: claim.attemptId, runId: claim.runId, answerId: claim.answerId,
