@@ -538,7 +538,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
    * Decision 13: A FREE DEBATE GOES PUBLIC when finished, with no session: the same body and the same publication check as an owner's publish, the clarifying answers published with the
    * question and checked with it. A refusal keeps it private for good; an unavailable check records nothing, and the sweep tries again. 0137's core.publish_free_debate does the rest.
    * Before the publication check, the end-of-debate check must allow this answer through the gate an owner's Publish passes (#endCheckOf); under the lease that
-   * publishes, the answer must still be the one both checks read and the debate not removed by that check, as an owner's Publish re-reads its answer there.
+   * publishes, the answer must still be the one both checks read and the debate neither held nor removed by that check, as an owner's Publish re-reads its answer there.
    */
   async publishFreeDebate(input: Readonly<{
     runId: string; answer: Answer; owner: { userId: string; ownerRef: string }; purposeLines: PurposeLines | null; source: AuthSourceContext; contentCheck: PublicationContentCheck;
@@ -579,9 +579,12 @@ export class PostgresPublicationApplication implements PublicationApplication {
     }
     if (checked.outcome !== "ALLOW") return "CHECK_UNAVAILABLE";
     return input.lease.run(async () => {
-      // Under this lease no new answer version and no removal can be written for the run, so what is read here holds until
-      // the debate is public. An answer that moved on while the checks ran is not the one they allowed: the next pass
-      // checks the new one.
+      // The run's content lease is shared: holding it does not stop a verdict, a removal or a new answer version from being
+      // written meanwhile (the check's own insert takes the same shared lease). What keeps this publish safe is the gate's
+      // rule: its PROCEED rests on the one final verdict of record for this synthesis, or on an approval, which is never
+      // withdrawn, and a later version of the answer keeps the same synthesis. These reads catch only what was written
+      // before them: an answer that moved on while the checks ran (the next pass checks the new one), or a hold or a
+      // removal now in force.
       const current = await input.lease.readAnswer();
       if (current === null) return "NOT_WAITING";
       if (current.run_ref !== input.runId || current.answer_id !== input.answer.answer_id

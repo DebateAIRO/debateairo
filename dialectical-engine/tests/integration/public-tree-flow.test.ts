@@ -1347,6 +1347,24 @@ describe("Free debates go public when finished", () => {
     expect((await database.pool.query("SELECT 1 FROM core.run_visibility_event WHERE run_id=$1", [refused])).rowCount).toBe(0);
   });
 
+  it("a hold or a deletion of the end-of-debate check that comes while the publication check runs publishes nothing: the publish reads that check's state again", async () => {
+    const ana = await account();
+    const owner = { userId: ana.userId, ownerRef: ana.ownerRef };
+    const source = { ip: "", userAgent: "", requestId: "test" };
+    for (const [later, outcome] of [["REMOVED", "REMOVED"], ["HELD", "WAITING_FOR_CHECK"]] as const) {
+      const run = await finishedFree(ana);
+      const answer = answerOf(run);
+      // The end-of-debate check allows the answer; while the publication check runs, its state changes.
+      let state: "SHOW" | "HELD" | "REMOVED" = "SHOW";
+      const endCheck: FreeEndCheck = { stateOf: async () => state, decide: async () => "PROCEED" };
+      const allowMeanwhile: PublicationContentCheck = { check: async () => { state = later; return { outcome: "ALLOW" }; } };
+      expect(await application().publishFreeDebate({ runId: run, answer, owner, purposeLines: null, source, contentCheck: allowMeanwhile, endCheck,
+        store: freeStore(), lease: stageLease(answer) })).toBe(outcome);
+      expect((await database.pool.query("SELECT 1 FROM core.run_visibility_event WHERE run_id=$1", [run])).rowCount).toBe(0);
+      expect((await database.pool.query<{ outcome: string | null }>("SELECT outcome FROM identity.free_public_ask WHERE run_id=$1", [run])).rows[0]).toEqual({ outcome: null });
+    }
+  });
+
   it("on the test site the check goes through the Anthropic gate: a finished Free debate goes public, and its record names the gate's model", async () => {
     const ana = await account();
     const run = await finishedFree(ana);
