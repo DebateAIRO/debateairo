@@ -20,6 +20,11 @@ import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import { safeReturnPath } from '@/lib/returnPath';
 import authEnglish from '@/messages/en/auth.json';
 type LoginClient = Pick<ContractClient, 'beginLogin' | 'completeLogin'> & Partial<Pick<ContractClient, 'authProviders' | 'beginSocialLogin' | 'beginPasskeyLogin' | 'completePasskeyLogin' | 'resendVerification'>>;
+/** The browser's prompt ended without a passkey (closed, or none of the named passkeys here), or the site refused the one given. */
+function passkeyNotUsed(failure: unknown): boolean {
+    return (typeof failure === 'object' && failure !== null && (failure as { name?: unknown }).name === 'NotAllowedError')
+        || (failure instanceof ContractHttpError && failure.serverCode === 'AUTH_CREDENTIALS_INVALID');
+}
 async function navigateHome() {
     const next = new URLSearchParams(window.location.search).get('next');
     window.location.assign(await ageConfirmationRequired() ? ageConfirmationHref(next) : safeReturnPath(next));
@@ -183,8 +188,10 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         }
         catch (failure) {
             if (dispatched.current && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
+            // After email and password the browser offers only this account's passkeys. A closed prompt or a refused passkey there
+            // may mean this device holds none of them, where trying again cannot help: say so, and point to the other ways in.
             if (owner === sequence.current)
-                setError(t(catalog, "auth.passkey.cancelled"));
+                setError(t(catalog, continuation && passkeyNotUsed(failure) ? "auth.passkey.notOnThisDevice" : "auth.passkey.cancelled"));
         }
         finally {
             if (owner === sequence.current) {

@@ -902,3 +902,95 @@ it('NV-41: a full store still admits a password-continuation passkey begin', asy
     expect(await passkeyRows()).toBe(passkeyLowWater + 1);
     expect(await passkeyRows("user_id=$1 AND purpose='LOGIN'", [a.userId])).toBe(1);
 });
+
+describe('the passkeys a sign-in after the first step may use (0187): only the bound account\'s own, never before the first step', () => {
+    const allowSql = 'SELECT identity.read_consumer_passkey_allow_credentials($1,$2) AS value';
+    const binding = () => sessions.consumerProducer().bindingHash(source);
+    /** Each account's authenticator, which a first step's continuation names (one per account, written once). */
+    const factors = new Map<string, string>();
+    /** A first step that passed (email and password) for the account: its continuation token, as SessionService hands it out. */
+    async function continued(a: Awaited<ReturnType<typeof enrolled>>) {
+        let factorId = factors.get(a.userId);
+        if (factorId === undefined) {
+            factorId = randomUUID();
+            factors.set(a.userId, factorId);
+            await withMailLocale(database.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at,last_accepted_step) VALUES($1,$2,'totp','{}','active',now(),now(),1)`, [factorId, a.userId]));
+        }
+        const continuation = token();
+        const identity = { userId: a.userId, ownerRef: a.ownerRef, auditToken: a.auditToken, passwordHash: fixturePassword, factorId, secretCiphertext: env, lastAcceptedStep: 1 };
+        expect(await new PostgresSessionRepository(runtime, audit).createLoginChallenge({ identity, challengeId: randomUUID(), challengeTokenHash: hashToken('login-challenge', continuation), bindingHash: binding(), occurredAt: new Date(), expiresAt: new Date(Date.now() + 300000), source })).toBe(true);
+        return continuation;
+    }
+    /** One more passkey row of the account, written as the database holds it. */
+    async function stored(userId: string, values: Readonly<{ rpId?: string; origin?: string; transports?: string[]; revoked?: boolean }> = {}) {
+        const id = token();
+        await withMailLocale(database.pool, 'en', (c) => c.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,transports,rp_id,origin,revoked_at)
+            VALUES($1,$2,$3,0,'multiDevice',true,$4,$5,$6,CASE WHEN $7 THEN clock_timestamp() END)`, [userId, id, b64(consumerFixture().k.wire), values.transports ?? [], values.rpId ?? rpId, values.origin ?? origin, values.revoked ?? false]));
+        return id;
+    }
+    const allowed = async (handle: string, bindingHash = binding()) => ((await systemRuntime.query(allowSql, [handleHash('LOGIN', handle), bindingHash])).rows[0].value as Array<{ id: string; transports: string[] }>);
+    it('names the bound account\'s passkeys that could pass, and no other account\'s, revoked one or one of another site name or origin', async () => {
+        const a = await enrolled(), other = await enrolled(), continuation = await continued(a);
+        const second = await stored(a.userId, { transports: ['usb', 'nfc'] });
+        await stored(a.userId, { revoked: true });
+        await stored(a.userId, { rpId: 'old.example.test', origin: 'https://old.example.test' });
+        await stored(a.userId, { origin: 'https://other.app.example.test' });
+        const o = await service.beginPasskeyLogin({ continuation_token: continuation }, source);
+        expect(o.options.allowCredentials?.map((c) => c.id)).toEqual([a.f.credentialId, second]);
+        expect(o.options.allowCredentials?.[1]).toEqual({ id: second, type: 'public-key', transports: ['usb', 'nfc'] });
+        expect(o.options.allowCredentials?.map((c) => c.id)).not.toContain(other.f.credentialId);
+        // The function itself, for the challenge just written: oldest first, ids and transports only.
+        const listed = await allowed(o.challenge_handle);
+        expect(listed.map((c) => c.id)).toEqual([a.f.credentialId, second]);
+        expect(listed.every((c) => Object.keys(c).sort().join() === 'id,transports')).toBe(true);
+        // Another browser's binding reads nothing.
+        expect(await allowed(o.challenge_handle, hash('another browser'))).toEqual([]);
+        // The repository reaches it from inside a request on its cross-account site (X36), where the request login could not.
+        expect((await runInRequestScope(() => repo.readAllowCredentials(handleHash('LOGIN', o.challenge_handle), binding()))).map((c) => c.id)).toEqual([a.f.credentialId, second]);
+        // The list changes nothing of the sign-in: the account's passkey completes it, and the used challenge then names nothing.
+        const result = await service.completePasskeyLogin({ challenge_handle: o.challenge_handle, credential: a.f.assertion(o.options.challenge, { userHandle: a.userHandle }) }, source);
+        expect(result.status).toBe('authenticated');
+        expect(await allowed(o.challenge_handle)).toEqual([]);
+    });
+    it('names nothing before the first step, for a refused, run out or used challenge or continuation, or a held account', async () => {
+        const a = await enrolled();
+        // The "sign in with a passkey" button: no account is bound and nothing is proved, so no list at all.
+        const anonymous = await service.beginPasskeyLogin({}, source);
+        expect(anonymous.options.allowCredentials).toBeUndefined();
+        expect(await allowed(anonymous.challenge_handle)).toEqual([]);
+        // A continuation that never passed a first step writes no challenge and reads no list.
+        await expect(service.beginPasskeyLogin({ continuation_token: token() }, source)).rejects.toMatchObject({ code: 'AUTH_CREDENTIALS_INVALID' });
+        for (const mutation of ['challenge expired', 'challenge used', 'continuation used', 'continuation expired', 'held', 'suspended']) {
+            const continuation = await continued(a), o = await service.beginPasskeyLogin({ continuation_token: continuation }, source);
+            expect((await allowed(o.challenge_handle)).map((c) => c.id), mutation).toEqual([a.f.credentialId]);
+            const h = handleHash('LOGIN', o.challenge_handle), t = hashToken('login-challenge', continuation);
+            if (mutation === 'challenge expired')
+                await database.pool.query('UPDATE identity.consumer_passkey_challenge SET expires_at=clock_timestamp() WHERE handle_hash=$1', [h]);
+            if (mutation === 'challenge used')
+                await database.pool.query('UPDATE identity.consumer_passkey_challenge SET consumed_at=clock_timestamp() WHERE handle_hash=$1', [h]);
+            if (mutation === 'continuation used')
+                await database.pool.query('UPDATE identity.login_challenge SET consumed_at=clock_timestamp() WHERE token_hash=$1', [t]);
+            if (mutation === 'continuation expired')
+                await database.pool.query("UPDATE identity.login_challenge SET expires_at=created_at+interval '1 microsecond' WHERE token_hash=$1", [t]);
+            if (mutation === 'held')
+                await database.pool.query('INSERT INTO identity.account_security_hold(user_id,held,security_epoch) VALUES($1,true,0) ON CONFLICT(user_id) DO UPDATE SET held=true', [a.userId]);
+            if (mutation === 'suspended')
+                await database.pool.query("UPDATE identity.\"user\" SET state='suspended' WHERE user_id=$1", [a.userId]);
+            expect(await allowed(o.challenge_handle), mutation).toEqual([]);
+            if (mutation === 'held')
+                await database.pool.query('UPDATE identity.account_security_hold SET held=false WHERE user_id=$1', [a.userId]);
+        }
+    });
+    it('is the cross-account marker\'s alone, with the owner and search path of the stored-credential read: the request login and PUBLIC may not run it', async () => {
+        const fn = 'identity.read_consumer_passkey_allow_credentials(text,text)';
+        const can = async (role: string) => (await database.pool.query("SELECT has_function_privilege($1,$2,'EXECUTE') AS allowed", [role, fn])).rows[0].allowed;
+        expect(await can('consumer_test_runtime_system')).toBe(true);
+        expect(await can('debateai_rls_all_accounts')).toBe(true);
+        for (const role of ['consumer_test_runtime', 'debateai_authorization_runtime', 'debateai_runtime', 'debateai_billing_runtime', 'public']) expect(await can(role), role).toBe(false);
+        await expect(runtime.query(allowSql, [hash('handle'), hash('binding')])).rejects.toMatchObject({ code: '42501' });
+        const shape = (await database.pool.query(`SELECT p.prosecdef,p.proconfig,p.provolatile,p.proowner=(SELECT proowner FROM pg_proc WHERE oid='identity.read_consumer_passkey_credential(text,text,text)'::regprocedure) AS owner,
+            (SELECT array_agg(coalesce(pg_get_userbyid(nullif(a.grantee,0))::text,'PUBLIC') ORDER BY 1)::text[] FROM aclexplode(p.proacl) a WHERE a.grantee<>p.proowner) AS grantees
+            FROM pg_proc p WHERE p.oid=$1::regprocedure`, [fn])).rows[0];
+        expect(shape).toEqual({ prosecdef: true, proconfig: ['search_path=pg_catalog'], provolatile: 's', owner: true, grantees: ['debateai_rls_all_accounts'] });
+    });
+});

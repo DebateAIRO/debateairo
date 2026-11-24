@@ -92,3 +92,58 @@ describe('consumer ceremony HTTP trust boundary', () => {
 });
 import {vi} from 'vitest';
 it('source admission refuses auth-method availability before the metadata producer or provider-capability work',async()=>{const methods=vi.fn().mockResolvedValue({methods:[],recovery_codes_remaining:0,available_step_up_methods:[],step_up_providers:[]}),decide=vi.fn().mockReturnValue({allowed:false,reason:'LIMIT',retryAfterMs:1000,windowMs:60000}),diagnostic=vi.spyOn(console,'error').mockImplementation(()=>undefined);const api=buildApi({application:{} as AskApplication,allowedOrigin:origin,sessions:{authenticate:async()=>session,verifyCsrf:()=>true} as never,consumerSecurity:{authMethods:methods} as never,admission:{decide} as never});try{const response=await api.inject({method:'GET',url:'/v1/account/auth-methods',headers});expect(response.statusCode).toBe(429);expect(response.json()).toEqual({error:'ADMISSION_RATE_LIMITED',message:'ADMISSION_RATE_LIMITED'});expect(methods).not.toHaveBeenCalled();expect(decide).toHaveBeenCalledWith('publicReads',expect.any(String),expect.any(Date));expect(diagnostic).toHaveBeenCalledWith(expect.stringContaining('api.admission.refused'));}finally{await api.close();diagnostic.mockRestore();}});
+import { ConsumerWebAuthnService } from '../../apps/api/src/consumer-webauthn.js';
+import type { ConsumerAllowCredential } from '@debateai/db';
+describe('a passkey sign-in after the first step, over HTTP: the browser is told only the bound account\'s own passkeys', () => {
+    const continuation = 'k'.repeat(43);
+    /** The real ceremony service behind the real routes, on a stand-in repository that answers `list` for a bound challenge. */
+    function served(list: readonly ConsumerAllowCredential[]) {
+        const reads: string[] = [];
+        const unused = async () => { throw new Error('UNUSED'); };
+        const repository = {
+            beginLogin: async () => ({ expiresAt: new Date(Date.now() + 300000).toISOString() }),
+            readAllowCredentials: async (handleHash: string) => { reads.push(handleHash); return list; },
+            readChallenge: unused, readCredential: unused, beginEnrollment: unused, completeEnrollment: unused, completeLogin: unused
+        };
+        const producer = { admit: async () => ({ retentionKey: 'sha256:' + 'a'.repeat(64), challengeCapacity: 1000, challengesPerScope: 10 }), bindingHash: () => 'sha256:' + 'b'.repeat(64), prepare: () => { throw new Error('UNUSED'); }, committed: unused };
+        const api = buildApi({ application: {} as AskApplication, allowedOrigin: origin, sessions: { authenticate: async () => null, verifyCsrf: () => false } as unknown as SessionApplication,
+            consumerWebAuthn: new ConsumerWebAuthnService(repository as never, producer as never, { publicAppUrl: origin }) });
+        const client = createContractClient(origin, async (input, init) => {
+            const response = await api.inject({ method: (init?.method ?? 'GET') as 'POST', url: new URL(input instanceof Request ? input.url : String(input)).pathname, headers: { origin, 'content-type': 'application/json' }, payload: init?.body as string });
+            return new Response(response.body, { status: response.statusCode, headers: { 'content-type': 'application/json' } });
+        });
+        return { api, client, reads };
+    }
+    it('with a continuation the options carry exactly the account\'s qualifying ids; the browser-side contract keeps them', async () => {
+        const { api, client, reads } = served([{ id: 'AQID', transports: ['usb', 'nfc'] }, { id: 'BAUG', transports: [] }]);
+        try {
+            const options = await client.beginPasskeyLogin({ continuation_token: continuation });
+            expect(reads).toHaveLength(1);
+            expect(options.options.allowCredentials).toEqual([{ id: 'AQID', type: 'public-key', transports: ['usb', 'nfc'] }, { id: 'BAUG', type: 'public-key' }]);
+        }
+        finally {
+            await api.close();
+        }
+    });
+    it('without a continuation no list is read or sent, and an account with no qualifying passkey gets none either', async () => {
+        const listed = served([{ id: 'AQID', transports: ['internal'] }]);
+        try {
+            const options = await listed.client.beginPasskeyLogin();
+            expect(listed.reads).toEqual([]);
+            expect(options.options.allowCredentials).toBeUndefined();
+        }
+        finally {
+            await listed.api.close();
+        }
+        const none = served([]);
+        try {
+            const raw = await none.api.inject({ method: 'POST', url: '/v1/auth/passkeys/login/options', headers: { origin, 'content-type': 'application/json' }, payload: { continuation_token: continuation } });
+            expect(raw.statusCode).toBe(200);
+            expect(none.reads).toHaveLength(1);
+            expect(raw.json().options).not.toHaveProperty('allowCredentials');
+        }
+        finally {
+            await none.api.close();
+        }
+    });
+});

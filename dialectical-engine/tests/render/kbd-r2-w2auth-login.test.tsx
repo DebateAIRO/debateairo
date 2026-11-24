@@ -121,3 +121,46 @@ it("AUTH-15: a social sign-in that fails to start gives focus back to the presse
   expect(document.activeElement).not.toBe(document.body);
   expect(document.activeElement).toBe(second);
 });
+
+it("after email and password, a passkey step that ends without a passkey says this device may hold none of the account's; the first screen keeps the cancelled sentence", async () => {
+  const alert = () => document.querySelector("[role=alert]")?.textContent;
+  for (const failure of [new DOMException("cancelled", "NotAllowedError"), new ContractHttpError("SESSION_REQUIRED", 401, "AUTH_CREDENTIALS_INVALID", "AUTH_CREDENTIALS_INVALID")]) {
+    const browser = { supportsConditional: async () => false, authenticate: vi.fn(), register: vi.fn(), cancel: vi.fn() };
+    const client = {
+      beginLogin: vi.fn().mockResolvedValue({ status: "mfa_required", challenge_token: "a".repeat(43), available_methods: ["passkey", "totp"] }),
+      completeLogin: vi.fn(), beginPasskeyLogin: vi.fn().mockResolvedValue({ challenge_handle: "h", options: {} }), completePasskeyLogin: vi.fn()
+    };
+    if (failure instanceof DOMException) browser.authenticate.mockRejectedValue(failure);
+    else { browser.authenticate.mockResolvedValue({}); client.completePasskeyLogin.mockRejectedValue(failure); }
+    await mount(client, browser);
+    pressByKeyboard(button(auth["auth.passkey.signIn"]));
+    await settled();
+    expect(client.beginPasskeyLogin).toHaveBeenLastCalledWith(undefined);
+    expect(alert()).toBe(auth["auth.passkey.cancelled"]);
+    await type("[name=email]", "person@example.test");
+    await type("[name=password]", "existing-password");
+    submitByKeyboard(document.querySelector("#login-password")!);
+    await settled();
+    pressByKeyboard(button(auth["auth.passkey.signIn"]));
+    await settled();
+    expect(client.beginPasskeyLogin).toHaveBeenLastCalledWith({ continuation_token: "a".repeat(43) });
+    expect(alert()).toBe(auth["auth.passkey.notOnThisDevice"]);
+    await act(async () => root!.unmount());
+    root = null;
+    document.body.replaceChildren();
+  }
+  // Any other failure on that step (here, too many tries) keeps the general sentence.
+  const browser = { supportsConditional: async () => false, authenticate: vi.fn(), register: vi.fn(), cancel: vi.fn() };
+  const client = {
+    beginLogin: vi.fn().mockResolvedValue({ status: "mfa_required", challenge_token: "a".repeat(43), available_methods: ["passkey"] }),
+    completeLogin: vi.fn(), beginPasskeyLogin: vi.fn().mockRejectedValue(new ContractHttpError("RATE_LIMITED", 429, "MFA_RATE_LIMITED", "MFA_RATE_LIMITED")), completePasskeyLogin: vi.fn()
+  };
+  await mount(client, browser);
+  await type("[name=email]", "person@example.test");
+  await type("[name=password]", "existing-password");
+  submitByKeyboard(document.querySelector("#login-password")!);
+  await settled();
+  pressByKeyboard(button(auth["auth.passkey.signIn"]));
+  await settled();
+  expect(alert()).toBe(auth["auth.passkey.cancelled"]);
+});
