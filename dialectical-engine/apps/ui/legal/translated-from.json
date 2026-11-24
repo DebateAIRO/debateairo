@@ -38,7 +38,7 @@
     },
     "fr": {
       "version": "1.1",
-      "sha256": "bb63eaa06bf1a94b278983082a707581238e6e16fb4c7c0b93716d828d728928"
+      "sha256": "c9886a4e978a2657d6a2c2f728c77d16fdb877271cfa291d4128f1d488ff8e8e"
     },
     "ga": {
       "version": "3.12",
@@ -102,7 +102,7 @@
     },
     "ro": {
       "version": "1.1",
-      "sha256": "bb63eaa06bf1a94b278983082a707581238e6e16fb4c7c0b93716d828d728928"
+      "sha256": "c9886a4e978a2657d6a2c2f728c77d16fdb877271cfa291d4128f1d488ff8e8e"
     },
     "ru": {
       "version": "3.12",
@@ -176,7 +176,7 @@
     },
     "fr": {
       "version": "1.1",
-      "sha256": "42e23f184e1a4aa5f5afb993cdcd1b890e14a75ffec61b3c119ac1ca1f8ca80a"
+      "sha256": "c8e324b04fcbd00d912f4d7877f61ff02ac8cf7bd7475a8f97bc67a29b40a537"
     },
     "ga": {
       "version": "2.18",
@@ -240,7 +240,7 @@
     },
     "ro": {
       "version": "1.1",
-      "sha256": "42e23f184e1a4aa5f5afb993cdcd1b890e14a75ffec61b3c119ac1ca1f8ca80a"
+      "sha256": "c8e324b04fcbd00d912f4d7877f61ff02ac8cf7bd7475a8f97bc67a29b40a537"
     },
     "ru": {
       "version": "2.18",

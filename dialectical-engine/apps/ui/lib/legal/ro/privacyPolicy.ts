@@ -430,7 +430,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la dezbatere.ro/privacy/versions. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune." },
-      { kind: "p", text: "Această politică a fost actualizată ultima dată la 25 noiembrie 2026. Versiunea 1.1 a înlocuit versiunea 1.0: nu mai arată că DeepInfra transmite solicitările unui model unei societăți partenere pe care nu o numește, deoarece niciun model folosit într-o dezbatere nu mai este pus la dispoziție în acest fel (rezumatul și secțiunile 4 și 5)." }
+      { kind: "p", text: "Această politică a fost actualizată ultima dată la 25 noiembrie 2026. Versiunea 1.1 a înlocuit versiunea 1.0: secțiunea 5 arată acum că DeepInfra rulează pe propriile servere fiecare model pus la dispoziția unei dezbateri prin intermediul său, iar rezumatul și secțiunea 4 au fost modificate în mod corespunzător." }
     ]
   },
   {
@@ -495,7 +495,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.1",
-  sha256: "f7fc823bb328c090196bc89049fccbd942127d4793d1e9efff93067fc210d9d6",
+  sha256: "61747188b37a5c19cf380eddd32e8386402ac01f52705317cc84695d75afdf51",
   eyebrow: "POLITICA DE CONFIDENȚIALITATE · v1.1 · ÎN VIGOARE DE LA 25 NOIEMBRIE 2026",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",

@@ -253,7 +253,7 @@ We tell you in advance, on a durable medium, what is changing and when. If the c
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
 
-Version 1.1 replaced version 1.0: it no longer says that DeepInfra passes one model's requests to a partner company it does not name, because no model a debate uses is served that way any more (the summary and section 8).
+Version 1.1 replaced version 1.0: section 8 now says that DeepInfra runs on its own servers every model a debate is given through it, and the summary was changed to match.
 
 ## 15. Liability
 

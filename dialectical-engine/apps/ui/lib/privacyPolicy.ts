@@ -430,7 +430,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at dezbatere.ro/privacy/versions. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version." },
-      { kind: "p", text: "This policy was last updated on 25 November 2026. Version 1.1 replaced version 1.0: it no longer says that DeepInfra passes one model's requests to a partner company it does not name, because no model a debate uses is served that way any more (the summary and sections 4 and 5)." }
+      { kind: "p", text: "This policy was last updated on 25 November 2026. Version 1.1 replaced version 1.0: section 5 now says that DeepInfra runs on its own servers every model a debate is given through it, and the summary and section 4 were changed to match." }
     ]
   },
   {
@@ -495,7 +495,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.1",
-  sha256: "bb63eaa06bf1a94b278983082a707581238e6e16fb4c7c0b93716d828d728928",
+  sha256: "c9886a4e978a2657d6a2c2f728c77d16fdb877271cfa291d4128f1d488ff8e8e",
   eyebrow: "PRIVACY POLICY · v1.1 · EFFECTIVE 25 NOVEMBER 2026",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",

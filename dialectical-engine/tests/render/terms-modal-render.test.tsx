@@ -17,6 +17,7 @@ import {
   type TermsOfServiceModalProps
 } from "../../apps/ui/components/consent/TermsOfServiceModal.js";
 import { TERMS_JUMP, TERMS_SECTIONS } from "../../apps/ui/lib/termsOfService.js";
+import { legalEffectiveDay } from "../support/legalText.js";
 
 /**
  * Locked: natively disabled, or aria-disabled — a locked control that stays in the Tab order so a
@@ -133,7 +134,7 @@ describe("terms of service modal — rendered", () => {
     await render(<TermsOfServiceModal open mode="consent" onClose={vi.fn()} />);
 
     expect(dialog().querySelector(".policyEyebrow")!.textContent).toBe(
-      "TERMS OF SERVICE · v1.1 · EFFECTIVE 25 NOVEMBER 2026"
+      `TERMS OF SERVICE · v1.1 · EFFECTIVE ${legalEffectiveDay().toUpperCase()}`
     );
     expect(dialog().querySelector(".policyTitle")!.textContent).toBe("What you agree to");
     expect(dialog().querySelector(".policyLede")!.textContent).toBe(

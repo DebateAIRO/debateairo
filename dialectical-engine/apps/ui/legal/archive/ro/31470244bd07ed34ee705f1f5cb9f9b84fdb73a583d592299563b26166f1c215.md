@@ -253,7 +253,7 @@ Vă informăm în avans, pe un suport durabil, ce se modifică și când. Dacă 
 
 **Cu privire la acești Termeni.** Putem modifica acești Termeni pentru aceleași tipuri de motive. Pentru modificările care nu vă reduc drepturile, publicăm noua versiune însoțită de un rezumat al modificărilor și vă trimitem un e-mail cu cel puțin **30 de zile** înainte ca aceasta să producă efecte; continuarea utilizării Dialectical Engine după data respectivă înseamnă că o acceptați și vă puteți închide contul înainte de acea dată. Pentru modificările care vă reduc drepturile — inclusiv majorarea prețurilor unui plan existent, reducerea limitelor, eliminarea unor funcții, noi utilizări ale conținutului dumneavoastră sau modificări privind răspunderea, legea aplicabilă ori soluționarea litigiilor — vă solicităm să acceptați în mod expres noua versiune la următoarea autentificare, iar modificarea se aplică numai pentru viitor. Nu aplicăm niciodată retroactiv o modificare și nu folosim niciodată această secțiune pentru a modifica, pe parcursul termenului, esența serviciului pentru care ați plătit fără să vă oferim o posibilitate de încetare. Versiunile anterioare rămân disponibile la dezbatere.ro/terms/versions.
 
-Versiunea 1.1 a înlocuit versiunea 1.0: nu mai arată că DeepInfra transmite solicitările unui model unei societăți partenere pe care nu o numește, deoarece niciun model folosit într-o dezbatere nu mai este pus la dispoziție în acest fel (rezumatul și secțiunea 8).
+Versiunea 1.1 a înlocuit versiunea 1.0: secțiunea 8 arată acum că DeepInfra rulează pe propriile servere fiecare model pus la dispoziția unei dezbateri prin intermediul său, iar rezumatul a fost modificat în mod corespunzător.
 
 ## 15. Răspunderea
 

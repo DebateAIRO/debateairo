@@ -259,7 +259,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", lead: "To the service.", text: "To the service. We develop Dialectical Engine continuously, and routine improvements, fixes and model-roster changes happen without notice. Where we make a change that goes beyond keeping the service working as described, we do it only for one of these reasons: to comply with a legal or regulatory requirement; to respond to a security or abuse problem; because a model provider changes, restricts or withdraws a model or feature we depend on; to adapt to a technical environment we do not control; or to add, improve or retire a feature in a way that adds no cost to you." },
       { kind: "p", text: "We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within 30 days of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period." },
       { kind: "p", lead: "To these Terms.", text: "To these Terms. We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least 30 days before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions." },
-      { kind: "p", text: "Version 1.1 replaced version 1.0: it no longer says that DeepInfra passes one model's requests to a partner company it does not name, because no model a debate uses is served that way any more (the summary and section 8)." }
+      { kind: "p", text: "Version 1.1 replaced version 1.0: section 8 now says that DeepInfra runs on its own servers every model a debate is given through it, and the summary was changed to match." }
     ]
   },
   {
@@ -380,7 +380,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "1.1",
-  sha256: "42e23f184e1a4aa5f5afb993cdcd1b890e14a75ffec61b3c119ac1ca1f8ca80a",
+  sha256: "c8e324b04fcbd00d912f4d7877f61ff02ac8cf7bd7475a8f97bc67a29b40a537",
   eyebrow: "TERMS OF SERVICE · v1.1 · EFFECTIVE 25 NOVEMBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",

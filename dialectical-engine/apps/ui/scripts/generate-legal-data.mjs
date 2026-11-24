@@ -42,7 +42,9 @@
  *     every language this release offers (RELEASE_LEGAL_LOCALES) into the archive, and
  *     `pnpm run legal:release-check` (legal-release-check.mjs), which the release step runs, refuses
  *     a release while one of those languages lags the English text, a current text of one of them is
- *     not archived, or a changed text still carries an archived version number.
+ *     not archived, or a changed text still carries an archived version number;
+ *   - the effective day is the upload day: `pnpm run legal:redate --date YYYY-MM-DD` (legal-redate.mjs)
+ *     sets it in every draft and then runs the steps above and the release check.
  */
 
 import { createHash } from "node:crypto";

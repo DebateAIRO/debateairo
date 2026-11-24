@@ -2,14 +2,14 @@
  * A model DeepInfra forwards to a partner company it does not name (its "Partner" tag) is never seated by a new settings
  * version, and the Provider Register, the Privacy Policy and the Terms name no such partner. This file pins both halves
  * and the tie between them:
- *  1. the mark: Qwen3.8-Flash's preview row is `partnerServed`, the other rows are not; its row, prices and maker stay,
- *     so debates already recorded with it read and price as before;
- *  2. the Register carries a partner entry if and only if a model a new version may seat is partner-served (today: none),
- *     and its DeepInfra row lists exactly the DeepInfra models a new version may seat;
+ *  1. the mark: the set of partner-served models is pinned (Qwen3.8-Flash alone); its row, prices and maker stay, so
+ *     debates already recorded with it read and price as before;
+ *  2. the Register has no partner entry, and its DeepInfra row lists exactly the DeepInfra models a new version may seat;
  *  3. sealing refuses: the line-up row builder, the publish kit's carried line-up row and its answer seats;
  *  4. reading does not: a sealed version that seats Qwen still parses and composes, so a debate admitted on it finishes;
  *  5. check-version's condition 6 names such a version (SETTINGS_GATE_PARTNER_SERVED:<model>);
- *  6. the English legal texts and catalogue say nothing about a partner of DeepInfra.
+ *  6. the English legal texts and catalogue say nothing about a partner of DeepInfra, their change summary included;
+ *  7. the line-up activated on the live server (no Qwen in the lists, its thinking-table entry kept) passes every check.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -20,11 +20,13 @@ import {
   previewPartnerServedSeatRefs, previewSeatableModels, resolvePreviewLineUp
 } from "@debateai/providers";
 import {
-  previewLineUpPolicyFromValue, previewLineUpPolicyRow, settingsGatePartnerServedCodes, settingsGateUnreviewedCodes
+  previewLineUpPolicyFromValue, previewLineUpPolicyRow, settingsGatePartnerServedCodes, settingsGateThinkingCodes,
+  settingsGateUnreviewedCodes, settingsSeatableModels
 } from "@debateai/register";
 import { DEEPINFRA_PROVIDER, PREVIEW_DEEPINFRA_MODELS, legalRegister, providerRegister } from "../../apps/ui/lib/legal/pages.js";
 import { PREVIEW_MODEL_MAKERS } from "../../apps/ui/lib/previewPlanRoster.js";
 import { previewAnswerSeatRefs } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
+import { assertSettingsGatesServe, seatableGateModelsReader, type SettingsOperatorClient } from "../../tools/settings-version/settings-operator.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
 const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -32,6 +34,12 @@ const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
 const QWEN = "Qwen/Qwen3.8-Flash";
 const HAIKU = "claude-haiku-5-5";
 const QWEN_REF = "preview:qwen-3-8-flash";
+/**
+ * The models a provider forwards to a company the legal texts do not name. Taking one off this list (and its row's
+ * `partnerServed` mark) needs that company's facts checked and recorded under docs/legal/, and its Register entry and
+ * the legal texts naming it, first; adding one takes it out of every new line-up.
+ */
+const PARTNER_SERVED_MODELS = Object.freeze([QWEN]);
 /** The line-up the live site runs once Qwen is out: GLM and DeepSeek on Free; GLM, DeepSeek, MiMo and Haiku on Premium. */
 const WITHOUT_QWEN = Object.freeze({ free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, HAIKU], thinking_levels: null });
 /** The line-up the site ran before: the same with Qwen on Premium. */
@@ -44,9 +52,9 @@ const GATE = Object.freeze({ deployment: "v3-preview", requested_thinking_level:
   anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock" });
 
 describe("the partner-served mark on the preview rows", () => {
-  it("marks Qwen3.8-Flash alone; every other reviewed row may be seated", () => {
-    expect(PREVIEW_MODEL_ROWS.filter((row) => row.partnerServed === true).map((row) => row.model)).toEqual([QWEN]);
-    for (const row of PREVIEW_MODEL_ROWS) expect(previewModelSeatable(row.model), row.model).toBe(row.model !== QWEN);
+  it("marks exactly the pinned partner-served models; every other reviewed row may be seated", () => {
+    expect(PREVIEW_MODEL_ROWS.filter((row) => row.partnerServed === true).map((row) => row.model)).toEqual(PARTNER_SERVED_MODELS);
+    for (const row of PREVIEW_MODEL_ROWS) expect(previewModelSeatable(row.model), row.model).toBe(!PARTNER_SERVED_MODELS.includes(row.model));
     expect(previewModelSeatable("vendor/Unknown-1")).toBe(false);
     expect(previewModelSeatable(undefined)).toBe(false);
   });
@@ -62,15 +70,13 @@ describe("the partner-served mark on the preview rows", () => {
 });
 
 describe("the Provider Register follows the mark", () => {
-  const seatablePartnerServed = PREVIEW_MODEL_ROWS.filter((row) => row.partnerServed === true && previewModelSeatable(row.model));
   const registers = [null, [], ["deepinfra"], ["anthropic", "deepinfra", "amazon"]] as const;
 
-  it("carries an entry for a partner of DeepInfra if and only if a model a new version may seat is partner-served", () => {
+  it("carries no entry for a partner of DeepInfra, whichever companies the API names", () => {
     for (const companies of registers) {
       const keys = legalRegister(companies === null ? null : [...companies]).map((entry) => entry.key);
-      expect(keys.some((key) => key.includes("partner")), String(companies)).toBe(seatablePartnerServed.length > 0);
+      expect(keys.filter((key) => key.includes("partner")), String(companies)).toEqual([]);
     }
-    expect(seatablePartnerServed).toEqual([]);
   });
 
   it("lists under DeepInfra exactly the DeepInfra models a new version may seat", () => {
@@ -92,16 +98,24 @@ describe("the Provider Register follows the mark", () => {
   });
 
   it("the English Privacy Policy and Terms name no partner of DeepInfra and no company left unconfirmed for training", () => {
-    for (const file of ["privacy-policy.md", "terms-of-service.md"]) {
-      const whole = readFileSync(resolve(process.cwd(), "apps/ui/legal/en", file), "utf8");
-      // Section 14's change summary says what 1.1 no longer says; the rest of the text says nothing about a partner.
-      const summary = /^.*Version 1\.1 replaced version 1\.0: it no longer says that DeepInfra passes one model's requests to a partner company it does not name.*$/mu;
-      expect(whole, file).toMatch(summary);
-      const text = whole.replace(summary, "");
+    // Section 14's change summary says what the text now says, with each section it changed, and no partner.
+    const summaries = {
+      "privacy-policy.md": "Version 1.1 replaced version 1.0: section 5 now says that DeepInfra runs on its own servers every model a debate is given through it, and the summary and section 4 were changed to match.",
+      "terms-of-service.md": "Version 1.1 replaced version 1.0: section 8 now says that DeepInfra runs on its own servers every model a debate is given through it, and the summary was changed to match."
+    } as const;
+    for (const file of ["privacy-policy.md", "terms-of-service.md"] as const) {
+      const text = readFileSync(resolve(process.cwd(), "apps/ui/legal/en", file), "utf8");
+      expect(text, file).toContain(summaries[file]);
       expect(text, file).not.toMatch(/partner/iu);
       expect(text, file).not.toContain("which it does not name");
       expect(text, file).not.toContain("for which company we have not confirmed");
       expect(text, file).toContain("DeepInfra runs these models on its own servers in the United States");
+    }
+    // The French and Romanian texts carry no partner either (their summaries translate the English ones).
+    for (const code of ["fr", "ro"]) {
+      for (const file of ["privacy-policy.md", "terms-of-service.md"]) {
+        expect(readFileSync(resolve(process.cwd(), "apps/ui/legal", code, file), "utf8"), `${code} ${file}`).not.toMatch(/partenaire|partener/iu);
+      }
     }
   });
 });
@@ -175,5 +189,39 @@ describe("check-version's condition 6 names a version that seats a partner-serve
     const source = readFileSync(resolve(process.cwd(), "apps/runner/src/settings-check.ts"), "utf8");
     expect(source).toContain('name: "gate-models-partner-served"');
     expect(source).toContain("settingsGatePartnerServedCodes({ seatable: (await seatableOf()).seatable })");
+  });
+});
+
+describe("the line-up activated on the live server: no Qwen in the lists, its thinking-table entry kept", () => {
+  /** Free GLM, DeepSeek and Haiku; Premium the same and MiMo; the owner's table, Qwen's entry included; seats unchanged. */
+  const LIVE = parsePreviewLineUp({ free_model_ids: [GLM, DEEPSEEK, HAIKU], premium_model_ids: [GLM, DEEPSEEK, HAIKU, MIMO],
+    thinking_levels: { [GLM]: { level: "high" }, [DEEPSEEK]: { level: "none" }, [QWEN]: { level: "medium" },
+      [MIMO]: { level: "default", steps: { pros_cons: "none", cross_exchange: "none" } }, [HAIKU]: { level: "medium" } } });
+  const SEATS = ["preview:fixture-a", "preview:deepseek-v4-1-flash", "preview:fixture-a", "preview:deepseek-v4-1-flash"];
+  const DECLARED = [GLM, DEEPSEEK, MIMO, QWEN, HAIKU];
+
+  it("the kits seal it and carry it: an entry in the table seats nothing", () => {
+    expect(() => assertPreviewLineUpSeatable(LIVE)).not.toThrow();
+    const row = previewLineUpPolicyRow(LIVE, "test");
+    expect(previewLineUpPolicyFromValue(JSON.parse(row.valueJsonText)).thinking_levels).toHaveProperty([QWEN]);
+  });
+
+  it("check-version finds nothing: Qwen is not seatable, and its table entry is a reviewed model at a level on its menu", () => {
+    const seatable = settingsSeatableModels({ lineUp: LIVE, seatRefs: SEATS, declaredModels: DECLARED });
+    expect(seatable).not.toContain(QWEN);
+    expect(settingsGatePartnerServedCodes({ seatable })).toEqual([]);
+    expect(settingsGateUnreviewedCodes({ seatable, lineUp: LIVE })).toEqual([]);
+    expect(settingsGateThinkingCodes({ lineUp: LIVE })).toEqual([]);
+  });
+
+  it("the activation's gate check passes with Qwen off the DeepInfra gate", async () => {
+    const check = (lineUp: typeof LIVE) => assertSettingsGatesServe({} as SettingsOperatorClient, {
+      version: 27, gateEnabledModels: { deepinfra: [GLM, DEEPSEEK, MIMO], anthropic: [HAIKU] },
+      seatableEnvironment: { envLineUp: null, declaredModels: DECLARED }
+    }, { readGateModels: seatableGateModelsReader({ readSeatRefs: async () => SEATS, readLineUp: async () => lineUp }) });
+    await expect(check(LIVE)).resolves.toBeUndefined();
+    // The same check refuses Qwen in a list once the gate no longer serves it.
+    await expect(check(parsePreviewLineUp({ ...LIVE, premium_model_ids: [...LIVE.premium_model_ids, QWEN] })))
+      .rejects.toMatchObject({ code: "SETTINGS_GATE_LIVE_CHECK_FAILED" });
   });
 });

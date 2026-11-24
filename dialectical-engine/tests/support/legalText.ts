@@ -23,6 +23,17 @@ export const legalText = (kind: LegalKind, code: string): string =>
 
 export const legalLines = (kind: LegalKind, code: string): string[] => legalText(kind, code).split("\n");
 
+/**
+ * The day the current texts take effect, as the English Privacy Policy's version line gives it (`<day> <Month> <year>`).
+ * apps/ui/scripts/legal-redate.mjs sets it in every draft at once, so a test reads it here instead of typing it;
+ * tests/unit/legal-reset-10.test.ts holds every draft of both documents to it.
+ */
+export const legalEffectiveDay = (): string => {
+  const day = /^\*\*Version \d+\.\d+ · Effective (\d{1,2} [A-Z][a-z]+ \d{4}) · /mu.exec(legalText("PRIVACY", "en"))?.[1];
+  if (day === undefined) throw new Error("the English Privacy Policy's version line gives no day");
+  return day;
+};
+
 /** Where numbered section `section` starts: the index of its `## <section>. …` heading. */
 const headingAt = (lines: readonly string[], section: number): number => {
   const found = lines.flatMap((line, index) => (line.startsWith(`## ${section}. `) ? [index] : []));

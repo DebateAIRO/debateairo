@@ -8,14 +8,16 @@ import { TERMS_VERSIONS } from "../../apps/ui/lib/legal/pages.js";
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
 import { TERMS_OF_SERVICE } from "../../apps/ui/lib/termsOfService.js";
 import { RELEASE_LEGAL_LOCALES } from "../../apps/ui/scripts/generate-legal-data.mjs";
-import { legalText, type LegalKind as ResetKind } from "../support/legalText.js";
+import { englishVersionAndDay, legalDayIso, legalDayText } from "../../apps/ui/scripts/legal-redate.mjs";
+import { legalEffectiveDay, legalText, type LegalKind as ResetKind } from "../support/legalText.js";
 
 /**
  * Launch started both legal texts at 1.0: the pre-launch drafts were never offered, so neither text carried a change
  * history and both re-acceptance floors are 1.0, which every acceptance of a draft written before launch clears. The
- * first change after launch is 1.1 (the partner company of DeepInfra no longer named: no model a debate uses is served
- * that way): every language's Terms of Service and Privacy Policy say 1.1 in their eyebrow, end marker and version line
- * (the number changes for all languages together); the languages the release offers carry one change summary, "Version
+ * first change after launch is 1.1 (DeepInfra runs on its own servers every model a debate is given through it): every
+ * language's Terms of Service and Privacy Policy say 1.1 in their eyebrow, end marker and version line, and the same
+ * effective day (the number and the day change for all languages together, the day with legal-redate.mjs); the
+ * languages the release offers carry one change summary, "Version
  * 1.1 replaced version 1.0", and the others none, since their text still follows an older English one; the floors stay
  * 1.0, so nobody who accepted 1.0 is asked again; the archive holds exactly the 1.0 and 1.1 texts of the languages the
  * release offers; /terms/versions lists 1.1, in force, and 1.0, linked to its archived English text.
@@ -78,10 +80,10 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, 1.1 now", 
     if (OFFERED.includes(code)) {
       expect(terms, "the Terms' section 14 and its summary").toHaveLength(5);
       expect(terms[4]!.startsWith(REPLACED[code]!), "the Terms' summary").toBe(true);
-      expect(terms[4], "it names the section it changed").toMatch(/8\)\.$/u);
+      expect(terms[4], "it names the section it changed").toMatch(/ 8 /u);
       // One sentence on the update, then the summary; no older history.
       expect(privacy[2]!.split(REPLACED[code]!), "the Privacy Policy's summary, once").toHaveLength(2);
-      expect(privacy[2], "it names the sections it changed").toMatch(/4 (and|et|și) 5\)\.$/u);
+      expect(privacy[2], "it names the sections it changed").toMatch(/ 5 .* 4 /u);
       expect(privacy[2], "and names no other version").not.toMatch(/(?<![\d.])(?!1\.[01](?!\d))\d\.\d+(?!\d)/u);
     } else {
       expect(terms, "the Terms' section 14").toHaveLength(4);
@@ -91,12 +93,30 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, 1.1 now", 
     }
   });
 
-  it("the English pages say 1.1, in force from 25 November 2026", () => {
+  it("the English pages say 1.1, in force from the effective day", () => {
     expect([TERMS_OF_SERVICE.version, PRIVACY_POLICY.version]).toEqual(["1.1", "1.1"]);
-    expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v1.1 · EFFECTIVE 25 NOVEMBER 2026");
-    expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v1.1 · EFFECTIVE 25 NOVEMBER 2026");
+    expect(TERMS_OF_SERVICE.eyebrow).toBe(`TERMS OF SERVICE · v1.1 · EFFECTIVE ${legalEffectiveDay().toUpperCase()}`);
+    expect(PRIVACY_POLICY.eyebrow).toBe(`PRIVACY POLICY · v1.1 · EFFECTIVE ${legalEffectiveDay().toUpperCase()}`);
     expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v1.1");
     expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v1.1");
+  });
+
+  it("every draft of both documents takes effect on the same day, in its own words, after 1.0's day", () => {
+    const day = englishVersionAndDay(draft("PRIVACY", "en")).day;
+    expect(legalDayText("en", day, "line")).toBe(legalEffectiveDay());
+    // A later version takes effect after the day 1.0 did (read from its archived English text), never on it or before.
+    const launched = englishVersionAndDay(readFileSync(resolve(root, "apps/ui/legal/archive/en", `${LAUNCH.PRIVACY.en}.md`), "utf8")).day;
+    expect(legalDayIso(day) > legalDayIso(launched), `${legalDayIso(day)} after ${legalDayIso(launched)}`).toBe(true);
+    for (const kind of KINDS) {
+      for (const code of CODES) {
+        const lines = draft(kind, code).split("\n");
+        expect(lines.find((line) => line.startsWith("eyebrow: ")), `${kind} ${code}: the eyebrow`).toContain(legalDayText(code, day, "eyebrow"));
+        expect(lines.find((line) => line.startsWith("**Version ")), `${kind} ${code}: the version line`)
+          .toContain(`**Version 1.1 · Effective ${legalDayText(code, day, "line")} · `);
+      }
+    }
+    // The offered languages' Privacy Policy says it was last updated that day.
+    for (const code of OFFERED) expect(section14(draft("PRIVACY", code))[2], code).toContain(legalDayText(code, day, "line"));
   });
 
   it("keeps both re-acceptance floors at 1.0: an acceptance of 1.0, or of any pre-launch draft, owes nothing", () => {

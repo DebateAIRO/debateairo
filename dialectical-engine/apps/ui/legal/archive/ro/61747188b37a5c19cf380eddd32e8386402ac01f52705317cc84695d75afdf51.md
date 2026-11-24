@@ -261,7 +261,7 @@ Pentru a refuza aceste elemente, blocați sau ștergeți modulele cookie și dat
 
 Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la dezbatere.ro/privacy/versions. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune.
 
-Această politică a fost actualizată ultima dată la 25 noiembrie 2026. Versiunea 1.1 a înlocuit versiunea 1.0: nu mai arată că DeepInfra transmite solicitările unui model unei societăți partenere pe care nu o numește, deoarece niciun model folosit într-o dezbatere nu mai este pus la dispoziție în acest fel (rezumatul și secțiunile 4 și 5).
+Această politică a fost actualizată ultima dată la 25 noiembrie 2026. Versiunea 1.1 a înlocuit versiunea 1.0: secțiunea 5 arată acum că DeepInfra rulează pe propriile servere fiecare model pus la dispoziția unei dezbateri prin intermediul său, iar rezumatul și secțiunea 4 au fost modificate în mod corespunzător.
 
 ## Annex B — Condiții regionale privind confidențialitatea
 

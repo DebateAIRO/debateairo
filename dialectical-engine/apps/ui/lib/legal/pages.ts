@@ -305,9 +305,9 @@ export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
 /**
  * The open-weight models a debate may be given through DeepInfra, each made by another company (named in brackets),
  * all run on DeepInfra's own servers. Kept as the DeepInfra row's `models` fact; the page shows providers, not models.
- * Qwen3.8-Flash is not here: DeepInfra forwards its requests to a partner company it does not name, so no settings
- * version may seat it any more (its preview row's `partnerServed` mark). tests/unit/partner-served-line-up.test.ts holds
- * this list to the DeepInfra models a new version may seat.
+ * Qwen3.8-Flash is not here: DeepInfra forwards its requests to a partner company it does not name, so no new settings
+ * version may seat it (its preview row's `partnerServed` mark). tests/unit/partner-served-line-up.test.ts holds this
+ * list to the DeepInfra models a new version may seat.
  */
 export const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: string]> = Object.freeze([
   ["zai-org/GLM-5.3-Flash", "GLM-5.3-Flash (Z.AI)"],
