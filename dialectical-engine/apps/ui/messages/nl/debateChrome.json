@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Privédebat",
   "debateChrome.privateDebateDeleted": "Privédebat verwijderd",
   "debateChrome.privateDebateDeletionProcessing": "Verwijdering van privédebat wordt verwerkt",
-  "debateChrome.privateDebateDeletedDetail": "Dit debat is een verwijderingsmarkering. De versleutelde privé-inhoud is blijvend onleesbaar.",
+  "debateChrome.privateDebateDeletedDetail": "Dit debat is een verwijderingsmarkering. De versleutelde privé-inhoud kan hier niet meer worden gelezen. Onze back-ups kunnen die nog bevatten (Privacybeleid, hoofdstuk 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "De privé-inhoud is niet meer beschikbaar terwijl het definitief wissen van de sleutels wordt afgerond.",
   "debateChrome.tree.building": "Argumentboom opbouwen…",
   "debateChrome.tree.notProduced": "Voor dit debat is geen argumentboom gemaakt.",

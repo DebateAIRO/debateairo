@@ -17,16 +17,23 @@ describe("the languages of the legal texts", () => {
   it("checks and archives the legal texts of every interface language the site offers, and French for Canada", () => {
     // A person can only be shown and accept a legal text in an offered interface language, or in French when they pick
     // Canada at sign-up. Each of those must be in the release check, or a text nobody checked or archived could be accepted.
+    // Since 24 November 2026 the site offers every catalogue language.
+    expect([...OFFERED_LOCALE_CODES].sort()).toEqual(LOCALES.map(({ code }) => code).sort());
     for (const code of OFFERED_LOCALE_CODES) expect(RELEASE_LEGAL_LOCALES).toContain(code);
     expect(RELEASE_LEGAL_LOCALES).toContain("fr");
   });
 
-  it("the site shows legal texts in exactly the languages the release checks and archives", () => {
+  it("the site shows legal texts in exactly the languages the release checks and archives: all 35 catalogue languages", () => {
     // LEGAL_TEXT_LOCALE_CODES is the site's copy (a page cannot load the release script): the offered interface
-    // languages and the Canada rule's languages. An explicit /terms?lang= or /privacy?lang= counts only for these.
+    // languages (all 35 since 24 November 2026) and the Canada rule's languages. An explicit /terms?lang= or
+    // /privacy?lang= counts only for these; anything else (wrong case, a region, an unknown code) is not one.
     expect([...LEGAL_TEXT_LOCALE_CODES].sort()).toEqual([...RELEASE_LEGAL_LOCALES].sort());
-    for (const code of ["en", "en-GB", "en-US", "ro", "fr"]) expect(isLegalTextLocale(code), code).toBe(true);
-    for (const value of ["de", "pl", "es", "zh", "RO", "fr-CA", "xx", "", null, undefined]) {
+    expect([...RELEASE_LEGAL_LOCALES].sort()).toEqual(LOCALES.map(({ code }) => code).sort());
+    expect(RELEASE_LEGAL_LOCALES).toHaveLength(35);
+    for (const code of ["en", "en-GB", "en-US", "ro", "fr", "de", "pl", "es", "zh", "ar", "he"]) {
+      expect(isLegalTextLocale(code), code).toBe(true);
+    }
+    for (const value of ["RO", "DE", "fr-CA", "en-AU", "de-DE", "xx", "", " ", null, undefined, 1]) {
       expect(isLegalTextLocale(value), String(value)).toBe(false);
     }
   });

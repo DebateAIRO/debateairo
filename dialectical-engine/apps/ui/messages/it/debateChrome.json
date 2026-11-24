@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Dibattito privato",
   "debateChrome.privateDebateDeleted": "Dibattito privato eliminato",
   "debateChrome.privateDebateDeletionProcessing": "Eliminazione del dibattito privato in corso",
-  "debateChrome.privateDebateDeletedDetail": "Questo dibattito è ridotto a un contrassegno di eliminazione. I contenuti privati cifrati sono definitivamente illeggibili.",
+  "debateChrome.privateDebateDeletedDetail": "Questo dibattito è ridotto a un contrassegno di eliminazione. I suoi contenuti privati cifrati non possono più essere letti qui. Le nostre copie di sicurezza potrebbero conservarli ancora (Informativa sulla privacy, sezione 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "I contenuti privati non sono più disponibili mentre viene completata la rimozione definitiva delle chiavi.",
   "debateChrome.tree.building": "Creazione dell’albero delle argomentazioni…",
   "debateChrome.tree.notProduced": "Non è stato prodotto alcun albero delle argomentazioni per questo dibattito.",

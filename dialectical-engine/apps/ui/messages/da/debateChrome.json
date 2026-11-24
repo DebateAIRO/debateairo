@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Privat debat",
   "debateChrome.privateDebateDeleted": "Privat debat slettet",
   "debateChrome.privateDebateDeletionProcessing": "Sletning af privat debat behandles",
-  "debateChrome.privateDebateDeletedDetail": "Denne debat er en slettemarkør. Dens krypterede private indhold er permanent ulæseligt.",
+  "debateChrome.privateDebateDeletedDetail": "Denne debat er en slettemarkør. Dens krypterede private indhold kan ikke længere læses her. Vores sikkerhedskopier kan stadig indeholde det (privatlivspolitikken, afsnit 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Det private indhold er ikke længere tilgængeligt, mens den varige nøgleoprydning afsluttes.",
   "debateChrome.tree.building": "Opbygger argumenttræet…",
   "debateChrome.tree.notProduced": "Der blev ikke oprettet et argumenttræ for denne debat.",

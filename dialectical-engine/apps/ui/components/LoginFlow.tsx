@@ -13,13 +13,19 @@ import type { TurnstilePublicConfig } from '@/lib/turnstile';
 import { ageConfirmationHref, ageConfirmationRequired } from '@/lib/ageConfirmation';
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
+import { namePasskeysForAccount } from '@/lib/passkeyNames';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
 import { readSixDigitCode, sixDigitCodeToSend } from '@/lib/sixDigitCode';
 import { signInEmailShape } from '@/lib/authFormValidation';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import { safeReturnPath } from '@/lib/returnPath';
 import authEnglish from '@/messages/en/auth.json';
-type LoginClient = Pick<ContractClient, 'beginLogin' | 'completeLogin'> & Partial<Pick<ContractClient, 'authProviders' | 'beginSocialLogin' | 'beginPasskeyLogin' | 'completePasskeyLogin' | 'resendVerification'>>;
+type LoginClient = Pick<ContractClient, 'beginLogin' | 'completeLogin'> & Partial<Pick<ContractClient, 'authProviders' | 'beginSocialLogin' | 'beginPasskeyLogin' | 'completePasskeyLogin' | 'resendVerification' | 'readAccountEmail'>>;
+/** The browser's prompt ended without a passkey (closed, or none of the named passkeys here), or the site refused the one given. */
+function passkeyNotUsed(failure: unknown): boolean {
+    return (typeof failure === 'object' && failure !== null && (failure as { name?: unknown }).name === 'NotAllowedError')
+        || (failure instanceof ContractHttpError && failure.serverCode === 'AUTH_CREDENTIALS_INVALID');
+}
 async function navigateHome() {
     const next = new URLSearchParams(window.location.search).get('next');
     window.location.assign(await ageConfirmationRequired() ? ageConfirmationHref(next) : safeReturnPath(next));
@@ -139,6 +145,9 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 setCompleting(true);
                 setBusy(true);
                 const result = await client.completePasskeyLogin({ challenge_handle: options.challenge_handle, credential });
+                const naming = result.status === 'authenticated' ? namePasskeysForAccount(client, credential.response?.userHandle) : null;
+                if (naming)
+                    await naming;
                 if (owner === sequence.current && !abort.signal.aborted)
                     finish(result);
             }
@@ -178,13 +187,19 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
             dispatched.current = true;
             setCompleting(true);
             const result = await client.completePasskeyLogin({ challenge_handle: options.challenge_handle, credential });
+            // Signed in: the browser is given the account's email as this passkey's name (older passkeys carry a placeholder).
+            const naming = result.status === 'authenticated' ? namePasskeysForAccount(client, credential.response?.userHandle) : null;
+            if (naming)
+                await naming;
             if (owner === sequence.current)
                 finish(result);
         }
         catch (failure) {
             if (dispatched.current && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
+            // After email and password the browser offers only this account's passkeys. A closed prompt or a refused passkey there
+            // may mean this device holds none of them, where trying again cannot help: say so, and point to the other ways in.
             if (owner === sequence.current)
-                setError(t(catalog, "auth.passkey.cancelled"));
+                setError(t(catalog, continuation && passkeyNotUsed(failure) ? "auth.passkey.notOnThisDevice" : "auth.passkey.cancelled"));
         }
         finally {
             if (owner === sequence.current) {

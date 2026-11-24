@@ -16,7 +16,7 @@ export interface ConsumerWebAuthnApplication {
     beginPasskeyLogin(input: unknown, source: AuthSourceContext): Promise<PasskeyAuthenticationOptionsResponse>;
     completePasskeyLogin(input: unknown, source: AuthSourceContext): Promise<LoginResult>;
 }
-type Repository = Pick<PostgresConsumerAuthRepository, 'beginEnrollment' | 'beginLogin' | 'readChallenge' | 'readCredential' | 'completeEnrollment' | 'completeLogin'>;
+type Repository = Pick<PostgresConsumerAuthRepository, 'beginEnrollment' | 'beginLogin' | 'readAllowCredentials' | 'readChallenge' | 'readCredential' | 'completeEnrollment' | 'completeLogin'>;
 const random = () => randomBytes(32).toString('base64url');
 /** Handle namespaces prevent an opaque value from silently changing purpose. */
 const handleHash = (kind: 'ENROLLMENT' | 'LOGIN', value: string) => 'sha256:' + createHash('sha256').update('consumer-passkey:' + kind + '\0').update(value).digest('hex');
@@ -100,8 +100,19 @@ export class ConsumerWebAuthnService implements ConsumerWebAuthnApplication {
         const { handle, challenge, seed } = this.seed('LOGIN', source);
         try {
             const result = await this.repository.beginLogin({...(source.socialBrowserHash===undefined?{}:{browserHash:source.socialBrowserHash}),admittedProviders:await this.sessions.socialBindings?.()??[], ...seed, ...admission, ...(parsed.continuation_token === undefined ? {} : { continuationHash: hashToken('login-challenge', parsed.continuation_token) }) });
-            const { extensions: _extensions, ...options } = await generateAuthenticationOptions({ rpID: this.rpId, challenge: new Uint8Array(Buffer.from(challenge, 'base64url')), timeout: 300000, userVerification: 'required' });
-            return PasskeyAuthenticationOptionsResponseSchema.parse({ challenge_handle: handle, expires_at: new Date(result.expiresAt).toISOString(), options });
+            // After the first step the challenge is bound to one account, so the browser is told that account's own passkeys and offers
+            // only those. Without a continuation nothing is proved yet and no list is read: it would show anyone an account's passkeys.
+            const own = parsed.continuation_token === undefined ? [] : await this.repository.readAllowCredentials(seed.handleHash, seed.bindingHash);
+            const allowCredentials = own.map(c => ({ id: c.id, ...(c.transports.length === 0 ? {} : { transports: [...c.transports] }) }));
+            const { extensions: _extensions, allowCredentials: listed, ...bare } = await generateAuthenticationOptions({ rpID: this.rpId, challenge: new Uint8Array(Buffer.from(challenge, 'base64url')), timeout: 300000, userVerification: 'required', ...(allowCredentials.length === 0 ? {} : { allowCredentials }) });
+            const expiresAt = new Date(result.expiresAt).toISOString();
+            if (listed !== undefined) {
+                const withList = PasskeyAuthenticationOptionsResponseSchema.safeParse({ challenge_handle: handle, expires_at: expiresAt, options: { ...bare, allowCredentials: listed } });
+                // A list beyond the contract's bounds is a hint the browser can do without: it then offers every passkey, as without a list.
+                if (withList.success)
+                    return withList.data;
+            }
+            return PasskeyAuthenticationOptionsResponseSchema.parse({ challenge_handle: handle, expires_at: expiresAt, options: bare });
         }
         catch (error) {
             throw this.failure(error);

@@ -102,7 +102,8 @@ describe("the plan on the drafts as they are", () => {
     for (const draft of result.drafts) {
       const code = draft.path.split("/")[3]!;
       const kind = kindOf(draft.path);
-      const following = ["en", "fr", "ro"].includes(code) && kind === "PRIVACY";
+      // Every translation follows the current English text, so each Privacy Policy's last-updated day moves too.
+      const following = kind === "PRIVACY";
       expect(draft.lines.map((line) => line.before.slice(0, 9)).slice(0, 2), draft.path).toEqual(["eyebrow: ", "**Version"]);
       expect(draft.lines, draft.path).toHaveLength(following ? 3 : 2);
       if (following) {
@@ -113,15 +114,25 @@ describe("the plan on the drafts as they are", () => {
       expect(draft.after).toContain(legalDayText(code, next, "eyebrow"));
       expect(draft.after.split("\n").length).toBe(readFileSync(resolve(root, draft.path), "utf8").split("\n").length);
     }
-    expect(result.retranslate).toEqual({ PRIVACY: ["fr", "ro"], TERMS: ["fr", "ro"] });
+    const translations = CODES.filter((code) => code !== "en");
+    expect(result.retranslate).toEqual({ PRIVACY: translations, TERMS: translations });
     expect(result.kept).toEqual([]);
   });
 
   it("removes the archive copies of each current version only; older copies are never touched or asked about", () => {
     const asked: string[] = [];
     const result = plan(next, { isReleased: (path) => (asked.push(path), false) });
+    // The archive holds each document's current text in all 35 languages, one per language; only English, French and
+    // Romanian also hold 1.0 (the launch texts), since the other 32 languages were first released at 1.1.
     const currentCopies = KINDS.flatMap(currentCopiesOf);
-    expect(currentCopies).toHaveLength(6);
+    expect(currentCopies).toHaveLength(2 * CODES.length);
+    const archive = manifest().archive;
+    for (const kind of KINDS) {
+      const codesOf = (version: string) => Object.entries(archive[kind])
+        .filter(([, entries]) => Object.values(entries).some((entry) => entry.version === version)).map(([code]) => code).sort();
+      expect(codesOf(CURRENT[kind].version), kind).toEqual(CODES);
+      expect(codesOf("1.0"), kind).toEqual(["en", "fr", "ro"]);
+    }
     expect(result.archiveRemovals.map((removal) => removal.path).sort()).toEqual([...currentCopies].sort());
     expect(asked.sort()).toEqual([...currentCopies].sort());
   });
@@ -140,7 +151,7 @@ describe("the plan on the drafts as they are", () => {
     expect(released.has(result.kept[0]!.path)).toBe(true);
     expect(result.drafts.map((draft) => draft.path).sort()).toEqual(CODES.map((code) => `apps/ui/legal/${code}/privacy-policy.md`).sort());
     expect(result.archiveRemovals.map((removal) => removal.path).sort()).toEqual(currentCopiesOf("PRIVACY").sort());
-    expect(result.retranslate).toEqual({ PRIVACY: ["fr", "ro"], TERMS: [] });
+    expect(result.retranslate).toEqual({ PRIVACY: CODES.filter((code) => code !== "en"), TERMS: [] });
   });
 
   it("refuses a day before today, a day not after an earlier version's, a day no document can take and a draft whose day does not match", () => {
@@ -228,7 +239,7 @@ describe("the command on a copy of the legal files", () => {
     expect(tree()).toEqual(before);
   });
 
-  it("re-dates every draft, keeps the older copies byte for byte, makes the current copies again and passes the release check", () => {
+  it("re-dates every draft, keeps the older copies byte for byte, makes the current copies of all 35 languages again and passes the release check", () => {
     const older = Object.fromEntries(olderCopies().map((path) => [path, sha(readFileSync(join(copy, path)))]));
     const result = redate("--date", day);
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
@@ -241,8 +252,9 @@ describe("the command on a copy of the legal files", () => {
     for (const kind of KINDS) {
       const { version } = CURRENT[kind];
       const english = readFileSync(join(copy, "apps/ui/legal/en", DRAFT[kind]), "utf8");
-      for (const code of ["fr", "ro"]) expect(record[kind][code], `${kind} ${code}`).toEqual({ version, sha256: sha(english) });
-      for (const code of ["en", "fr", "ro"]) {
+      // Every translation is recorded again as following the re-dated English text, and every language's text is archived again.
+      for (const code of CODES.filter((code) => code !== "en")) expect(record[kind][code], `${kind} ${code}`).toEqual({ version, sha256: sha(english) });
+      for (const code of CODES) {
         const text = readFileSync(join(copy, "apps/ui/legal", code, DRAFT[kind]), "utf8");
         expect(after.archive[kind][code]![sha(text)], `${kind} ${code}`).toEqual({ version, path: `apps/ui/legal/archive/${code}/${sha(text)}.md` });
         expect(readFileSync(join(copy, `apps/ui/legal/archive/${code}/${sha(text)}.md`), "utf8")).toBe(text);
@@ -261,7 +273,7 @@ describe("the command on a copy of the legal files", () => {
     const copied = JSON.parse(readFileSync(join(copy, "packages/legal-manifest/src/manifest.json"), "utf8")) as LegalManifest;
     const termsCopies = Object.values(copied.archive.TERMS).flatMap((entries) => Object.values(entries)
       .filter((entry) => entry.version === CURRENT.TERMS.version).map((entry) => entry.path));
-    expect(termsCopies).toHaveLength(3);
+    expect(termsCopies).toHaveLength(CODES.length);
     liveRelease([...olderCopies(), ...termsCopies]);
     const terms = (): Record<string, string> => Object.fromEntries([...CODES.map((code) => `apps/ui/legal/${code}/terms-of-service.md`), ...termsCopies, "apps/ui/lib/termsOfService.ts"]
       .map((path) => [path, sha(readFileSync(join(copy, path)))]));

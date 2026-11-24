@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "निजी वाद-विवाद",
   "debateChrome.privateDebateDeleted": "निजी वाद-विवाद हटा दिया गया",
   "debateChrome.privateDebateDeletionProcessing": "निजी वाद-विवाद का विलोपन जारी है",
-  "debateChrome.privateDebateDeletedDetail": "यह वाद-विवाद एक समाधि-चिह्न है। इसकी एन्क्रिप्टेड निजी सामग्री स्थायी रूप से अपठनीय है।",
+  "debateChrome.privateDebateDeletedDetail": "यह वाद-विवाद एक समाधि-चिह्न है। इसकी एन्क्रिप्टेड निजी सामग्री अब यहाँ पढ़ी नहीं जा सकती। हमारे बैकअप में यह अब भी मौजूद हो सकती है (गोपनीयता नीति, खंड 7)।",
   "debateChrome.privateDebateDeletionProcessingDetail": "कुंजी की स्थायी सफ़ाई पूरी होने तक निजी सामग्री उपलब्ध नहीं है।",
   "debateChrome.tree.building": "तर्क-वृक्ष बनाया जा रहा है…",
   "debateChrome.tree.notProduced": "इस वाद-विवाद के लिए कोई तर्क-वृक्ष तैयार नहीं हुआ।",

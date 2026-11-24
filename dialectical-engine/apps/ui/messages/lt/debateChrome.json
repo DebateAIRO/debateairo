@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Privatūs debatai",
   "debateChrome.privateDebateDeleted": "Privatūs debatai ištrinti",
   "debateChrome.privateDebateDeletionProcessing": "Privatūs debatai trinami",
-  "debateChrome.privateDebateDeletedDetail": "Iš šių debatų liko tik ištrynimo žymuo. Jų užšifruoto privataus turinio visam laikui nebegalima perskaityti.",
+  "debateChrome.privateDebateDeletedDetail": "Iš šių debatų liko tik ištrynimo žymuo. Jų užšifruoto privataus turinio čia nebegalima perskaityti. Mūsų atsarginėse kopijose jis dar gali būti (Privatumo politikos 7 skyrius).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Kol baigiamas negrįžtamas rakto išvalymas, privatus turinys nebepasiekiamas.",
   "debateChrome.tree.building": "Kuriamas argumentų medis…",
   "debateChrome.tree.notProduced": "Šiems debatams argumentų medis nesukurtas.",

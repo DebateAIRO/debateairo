@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Débat privé",
   "debateChrome.privateDebateDeleted": "Débat privé supprimé",
   "debateChrome.privateDebateDeletionProcessing": "Suppression du débat privé en cours",
-  "debateChrome.privateDebateDeletedDetail": "Ce débat est un enregistrement résiduel. Son contenu privé chiffré est définitivement illisible.",
+  "debateChrome.privateDebateDeletedDetail": "Ce débat n’est plus qu’un enregistrement résiduel. Son contenu privé chiffré ne peut plus être lu ici. Nos sauvegardes peuvent encore le contenir (Politique de confidentialité, section 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Le contenu privé n’est plus disponible pendant que s’achève le nettoyage permanent des clés.",
   "debateChrome.tree.building": "Construction de l’arbre d’arguments…",
   "debateChrome.tree.notProduced": "Aucun arbre d’arguments n’a été produit pour ce débat.",

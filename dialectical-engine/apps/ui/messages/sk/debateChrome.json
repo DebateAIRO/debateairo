@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Súkromná debata",
   "debateChrome.privateDebateDeleted": "Súkromná debata bola odstránená",
   "debateChrome.privateDebateDeletionProcessing": "Prebieha odstránenie súkromnej debaty",
-  "debateChrome.privateDebateDeletedDetail": "Táto debata je iba záznamom o odstránení. Jej šifrovaný súkromný obsah je natrvalo nečitateľný.",
+  "debateChrome.privateDebateDeletedDetail": "Táto debata je iba záznamom o odstránení. Jej šifrovaný súkromný obsah sa tu už nedá prečítať. Naše zálohy ho môžu ešte obsahovať (Zásady ochrany osobných údajov, časť 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Súkromný obsah už nie je k dispozícii, kým sa dokončuje trvalé odstránenie kľúčov.",
   "debateChrome.tree.building": "Zostavuje sa strom argumentov…",
   "debateChrome.tree.notProduced": "Pre túto debatu nebol vytvorený žiadny strom argumentov.",
