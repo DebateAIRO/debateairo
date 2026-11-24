@@ -901,37 +901,49 @@ describe("hate-speech S02 publish path", () => {
     const main = readFileSync(join(REPOSITORY_ROOT, "apps/api/src/main.ts"), "utf8");
 
     /**
-     * The object literals passed to main.ts's two `createPublicationContentCheck(` calls: the publish check, and the one a public debate's report goes through (R22 decision 13, 0149).
-     * The second is no second judge: the test below holds that the two differ only in where they record.
+     * The object literals passed to main.ts's three `createPublicationContentCheck(` calls: an owner's Publish, the same check
+     * in the sweeps (a finished Free debate, a contribution), and the one a public debate's report goes through (0149). None
+     * is a second judge: the tests below hold that they differ only in where they record, in their time,
+     * the register's D for an owner's Publish and the background time for the two the sweeps run (on the preview gate that
+     * time also covers the gate's slot queue: tests/unit/content-checks-preview-route.test.ts), and in how many calls they
+     * send at once on that gate (contentCheckCallsAtOnce).
      */
     function checkCompositions(): readonly string[] {
       const pieces = main.split("createPublicationContentCheck(").slice(1);
-      expect(pieces).toHaveLength(2);
+      expect(pieces).toHaveLength(3);
       return pieces.map((piece) => piece.slice(0, piece.indexOf("});")));
     }
     function checkComposition(): string {
       return checkCompositions()[0]!;
     }
-    it("the report's check shares the publish check's one judge switch and the register's D: only the recorder and the usage row's subject kind differ", () => {
-      for (const composition of checkCompositions()) {
+    it("the sweeps' and the report's checks share the publish check's one judge switch: only the recorder, the usage row's subject kind, the time and the calls at once differ", () => {
+      const [publish, sweep, report] = checkCompositions() as [string, string, string];
+      for (const composition of [publish, sweep, report]) {
         expect(composition).toContain("judge: publicationJudgeSwitch.current");
-        expect(composition.match(/deadlineMs\s*:\s*([^,\n}]+)/gu)).toEqual(["deadlineMs: publicationCheckPolicy.deadlineMs"]);
         expect(composition).toContain("clock: () => new Date()");
       }
+      expect(publish.match(/deadlineMs\s*:\s*([^,\n}]+)/gu)).toEqual(["deadlineMs: publicationCheckPolicy.deadlineMs"]);
+      for (const background of [sweep, report]) expect(background.match(/deadlineMs\s*:\s*([^,\n}]+)/gu)).toEqual(["deadlineMs: backgroundCheckDeadlineMs"]);
+      expect(publish.match(/contentCheckCallsAtOnce\([^)]*\)/gu)).toEqual(['contentCheckCallsAtOnce(contentCheckRoute, "PUBLISH")']);
+      for (const background of [sweep, report]) expect(background.match(/contentCheckCallsAtOnce\([^)]*\)/gu)).toEqual(['contentCheckCallsAtOnce(contentCheckRoute, "BACKGROUND")']);
       expect(main.split("createPublicationJudgeTransport(").length - 1).toBe(1);
       expect(main.split("createPublicationJudgeSwitch(").length - 1).toBe(1);
-      const [publish, report] = checkCompositions() as [string, string];
       expect(publish).toContain('recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "RUN", subjectId: row.subject_id,');
       expect(report).toContain('recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "PUBLIC_REPORT", subjectId: row.subject_id,');
-      const shared = (composition: string) => composition.replace(/recorder:[^\n]*\n/u, "").replace(/subjectKind: "[A-Z_]+"/u, 'subjectKind: "?"');
-      expect(shared(publish)).toBe(shared(report));
+      const timeless = (composition: string) => composition.replace(/deadlineMs: [^\n]+/u, "deadlineMs: ?").replace(/contentCheckCallsAtOnce\(contentCheckRoute, "[A-Z]+"\)/u, "contentCheckCallsAtOnce(contentCheckRoute, ?)");
+      const shared = (composition: string) => timeless(composition).replace(/recorder:[^\n]*\n/u, "").replace(/subjectKind: "[A-Z_]+"/u, 'subjectKind: "?"');
+      // The sweeps' check records exactly where an owner's Publish records; the report's records name the report.
+      expect(timeless(sweep)).toBe(timeless(publish));
+      expect(shared(report)).toBe(shared(publish));
     });
-    it("main.ts wires D from the register's publicationCheckPolicy row into the check and the judge transport, and nothing else", () => {
+    it("main.ts wires D from the register's publicationCheckPolicy row into the checks and the judge transport, and nothing else", () => {
       const composition = checkComposition();
       expect(composition.match(/deadlineMs\s*:\s*([^,\n}]+)/gu)).toEqual(["deadlineMs: publicationCheckPolicy.deadlineMs"]);
       expect(main).toContain('const publicationCheckPolicy = await boot.run("publication-check-policy", () => readPublicationCheckPolicy(pool, environment.REGISTER_VERSION));');
       expect(main).toMatch(/createPublicationJudgeTransport\(supportModelTarget, \{[^}]*\bdeadlineMs: publicationCheckPolicy\.deadlineMs\b/u);
-      expect(composition).not.toMatch(/\b\d[\d_]*\b/u);
+      // The background time is D itself, with the gate's slot wait added only on the gate route.
+      expect(main).toContain("const backgroundCheckDeadlineMs = contentCheckBackgroundDeadlineMs(contentCheckRoute, publicationCheckPolicy.deadlineMs);");
+      for (const each of checkCompositions()) expect(each).not.toMatch(/\b\d[\d_]*\b/u);
     });
     // R-D: the UI proxy lifts its 30 s ceiling for the publish route ONLY, above the API's whole publish budget. D comes
     // from the register now, so the ceiling is held against the largest D the row accepts, probed by behaviour.

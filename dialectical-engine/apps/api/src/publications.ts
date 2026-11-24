@@ -40,6 +40,7 @@ import { MadeByNewerReleaseError, madeByNewerRelease } from "./made-by-newer-rel
 import { mergedPublicDebate, publicDebateOfStoredCopy, storedPublicCopyOf, type PublicReviewOverlay } from "./public-tree.js";
 import { questionWithPurposeLines } from "./purpose-lines.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
+import type { SynthesisPublishGate } from "./synthesis-check/publish-gate.js";
 type LabeledNumber = Node["base_score"];
 function redactLabeledNumber(
   n: LabeledNumber,
@@ -430,7 +431,24 @@ export type FreePublicationStore = Readonly<{
   refuse(runId: string): Promise<"RECORDED" | "ALREADY" | "NOT_FOUND">;
 }>;
 
-export type FreePublishOutcome = "PUBLISHED" | "REFUSED" | "CHECK_UNAVAILABLE" | "NOT_WAITING" | "NO_SESSION";
+/**
+ * WAITING_FOR_CHECK: the end-of-debate check may still answer, or the answer moved on while the checks ran.
+ * WAITING_FOR_APPROVAL: that check flagged it, and no staff approval covers the flag yet. REMOVED: that check asked for
+ * its deletion, which the erasure carries out. Each of them, like CHECK_UNAVAILABLE, publishes nothing and records nothing
+ * on the Free ask, so a later pass asks again.
+ */
+export type FreePublishOutcome = "PUBLISHED" | "REFUSED" | "CHECK_UNAVAILABLE" | "WAITING_FOR_CHECK" | "WAITING_FOR_APPROVAL"
+  | "REMOVED" | "NOT_WAITING" | "NO_SESSION";
+
+/**
+ * The end-of-debate check as a Free debate's way to the public page asks it (main.ts): the answer's hold (HELD while the
+ * worker's check may still answer, REMOVED once the check asked for the debate's deletion), then the gate an owner's
+ * Publish passes (synthesis-check/publish-gate.ts).
+ */
+export type FreeEndCheck = Readonly<{
+  stateOf(input: Readonly<{ runId: string; answerId: string; answerVersion: number }>): Promise<"SHOW" | "HELD" | "REMOVED">;
+  decide: SynthesisPublishGate["decide"];
+}>;
 
 export interface PublicationApplication {
   reconcileKeyCleanup(limit?: number): Promise<number>;
@@ -523,9 +541,13 @@ export class PostgresPublicationApplication implements PublicationApplication {
   /**
    * Decision 13: A FREE DEBATE GOES PUBLIC when finished, with no session: the same body and the same publication check as an owner's publish, the clarifying answers published with the
    * question and checked with it. A refusal keeps it private for good; an unavailable check records nothing, and the sweep tries again. 0137's core.publish_free_debate does the rest.
+   * Before the publication check, the end-of-debate check must allow this answer through the gate an owner's Publish passes (#endCheckOf); under the lease that
+   * publishes, the answer must still be the one both checks read and the debate neither held nor removed by that check, as an owner's Publish re-reads its answer there.
    */
   async publishFreeDebate(input: Readonly<{
     runId: string; answer: Answer; owner: { userId: string; ownerRef: string }; purposeLines: PurposeLines | null; source: AuthSourceContext; contentCheck: PublicationContentCheck;
+    /** Required, so every caller names the end-of-debate check it asks. */
+    endCheck: FreeEndCheck;
     store: FreePublicationStore; lease: PublicationContentLease;
   }>): Promise<FreePublishOutcome> {
     const owner = input.owner;
@@ -533,6 +555,9 @@ export class PostgresPublicationApplication implements PublicationApplication {
       await input.store.refuse(input.runId);
       return "REFUSED";
     }
+    if (isRunContentLeaseHeld()) throw new TypeError("PUBLICATION_CHECK_UNDER_CONTENT_LEASE");
+    const ended = await this.#endCheckOf(input);
+    if (ended !== null) return ended;
     const staged = await input.lease.run(async () => {
       const pseudonym = await this.repository.readAuthorPseudonym(input.runId, owner.userId, owner.ownerRef);
       if (pseudonym === null) return null;
@@ -558,6 +583,18 @@ export class PostgresPublicationApplication implements PublicationApplication {
     }
     if (checked.outcome !== "ALLOW") return "CHECK_UNAVAILABLE";
     return input.lease.run(async () => {
+      // The run's content lease is shared: holding it does not stop a verdict, a removal or a new answer version from being
+      // written meanwhile (the check's own insert takes the same shared lease). What keeps this publish safe is the gate's
+      // rule: its PROCEED rests on the one final verdict of record for this synthesis, or on an approval, which is never
+      // withdrawn, and a later version of the answer keeps the same synthesis. These reads catch only what was written
+      // before them: an answer that moved on while the checks ran (the next pass checks the new one), or a hold or a
+      // removal now in force.
+      const current = await input.lease.readAnswer();
+      if (current === null) return "NOT_WAITING";
+      if (current.run_ref !== input.runId || current.answer_id !== input.answer.answer_id
+        || current.answer_version !== input.answer.answer_version) return "WAITING_FOR_CHECK";
+      const state = await input.endCheck.stateOf({ runId: input.runId, answerId: input.answer.answer_id, answerVersion: input.answer.answer_version });
+      if (state !== "SHOW") return state === "REMOVED" ? "REMOVED" : "WAITING_FOR_CHECK";
       const prepared = await input.store.prepare(input.runId, staged.publicationRef);
       if (prepared.outcome === "NO_SESSION") return "NO_SESSION";
       if (prepared.outcome !== "PREPARED" || prepared.grantTokenHash === null) return "NOT_WAITING";
@@ -571,6 +608,31 @@ export class PostgresPublicationApplication implements PublicationApplication {
         cipher.close();
       }
     });
+  }
+
+  /**
+   * The end-of-debate check for a Free debate, through the gate an owner's Publish passes. Null: it allows this answer (a
+   * clear answer, no synthesis, or a flag a staff approval covers). While the worker's check may still answer, the debate
+   * waits for a later pass. A flag with no approval keeps it waiting, never refused for good, so an approval lets it go
+   * public later. A deletion publishes nothing: the erasure takes the debate. A check that cannot answer, or any failure
+   * here, records nothing: a later pass asks again, and the gate runs the check itself when none answered and none runs.
+   */
+  async #endCheckOf(input: Readonly<{
+    runId: string; answer: Answer; source: AuthSourceContext; endCheck: FreeEndCheck; lease: PublicationContentLease;
+  }>): Promise<FreePublishOutcome | null> {
+    try {
+      const state = await input.endCheck.stateOf({ runId: input.runId, answerId: input.answer.answer_id, answerVersion: input.answer.answer_version });
+      if (state === "HELD") return "WAITING_FOR_CHECK";
+      if (state === "REMOVED") return "REMOVED";
+      const decision = await input.endCheck.decide({ runId: input.runId, answer: input.answer, contentLease: input.lease, startedAt: this.clock() });
+      if (decision === "PROCEED") return null;
+      if (decision === "APPROVAL_REQUIRED") return "WAITING_FOR_APPROVAL";
+      if (decision === "REMOVED") return "REMOVED";
+      return "CHECK_UNAVAILABLE";
+    } catch (error) {
+      logCheckFailed(input.source.requestId, storyReadDiagnostic(error));
+      return "CHECK_UNAVAILABLE";
+    }
   }
 
   /** The publication's key for a sweep's sealing, under its content lease, while it is public. Null: it is not. */

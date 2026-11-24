@@ -29,6 +29,25 @@ export function createSynthesisPublishGate(input: Readonly<{
   check: SynthesisCheckDeps;
   approvalCovers?(input: Readonly<{ runId: string; answerId: string; originVersion: number }>): Promise<boolean>;
   deadlineMs: number;
+  /**
+   * How long another attempt (the worker's) may still be running, when that is longer than this gate's own D: on the preview
+   * gate the worker also waits out the gate's slot queue. A Publish then waits for that check, within its own D, rather than
+   * calling the model a second time beside it. Without it, D.
+   */
+  inFlightWindowMs?: number;
+  /**
+   * How long this caller waits for another attempt's check that is still running; without it, up to its own D. Zero: it
+   * does not wait, and such a check makes the decision UNAVAILABLE at once (the Free debates' sweep, which asks again on a
+   * later pass rather than hold its pass). Either way the gate never runs a check of its own beside one that is running.
+   */
+  inFlightWaitMs?: number;
+  /**
+   * How the gate's own check is started, when it runs one; without it, at once (an owner's Publish). The Free debates'
+   * sweep starts it in the debate's turn (public-tree.ts checksInTurn), because it calls the model and may take the whole
+   * background time. Null there means "not now": the decision is UNAVAILABLE, with no attempt written and no model called.
+   * A decision already stored is read without it, so a debate that needs no call is never held back by the turns.
+   */
+  ownCheckInTurn?(runId: string, check: () => Promise<SynthesisPublishDecision>): Promise<SynthesisPublishDecision | null>;
   clock(): Date;
   sleep(ms: number): Promise<void>;
 }>): SynthesisPublishGate {
@@ -58,39 +77,44 @@ export function createSynthesisPublishGate(input: Readonly<{
         const prior = await readDecision();
         if (prior !== null) return prior;
         const deadlineAt = new Date(target.startedAt.getTime() + input.deadlineMs);
+        const waitUntil = Math.min(deadlineAt.getTime(), target.startedAt.getTime() + (input.inFlightWaitMs ?? input.deadlineMs));
         let waitedForCheck = false;
         while (input.clock().getTime() < deadlineAt.getTime()) {
           const inFlight = await input.repository.readInFlightAttempts({
             answerId: target.answer.answer_id, maxVersion: target.answer.answer_version,
-            deadlineMs: input.deadlineMs
+            deadlineMs: input.inFlightWindowMs ?? input.deadlineMs
           });
           if (!inFlight.some((attempt) => originVersionOf(texts, attempt.answerVersion) === synthesisOriginVersion)) break;
           waitedForCheck = true;
-          await input.sleep(Math.min(SYNTHESIS_PUBLISH_POLL_MS, deadlineAt.getTime() - input.clock().getTime()));
+          if (input.clock().getTime() >= waitUntil) break;
+          await input.sleep(Math.min(SYNTHESIS_PUBLISH_POLL_MS, waitUntil - input.clock().getTime()));
           const observed = await readDecision();
           if (observed !== null) return observed;
         }
         const afterWait = await readDecision();
         if (afterWait !== null) return afterWait;
         if (waitedForCheck || input.clock().getTime() >= deadlineAt.getTime()) return "UNAVAILABLE";
-        const attempt = await input.repository.startPublishAttempt({
-          runId: target.runId, answerId: target.answer.answer_id,
-          answerVersion: target.answer.answer_version
-        });
-        const checked = await runSynthesisCheck(input.check, {
-          runId: target.runId, answerId: target.answer.answer_id,
-          answerVersion: target.answer.answer_version,
-          synthesisText: texts.get(target.answer.answer_version) ?? null,
-          deadlineAt
-        });
-        await input.repository.insertResult({
-          attemptId: attempt.attemptId, runId: target.runId, answerId: target.answer.answer_id,
-          answerVersion: target.answer.answer_version, synthesisOriginVersion,
-          outcome: checked.outcome, modelProviderRef: checked.modelProviderRef,
-          modelId: checked.modelId, policyVersion: SYNTHESIS_CHECK_POLICY_VERSION,
-          callCount: checked.callCount, deadlineMs: input.deadlineMs
-        });
-        return await readDecision() ?? "UNAVAILABLE";
+        const ownCheck = async (): Promise<SynthesisPublishDecision> => {
+          const attempt = await input.repository.startPublishAttempt({
+            runId: target.runId, answerId: target.answer.answer_id,
+            answerVersion: target.answer.answer_version
+          });
+          const checked = await runSynthesisCheck(input.check, {
+            runId: target.runId, answerId: target.answer.answer_id,
+            answerVersion: target.answer.answer_version,
+            synthesisText: texts.get(target.answer.answer_version) ?? null,
+            deadlineAt
+          });
+          await input.repository.insertResult({
+            attemptId: attempt.attemptId, runId: target.runId, answerId: target.answer.answer_id,
+            answerVersion: target.answer.answer_version, synthesisOriginVersion,
+            outcome: checked.outcome, modelProviderRef: checked.modelProviderRef,
+            modelId: checked.modelId, policyVersion: SYNTHESIS_CHECK_POLICY_VERSION,
+            callCount: checked.callCount, deadlineMs: input.deadlineMs
+          });
+          return await readDecision() ?? "UNAVAILABLE";
+        };
+        return (input.ownCheckInTurn === undefined ? await ownCheck() : await input.ownCheckInTurn(target.runId, ownCheck)) ?? "UNAVAILABLE";
       } catch {
         return "UNAVAILABLE";
       }

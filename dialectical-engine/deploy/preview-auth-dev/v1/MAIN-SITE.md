@@ -484,6 +484,7 @@ set -euo pipefail
 L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
 lc() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$L/$1" "${@:2}"; }
 E=/etc/debateai-v3-preview/auth-dev-v1
+RELS=/opt/debateai-v3-preview/releases
 ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "STAFFCHECK_NOT_DONE: release-check.mjs status refused (above): ask"; exit 1; }
 CL=$(jq -r '[.releases[] | select(.state == "CURRENT") | .label] | if length == 1 then .[0] else "" end' <<<"$ST" || true)
 [ -n "$CL" ] || { echo "STAFFCHECK_NOT_DONE: the release table does not name exactly one current release, or did not read (above): ask"; exit 1; }
@@ -492,8 +493,14 @@ F=$E/api-$CL.env
 echo "the running API's file: $F (the API is $(systemctl is-active "debateai-preview-api@$CL" || true))"
 grep -E '^(PUBLIC_APP_URL|STAFF_ACCESS_POLICY_VERSION|STAFF_WEBAUTHN_ORIGIN|STAFF_WEBAUTHN_RP_ID)=' "$F" || true
 P=$(grep -c '^STAFF_ACCESS_POLICY_VERSION=' "$F" || true); P1=$(grep -cx 'STAFF_ACCESS_POLICY_VERSION=1' "$F" || true); P2=$(grep -cx 'STAFF_ACCESS_POLICY_VERSION=2' "$F" || true)
-AL=$(grep -c '^INTERNAL_ALLOWANCE_' "$F" || true); RC=$(grep -c '^SUPPORT_MODEL_TARGET_JSON=' "$F" || true)
-echo "team allowance lines: $AL; the Report button's AI check line: $RC"
+AL=$(grep -c '^INTERNAL_ALLOWANCE_' "$F" || true)
+echo "team allowance lines: $AL"
+# The AI check for publication and reports goes through the Anthropic gate: the release must carry that way, and the API file must name the gate's socket.
+GS=$(sed -n 's/^PREVIEW_PROVIDER_TEST_CONFIG_JSON=//p' "$F" | jq -r '.anthropic_budget_socket // empty' 2>/dev/null | grep -c . || true)
+GR=0; [ ! -f "$RELS/auth-dev-candidate-$CL-api/dialectical-engine/apps/api/src/publication-check/gate-transport.ts" ] || GR=1
+if [ "$GR/$GS" = 1/1 ]; then echo "the AI check for publication and reports: on, through the Anthropic gate (6b.1's AICHECK reads whether the gate lets it through)"
+elif [ "$GR" = 1 ]; then echo "the AI check for publication and reports: off: the API file names no Anthropic gate socket"
+else echo "the AI check for publication and reports: off: this release has no way to it (a release that sends it through the Anthropic gate brings it)"; fi
 if [ "$P/$P2" = 1/1 ]; then
   echo "staff tools are on: do your staff work now (1.6); after a rename, enrol your staff key again under the new name (5.7)"
   [ "$AL" = 0 ] || echo "the file has team allowance lines: they need the staff tools on, so never run STAFFOFF here"
@@ -510,7 +517,7 @@ Read the lines just before `STAFFCHECK_DONE`:
 - `staff tools are on`: the file holds `STAFF_ACCESS_POLICY_VERSION=2`, and the two staff name lines
   (`STAFF_WEBAUTHN_ORIGIN`, `STAFF_WEBAUTHN_RP_ID`) name the name the site answers as. Do the steps below. If the next
   line says `the file has team allowance lines`, never run STAFFOFF on this server: the staff screens then stay on
-  through the rename (5.1b). The count line above it (`team allowance lines: 0; …`) is not a warning.
+  through the rename (5.1b). The count line above it (`team allowance lines: 0`) is not a warning.
 - `staff tools are off`: Hide now does not exist on this server now. Skip step 2 below. Hide now comes back only with
   5.7, after the rename: STAFFMAIN puts the staff screens on under dezbatere.ro, then REKEY lets you enrol your staff
   key there. STAFFMAIN needs the upload's tools-folder swap (SWAP) and its database step (migration 0184), and the two
@@ -518,8 +525,13 @@ Read the lines just before `STAFFCHECK_DONE`:
   works only on a server where STAFFOFF once took the staff screens off. Until 5.7 a published debate stays public
   behind the site password; if one must not, ask.
 
-`the Report button's AI check line` is 1 when the AI check behind the public Report button is set up, and 0 when it is
-not (5.1b says why it matters).
+`the AI check for publication and reports` is the AI check that lets a finished Free debate go public and that reads
+each press of the public Report button (5.1b says why it matters). It is Claude Haiku 5.5 through the Anthropic gate:
+the API holds no key for it, and the API file's `SUPPORT_MODEL_TARGET_JSON` plays no part on this server (it stays
+absent). The line says `on, through the Anthropic gate` when the running release sends the check that way and the API
+file names the gate's socket. Otherwise it says `off:` and why; before the upload of a release that sends the check
+through the gate, `off: this release has no way to it` is expected. `on` means the API will ask the gate; whether the
+gate lets it through, AICHECK (6b.1) reads.
 
 **Why now** (when STAFFCHECK said `staff tools are on`). A staff key belongs to one site name. The one you enrolled
 works only on the test name. After the rename nobody's staff key works until the staff screens are on under
@@ -718,8 +730,9 @@ On any other last line, run nothing more, and ask.
 The practice spends from the gates' daily pots (a day is a Bucharest day). On the same day, the practice and the test
 debate after the switch (part 2: it serves both SB13b and the proof of the step before Start) share the same pots.
 POTS (step 9) and the gates' own refusals say whether room is left. A test debate refused for lack of room waits for
-the next day: the site is up and correct meanwhile, and only that proof waits. The legal texts' date is the upload day
-in every case (step 3).
+the next day: the site is up and correct meanwhile, and only that proof waits. Each legal text's day follows its own
+rule in every case (step 3, and the release guide's section "The legal texts' day"): one the live site already carries
+keeps its day, and a new version takes the upload day.
 
 **REV, the commit you upload.** REV is taken once, after every change for this upload is merged into dev. On the Mac:
 `git fetch origin dev && git rev-parse refs/remotes/origin/dev`. It prints 40 characters. From then until DR6 nothing
@@ -769,17 +782,23 @@ The first line must be REV; if it is not, stop and ask. The last line must start
 it says `NOT ready for release`, stop and ask: the lines above it say what is missing (for example a translation of the
 Terms or the Privacy Policy that is older than the English text), and only a new commit fixes that.
 
-The Terms and the Privacy Policy (version 1.0) name the day they take effect, and that day is the upload day: they go
-live on the site at DR6. Check the day, in the same folder:
+The Terms and the Privacy Policy each name their version and the day it takes effect. The day follows a rule for each
+text on its own (the release guide's section "The legal texts' day", `deploy/preview-release/v1/README.md`): a text
+whose current version the live site already carries keeps its day, and a new version takes the upload day, because it
+goes live on the site at DR6. Today the Terms 1.1 and the Privacy Policy 1.1 are on the live site and keep 24 November
+2026; a newer version of either takes the upload day. This upload carries the Terms 1.1, which keep 24 November 2026,
+and the Privacy Policy 1.2, a new version, which takes the upload day. Check both, in the same folder:
 
 ```sh
-grep -ho 'Effective [0-9]* [A-Za-z]* 2026' apps/ui/legal/en/terms-of-service.md apps/ui/legal/en/privacy-policy.md
+grep -Ho 'Version [0-9.]* · Effective [0-9]* [A-Za-z]* 20[0-9]*' apps/ui/legal/en/terms-of-service.md apps/ui/legal/en/privacy-policy.md
 ```
 
-It must print the same line twice, `Effective <the upload day>`, with the day written out (day, month name, year). If
-it prints another day, or the upload moves to another day, stop and ask: the day is part of the texts, so a new day
-needs a new commit. At your first sign-in after the upload, neither you nor the team is asked to accept the texts
-again: your earlier acceptances count.
+It prints one line for each text, with its version and its day written out (day, month name, year). Compare each with
+the same text on the live site (`/terms` and `/privacy`). The same version must show the same day. A newer version
+must show the upload day. If a line shows anything else, or the upload moves to another day while a new version waits,
+stop and ask: the day is part of the texts, so a new day needs a new commit (the release guide's section says how). At
+your first sign-in after the upload, neither you nor the team is asked to accept the texts again: your earlier
+acceptances count.
 
 **4. The Mac check, on REV.** In the upload folder: `zsh -lic 'node tools/upload-check/run.mjs --rev <REV>'`. It tries
 on the Mac three things the server does during an upload (the release guide's "Before an upload: the Mac check" says
@@ -925,8 +944,9 @@ so the upload's cold copy (DR3) holds the line. Expect `STAFFHBA_DONE`. Its way 
 as that guide says. REKEYCHECK (5.7) reads the line again after the upload.
 
 **Before part 2 starts** you have seen, in this order: REV in the upload folder with nothing edited,
-`Legal texts: ready for release.` with the upload day twice, `ALL PASSED`, `TRYDETACH_DONE` after a closed window,
-`SB1_DONE`, the staging up to `A7_DONE`, `SHAPEON_DONE`, `POTS_DONE` (and your decision if it said `no` or `NO
+`Legal texts: ready for release.` with each text's day right (its live day for a version the site carries, the upload
+day for a new one: the release guide's section "The legal texts' day"), `ALL PASSED`, `TRYDETACH_DONE` after a closed
+window, `SB1_DONE`, the staging up to `A7_DONE`, `SHAPEON_DONE`, `POTS_DONE` (and your decision if it said `no` or `NO
 ROOM`), `MAILTIME_DONE`, the practice's `PRACTICE_VERDICT PASS` lines with the rows matching, S-7's gates active, and
 `STAFFHBA_DONE`. If one is missing, part 2 waits.
 
@@ -975,8 +995,13 @@ text under that step, or the repair map (after step 23), or ask. Never put a `.b
 
 ### 2.1 Before the downtime (the site is up)
 
-**1. The texts' date is still today** (Mac, the upload folder). Run the date line of 1.8, step 3, again. It must print
-`Effective <today>` twice. If it prints another day, stop before piece 1 and ask.
+**1. The texts' days are still right** (Mac, the upload folder). Run the date line of 1.8, step 3, again. A version
+the live site already carries must show its live day (in this upload the Terms 1.1: 24 November 2026), and a new
+version must show today (in this upload the Privacy Policy 1.2; the release guide's section "The legal texts' day",
+`deploy/preview-release/v1/README.md`). If a line shows another day, stop before piece 1 and ask. PRECHECK (step 14)
+still asks both texts to take effect today: on an upload day after 24 November its `legal-date` subject stops it while
+the Terms 1.1 keep their live day, as they do in this upload; the Privacy Policy 1.2 takes the upload day and does not
+stop it. Ask before the upload day how that is settled.
 
 **2. GATESBEFORE** (server; the release guide's "Before piece 1"). It only reads: each older gate's start checks, run
 by hand as systemd would run them, then its state and its calls in flight. Expect one line per gate, `<gate>: start
@@ -2014,12 +2039,57 @@ These wait in the database; nothing is lost. This holds on both names, during th
 payments are real (part 7). The site password keeps it small: only people who know it can see a published debate.
 
 **What still happens by itself:**
-- **Free debates go public.** On the Free plan, a finished debate goes public by itself when an AI check allows it.
-  The page tells the person this before they ask. With STAFFCHECK's `the Report button's AI check line: 0`, that check is not
-  set up, so nothing goes public: each finished Free debate waits.
+- **Free debates go public.** On the Free plan, a finished debate goes public by itself when two AI checks allow it,
+  in this order: the end-of-debate check (below), then the AI check for publication. The page tells the person this
+  before they ask. When STAFFCHECK (1.6) says `the AI check for publication and reports: off`, or a check cannot answer
+  (the Anthropic gate refuses the call, is halted or busy, or its day is used up), nothing goes public: the finished
+  debate stays private and waits. The API tries its check again by itself, a minute after a failure, then after longer
+  and longer waits, up to an hour. No staff screen lists a Free debate that waits for a check, and no staff member can
+  publish one by hand: it goes public by itself once the checks allow it, unless too many older Free debates wait ahead of it
+  (the warning below). The person is not told that it waits. A debate whose own check keeps failing is tried again
+  less and less often. The API makes its checks one at a time, contributions and reports included, so a check that
+  runs long (up to two minutes on a busy gate) delays the others by that much; after one end-of-debate check fails,
+  the other Free debates that need one wait for the API's next try, about 15 seconds later.
 - **The Report button.** It needs no staff. If the same AI check agrees with a report, the debate hides at once (once
-  per debate). With the line at 0, or when the check does not agree, the report waits for a person, and nobody can act
-  on it until the staff screens come back.
+  per debate). If it finds nothing on the page that bears the report out, the report is closed by itself and the
+  person who sent it is told so. When the check is off, does not answer within its 20 seconds, or is unsure, the report
+  waits for a person, and nobody can act on it until the staff screens come back.
+- **The end-of-debate check.** It runs on this server too, through the Anthropic gate, whenever the AI check above is
+  on (STAFFCHECK, 1.6). Claude Haiku 5.5 reads each finished debate's conclusion for the four things the Terms
+  (section 8) name. By itself:
+  - A finished debate's answer is held ("checking") until the check answers: usually a few seconds, and never more
+    than two minutes after the debate finished, however busy the gate. If the check cannot answer in that time (the
+    gate refused it, was busy, or its day is used up), the answer shows unchecked, nothing is deleted, and the check
+    runs again when the owner presses Publish, or, for a Free debate, when the API next tries to make it public. An
+    answer that comes later can no longer flag or delete anything.
+  - A debate it finds touching "tendencies to suicide or harming other people" is deleted for good, with no person
+    involved. The Terms (section 9) say so, and the owner sees the notice the site shows ("Am șters această
+    dezbatere", in English "We deleted this debate"). Nobody can bring it back.
+  - Any of its other flags means that the owner's Publish of that debate needs a staff approval. The owner presses
+    **Cereți aprobarea** ("Ask for approval") on the debate's page. A staff member with the Publication reviews
+    permission decides on the **Publication reviews** page (Cereri de publicare), which opens from the link on the Team
+    page once the staff key is verified (1.6, step 3). That works only while the staff screens are on and your staff
+    key works under the name the site answers as: STAFFCHECK says `staff tools are on`, and after the rename only once
+    5.7 is done. Until then the request waits, and nobody can decide it.
+  - A Free debate waits for that approval too. Its own way to the public page (the first point above) asks this check
+    first: a clear answer, or a flag that a staff approval covers, lets it go on to the AI check for publication. A
+    Free debate this check flagged is never refused for good: it stays private and waits, and once a staff member
+    approves it, it goes public on a later try of the API (usually within a minute; longer while the checks wait after
+    a failure or the gate is busy) if the AI check for publication allows it.
+    Its owner sees nothing of this on the debate's page (`/v4/debate/<id>`): no flag, no "waiting" and no **Cereți
+    aprobarea**. Only the older page `/debate/<id>`, which no V4 page links to, shows the flag and the button. So
+    unless you tell the owner, nobody asks, and the debate stays private.
+  - The API looks at the 100 oldest waiting Free debates on each try, and cannot look past them. A flagged one stays
+    among them until it is approved, and so does one whose deletion cannot finish yet. So once 100 such debates wait,
+    no newer Free debate goes public, and nobody is told. AICHECK's `Free debates` line (6b.1) counts them among the
+    waiting: if that count keeps rising while none went public in the last day, ask.
+  - A debate that is already public when this check asks for its deletion is not deleted. This can happen to a debate
+    published before the check existed, or to a later version of its answer. Its public page stays readable, and the
+    API's log repeats `[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED` every 30 seconds for as long as it is public.
+    Meanwhile its owner is treated as if it were deleted: it leaves their list, their Publish answers that it is
+    gone, and they see "We deleted this debate". If you see that line, ask. Hide now can take the page down only
+    while the staff screens are on (STAFFCHECK says `staff tools are on`, and after the rename only once 5.7 is
+    done).
 - **Staff mails.** You still get the mails that say a report waits, or that a debate was hidden
   by itself. You cannot open them in the app until the staff screens come back. That is expected. (The threat report
   screen and its mail are gone since this upload: 1.6.)
@@ -3295,7 +3365,7 @@ together (the files hold one asks line), and ASKS_OPEN (6.1) is the step for bot
 **Before you open:** mail is open (part 4.3; friends need the verification mail to sign up), payments are the sandbox
 with billing on, and you have read 6.4 (what bounds spending) and 6.5 (the brakes). Do 5.7 first if you can, so
 your staff key works on dezbatere.ro and you can hide a debate by hand during the test. If you have not, tell
-friends that on the Free plan a finished debate goes public by itself when the AI check allows it (5.1b), and that
+friends that on the Free plan a finished debate goes public by itself when the AI checks allow it (5.1b), and that
 nobody can take it down by hand for now.
 
 **If friends buy test plans.** Every open sandbox plan blocks the live start (part 7), so decide this first:
@@ -3664,6 +3734,8 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
   line.
 - Billing is on, and payments are NETOPIA's sandbox (no `PREVIEW_LIVE_PAYMENTS` line).
 - The four spending gates are active with their window open (GATES, 6.2).
+- The AI check for publication and reports can go through the Anthropic gate: AICHECK (end of 6b.1) ends with
+  `AICHECK_DONE`, or you have decided to open without it (decision 1 below).
 - With your staff key working, you have read the **Public** tab and used Hide now on anything that must not stay
   public (Free debates go public by themselves, 5.1b).
 - NETOPIA's logo shows (LOGOCHECK, part 2).
@@ -3679,16 +3751,44 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
   have read 6.4 (what bounds spending) and 6.5 (the brakes).
 
 **Your decisions, before you open.**
-1. **The AI check for publication and reports** (STAFFCHECK's `the Report button's AI check line`, 1.6; the API
-   file's `SUPPORT_MODEL_TARGET_JSON`).
-   - Set up (1): a stranger's finished Free debate goes public by itself when the AI check allows it, and anyone with
-     its link can read it. A report the check agrees with hides the debate at once (once per debate).
-   - Not set up (0): no Free debate goes public; each finished one waits for a publication review on the Team page.
-     Every report waits for you.
+1. **The AI check for publication and reports** (STAFFCHECK's `the AI check for publication and reports`, 1.6, and
+   AICHECK below). It is Claude Haiku 5.5 through the Anthropic gate: the API holds no key for it, and the API file's
+   `SUPPORT_MODEL_TARGET_JSON` stays absent. The end-of-debate check comes with it, the same way: it holds each finished
+   debate's answer until it answers, deletes a debate it finds touching "tendencies to suicide or harming other
+   people", and sends an owner's Publish of a debate with another flag to a staff approval. A Free debate waits for
+   it before it can go public: one it flagged waits for that approval, and one it is still checking waits at most two
+   minutes after the debate finished (5.1b says all of it).
+   Their calls count in the Anthropic gate's pot and day's calls, beside the debates' own Claude Haiku calls and the
+   question check, and they take the gate's few slots (`max_concurrent_calls` in its GO) from those calls. A check that
+   runs by itself sends one call at a time: a Free debate's, a contribution's or an AI-written report's check one call,
+   and the end-of-debate check one finished debate at a time. For a Free debate the end-of-debate check could not
+   answer in time, the API's tries of the Free debates run that check themselves, one call, taking their turn with
+   those debates' other checks. An owner's Publish sends two. So one check holds at most one slot (an owner's Publish
+   two). But the checks run apart from each other: when two run at the same moment (for example the end-of-debate
+   check and a Free debate's check), they hold two slots together, all that a gate of two has, for the few seconds a
+   call takes.
+   While a check runs, a debate's call or a person's question check may wait in the gate's queue for one of its calls
+   to end, and on a gate whose slots are all taken such a call is refused after the gate's wait of a minute. A Free
+   debate, a contribution or an AI-written report whose check keeps failing is tried again by itself, after its first
+   hour about once an hour, and each try's calls count in the day's calls.
+
+   When the gate's pot or its day's calls are used up, everything that goes through the gate stops until its next day
+   (midnight, Bucharest time). Nobody can ask a new question: the question check answers "unavailable". The debates'
+   Claude Haiku calls are refused. And the checks fail closed: no Free debate goes public, every report waits for a
+   person, the end-of-debate check deletes nothing and finished answers show unchecked, and an owner's Publish answers
+   that the check is not available.
+   - On (AICHECK ends with `AICHECK_DONE`): a stranger's finished Free debate goes public by itself when the
+     end-of-debate check and then the AI check for publication allow it, and anyone with its link can read it. One the
+     end-of-debate check flagged stays private until a staff approval (5.1b). A report the check agrees with hides the
+     debate at once (once per debate).
+   - Off, or the gate not letting it through (`AICHECK_NOT_DONE`): no Free debate goes public. Each finished one stays
+     private and waits; the API tries its checks again by itself, and the debate goes public once the checks allow it,
+     unless 100 older Free debates wait ahead of it (5.1b). No staff screen lists the waiting ones, and no staff member
+     can publish one by hand. Every report waits for you.
 
    Either way, read the Public tab and the report mails every day: with strangers in, the Terms' promises about
-   reports and removals (section 10) are owed to real people. Setting the line up is not a step of this document: if
-   you want it and STAFFCHECK says 0, ask before you open.
+   reports and removals (section 10) are owed to real people. If you want the check and AICHECK says
+   `AICHECK_NOT_DONE`, ask before you open.
 2. **Your numbers** (1.7 and 6.4, by setting name): the site's day (`dailyCeilingMicros`) and one debate's ceiling
    (`perRunCeilingMicros`); the Free plan's allowance (Free's `monthly_credit_micros`, `reserve_micros` and
    `finish_overflow_micros`: keep Free's credit well below the site's day); each gate's pot (`daily_budget_usd`,
@@ -3714,6 +3814,75 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
    that buying is open only to invited accounts while payments are in test mode. Changing either needs an upload, so
    decide before you open.
 
+**The AI check, read at the server (AICHECK).** It only reads, and it prints names, states and counts, never an amount.
+It checks that the release sends the check through the Anthropic gate, that the API file names the gate's socket, and
+that the gate's GO lets the API's user call it and enables `claude-haiku-5-5`; then it shows the gate's state and the
+day's count of its calls, and what the checks did in the last day. Run it before you open, and again in the test of
+6b.2 step 4.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# AICHECK: whether the AI check for publication and reports can go through the Anthropic gate, and what it did in the last day (read-only; prints names, states and counts, never an amount).
+GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json
+NO=''
+nope() { echo "not ready: $1"; NO=1; }
+[ -f "$CAPI/dialectical-engine/apps/api/src/publication-check/gate-transport.ts" ] || nope "this release sends the check through no gate (the upload of a release that does comes first)"
+[ -n "$(sed -n 's/^PREVIEW_PROVIDER_TEST_CONFIG_JSON=//p' "$A" | jq -r '.anthropic_budget_socket // empty' 2>/dev/null || true)" ] || nope "the API file names no Anthropic gate socket (anthropic_budget_socket in PREVIEW_PROVIDER_TEST_CONFIG_JSON)"
+U=$(id -u "$AU")
+if [ -f "$GO" ]; then
+  jq -e --argjson u "$U" '.allowed_peer_uids | index($u) != null' "$GO" >/dev/null 2>&1 || nope "the Anthropic gate's GO does not let the API's user ($AU, uid $U) call it"
+  jq -e '.enabled_models | index("claude-haiku-5-5") != null' "$GO" >/dev/null 2>&1 || nope "the Anthropic gate's GO does not enable claude-haiku-5-5"
+else
+  nope "$GO is missing"
+fi
+S=$(gs "$GAN" "$PAN" 2>/dev/null) || S='{}'
+echo "the Anthropic gate: $(jq -c '{state, window_open, enabled_models, calls_today: .today_posts, in_flight, refused_unbilled_today: .today_unbilled_releases}' <<<"$S" 2>/dev/null || echo 'did not read')"
+[ "$(jq -r '"\(.state) \(.window_open)"' <<<"$S" 2>/dev/null || true)" = 'active true' ] || nope "the Anthropic gate is not active with its window open (GATES, 6.2)"
+db() { psqlq "$1" 2>/dev/null || echo 'did not read'; }
+echo "publication checks in the last day (outcome, cause, count):"
+db "SELECT concat_ws(' ', outcome, coalesce(failure_cause, '-'), count(*)) FROM serve.publication_check_record WHERE attempted_at > clock_timestamp() - interval '1 day' GROUP BY outcome, failure_cause ORDER BY outcome, failure_cause"
+echo "Report button checks in the last day (verdict, count):"
+db "SELECT concat_ws(' ', coalesce(verdict, 'not yet'), count(*)) FROM identity.public_flag WHERE created_at > clock_timestamp() - interval '1 day' GROUP BY verdict ORDER BY verdict"
+echo "Free debates (waiting, public in the last day, kept private in the last day): $(db "SELECT concat_ws(' ', count(*) FILTER (WHERE outcome IS NULL), count(*) FILTER (WHERE outcome = 'PUBLISHED' AND decided_at > clock_timestamp() - interval '1 day'), count(*) FILTER (WHERE outcome = 'REFUSED' AND decided_at > clock_timestamp() - interval '1 day')) FROM identity.free_public_ask")"
+echo "end-of-debate checks in the last day: $(db "SELECT concat_ws(', ', 'answered ' || (SELECT count(*) FROM serve.synthesis_check_result WHERE final AND checked_at > clock_timestamp() - interval '1 day'), (SELECT string_agg('UNAVAILABLE ' || failure_code || ' ' || n, ', ' ORDER BY failure_code) FROM (SELECT failure_code, count(*) AS n FROM serve.synthesis_check_result WHERE NOT final AND checked_at > clock_timestamp() - interval '1 day' GROUP BY failure_code) AS unanswered), 'deleted ' || ((SELECT count(*) FROM serve.synthesis_check_removal_request WHERE requested_at > clock_timestamp() - interval '1 day') + (SELECT count(*) FROM identity.synthesis_check_erasure_binding WHERE created_at > clock_timestamp() - interval '1 day')))")"
+[ -z "$NO" ] || { echo "AICHECK_NOT_DONE: the check cannot go through the Anthropic gate (the lines above say why): ask"; exit 1; }
+echo AICHECK_DONE
+exit 0
+```
+
+Read the lines before the last one:
+- `not ready: …` lines name what stops the check. The socket in the API file is an env change that comes with an
+  upload; a GO that leaves out the API's user or the model changes only as the Anthropic gate's guide says
+  (`deploy/preview-gate/v3/README-anthropic.md`). Either way, ask.
+- `the Anthropic gate:` shows its state, whether its window is open, the models it serves, its paid calls today
+  (`calls_today`, the debates' calls and the checks' together), the calls in flight, and today's calls the vendor
+  refused without billing.
+- `publication checks in the last day`: one line per outcome and cause. `ALLOW -`, `BLOCK -` and `UNSURE -` are the
+  check's answers; `UNSURE` means it was not sure, and like `BLOCK` it keeps what it checked private for good (a Free
+  debate stays private, a contribution stays off the page). `UNAVAILABLE JUDGE_NOT_CONFIGURED` means the check is off; `UNAVAILABLE JUDGE_TRANSPORT_FAILED` or
+  `JUDGE_DEADLINE` means the gate refused, was busy or did not answer in time: the debate waits, and the API tries
+  again. The other causes an `UNAVAILABLE` line can carry: `JUDGE_HTTP_STATUS`, the AI company answered with an error,
+  which the gate passed on; `JUDGE_ANSWER_NOT_JSON`, the answer was cut off or could not be read; `JUDGE_ANSWER_SCHEMA`,
+  the answer could be read but was not in the form the check asks for; `JUDGE_ANSWER_UNKNOWN_PART`, the answer named a
+  part of the debate the check did not send; `JUDGE_DOOR_REFUSED`, the site's own guard would not send the text, so
+  nothing left the server. With every one of them nothing is published and nothing is hidden, and the API tries again.
+  No line means no check ran in the last day.
+- `Report button checks in the last day`: one line per verdict. `NOT_FOUND`, `UNSURE` and `AGREE` are the check's
+  answers; `UNAVAILABLE` means it did not answer, and the report went to a person. `not yet` counts reports the check
+  has given no verdict on: one it is still reading, or one that went to a person without it (for example a report on a
+  debate that was already hidden once).
+- `Free debates`: how many wait (finished or not yet), and how many went public or were kept private in the last day.
+- `end-of-debate checks in the last day` (5.1b): `answered` counts the checks that gave an answer. The answer itself
+  (clear, flagged, or no conclusion to read) is sealed with each debate's own key, so this line cannot tell them apart.
+  `UNAVAILABLE` and a cause count the checks that gave none, and that debate's answer showed unchecked: `DEADLINE`, no
+  answer in time; `TRANSPORT_FAILED`, the gate refused the call (busy, halted, or its day used up) or the line failed;
+  `HTTP_STATUS`, the AI company answered with an error; `ANSWER_NOT_JSON` or `ANSWER_SCHEMA`, an answer cut off or not
+  in the form asked for; `MONEY_REFUSED`, the site's own day was used up; `NOT_CONFIGURED`, the check is off. Any other
+  cause: ask. `deleted` counts the debates the check deleted for touching "tendencies to suicide or harming other
+  people". It also counts a debate that was already public when the check asked for its deletion, which is not
+  deleted (5.1b).
+
 ### 6b.2 The steps, in order
 
 Each step is yours, at the server or in the browser. Each API restart shows an error page for a minute or more: pick
@@ -3731,7 +3900,21 @@ quiet minutes.
    - that account opens a plan from `/pricing`: the whole order page shows, with its price; at **Abonați-vă și
      plătiți** the sentence shows; SANDBOXLIST (3.3) is unchanged;
    - only if you want a test plan: a listed account that is not the one you will pay with in part 7 (3.2's rules) buys
-     with the test card, and finishes NETOPIA's page.
+     with the test card, and finishes NETOPIA's page;
+   - the AI check (skip this if you open without it, decision 1): run AICHECK (6b.1) and note `calls_today`. A test
+     account of yours on the Free plan asks a short question. A few minutes after its story is written, the debate
+     shows on the home page's **Public** tab: the end-of-debate check answers first (at most two minutes after the
+     debate finished), then the AI check for publication. If AICHECK showed `UNAVAILABLE` lines just before, the API
+     may still be in its wait after those failures, and it can take up to an hour. If it does not show and AICHECK has
+     no `UNAVAILABLE` lines, the end-of-debate check may have flagged it: that account sees the flag only on
+     `/debate/<id>` (5.1b). Ask. Then, on a test public debate, press the Report button with a claim that is
+     plainly not on its page (for example that it names someone's home address): the answer comes back within about
+     20 seconds, usually that the report was stopped automatically ("Nu am dat curs acestei raportări", in English "We
+     have not acted on this report"). "O persoană o va citi" ("A person will read this") means the check did not answer
+     or was unsure. Run AICHECK again: `calls_today` has gone up, the publication checks show an `ALLOW -` line, and the
+     Report button checks show your report's verdict (`UNAVAILABLE` there means the check did not answer: ask). The
+     end-of-debate checks count your test debate among the `answered` ones (`answered 0` with `UNAVAILABLE` causes:
+     ask). Hide the test debate afterwards (Hide now) if it must not stay public.
 5. REVIEW_CLOSE (5.8), if the review window is open.
 6. PWOFF1 (8.2), the hand edit of 8.2 (its two cases: the robots line is added only when PWOFF1 says the file sends
    none), then PWOFF2 (8.3). On any failed check PWOFF2 puts the password back by itself.
@@ -3743,8 +3926,8 @@ quiet minutes.
 8. OPENCHECK (6b.4).
 9. NETOPIA: 5.8b, steps 1 to 4, with 6b's words. List its tester (6b.3) if you chose that.
 
-Every morning while 6b is open: OPENCHECK, GATES (6.2; its amounts stay on your screen), the Public tab and the
-report mails.
+Every morning while 6b is open: OPENCHECK, GATES (6.2; its amounts stay on your screen), AICHECK (6b.1), the Public tab
+and the report mails.
 
 ### 6b.3 Add or remove a buyer on the Team page
 

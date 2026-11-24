@@ -14,7 +14,7 @@ import {
   createPool, migrate, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicationCheckRecordRepository,
   PostgresPublicationRepository, type Pool
 } from "@debateai/db";
-import { PostgresPublicationApplication, type FreePublicationStore } from "../../apps/api/src/publications.js";
+import { PostgresPublicationApplication, type FreeEndCheck, type FreePublicationStore } from "../../apps/api/src/publications.js";
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
 import { createPublicationContentCheck, PublicationJudgeFailure } from "../../apps/api/src/publication-check/check.js";
 import { PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW } from "../../packages/register/src/publication-check-policy.js";
@@ -39,6 +39,8 @@ const BLOCK: Readonly<Record<string, JudgeStubStep>> = { question: JSON.stringif
 const UNSURE: Readonly<Record<string, JudgeStubStep>> = { question: JSON.stringify({ verdict: "UNSURE", rules: [], parts: ["question"], possibly_illegal: false }) };
 const UNAVAILABLE: Readonly<Record<string, JudgeStubStep>> = { question: new PublicationJudgeFailure("JUDGE_TRANSPORT_FAILED") };
 const ALLOW: Readonly<Record<string, JudgeStubStep>> = {};
+/** The end-of-debate check allowing every answer at once, so each test here turns on the publication check alone. */
+const END_CHECK_ALLOWS: FreeEndCheck = Object.freeze({ stateOf: async () => "SHOW" as const, decide: async () => "PROCEED" as const });
 const PRIVATE = Object.freeze({ state: "PRIVATE", public_ref: null });
 const KEPT_PRIVATE = Object.freeze({ state: "PRIVATE", public_ref: null, public_stage: "KEPT_PRIVATE" });
 
@@ -100,7 +102,7 @@ async function sweep(run: Run, steps: Readonly<Record<string, JudgeStubStep>>, s
   const sweeper = new PostgresPublicationApplication(new PostgresPublicationRepository(database.pool, HASHER), CIPHER);
   const outcome = await sweeper.publishFreeDebate({
     runId: run.runId, answer: run.answer, owner: { userId: owner.userId, ownerRef: owner.ownerRef }, purposeLines: null, source: SOURCE,
-    contentCheck, store, lease: { run: (use) => use(), readAnswer: async () => run.answer }
+    contentCheck, endCheck: END_CHECK_ALLOWS, store, lease: { run: (use) => use(), readAnswer: async () => run.answer }
   });
   return { outcome, judgeCalls: judge.calls.length };
 }
