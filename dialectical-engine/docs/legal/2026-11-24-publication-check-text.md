@@ -63,12 +63,11 @@ automatic checks make with no person involved.
 
 - **Privacy Policy 1.2, in all 35 languages.** It is written in English first. French and Romanian follow it sentence
   for sentence, with both changes, and are recorded as translated from it in `apps/ui/legal/translated-from.json`. The
-  32 other languages carry this change translated from its first English 1.2 text: before the rows on help getting
+  32 other languages were first translated from this change's first English 1.2 text: before the rows on help getting
   back into an account were joined to it, and before three wording fixes (section 5's sentence on what a dig adds, and
-  section 8's sentences on what the page tells you and on who gets a statement of reasons). They are recorded as
-  following that earlier text, so the tooling reports them as following an older English text until they are
-  translated again from the English 1.2 and recorded. None of the translations has been reviewed by a native speaker or by counsel. In
-  section 5, "What is sent":
+  section 8's sentences on what the page tells you and on who gets a statement of reasons). They were then brought up
+  to the English 1.2, with both changes and the fixes, and are recorded as translated from it too. None of the
+  translations has been reviewed by a native speaker or by counsel. In section 5, "What is sent":
   - the synthesis sentence now reads "For this end-of-debate check we send only the synthesis text, with nothing that
     identifies you or your account.", so it stays true for that check and no longer reads as covering every check;
   - after the question check's sentence, new sentences: "Before a debate on the Free plan goes public, and when you
@@ -122,10 +121,11 @@ automatic checks make with no person involved.
   joined, the latter's version was kept (`apps/ui/scripts/legal-redate.mjs`). It leaves a document whose current
   version is released at its day and prints `<document>: released, keeps <day>`, dates the other, refuses a day that no
   document can take, and refuses any change while a translation the release offers follows an older English text.
-- **No archive copy of 1.2.** This change had archived its first English 1.2 text and its 34 translations. None of
-  them was released. The 35 copies were removed when the two changes were joined: 1.2's text changed, and the archive
-  step refuses a second text under a version number it already holds. `pnpm run generate:legal:archive` runs once
-  every translation follows the English 1.2.
+- **One archive copy of 1.2 per language.** This change had archived its first English 1.2 text and its 34
+  translations. None of them was released. The 35 copies were removed when the two changes were joined: 1.2's text
+  changed, and the archive step refuses a second text under a version number it already holds. Once every translation
+  followed the English 1.2, `pnpm run generate:legal:archive` archived the final 1.2 text of each of the 35 languages;
+  the 1.0 and 1.1 copies did not change.
 - **Not changed.** No new company. Nothing about DeepInfra. The re-acceptance floors stay at 1.0. The Terms are not
   changed. What they say about what is sent stays true with the checks running: section 8 says what a provider receives
   to run a debate, that the synthesis goes to a model that checks it and that the question goes to a model before a
@@ -147,7 +147,8 @@ SB1, on the Mac, with the upload day (the release guide, "The legal texts' day")
 YYYY-MM-DD --dry-run`, then the same without `--dry-run`, commit what it writes through a pull request into dev, then
 SB1. It dates the Privacy Policy only and prints "Terms of Service: released, keeps 24 November 2026". On 26 November
 2026 it changes nothing and prints "Privacy Policy: from 26 November 2026 to 26 November 2026; translations recorded
-again: none". On any other day it refuses until the 32 other translations follow the English 1.2 and are recorded.
+again: none". On another day it can take, it re-dates the Privacy Policy in all 35 languages, records the 34
+translations again, makes the 35 archive copies of 1.2 again from the re-dated texts and runs the release check.
 
 **The release guide's check follows the same rule.** Before this change, the drained upload's PRECHECK read both
 English texts for "Effective <upload day>", so with Terms 1.1 keeping 24 November 2026 it would have stopped every
