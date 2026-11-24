@@ -2,7 +2,7 @@
 // MAIN-SITE.md, 6b.1), run on real PostgreSQL with every migration applied: the runbook's own lines build each query in bash
 // (psql stood in for by a printer), and the queries read the tables the API writes: the publication checks' records, the
 // Report button's reports, the Free debates' list and the end-of-debate check's results and deletions. Each prints names
-// and counts, never a cost or a token count. Data is made up.
+// and counts, never an amount or a token count. Data is made up.
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";

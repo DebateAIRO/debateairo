@@ -144,7 +144,7 @@ describe("one item whose check always fails holds back no other, in any of the s
     expect(world.done).toEqual(["f-new"]);
   });
 
-  it("a judge that is down is still no cost loop: one call per wait, the items in turn instead of the oldest each time", async () => {
+  it("a judge that is down is still no endless loop of calls: one call per wait, the items in turn instead of the oldest each time", async () => {
     const rows = ["c-1", "r-1", "f-1"];
     const before = sweepsWorld({ rows, failing: () => true, inTurn: false });
     await before.runUntil(10);
