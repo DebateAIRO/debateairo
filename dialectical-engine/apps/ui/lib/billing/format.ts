@@ -15,9 +15,21 @@ export function formatMoney(locale: string, decimal: string, currency: BillingCu
 }
 
 /**
- * Terms §12: how a plans list's prices stand toward tax. INCLUDED: the place's tax is in them; NONE: that place adds
- * none, so they are final; UNPRICED: no place's tax is known yet (no country, a US or Canadian postal code still
- * needed, or the tax service not answering), so no price is shown at all, never one before tax. `== null`: an answer
+ * The tax inside a price the API sent with its net ("24.20" and "20.00" give "4.20"), counted in whole cents so no
+ * float rounding can show; null when either is not a plain decimal price or the total is below the net.
+ */
+export function taxInPrice(total: string, net: string): string | null {
+  if (!DECIMAL_PRICE.test(total) || !DECIMAL_PRICE.test(net)) return null;
+  const cents = (decimal: string): number => Number(decimal.replace(".", ""));
+  const tax = cents(total) - cents(net);
+  return tax < 0 ? null : `${Math.trunc(tax / 100)}.${String(tax % 100).padStart(2, "0")}`;
+}
+
+/**
+ * Terms §12: how a plans list's prices stand toward tax. INCLUDED: the place's tax is in the total (a card shows our
+ * price and that tax apart, as price + VAT, with the total under them); NONE: that place adds none, so they are final;
+ * UNPRICED: no place's tax is known yet (no country, a US or Canadian postal code still needed, or the tax service not
+ * answering), so no price is shown at all, never one before tax alone. `== null`: an answer
  * without the fields (only a hand-made one: the contract client requires them) is UNPRICED.
  */
 export type PricedTax = "INCLUDED" | "NONE" | "UNPRICED";
@@ -28,6 +40,23 @@ export function pricedTax(
   const tax = answer?.tax;
   if (answer?.place?.status !== "PRICED" || tax == null) return "UNPRICED";
   return tax.tax_status === "TAXABLE" && tax.tax_rate_bp > 0 ? "INCLUDED" : "NONE";
+}
+
+/**
+ * A price for a sentence that names one, as price + VAT: "€20.00 + €3.80 MwSt. = €23.80", our price, the place's tax
+ * apart and the total with that tax in it (Terms §12: the price paid is always named). A total that cannot be split,
+ * or holds no tax, is named whole.
+ */
+export function priceWithTaxTotal(
+  catalog: MessageCatalog, locale: string, currency: BillingCurrency,
+  price: Readonly<{ net: string; total: string; taxName: string }>
+): string {
+  const total = formatMoney(locale, price.total, currency);
+  const tax = taxInPrice(price.total, price.net);
+  if (tax === null || Number(tax) === 0) return total;
+  return `${t(catalog, "billing.pricing.priceWithTax", {
+    price: formatMoney(locale, price.net, currency), tax: formatMoney(locale, tax, currency), taxName: price.taxName
+  })} = ${total}`;
 }
 
 /** The sentence a card shows in place of a price its place cannot be given yet (Terms §12: never a price before tax). */

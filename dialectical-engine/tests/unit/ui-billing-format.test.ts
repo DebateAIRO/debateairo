@@ -6,7 +6,9 @@ import {
   formatLongDate,
   formatMoney,
   planName,
+  priceWithTaxTotal,
   renewDayLabel,
+  taxInPrice,
   taxLabel
 } from "../../apps/ui/lib/billing/format.js";
 import { isBillingPlanId, isPaidPlanId } from "../../apps/ui/lib/billing/plans.js";
@@ -16,6 +18,28 @@ describe("P18 billing formatting helpers", () => {
     expect(formatMoney("en", "20.00", "USD")).toBe("$20.00");
     expect(formatMoney("de", "20.00", "USD")).toMatch(/^20,00\s\$$/u);
     expect(formatMoney("en", "20", "USD")).toBe("20");
+  });
+
+  it("takes the tax out of a total in whole cents, and gives nothing for a price it cannot split", () => {
+    expect(taxInPrice("24.20", "20.00")).toBe("4.20");
+    expect(taxInPrice("121.00", "100.00")).toBe("21.00");
+    // 53.13 - 50.00 is 3.1300000000000026 in floats; whole cents keep it exact.
+    expect(taxInPrice("53.13", "50.00")).toBe("3.13");
+    expect(taxInPrice("20.05", "20.00")).toBe("0.05");
+    expect(taxInPrice("20.00", "20.00")).toBe("0.00");
+    expect(taxInPrice("19.99", "20.00")).toBeNull();
+    expect(taxInPrice("24.2", "20.00")).toBeNull();
+    expect(taxInPrice("24.20", "twenty")).toBeNull();
+  });
+
+  it("writes a price as price + VAT = total, and whole where there is no tax to show apart", () => {
+    expect(priceWithTaxTotal(billingEnglish, "en", "EUR", { net: "20.00", total: "23.80", taxName: "MwSt." }))
+      .toBe("€20.00 + €3.80 MwSt. = €23.80");
+    expect(priceWithTaxTotal(billingEnglish, "en", "RON", { net: "100.00", total: "121.00", taxName: "TVA" }))
+      .toBe(`${formatMoney("en", "100.00", "RON")} + ${formatMoney("en", "21.00", "RON")} TVA = ${formatMoney("en", "121.00", "RON")}`);
+    // Never a price before tax alone: a total that holds no tax, or cannot be split, is named whole.
+    expect(priceWithTaxTotal(billingEnglish, "en", "USD", { net: "20.00", total: "20.00", taxName: "VAT" })).toBe("$20.00");
+    expect(priceWithTaxTotal(billingEnglish, "en", "USD", { net: "20.00", total: "19.00", taxName: "VAT" })).toBe("$19.00");
   });
 
   it("names plans from the catalogue and words the quota as a multiple, never as credit", () => {
