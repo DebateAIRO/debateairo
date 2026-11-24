@@ -786,7 +786,8 @@ The Terms and the Privacy Policy each name their version and the day it takes ef
 text on its own (the release guide's section "The legal texts' day", `deploy/preview-release/v1/README.md`): a text
 whose current version the live site already carries keeps its day, and a new version takes the upload day, because it
 goes live on the site at DR6. Today the Terms 1.1 and the Privacy Policy 1.1 are on the live site and keep 24 November
-2026; a newer version of either takes the upload day. Check both, in the same folder:
+2026; a newer version of either takes the upload day. This upload carries the Terms 1.1, which keep 24 November 2026,
+and the Privacy Policy 1.2, a new version, which takes the upload day. Check both, in the same folder:
 
 ```sh
 grep -Ho 'Version [0-9.]* · Effective [0-9]* [A-Za-z]* 20[0-9]*' apps/ui/legal/en/terms-of-service.md apps/ui/legal/en/privacy-policy.md
@@ -995,11 +996,12 @@ text under that step, or the repair map (after step 23), or ask. Never put a `.b
 ### 2.1 Before the downtime (the site is up)
 
 **1. The texts' days are still right** (Mac, the upload folder). Run the date line of 1.8, step 3, again. A version
-the live site already carries must show its live day (today the Terms 1.1 and the Privacy Policy 1.1: 24 November
-2026), and a new version must show today (the release guide's section "The legal texts' day",
+the live site already carries must show its live day (in this upload the Terms 1.1: 24 November 2026), and a new
+version must show today (in this upload the Privacy Policy 1.2; the release guide's section "The legal texts' day",
 `deploy/preview-release/v1/README.md`). If a line shows another day, stop before piece 1 and ask. PRECHECK (step 14)
 still asks both texts to take effect today: on an upload day after 24 November its `legal-date` subject stops it while
-either text keeps its live day, as both do today. Ask before the upload day how that is settled.
+the Terms 1.1 keep their live day, as they do in this upload; the Privacy Policy 1.2 takes the upload day and does not
+stop it. Ask before the upload day how that is settled.
 
 **2. GATESBEFORE** (server; the release guide's "Before piece 1"). It only reads: each older gate's start checks, run
 by hand as systemd would run them, then its state and its calls in flight. Expect one line per gate, `<gate>: start
