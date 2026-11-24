@@ -267,9 +267,9 @@ describe("the Register names the two jobs before a debate starts", () => {
 
   it("DeepInfra suggests what to look into; Anthropic does both; the support row names both when Anthropic's is not shown", () => {
     expect(DEEPINFRA_PROVIDER.purposes).toEqual(["arguments", "judging", "story", "suggestPaths"]);
-    expect(ANTHROPIC_PREVIEW_PROVIDER.purposes).toEqual(["arguments", "judging", "story", "synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths"]);
+    expect(ANTHROPIC_PREVIEW_PROVIDER.purposes).toEqual(["arguments", "judging", "story", "synthesisCheck", "publicationCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths"]);
     expect(SUPPORT_PROVIDER.purposes).toEqual(["support"]);
-    expect(providerRegister(["deepinfra"]).at(-1)?.purposes).toEqual(["synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support"]);
+    expect(providerRegister(["deepinfra"]).at(-1)?.purposes).toEqual(["synthesisCheck", "publicationCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support"]);
     expect(providerRegister(["anthropic", "deepinfra"]).at(-1)).toBe(SUPPORT_PROVIDER);
   });
 

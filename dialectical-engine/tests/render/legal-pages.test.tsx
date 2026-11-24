@@ -643,7 +643,7 @@ describe("the model providers page lists the companies the API's targets reach (
   });
 
   // Privacy 3.12 (V4 start step): two jobs before a debate starts join the eight.
-  it("names the ten jobs a provider can be given, and brackets every job nobody has confirmed", () => {
+  it("names the eleven jobs a provider can be given, and brackets every job nobody has confirmed", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={WITH_UNCHECKED} />);
     const jobs = new Set(texts(view.querySelectorAll(".legalProviderPurposes li")));
     expect([...jobs].sort()).toEqual(
@@ -653,6 +653,7 @@ describe("the model providers page lists the companies the API's targets reach (
         "The finished debate — to write the verdict story",
         "Search questions the models write from the debate — to find evidence on the web",
         "The synthesis of a finished debate — to check it for four categories",
+        "A debate's public text before it goes public, and what is added to a public debate — to check it against our rule on content",
         "A question before a debate starts — to check whether the debate may start",
         REPORT_CHECK_LINE,
         "Before a debate starts: suggesting clarifying questions",
@@ -681,6 +682,9 @@ describe("the model providers page lists the companies the API's targets reach (
     expect(synthesisRows).toHaveLength(1);
     expect(showing(REPORT_CHECK_LINE)).toEqual(synthesisRows);
     expect(register.filter((entry) => entry.purposes.includes("reportCheck")).map((entry) => entry.key)).toEqual(synthesisRows);
+    // The check of a debate's public text before it goes public runs on that judge too.
+    expect(showing(legalEnglish["legal.providers.purpose.publicationCheck"])).toEqual(synthesisRows);
+    expect(register.filter((entry) => entry.purposes.includes("publicationCheck")).map((entry) => entry.key)).toEqual(synthesisRows);
   });
 
   // FIX-SF-S03-p1 (t_566873aa): both checks always call Claude Haiku 5.5 on Anthropic (S01-R9, S04-R5), so every
@@ -694,7 +698,7 @@ describe("the model providers page lists the companies the API's targets reach (
     ["a target on a host no catalogue row knows", ["host:api.acme.example"]]
   ] as const)("names Anthropic's Claude Haiku 5.5 for both checks on exactly one row: %s", (_build, companies) => {
     const register = providerRegister(companies);
-    for (const purpose of ["synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions"] as const) {
+    for (const purpose of ["synthesisCheck", "publicationCheck", "questionCheck", "reportCheck", "clarifyQuestions"] as const) {
       const rows = register.filter((entry) => entry.purposes.includes(purpose));
       expect(rows.map((entry) => entry.key), purpose).toHaveLength(1);
       expect(rows[0]).toMatchObject({ models: "Claude Haiku 5.5", entity: "Anthropic Ireland, Limited" });

@@ -127,6 +127,7 @@
   "legal.providers.purpose.judging": "טקסט הדיון — לשיפוט הטיעונים ולבדיקתם",
   "legal.providers.purpose.story": "הדיון שהושלם — לכתיבת סיפור ההכרעה",
   "legal.providers.purpose.synthesisCheck": "הסינתזה של דיון שהסתיים — לבדיקתה בארבע קטגוריות",
+  "legal.providers.purpose.publicationCheck": "הטקסט הציבורי של דיון לפני שהוא הופך לציבורי, ומה שמתווסף לדיון ציבורי — לבדיקתם לפי הכלל שלנו בנוגע לתוכן",
   "legal.providers.purpose.reportCheck": "דיווח שהוגש בלחצן דיווח והטקסט הציבורי של הדיון — לבדיקת הדיווח",
   "legal.providers.purpose.questionCheck": "שאלה לפני שדיון מתחיל — לבדיקה אם הדיון רשאי להתחיל",
   "legal.providers.purpose.clarifyQuestions": "לפני שדיון מתחיל: הצעת שאלות הבהרה",

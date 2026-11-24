@@ -127,6 +127,7 @@
   "legal.providers.purpose.judging": "Tartışma metni — argümanları değerlendirmek ve kontrol etmek için",
   "legal.providers.purpose.story": "Tamamlanan tartışma — hükmün hikâyesini yazmak için",
   "legal.providers.purpose.synthesisCheck": "Biten bir tartışmanın sentezi — dört kategori bakımından kontrol etmek için",
+  "legal.providers.purpose.publicationCheck": "Bir tartışmanın herkese açık hâle gelmeden önceki herkese açık metni ve herkese açık bir tartışmaya eklenen şey — içerikle ilgili kuralımıza göre kontrol etmek için",
   "legal.providers.purpose.reportCheck": "Bildir düğmesiyle yapılan bir bildirim ve tartışmanın herkese açık metni — bildirimi kontrol etmek için",
   "legal.providers.purpose.questionCheck": "Bir tartışma başlamadan önceki soru — tartışmanın başlayıp başlayamayacağını kontrol etmek için",
   "legal.providers.purpose.clarifyQuestions": "Bir tartışma başlamadan önce: açıklayıcı sorular önermek",
