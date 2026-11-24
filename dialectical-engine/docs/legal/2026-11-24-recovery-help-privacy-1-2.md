@@ -16,8 +16,8 @@ These notes are not legal advice.
 - A member of the team then approves or refuses the request on an internal page. To decide, they see only: a shortened
   form of the account's sign-in email address, when the account was created, when it was last signed in to, its
   sign-in methods (how many passkeys, whether it has an authenticator app), whether a recovery code is left (yes or no),
-  whether it is under a security hold or has a risk mark, whether it has ever paid (yes or no, no amounts) and how many such
-  requests it made before (`apps/api/src/staff/recovery-permits.ts`). They do not see the password, the debates,
+  whether it is under a security hold or has a risk mark, whether it has ever paid (yes or no, no amounts) and how many
+  such requests it made before (`apps/api/src/staff/recovery-permits.ts`). They do not see the password, the debates,
   payment details or anything the person typed.
 - If the request is approved, the account waits 72 hours, every verified address on it is emailed with a way to stop
   the request, and then the person can set up one new sign-in method.

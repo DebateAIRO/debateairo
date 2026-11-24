@@ -1164,13 +1164,12 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(prose).toContain('The main-site runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`) follows the same rule in both places it checks the day: 1.8 step 3, in the preparation, and 2.1 step 1, on the upload day before the downtime.');
     expect(prose).not.toContain('it does not follow this rule yet');
     const runbook = read('deploy/preview-auth-dev/v1/MAIN-SITE.md');
+    const preparation = sectionOf(runbook, '### 1.8 The preparation: the day before, or earlier on the upload day').replace(/\s+/g, ' ');
+    const beforeDowntime = sectionOf(runbook, '### 2.1 Before the downtime (the site is up)').replace(/\s+/g, ' ');
     expect(runbook.replace(/\s+/g, ' ')).not.toContain('It must print the same line twice, `Effective <the upload day>`');
-    expect(sectionOf(runbook, '### 1.8 The preparation: the day before, or earlier on the upload day').replace(/\s+/g, ' '))
-      .toContain('**3. The legal texts, on the Mac.**');
-    expect(sectionOf(runbook, '### 1.8 The preparation: the day before, or earlier on the upload day').replace(/\s+/g, ' '))
-      .toContain('The day follows a rule for each text on its own (the release guide\'s section "The legal texts\' day"');
-    expect(sectionOf(runbook, '### 2.1 Before the downtime (the site is up)').replace(/\s+/g, ' '))
-      .toContain('**1. The texts\' days are still right** (Mac, the upload folder). Run the date line of 1.8, step 3, again. A version the live site already carries must show its live day');
+    expect(preparation).toContain('**3. The legal texts, on the Mac.**');
+    expect(preparation).toContain('The day follows a rule for each text on its own (the release guide\'s section "The legal texts\' day"');
+    expect(beforeDowntime).toContain('**1. The texts\' days are still right** (Mac, the upload folder). Run the date line of 1.8, step 3, again. A version the live site already carries must show its live day');
     expect(prose).not.toContain('it is not changed here');
     // What else reads the day: no check on the side-by-side path; PRECHECK on the drained path, by the same rule.
     expect(prose).toContain('`legal:release-check` does not: it passes with any day the command accepts. On the side-by-side path nothing else does either, so this step is the check.');
