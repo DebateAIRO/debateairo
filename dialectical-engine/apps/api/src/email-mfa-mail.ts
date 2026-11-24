@@ -1,17 +1,19 @@
 import type { RecoveryMailWork } from "./registration.js";
-import{authorizeOutboundMail,isOutboundMailAuthorizer}from"./mail-channel.js";import type{OutboundMailAuthorizer}from"./outbound-mail-gate.js";import{spawn}from"node:child_process";import{decrypt,type ReadableUserDekStore}from"@debateai/crypto";import type{AuthPolicy}from"@debateai/register";import type{EmailRecoveryNotice}from"../../../packages/db/src/email-mfa-recovery.js";import{isSingleDeliverableRecipient,MailDeliveryError}from"./mail-channel.js";import{emailRecoveryNoticeAad}from"./email-mfa-recovery.js";
+import{authorizeOutboundMail,isOutboundMailAuthorizer}from"./mail-channel.js";import type{OutboundMailAuthorizer}from"./outbound-mail-gate.js";import{spawn}from"node:child_process";import{decrypt,type ReadableUserDekStore}from"@debateai/crypto";import type{AuthPolicy}from"@debateai/register";import type{EmailRecoveryNotice}from"../../../packages/db/src/email-mfa-recovery.js";import{isSingleDeliverableRecipient,MailDeliveryError}from"./mail-channel.js";import{emailRecoveryNoticeAad,type EmailRecoveryFlow}from"./email-mfa-recovery.js";
 import { copyOf } from "@debateai/mail-templates";
 import { catalogLocaleOf, MAIL_LOCALE_VALUES } from "./mail-locale.js";
 import { encodeHeaderText, transferBody } from "./mail-mime.js";
-export type EmailRecoveryMail=Readonly<{flow:"backup_email"|"mfa_recovery";messageId:string;event:"PROOF"|"VERIFIED"|"STARTED"|"WAITING"|"FINISH"|"COMPLETED"|"CANCELLED"|"REFUSED";recipient:string;expiresAt:Date;token?:string;cancelToken?:string;notBefore?:Date;finishToken?:string;mailLocale?:string}>;
+export type EmailRecoveryMail=Readonly<{flow:EmailRecoveryFlow;messageId:string;event:"PROOF"|"VERIFIED"|"STARTED"|"WAITING"|"FINISH"|"COMPLETED"|"CANCELLED"|"REFUSED";recipient:string;expiresAt:Date;token?:string;cancelToken?:string;notBefore?:Date;finishToken?:string;mailLocale?:string}>;
 export interface EmailRecoveryMailSender{send(mail:EmailRecoveryMail):Promise<void>;}
 const bearer=/^[A-Za-z0-9_-]{43}$/;
 export function renderEmailRecoveryMail(mail:EmailRecoveryMail,options:Readonly<{from:string;publicAppUrl:string}>):string{
  // R-13, R-22, R-23: the copy is the catalogue of the language stored on the row; a mail that carries none is English (the pinned default).
  const locale=mail.mailLocale??"en",catalogue=catalogLocaleOf(locale);
- const origin=new URL(options.publicAppUrl),allowed=["flow","messageId","event","recipient","expiresAt","mailLocale",...(mail.event==="PROOF"?["token",...(mail.flow==="mfa_recovery"?["cancelToken"]:[])]:mail.flow==="mfa_recovery"&&mail.event==="STARTED"?["cancelToken"]:mail.flow==="mfa_recovery"&&mail.event==="WAITING"?["notBefore","cancelToken"]:mail.flow==="mfa_recovery"&&mail.event==="FINISH"?["finishToken"]:[])];
- if(Object.keys(mail).some(k=>!allowed.includes(k))||!['backup_email','mfa_recovery'].includes(mail.flow)||!MAIL_LOCALE_VALUES.includes(locale)||origin.protocol!=="https:"||origin.username||origin.password||!/^noreply@[^@\s,;<>]+$/u.test(options.from)||!isSingleDeliverableRecipient(mail.recipient)||!/^[0-9a-f-]{36}$/i.test(mail.messageId)||!(mail.expiresAt instanceof Date)||!Number.isFinite(mail.expiresAt.getTime()))throw new MailDeliveryError("EMAIL_RECOVERY_MAIL_INPUT_INVALID");
- const link=(kind:"token"|"cancel"|"finish",value:string)=>{if(!bearer.test(value))throw new MailDeliveryError("EMAIL_RECOVERY_MAIL_INPUT_INVALID");const u=new URL(mail.flow==="backup_email"?"/verify-backup-email":"/recover-authenticator",origin.origin);u.hash=`${kind}=${value}`;return u.toString();};
+ // The lost authenticator app's mails and the Owner's permit's (0188) carry the same fields: a cancel link beside the proof link and in the notice of the wait, and a finish link.
+ const linked=mail.flow!=="backup_email";
+ const origin=new URL(options.publicAppUrl),allowed=["flow","messageId","event","recipient","expiresAt","mailLocale",...(mail.event==="PROOF"?["token",...(linked?["cancelToken"]:[])]:mail.flow==="mfa_recovery"&&mail.event==="STARTED"?["cancelToken"]:linked&&mail.event==="WAITING"?["notBefore","cancelToken"]:linked&&mail.event==="FINISH"?["finishToken"]:[])];
+ if(Object.keys(mail).some(k=>!allowed.includes(k))||!['backup_email','mfa_recovery','recovery_permit'].includes(mail.flow)||!MAIL_LOCALE_VALUES.includes(locale)||origin.protocol!=="https:"||origin.username||origin.password||!/^noreply@[^@\s,;<>]+$/u.test(options.from)||!isSingleDeliverableRecipient(mail.recipient)||!/^[0-9a-f-]{36}$/i.test(mail.messageId)||!(mail.expiresAt instanceof Date)||!Number.isFinite(mail.expiresAt.getTime()))throw new MailDeliveryError("EMAIL_RECOVERY_MAIL_INPUT_INVALID");
+ const link=(kind:"token"|"cancel"|"finish",value:string)=>{if(!bearer.test(value))throw new MailDeliveryError("EMAIL_RECOVERY_MAIL_INPUT_INVALID");const u=new URL(mail.flow==="backup_email"?"/verify-backup-email":mail.flow==="recovery_permit"?"/recover/help":"/recover-authenticator",origin.origin);u.hash=`${kind}=${value}`;return u.toString();};
  // One sentence of the copy, with its placeholders ({expiry}, {notBefore}) filled from the values the mail already carries.
  const copy=(key:string,values:Readonly<Record<string,string>>={})=>Object.entries(values).reduce((text,[name,value])=>text.split(`{${name}}`).join(value),copyOf(catalogue,key));
  const expiry=mail.expiresAt.toISOString();
@@ -20,6 +22,18 @@ export function renderEmailRecoveryMail(mail:EmailRecoveryMail,options:Readonly<
   if(mail.event==="PROOF"){if(!mail.token)throw new MailDeliveryError("EMAIL_RECOVERY_MAIL_INPUT_INVALID");subject=copy("auth.emr.backup.proof.subject");body=[copy("auth.emr.backup.proof.p1"),copy("auth.emr.backup.proof.p2"),link("token",mail.token),"",copy("auth.emr.backup.proof.p3",{expiry}),copy("auth.emr.backup.proof.p4")];}
   else if(mail.event==="VERIFIED"){subject=copy("auth.emr.backup.verified.subject");body=[copy("auth.emr.backup.verified.p1"),copy("auth.emr.backup.verified.p2")];}
   else throw new MailDeliveryError("EMAIL_RECOVERY_MAIL_INPUT_INVALID");
+ }else if(mail.flow==="recovery_permit"){
+  // The Owner's permit: the mailbox link, the notice of the 72 hours, the finish link, and the two short endings.
+  if(mail.event==="PROOF"){
+   if(!mail.token||!mail.cancelToken)throw new MailDeliveryError("EMAIL_RECOVERY_MAIL_INPUT_INVALID");subject=copy("auth.emr.permit.proof.subject");body=[copy("auth.emr.permit.proof.p1"),copy("auth.emr.permit.proof.p2"),link("token",mail.token),"",copy("auth.emr.permit.proof.p3",{expiry}),copy("auth.emr.permit.proof.p4"),"",copy("auth.emr.permit.proof.p5"),link("cancel",mail.cancelToken),copy("auth.emr.permit.proof.p6")];
+  }else if(mail.event==="WAITING"){
+   // An address that may not cancel gets the same notice without the link; signing in stops the request for everyone.
+   if(!(mail.notBefore instanceof Date)||!Number.isFinite(mail.notBefore.getTime()))throw new MailDeliveryError("EMAIL_RECOVERY_MAIL_INPUT_INVALID");subject=copy("auth.emr.permit.waiting.subject");body=[copy("auth.emr.permit.waiting.p1"),copy("auth.emr.permit.waiting.p2",{notBefore:mail.notBefore.toISOString()}),copy("auth.emr.permit.waiting.p3")];if(mail.cancelToken)body.push("",copy("auth.emr.permit.waiting.p4"),link("cancel",mail.cancelToken),copy("auth.emr.permit.waiting.p5"));body.push("",copy("auth.emr.permit.waiting.p6"));
+  }else if(mail.event==="FINISH"){
+   if(!mail.finishToken)throw new MailDeliveryError("EMAIL_RECOVERY_MAIL_INPUT_INVALID");subject=copy("auth.emr.permit.finish.subject");body=[copy("auth.emr.permit.finish.p1"),copy("auth.emr.permit.finish.p2"),link("finish",mail.finishToken),"",copy("auth.emr.permit.finish.p3",{expiry}),copy("auth.emr.permit.finish.p4"),copy("auth.emr.permit.finish.p5")];
+  }else if(mail.event==="REFUSED"||mail.event==="CANCELLED"){
+   const name=mail.event==="REFUSED"?"refused":"cancelled";subject=copy(`auth.emr.permit.${name}.subject`);body=[copy(`auth.emr.permit.${name}.statement`)];
+  }else throw new MailDeliveryError("EMAIL_RECOVERY_MAIL_INPUT_INVALID");
  }else if(mail.event==="PROOF"){
   if(!mail.token||!mail.cancelToken)throw new MailDeliveryError("EMAIL_RECOVERY_MAIL_INPUT_INVALID");subject=copy("auth.emr.mfa.proof.subject");body=[copy("auth.emr.mfa.proof.p1"),copy("auth.emr.mfa.proof.p2"),link("token",mail.token),"",copy("auth.emr.mfa.proof.p3",{expiry}),copy("auth.emr.mfa.proof.p4"),copy("auth.emr.mfa.proof.p5"),copy("auth.emr.mfa.proof.p6"),"",copy("auth.emr.mfa.proof.p7"),link("cancel",mail.cancelToken),copy("auth.emr.mfa.proof.p8")];
  }else if(mail.event==="WAITING"){
@@ -34,7 +48,7 @@ export function renderEmailRecoveryMail(mail:EmailRecoveryMail,options:Readonly<
   // The STARTED cancel sentences are the words of the PROOF and WAITING copy (V-19: the STARTED event has no copy of its own for them).
   if(mail.event==="STARTED"&&mail.cancelToken)body.push("",copy("auth.emr.mfa.proof.p7"),link("cancel",mail.cancelToken),copy("auth.emr.mfa.waiting.p5"));
  }
- const prefix=mail.flow==="backup_email"?"backup-email":"mfa-recovery";const text=[copy("auth.common.greeting"),"",...body,"",copy("auth.common.signoff"),""].join("\r\n");const transfer=transferBody(text);return[`From: ${options.from}`,`To: ${mail.recipient}`,`Subject: ${encodeHeaderText(subject)}`,`Message-ID: <${prefix}-${mail.messageId}@${origin.hostname}>`,"MIME-Version: 1.0",`Content-Language: ${catalogue}`,"Content-Type: text/plain; charset=UTF-8",...(transfer.contentTransferEncoding===null?[]:[`Content-Transfer-Encoding: ${transfer.contentTransferEncoding}`]),"",transfer.body].join("\r\n");
+ const prefix=mail.flow==="backup_email"?"backup-email":mail.flow==="recovery_permit"?"recovery-permit":"mfa-recovery";const text=[copy("auth.common.greeting"),"",...body,"",copy("auth.common.signoff"),""].join("\r\n");const transfer=transferBody(text);return[`From: ${options.from}`,`To: ${mail.recipient}`,`Subject: ${encodeHeaderText(subject)}`,`Message-ID: <${prefix}-${mail.messageId}@${origin.hostname}>`,"MIME-Version: 1.0",`Content-Language: ${catalogue}`,"Content-Type: text/plain; charset=UTF-8",...(transfer.contentTransferEncoding===null?[]:[`Content-Transfer-Encoding: ${transfer.contentTransferEncoding}`]),"",transfer.body].join("\r\n");
 }
 export class SendmailEmailRecoverySender implements EmailRecoveryMailSender{
  constructor(private readonly options:Readonly<{executable:string;from:string;publicAppUrl:string;timeoutMs:number;gate:OutboundMailAuthorizer}>){if(!options.executable||!Number.isInteger(options.timeoutMs)||options.timeoutMs<1||!isOutboundMailAuthorizer(options.gate))throw new MailDeliveryError("EMAIL_RECOVERY_MAIL_CONFIGURATION_INVALID");}
@@ -46,7 +60,7 @@ export class EmailRecoveryNotificationWorker {
  private active: Promise<void> | null = null;
  private closed = false;
  private readonly pending = new Set<Promise<void>>();
- constructor(private readonly d: Readonly<{flow:"backup_email"|"mfa_recovery";repository:NoticeRepository;users:ReadableUserDekStore;sender:EmailRecoveryMailSender;authPolicy:AuthPolicy;reportDiagnostic:(code:string)=>void;dispatch:(prepare:()=>Promise<RecoveryMailWork|null>)=>Promise<void>}>) {
+ constructor(private readonly d: Readonly<{flow:EmailRecoveryFlow;repository:NoticeRepository;users:ReadableUserDekStore;sender:EmailRecoveryMailSender;authPolicy:AuthPolicy;reportDiagnostic:(code:string)=>void;dispatch:(prepare:()=>Promise<RecoveryMailWork|null>)=>Promise<void>}>) {
   if(typeof d.dispatch!=="function") throw TypeError("EMAIL_RECOVERY_DISPATCH_REQUIRED");
  }
  private reportDiagnostic(code:string):void {try{this.d.reportDiagnostic(code);}catch{/* Diagnostics cannot orphan an owned notice. */}}

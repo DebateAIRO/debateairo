@@ -1,5 +1,5 @@
-// tests/integration/free-debate-refused-by-check-0188.test.ts
-// Migration 0188 on real PostgreSQL: the owner of a Free debate the publication check refused is told so by the visibility read
+// tests/integration/free-debate-refused-by-check-0189.test.ts
+// Migration 0189 on real PostgreSQL: the owner of a Free debate the publication check refused is told so by the visibility read
 // (public_stage KEPT_PRIVATE), and no one else learns anything new. Unless a test says otherwise, every row is written by the code that
 // writes it in the product: the ask's Free notice by the API's writer on the request login, each check by the shipped publication check
 // and its recorder (only the judge's answers are scripted), and the outcome by the shipped Free publication path with the sweep's own store. The visibility
@@ -146,7 +146,7 @@ afterAll(async () => {
   if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
 });
 
-describe("0188: the owner of a Free debate the publication check refused is told it stays private", () => {
+describe("0189: the owner of a Free debate the publication check refused is told it stays private", () => {
   it("BLOCK: the sweep records the check, then the refusal, and the owner's visibility read says KEPT_PRIVATE", async () => {
     const run = await freeDebate("block");
     expect(await ownersRead(run.runId)).toStrictEqual(PRIVATE);
@@ -235,7 +235,7 @@ describe("0188: the owner of a Free debate the publication check refused is told
     const run = await freeDebate("strangers");
     expect(await sweep(run, BLOCK)).toMatchObject({ outcome: "REFUSED" });
     expect(await ownersRead(run.runId)).toStrictEqual(KEPT_PRIVATE);
-    // The visibility read of another account's debate: not theirs, so nothing at all (the route's 404), as before 0188.
+    // The visibility read of another account's debate: not theirs, so nothing at all (the route's 404), as before 0189.
     expect(await visibilityFor(other, other.token, run.runId)).toBeNull();
     expect(await visibilityFor(owner, other.token, run.runId)).toBeNull();
     // The reader itself: null for a connection that is not the owner's, whichever owner it is asked of, and for a debate not theirs.

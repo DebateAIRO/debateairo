@@ -291,6 +291,7 @@ describe('scoped rotation, JIT and trusted ceremony persistence',()=>{
   // functions they stand beside; the operator's permit (arm_rekey) is the recovery capability's alone, and the permit's own tests are no role's.
   // 0186: the audit page beside 0150's goes where 0142's went (the runtime's); the preview buyers' yes-or-no, list and door are the API's
   // billing role's alone (debateai_billing_runtime), so neither the runtime role nor the marker holds them.
+  // 0188: the Owner's list of asks to get back into an account and its door are the API's billing role's alone too.
   // 0172 (M7): the release before's door, the grounded one without the law, is no longer the runtime's; its overload with the law is.
   // 0174: nor is 0150's first door, which records no ground at all.
   const runtimeClosed=new Set(['staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)','staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)']);

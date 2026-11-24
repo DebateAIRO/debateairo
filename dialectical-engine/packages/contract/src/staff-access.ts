@@ -153,6 +153,12 @@ export type PublicFlagOutcome = z.infer<typeof PublicFlagOutcomeSchema>;
 const PreviewBuyerAddressSchema = z.string().trim().min(3).max(320).regex(/^[^@\s]+@[^@\s]+$/u);
 const PreviewBuyerAddShape = { address: PreviewBuyerAddressSchema, expected_revision: RevisionSchema, operation_id: z.uuid() };
 const PreviewBuyerRemoveShape = { buyer_ref: z.uuid(), expected_revision: RevisionSchema, operation_id: z.uuid() };
+/**
+ * The Owner's permit for a locked-out account (migration 0188): the Owner approves or refuses one ask, named by its ref.
+ * The proof binds the decision, the ask, its account and the revision the page showed. No address is typed or sent.
+ */
+const RecoveryPermitRevisionSchema = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
+const RecoveryPermitDecisionShape = { request_ref: z.uuid(), expected_revision: RecoveryPermitRevisionSchema, operation_id: z.uuid() };
 export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("TEAM_INVITE"), target_user_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
     z.object({ action: z.literal("TEAM_GRANT"), target_staff_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
@@ -171,7 +177,10 @@ export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("PUBLIC_REPORT_DISMISS"), flag_id: z.uuid(), outcome: PublicFlagOutcomeSchema, operation_id: z.uuid() }).strict(),
     // 0186: both bound under the existing action TEAM_GRANT, which only the Owner holds; the change is in the proof's body.
     z.object({ action: z.literal("PREVIEW_BUYER_ADD"), ...PreviewBuyerAddShape }).strict(),
-    z.object({ action: z.literal("PREVIEW_BUYER_REMOVE"), ...PreviewBuyerRemoveShape }).strict()
+    z.object({ action: z.literal("PREVIEW_BUYER_REMOVE"), ...PreviewBuyerRemoveShape }).strict(),
+    // 0188: both bound under the existing action TEAM_GRANT, which only the Owner holds; the decision and the ask are in the proof's body.
+    z.object({ action: z.literal("RECOVERY_PERMIT_APPROVE"), ...RecoveryPermitDecisionShape }).strict(),
+    z.object({ action: z.literal("RECOVERY_PERMIT_REFUSE"), ...RecoveryPermitDecisionShape }).strict()
 ]);
 export const StaffActionOptionsRequestSchema = z.object({ intent: StaffActionIntentSchema }).strict();
 export const StaffActionVerifyRequestSchema = z.object({ intent: StaffActionIntentSchema,
@@ -248,6 +257,33 @@ export const PreviewBuyersPageSchema = z.object({
     buyers: z.array(z.object({ ref: z.uuid(), masked_address: PreviewBuyerMaskedAddressSchema.nullable(), since: z.iso.datetime({ offset: true }) }).strict()).max(1000)
 }).strict();
 export type PreviewBuyersPage = z.infer<typeof PreviewBuyersPageSchema>;
+/** 0188: one decision of the Owner on one ask; the ask is the route's ref. */
+export const RecoveryPermitDecideRequestSchema = z.object({ expected_revision: RecoveryPermitRevisionSchema, operation_id: z.uuid(), proof_handle: OpaqueHandleSchema }).strict();
+export const RecoveryPermitRefParamsSchema = z.object({ ref: z.uuid() }).strict();
+/**
+ * 0188: the Owner's list of asks to get back into an account. Each row is facts the system knows and nothing the person
+ * typed: the shortened sign-in address (null when it cannot be read now), where the ask stands (REQUESTED: the Owner
+ * decides; WAITING: approved, the 72 hours and then the finish link's 7 days; OPENED: the finish link was used and the
+ * new sign-in method is being set up), its times, when the account was made and last signed in, its sign-in methods,
+ * whether a saved code is left, a security hold or a risk mark, whether it ever paid (null when that cannot be read
+ * now) and how many asks it made before. `approved_today` of `daily_cap`: the approvals of the last 24 hours and the
+ * most there may be. The full address and the account id never leave the server.
+ */
+const RecoveryPermitInstantSchema = z.iso.datetime({ offset: true });
+export const RecoveryPermitsPageSchema = z.object({
+    daily_cap: z.number().int().positive().max(1000), approved_today: z.number().int().min(0).max(1000),
+    requests: z.array(z.object({
+        ref: z.uuid(), revision: RecoveryPermitRevisionSchema, stage: z.enum(["REQUESTED", "WAITING", "OPENED"]),
+        masked_address: PreviewBuyerMaskedAddressSchema.nullable(),
+        requested_at: RecoveryPermitInstantSchema, request_expires_at: RecoveryPermitInstantSchema,
+        approved_at: RecoveryPermitInstantSchema.nullable(), not_before: RecoveryPermitInstantSchema.nullable(), finish_expires_at: RecoveryPermitInstantSchema.nullable(),
+        account_created_at: RecoveryPermitInstantSchema, last_sign_in_at: RecoveryPermitInstantSchema.nullable(),
+        passkeys: z.number().int().min(0).max(1000), authenticator_app: z.boolean(), saved_codes_left: z.boolean(),
+        security_hold: z.boolean(), risk_mark: z.boolean(), ever_paid: z.boolean().nullable(),
+        earlier_requests: z.number().int().min(0).max(100000)
+    }).strict()).max(200)
+}).strict();
+export type RecoveryPermitsPage = z.infer<typeof RecoveryPermitsPageSchema>;
 export const StaffActionProofResponseSchema = z.object({ proof_handle: OpaqueHandleSchema, expires_at: z.iso.datetime() }).strict();
 const CredentialDescriptorSchema = z.object({ id: CredentialIdSchema, type: z.literal("public-key"), transports: TransportsSchema.optional() }).strict();
 export const StaffRegistrationOptionsResponseSchema = z.object({
@@ -350,7 +386,8 @@ export const staffContractInventory = Object.freeze({
         "DELETE /v1/admin/team-limit/partner/{staffId}", "POST /v1/admin/team-limit/practice",
         "GET /v1/admin/public-review", "GET /v1/admin/public-review/{id}", "POST /v1/admin/public-review/{id}/hide", "POST /v1/admin/public-review/{id}/step",
         "GET /v1/admin/public-reports", "POST /v1/admin/public-reports/{id}/dismiss",
-        "GET /v1/admin/preview-buyers", "POST /v1/admin/preview-buyers/find", "POST /v1/admin/preview-buyers", "DELETE /v1/admin/preview-buyers/{ref}"
+        "GET /v1/admin/preview-buyers", "POST /v1/admin/preview-buyers/find", "POST /v1/admin/preview-buyers", "DELETE /v1/admin/preview-buyers/{ref}",
+        "GET /v1/admin/recovery-permits", "POST /v1/admin/recovery-permits/{ref}/approve", "POST /v1/admin/recovery-permits/{ref}/refuse"
     ]),
     resources: Object.freeze({
         StaffCapabilitySchema, DelegatedStaffCapabilitiesSchema, ActiveStaffCapabilitiesSchema, StaffActionSchema,
@@ -367,7 +404,8 @@ export const staffContractInventory = Object.freeze({
         PublicReviewHideRequestSchema, PublicReviewStepRequestSchema, PublicReviewPageSchema, PublicReviewListSchema,
         PublicFlagQueueSchema, PublicFlagDismissRequestSchema,
         PreviewBuyerFindRequestSchema, PreviewBuyerFindResponseSchema, PreviewBuyerAddRequestSchema, PreviewBuyerRemoveRequestSchema,
-        PreviewBuyerRefParamsSchema, PreviewBuyersPageSchema
+        PreviewBuyerRefParamsSchema, PreviewBuyersPageSchema,
+        RecoveryPermitDecideRequestSchema, RecoveryPermitRefParamsSchema, RecoveryPermitsPageSchema
     })
 });
 

@@ -672,7 +672,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
       public_ref: visibility.publicRef,
       // Security review F2: said only of a dig, so a debate that is none reads as before.
       ...(visibility.dig === true ? { dig: true } : {}),
-      // Said only of a private Free debate the publication check refused (0188), so the owner's page can say it stays
+      // Said only of a private Free debate the publication check refused (0189), so the owner's page can say it stays
       // private for good. Every other debate reads as before; the stages before the check are not sent.
       ...(visibility.state === "PRIVATE" && visibility.keptPrivate === true ? { public_stage: "KEPT_PRIVATE" as const } : {})
     });

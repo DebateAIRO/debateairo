@@ -70,6 +70,12 @@ tests/integration/staff-rekey-permit.test.ts
 # the grants and the erasure on real Postgres; and the four Owner routes over HTTP on fake data ports.
 tests/integration/preview-buyers-0186.test.ts
 tests/integration/preview-buyers-http.test.ts
+# 0188: the Owner's permit for a locked-out account: the mailbox link and the password before any request, only the Owner with a proof
+# bound to that request, the daily limit, the 72 hours, what ends a permit, the finish link's uses, the grants and the erasure on real
+# Postgres; the person's routes end to end with the real mail worker; and the Owner's three routes over HTTP.
+tests/integration/recovery-permit-0188.test.ts
+tests/integration/recovery-permit-journey.test.ts
+tests/integration/recovery-permits-http.test.ts
 tests/integration/owner-one-key.test.ts
 # Spawns one tsx child under a 5 s commit deadline (kill-ceremony case): the only timing-bounded case on this list.
 tests/integration/owner-bootstrap-recovery.test.ts
@@ -143,5 +149,5 @@ tests/integration/moderation-final-outcome-0176.test.ts
 tests/integration/erased-owner-unlinked-0177.test.ts
 # A sign-up not finished within 24 hours is deleted (0183): only the system login may run the four functions, the delete asks again under the account's locks, a live (resent) link keeps the account, and the key file stays owed until destroyed.
 tests/integration/unfinished-signup-expiry-database.test.ts
-# A Free debate the publication check kept private (0188): only its owner's visibility read says KEPT_PRIVATE, only after a BLOCK or UNSURE check, and no other account, request or login learns it.
-tests/integration/free-debate-refused-by-check-0188.test.ts
+# A Free debate the publication check kept private (0189): only its owner's visibility read says KEPT_PRIVATE, only after a BLOCK or UNSURE check, and no other account, request or login learns it.
+tests/integration/free-debate-refused-by-check-0189.test.ts

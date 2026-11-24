@@ -12,7 +12,7 @@ import { contractClient } from "../api.js";
  * checked" from "kept private because it did not pass the check" or a paid debate that simply is private, so those three
  * stages come only from the read's OPTIONAL `public_stage` field, whose values the contract names
  * (RUN_VISIBILITY_PUBLIC_STAGES). The server sends KEPT_PRIVATE to the owner of a Free debate the publication check
- * refused (migration 0188), and neither stage before the check. PRIVATE without a stage shows nothing: the page never
+ * refused (migration 0189), and neither stage before the check. PRIVATE without a stage shows nothing: the page never
  * guesses Free or paid, so a paid person is never told their debate is public. No browser storage.
  */
 

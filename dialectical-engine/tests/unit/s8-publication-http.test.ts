@@ -308,7 +308,7 @@ describe("S8 publication HTTP boundary", () => {
     type VisibilityRow = Readonly<{ state: "PRIVATE" | "PUBLISHED"; publication_ref: string | null; dig: boolean; kept_private: boolean }>;
     const answers: VisibilityRow[] = [];
     const query = vi.fn(async (statement: string, _values: readonly unknown[]) => {
-      // The repository's one visibility statement, which asks 0188's reader beside 0171's.
+      // The repository's one visibility statement, which asks 0189's reader beside 0171's.
       if (statement.includes("identity.read_free_debate_refused_by_check($3,run.run_id)")) return { rows: answers.splice(0, 1) };
       throw new Error(`UNEXPECTED_QUERY:${statement}`);
     });

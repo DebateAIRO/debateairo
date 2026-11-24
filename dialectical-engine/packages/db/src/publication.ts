@@ -539,7 +539,7 @@ export class PostgresPublicationRepository {
     /** Security review F2: a dig, which is never published (the same reader as readRunIsDig). */
     dig: boolean;
     /**
-     * A private Free debate the publication check refused (BLOCK or UNSURE): it stays private for good (0188's owner-scoped
+     * A private Free debate the publication check refused (BLOCK or UNSURE): it stays private for good (0189's owner-scoped
      * identity.read_free_debate_refused_by_check). False for every other debate, and when the connection is not the owner's.
      */
     keptPrivate: boolean;

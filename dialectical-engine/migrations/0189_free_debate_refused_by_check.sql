@@ -1,5 +1,5 @@
--- 0188 · The owner of a Free debate the publication check kept private can be told so (migrations/lineage/README.md
--- "A Free debate the publication check kept private (0188)").
+-- 0189 · The owner of a Free debate the publication check kept private can be told so (migrations/lineage/README.md
+-- "A Free debate the publication check kept private (0189)").
 --
 -- Plain words. A finished Free debate goes public after an AI check (0137's identity.free_public_ask). When the check
 -- answers BLOCK or UNSURE, the API's sweep records a refusal and the debate stays private to its owner for good. The

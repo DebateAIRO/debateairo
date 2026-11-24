@@ -1,5 +1,5 @@
 import { passwordResetEndpointContracts, passwordResetContractSchemas } from "./password-reset.js";
-import { mfaRecoveryEndpointContracts, backupEmailEndpointContracts, mfaRecoveryContractSchemas } from "./mfa-recovery.js";
+import { mfaRecoveryEndpointContracts, backupEmailEndpointContracts, mfaRecoveryContractSchemas, recoveryPermitEndpointContracts, recoveryPermitContractSchemas } from "./mfa-recovery.js";
 export * from "./password-reset.js";
 export * from "./mfa-recovery.js";
 import { socialAuthContractSchemas } from './social-auth.js';
@@ -1439,7 +1439,7 @@ export const RUN_VISIBILITY_PUBLIC_STAGES = ["WILL_BE_PUBLIC", "BEING_CHECKED", 
  * GET /v1/runs/{id}/visibility: the publish's own two fields and, security review F2, `dig`: sent (true) only for a dig, which is never published,
  * so the page offers no Publish for it. The publish's 201 keeps the two fields alone.
  * `public_stage`: sent only to the owner, and only as KEPT_PRIVATE, for a private Free debate the publication check refused (BLOCK or UNSURE,
- * migration 0188): it stays private for good. The API sends neither stage before the check; the page shows nothing more than private without one.
+ * migration 0189): it stays private for good. The API sends neither stage before the check; the page shows nothing more than private without one.
  */
 export const RunVisibilitySchema = z.object({
   state: z.enum(["PRIVATE", "PUBLISHED"]),
@@ -2059,6 +2059,7 @@ export const contractInventory = Object.freeze({
   routes: Object.freeze([
     ...Object.keys(passwordResetEndpointContracts),
     ...Object.keys(mfaRecoveryEndpointContracts),
+    ...Object.keys(recoveryPermitEndpointContracts),
     ...Object.keys(backupEmailEndpointContracts),
     ...staffContractInventory.routes,
     ...fundedStaffContractInventory.routes,
@@ -2230,6 +2231,7 @@ export const contractInventory = Object.freeze({
   resources: Object.freeze({
     ...passwordResetContractSchemas,
     ...mfaRecoveryContractSchemas,
+    ...recoveryPermitContractSchemas,
     ...consumerAuthContractSchemas,
     ...socialAuthContractSchemas,
     ...staffContractInventory.resources,

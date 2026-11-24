@@ -48,7 +48,7 @@ async function show(stage: PublicStage | null): Promise<HTMLDivElement> {
 }
 const line = (): HTMLElement | null => host!.querySelector(".v4PublicMark");
 const clipboard = { writeText: vi.fn() };
-/** What the API answers its owner for a Free debate the publication check refused (migration 0188). */
+/** What the API answers its owner for a Free debate the publication check refused (migration 0189). */
 const KEPT_PRIVATE_ANSWER = Object.freeze({ state: "PRIVATE", public_ref: null, public_stage: "KEPT_PRIVATE" });
 /**
  * The website's own browser client (the same-origin proxy and the contract's strict read) over one canned API answer, so

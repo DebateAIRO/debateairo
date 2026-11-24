@@ -494,12 +494,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "1.1",
-  sha256: "2c639718616db98b874948e323503ddb1f5ff23e2cd1edf12f22fe42b9f741a0",
-  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v1.1 · EN VIGUEUR LE 24 NOVEMBRE 2026",
+  version: "1.2",
+  sha256: "a65ffb6ca9518582288d30fc6749dff05c1742e322c4bcfd36ad15b4ef3058a0",
+  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v1.2 · EN VIGUEUR LE 26 NOVEMBRE 2026",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",
-  endMarker: "FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v1.1",
+  endMarker: "FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v1.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Texte de la Politique de confidentialité",
   sectionIdPrefix: "policy-section-",

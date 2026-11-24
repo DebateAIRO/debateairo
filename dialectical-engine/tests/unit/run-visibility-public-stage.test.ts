@@ -5,7 +5,7 @@ import { createContractClient, ContractHttpError } from "../../packages/contract
 import { publicStageOf } from "../../apps/ui/lib/v4/publicState.js";
 
 /*
- * GET /v1/runs/{id}/visibility's optional `public_stage` (migration 0188): the API sends KEPT_PRIVATE to the owner of a
+ * GET /v1/runs/{id}/visibility's optional `public_stage` (migration 0189): the API sends KEPT_PRIVATE to the owner of a
  * Free debate the publication check refused. The website reads the answer through the contract's strict schema, so the
  * schema names the field with exactly the stages the website's public mark knows, and nothing else.
  */

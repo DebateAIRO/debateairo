@@ -1239,4 +1239,4 @@ export function createContractClient(
 }
 
 export { createPasswordResetClient } from "./password-reset.js";
-export { createMfaRecoveryClient, createBackupEmailClient } from "./mfa-recovery.js";
+export { createMfaRecoveryClient, createBackupEmailClient, createRecoveryPermitClient } from "./mfa-recovery.js";
