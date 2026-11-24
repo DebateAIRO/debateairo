@@ -10,7 +10,21 @@ const SYNTHESIS_CHECK_ERASURE_WAITING_OUTCOMES = Object.freeze([
 export type SynthesisCheckErasureOutcome =
   | "ACCOUNT_CLOSED" | "ERASED" | "OWNERSHIP_MOVED" | "LEGACY_PLAINTEXT_RETAINED"
   | "PUBLISHED" | "CONTENDED" | "PREPARED" | "COMMITTED" | "CLEANED"
-  | "NOT_FOUND" | "INVALID_EVIDENCE";
+  | "NOT_FOUND" | "INVALID_EVIDENCE" | CheckDeletedPublicDebateOutcome;
+
+/**
+ * 0190's takedown of a public debate the end-of-debate check deletes, on the requests it can act on now. TAKEN_DOWN: its page
+ * went private, every page it had is closed, and its publication's key is queued for the API's key cleanup; 0126's prepare
+ * erases it once that key is gone. CONTENDED: busy now; the next pass tries again. FAILED: something else went wrong for that
+ * debate alone (`failureCode`, its SQLSTATE); nothing of it was written, and the next pass tries again.
+ */
+export type CheckDeletedPublicDebateOutcome = "TAKEN_DOWN" | "CONTENDED" | "FAILED";
+export type CheckDeletedPublicDebate = Readonly<{ outcome: CheckDeletedPublicDebateOutcome; runId: string; failureCode: string | null }>;
+export type CheckDeletedPublicPages = Readonly<{
+  takeDown(limit?: number): Promise<readonly CheckDeletedPublicDebate[]>;
+}>;
+/** A SQLSTATE is five digits or capitals; anything else is logged as unknown, so a log line never carries more. */
+const sqlStateOf = (code: string | null): string => code !== null && /^[0-9A-Z]{5}$/u.test(code) ? code : "UNKNOWN";
 
 type PrepareOutcome = Readonly<{ outcome: SynthesisCheckErasureOutcome; erasureId: string | null; runId: string }>;
 type CleanupManifest = Readonly<{
@@ -23,6 +37,20 @@ type CleanupManifest = Readonly<{
 async function recordedOwnerRef(runs: RunContentKeyStore, runId: string): Promise<string | null> {
   try { return await runs.ownerRef(runId); }
   catch (error) { if (isRunContentKeyRecordMissing(error)) return null; throw error; }
+}
+
+/**
+ * 0190's core.take_down_check_deleted_debates, on the API's system pool outside any request (the cross-account marker's, as the
+ * Free publish's). Never the erasure login's: the API attests at start that it can run exactly the functions it knows.
+ */
+export class PostgresCheckDeletedPublicPageRepository implements CheckDeletedPublicPages {
+  constructor(private readonly pool: Pool) {}
+
+  async takeDown(limit = 100): Promise<readonly CheckDeletedPublicDebate[]> {
+    const result = await this.pool.query<{ outcome: CheckDeletedPublicDebateOutcome; run_id: string; failure_code: string | null }>(
+      "SELECT outcome,run_id,failure_code FROM core.take_down_check_deleted_debates($1)", [limit]);
+    return Object.freeze(result.rows.map((row) => Object.freeze({ outcome: row.outcome, runId: row.run_id, failureCode: row.failure_code })));
+  }
 }
 
 /** The SQL principal has only definer capabilities; it never reads check rows directly. */
@@ -76,12 +104,18 @@ export class PostgresSynthesisCheckErasureRepository {
   }
 }
 
+/**
+ * One pass over the end-of-debate check's deletions. A debate that is public comes down first (`publicPages`, 0190): its page
+ * goes private and its publication's key goes to the API's key cleanup, which destroys it on its own timer; a later pass then
+ * erases the debate through 0126's prepare, as a private one. Without `publicPages` a public debate waits, as before 0190.
+ */
 export class SynthesisCheckErasureCoordinator {
   constructor(
     private readonly repository: PostgresSynthesisCheckErasureRepository,
     private readonly runs: RunContentKeyStore,
     private readonly publications?: Pick<PublicationCipher, "destroy" | "exists">,
-    private readonly log: (line: string) => void = (line) => console.error(line)
+    private readonly log: (line: string) => void = (line) => console.error(line),
+    private readonly publicPages?: CheckDeletedPublicPages
   ) {}
 
   private async completePrepared(erasureId: string, manifest: CleanupManifest): Promise<SynthesisCheckErasureOutcome> {
@@ -115,12 +149,31 @@ export class SynthesisCheckErasureCoordinator {
     outcome: SynthesisCheckErasureOutcome;
   }>[]> {
     const outcomes: Array<{ runId: string; outcome: SynthesisCheckErasureOutcome }> = [];
-    for (const prepared of await this.repository.prepareRequested(limit)) {
-      if (SYNTHESIS_CHECK_ERASURE_WAITING_OUTCOMES.includes(
-        prepared.outcome as typeof SYNTHESIS_CHECK_ERASURE_WAITING_OUTCOMES[number]
-      )) {
-        this.log("[SYNTHESIS_CHECK_ERASURE_WAITING] " + prepared.outcome);
+    const waiting = (outcome: SynthesisCheckErasureOutcome): void => {
+      if (SYNTHESIS_CHECK_ERASURE_WAITING_OUTCOMES.includes(outcome as typeof SYNTHESIS_CHECK_ERASURE_WAITING_OUTCOMES[number])) {
+        this.log("[SYNTHESIS_CHECK_ERASURE_WAITING] " + outcome);
       }
+    };
+    // The public ones first: 0126's prepare reads them as PUBLISHED, or as CONTENDED until their publication's key is gone,
+    // so each is reported once, by what the takedown said. A public one the takedown cannot act on is not on its list, and
+    // prepare reports it as before (PUBLISHED for an account with no session row).
+    // A takedown that fails as a whole holds back none of the private debates' erasures: it is tried again on the next pass.
+    let pages: readonly CheckDeletedPublicDebate[] = [];
+    try {
+      if (this.publicPages !== undefined) pages = await this.publicPages.takeDown(limit);
+    } catch {
+      this.log("[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_PENDING]");
+    }
+    const takenDown = new Set<string>();
+    for (const page of pages) {
+      takenDown.add(page.runId);
+      if (page.outcome === "TAKEN_DOWN") this.log("[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEN_DOWN]");
+      if (page.outcome === "FAILED") this.log("[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_FAILED] " + sqlStateOf(page.failureCode));
+      outcomes.push({ runId: page.runId, outcome: page.outcome });
+    }
+    for (const prepared of await this.repository.prepareRequested(limit)) {
+      if (takenDown.has(prepared.runId) && (prepared.outcome === "PUBLISHED" || prepared.outcome === "CONTENDED")) continue;
+      waiting(prepared.outcome);
       if (prepared.outcome !== "PREPARED") outcomes.push({ runId: prepared.runId, outcome: prepared.outcome });
     }
     for (const erasureId of await this.repository.pendingCleanup(limit)) {

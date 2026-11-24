@@ -1,0 +1,18 @@
+{
+  "version": "check-deletes-public-debate-forward0190-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0189_free_debate_refused_by_check.sql",
+    "manifestSha256": "f6a38239bece802a0ef073f8ba4565bf8020809c304839dea01bb71b358307b7",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0190_check_deletes_public_debate.sql",
+    "sha256": "ca4e8d4fd8836c4ef37a95586827409b3aa8f07f39c5789aa39938af79f10b24"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": []
+}

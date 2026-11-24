@@ -17,7 +17,7 @@ import {
   PostgresDigPicksRepository, PostgresInvestigationRepository, PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresPublicTreeRunnerRepository, PostgresPublicationRepository, PostgresStartPathsStore, PostgresTreeUpdateRepository, configureContentEncryption, contentCipherFor, createPool,
   decryptContentForRun, migrate, PostgresModerationStatementRepository, PostgresPublicFlagMailRepository, withRunContentLease, type Pool, type PublicFlagLimits,
   PUBLIC_REPORT_CARRIER_MARK, PostgresPublicationCheckRecordRepository, RunRepository, withOwnerAskAdmissionLease,
-  PostgresSynthesisCheckErasureRepository, SynthesisCheckErasureCoordinator
+  PostgresCheckDeletedPublicPageRepository, PostgresSynthesisCheckErasureRepository, SynthesisCheckErasureCoordinator
 } from "@debateai/db";
 import { ServeRepository, SynthesisCheckRepository, synthesisCheckWindowMs } from "@debateai/serve";
 import { renderMail } from "@debateai/mail-templates";
@@ -32,7 +32,7 @@ import type { PublicationContentCheck } from "../../apps/api/src/publication-che
 import { createPublicationContentCheck } from "../../apps/api/src/publication-check/check.js";
 import { contentCheckBackgroundDeadlineMs, contentCheckCallsAtOnce, createPreviewPublicationJudgeTransport } from "../../apps/api/src/publication-check/gate-transport.js";
 import { PostgresPublicationApplication, type FreeEndCheck } from "../../apps/api/src/publications.js";
-import { admitPublicDig, backedOffContentCheck, checksInTurn, joinPublicDigAtStart, pressPublicReport, publicReportCarrierMaker, sweepFreePublications, sweepPublicPage, type PublicDigAdmission } from "../../apps/api/src/public-tree.js";
+import { admitPublicDig, backedOffContentCheck, checksInTurn, freeSweepCursor, joinPublicDigAtStart, pressPublicReport, publicReportCarrierMaker, sweepFreePublications, sweepPublicPage, type PublicDigAdmission } from "../../apps/api/src/public-tree.js";
 import { judgeCallValue } from "../../apps/api/src/publication-check/verdict.js";
 import { createSynthesisPublishGate } from "../../apps/api/src/synthesis-check/publish-gate.js";
 import { createSynthesisAnswerAccess } from "../../apps/api/src/synthesis-check/hold.js";
@@ -69,7 +69,6 @@ const keyLoads: string[] = [];
 const users = new Map<string, string>();
 let userDeks: FileUserDekStore;
 const publicationCipher = new PublicationCipher(new MemoryPublicationKeyStore(loadKek(generateDek())));
-let sequence = 9_800_000;
 
 const QUESTION = "Should Harbour Town build a second ferry pier?";
 const PATH_LINE = "Yes: a second pier would cut the queues.";
@@ -114,12 +113,38 @@ function node(id: string, claim: string) {
 }
 
 /**
+ * A second version of a debate's answer with a composed text of its own, so a conclusion of its own. The product's answer writer never stores one (a later version keeps the
+ * first one's composed text, packages/serve); the tests write one to show what does not depend on it.
+ */
+async function writeSecondAnswerVersion(run: string, answerId: string, text: string): Promise<void> {
+  const [composedId, rawId] = [randomUUID(), randomUUID()];
+  const composed = await encryptAttestedContentForRun(database.pool, run, "serve.composed_text", composedId,
+    { segments: [{ segment_id: randomUUID(), text, load_bearing: true, served_number_refs: [] }] });
+  const raw = await encryptAttestedContentForRun(database.pool, run, "ledger.raw_artifact", rawId, { rawText: "fixture", metadataJson: {} });
+  const sealed = await encryptAttestedContentForRun(database.pool, run, "serve.answer", `${answerId}:2`, { answerForm: null });
+  await database.pool.query(`INSERT INTO ledger.raw_artifact (raw_artifact_id,attempt_id,run_id,provider_ref,provider,model_id,maker,raw_text,metadata_json,parse_status,input_hash,
+      input_hash_version,contract_hash,content_hash,content_hash_version,at_seq,content_ciphertext,content_attestation)
+    VALUES ($1,$2,$3,'test','test','test','test','⟦DEBATEAI:CIPHERTEXT:V1⟧','{}'::jsonb,'PARSED','test',1,'test','test',1,ledger.allocate_sequence(),$4::jsonb,$5)`,
+    [rawId, randomUUID(), run, JSON.stringify(raw!.envelope), raw!.attestation]);
+  await database.pool.query(`INSERT INTO serve.composed_text (composed_text_id,fact_bundle_id,segments,raw_artifact_ref,attempt,content_ciphertext,content_attestation)
+    SELECT $2,fact_bundle_id,'[]'::jsonb,$3,1,$4::jsonb,$5 FROM serve.answer WHERE answer_id=$1 AND answer_version=1`,
+    [answerId, composedId, rawId, JSON.stringify(composed!.envelope), composed!.attestation]);
+  await database.pool.query(`INSERT INTO serve.answer (answer_id,answer_version,run_id,work_item_id,terminal,serve_state,verdict_state,answer_form,condition_marks,fact_bundle_id,
+      composed_text_id,conformance_record_id,sealed_at_seq,confidence_band,band_ceiling,reversal_point,builds_on_previous,badges,verdict_unavailable,memory_disclosure,
+      content_ciphertext,content_attestation)
+    SELECT answer_id,2,run_id,work_item_id,terminal,'COMPOSED',verdict_state,answer_form,condition_marks,fact_bundle_id,$2,conformance_record_id,
+      ledger.allocate_sequence(),confidence_band,band_ceiling,reversal_point,builds_on_previous,badges,verdict_unavailable,memory_disclosure,$3::jsonb,$4
+    FROM serve.answer WHERE answer_id=$1 AND answer_version=1`, [answerId, composedId, JSON.stringify(sealed!.envelope), sealed!.attestation]);
+}
+
+/**
  * A debate, published as the transition publishes it: its snapshot under its own publication key, and its visibility event. `ownQuestion`: the question line its author's own
  * run keeps, when a test needs it to differ from the page's.
  */
-async function publishedDebate(author: StoryEncryptedOwner, shape: Readonly<{ story?: boolean; ownQuestion?: string }> = {}): Promise<Readonly<{ root: string; ref: string; position: string; snapshot: PublicDebate }>> {
+async function publishedDebate(author: StoryEncryptedOwner, shape: Readonly<{ story?: boolean; ownQuestion?: string; beforePublish?: (root: string, answerId: string) => Promise<void> }> = {}): Promise<Readonly<{ root: string; ref: string; position: string; snapshot: PublicDebate }>> {
   const root = await createEncryptedStoryRun(database.pool, author, shape.ownQuestion ?? QUESTION);
   const { answerId } = await persistTerminalRun({ pool: database.pool, runId: root, fixtureKey: randomUUID(), factBundle: FACTS });
+  await shape.beforePublish?.(root, answerId);
   const position = randomUUID();
   const ref = randomUUID();
   const at = new Date();
@@ -141,8 +166,9 @@ async function publishedDebate(author: StoryEncryptedOwner, shape: Readonly<{ st
   await seeded([
     ["INSERT INTO core.publication_ref_tombstone (ref,ref_kind,created_at) VALUES ($1,'publication_ref',now())", [ref]],
     ["INSERT INTO serve.publication_snapshot (publication_ref,run_id,format_version,content_ciphertext,created_at) VALUES ($1,$2,1,$3::jsonb,$4)", [ref, root, JSON.stringify(content), at]],
+    // From the ledger's own sequence, as every writer of an event takes it, so a later event of the debate comes after this one.
     [`INSERT INTO core.run_visibility_event (run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,actor_ref_version,warning_version,occurred_at,at_seq)
-      VALUES ($1,$2,$3,'PUBLISHED',$4,2,'PUBLIC_INDEXED_V1',now(),$5)`, [randomUUID(), root, ref, randomUUID(), ++sequence]]]);
+      VALUES ($1,$2,$3,'PUBLISHED',$4,2,'PUBLIC_INDEXED_V1',now(),ledger.allocate_sequence())`, [randomUUID(), root, ref, randomUUID()]]]);
   return { root, ref, position, snapshot };
 }
 
@@ -1431,27 +1457,10 @@ describe("a Free debate goes public only when the end-of-debate check allows it"
       outcome: categories.length === 0 ? { verdict: "CLEAR", categories: [] } : { verdict: "FLAGGED", categories: [...categories] },
       modelProviderRef: "anthropic", modelId: "claude-haiku-5-5", policyVersion: POLICY, callCount: 1, deadlineMs: 60_000 })).toBe("INSERTED");
   }
-  /** A newer version of the debate's answer with a composed text of its own, so a synthesis of its own, as a later write of the answer stores it. */
+  /** A newer version of the debate's answer with a composed text of its own, so a synthesis of its own (writeSecondAnswerVersion: the product never stores one). */
   async function newerVersion(debate: FreeDebate): Promise<void> {
     const text = "A newer synthesis that urges harm.";
-    const [composedId, rawId] = [randomUUID(), randomUUID()];
-    const composed = await encryptAttestedContentForRun(database.pool, debate.run, "serve.composed_text", composedId,
-      { segments: [{ segment_id: randomUUID(), text, load_bearing: true, served_number_refs: [] }] });
-    const raw = await encryptAttestedContentForRun(database.pool, debate.run, "ledger.raw_artifact", rawId, { rawText: "fixture", metadataJson: {} });
-    const sealed = await encryptAttestedContentForRun(database.pool, debate.run, "serve.answer", `${debate.answerId}:2`, { answerForm: null });
-    await database.pool.query(`INSERT INTO ledger.raw_artifact (raw_artifact_id,attempt_id,run_id,provider_ref,provider,model_id,maker,raw_text,metadata_json,parse_status,input_hash,
-        input_hash_version,contract_hash,content_hash,content_hash_version,at_seq,content_ciphertext,content_attestation)
-      VALUES ($1,$2,$3,'test','test','test','test','⟦DEBATEAI:CIPHERTEXT:V1⟧','{}'::jsonb,'PARSED','test',1,'test','test',1,ledger.allocate_sequence(),$4::jsonb,$5)`,
-      [rawId, randomUUID(), debate.run, JSON.stringify(raw!.envelope), raw!.attestation]);
-    await database.pool.query(`INSERT INTO serve.composed_text (composed_text_id,fact_bundle_id,segments,raw_artifact_ref,attempt,content_ciphertext,content_attestation)
-      SELECT $2,fact_bundle_id,'[]'::jsonb,$3,1,$4::jsonb,$5 FROM serve.answer WHERE answer_id=$1 AND answer_version=1`,
-      [debate.answerId, composedId, rawId, JSON.stringify(composed!.envelope), composed!.attestation]);
-    await database.pool.query(`INSERT INTO serve.answer (answer_id,answer_version,run_id,work_item_id,terminal,serve_state,verdict_state,answer_form,condition_marks,fact_bundle_id,
-        composed_text_id,conformance_record_id,sealed_at_seq,confidence_band,band_ceiling,reversal_point,builds_on_previous,badges,verdict_unavailable,memory_disclosure,
-        content_ciphertext,content_attestation)
-      SELECT answer_id,2,run_id,work_item_id,terminal,'COMPOSED',verdict_state,answer_form,condition_marks,fact_bundle_id,$2,conformance_record_id,
-        ledger.allocate_sequence(),confidence_band,band_ceiling,reversal_point,builds_on_previous,badges,verdict_unavailable,memory_disclosure,$3::jsonb,$4
-      FROM serve.answer WHERE answer_id=$1 AND answer_version=1`, [debate.answerId, composedId, JSON.stringify(sealed!.envelope), sealed!.attestation]);
+    await writeSecondAnswerVersion(debate.run, debate.answerId, text);
     syntheses.get(debate.answerId)!.set(2, text);
   }
   const isPublic = async (debate: FreeDebate) => (await database.pool.query("SELECT 1 FROM core.run_visibility_event WHERE run_id=$1 AND state='PUBLISHED'", [debate.run])).rowCount === 1;
@@ -1464,7 +1473,9 @@ describe("a Free debate goes public only when the end-of-debate check allows it"
    * categories, in the check's order), or null while the check cannot be reached. `duringPublicationCheck` runs while the
    * publication check works on a debate, between the end-of-debate check's answer and the publish.
    */
-  function freeSweep(options: { flags: readonly number[] | null; duringPublicationCheck?: (debate: FreeDebate) => Promise<void>; afterAnswerRead?: (debate: FreeDebate) => Promise<void> }) {
+  function freeSweep(options: { flags: readonly number[] | null; duringPublicationCheck?: (debate: FreeDebate) => Promise<void>; afterAnswerRead?: (debate: FreeDebate) => Promise<void>;
+    /** Runs after the publish's last read of the end-of-debate check, before it reserves the page: the last moment a verdict can race it. */
+    beforePrepare?: (debate: FreeDebate) => Promise<void> }) {
     let clock = 0;
     const modelCalls: string[] = [];
     const judged: string[] = [];
@@ -1476,6 +1487,7 @@ describe("a Free debate goes public only when the end-of-debate check allows it"
       return { outcome: "ALLOW" };
     } };
     const inTurn = checksInTurn(backedOffContentCheck(publication, { now: () => clock }), { now: () => clock });
+    const cursor = freeSweepCursor();
     const gate = createSynthesisPublishGate({
       repository: checks(), approvalCovers: async ({ answerId }) => approved.has(answerId),
       readAnswerVersions: async (_runId, answerId, maxVersion) => new Map([...(syntheses.get(answerId) ?? [])].filter(([version]) => version <= maxVersion)),
@@ -1495,7 +1507,7 @@ describe("a Free debate goes public only when the end-of-debate check allows it"
     const endCheck: FreeEndCheck = { stateOf: (target) => access.stateOf(target), decide: (target) => gate.decide(target) };
     const pass = async (...debates: FreeDebate[]): Promise<void> => {
       for (const debate of debates) ours.set(debate.run, debate);
-      await inTurn.pass(() => sweepFreePublications({ contributions: new PostgresPublicDebateRunnerRepository(runner),
+      await inTurn.pass(() => sweepFreePublications({ contributions: new PostgresPublicDebateRunnerRepository(runner), cursor,
         log: (event, detail) => { const runId = String(detail.runId); if (ours.has(runId)) outcomes.set(runId, event === "FREE_PUBLICATION" ? String(detail.outcome) : `${event} ${String(detail.code)}`); },
         publishOne: async (waiting) => {
           const debate = ours.get(waiting.run_id);
@@ -1506,8 +1518,12 @@ describe("a Free debate goes public only when the end-of-debate check allows it"
           if (answer === null) return "NO_ANSWER_YET";
           await options.afterAnswerRead?.(debate);
           return application().publishFreeDebate({ runId: debate.run, answer, owner: { userId: debate.owner.userId, ownerRef: debate.owner.ownerRef }, purposeLines: null,
-            source: { ip: "", userAgent: "", requestId: "free-publication-sweep" }, contentCheck: inTurn.check, endCheck, store: freeStore(), lease });
-        } }));
+            source: { ip: "", userAgent: "", requestId: "free-publication-sweep" }, contentCheck: inTurn.check, endCheck, lease,
+            store: options.beforePrepare === undefined ? freeStore() : { ...freeStore(), prepare: async (runId, ref) => {
+              await options.beforePrepare!(debate);
+              return freeStore().prepare(runId, ref);
+            } } });
+        } }), () => cursor.after !== null);
     };
     return { pass, outcomeOf: (debate: FreeDebate) => outcomes.get(debate.run), modelCalls, judged, wait: (ms: number) => { clock += ms; } };
   }
@@ -1667,33 +1683,306 @@ describe("a Free debate goes public only when the end-of-debate check allows it"
     expect(restarted.modelCalls).toHaveLength(1);
     expect(await attemptsOf(debate)).toBe(2);
   }, 30_000);
+
+  it("more than a list's worth of older debates that cannot move do not stop a newer one: the sweep reads past them across its passes, and one approved meanwhile goes public on its next turn", async () => {
+    const owner = await account();
+    const flagged: FreeDebate[] = [];
+    // More flagged debates than the database's list gives at once (100), each waiting for a staff approval.
+    for (let made = 0; made < 101; made += 1) {
+      const debate = await finished(owner);
+      await verdict(debate, 1, ["HATE_SPEECH"]);
+      flagged.push(debate);
+    }
+    const clear = await finished(owner);
+    await verdict(clear, 1, []);
+    const sweep = freeSweep({ flags: null });
+    // The first pass reads a full list of older ones, all still waiting, and does not reach the newer one.
+    await sweep.pass(...flagged, clear);
+    expect(sweep.outcomeOf(clear)).toBeUndefined();
+    expect(flagged.slice(0, 50).map((debate) => sweep.outcomeOf(debate))).toEqual(flagged.slice(0, 50).map(() => "WAITING_FOR_APPROVAL"));
+    // A staff member approves the first one meanwhile; nobody presses anything.
+    approved.add(flagged[0]!.answerId);
+    // The next passes read on from where the first stopped, reach the newer one, and come round to the top again.
+    for (let pass = 0; pass < 6 && (sweep.outcomeOf(clear) === undefined || !await isPublic(flagged[0]!)); pass += 1) await sweep.pass(...flagged, clear);
+    expect(sweep.outcomeOf(clear)).toBe("PUBLISHED");
+    expect(await isPublic(clear)).toBe(true);
+    expect(await isPublic(flagged[0]!)).toBe(true);
+    expect(await isPublic(flagged[1]!)).toBe(false);
+    expect(await askOf(flagged[1]!)).toEqual({ outcome: null });
+    expect(sweep.modelCalls).toEqual([]);
+  }, 600_000);
+
+  it("a deletion verdict stored while the publish is between its last read of the check and its commit: the debate goes public, and the next erasure pass takes it down", async () => {
+    const debate = await finished(await account());
+    await verdict(debate, 1, []);
+    let raced = false;
+    const sweep = freeSweep({ flags: null, beforePrepare: async (racing) => {
+      if (raced) return;
+      raced = true;
+      // Past the publish's last read: a newer version of the answer is written and the check asks for its deletion.
+      await newerVersion(racing);
+      await verdict(racing, 2, ["SUICIDE_OR_HARM_TO_OTHERS"]);
+    } });
+    // The sweep reads the waiting debates a list at a time, so a few passes may come before this one's turn.
+    for (let pass = 0; pass < 4 && sweep.outcomeOf(debate) === undefined; pass += 1) await sweep.pass(debate);
+    expect(sweep.outcomeOf(debate)).toBe("PUBLISHED");
+    expect(await isPublic(debate)).toBe(true);
+    const outcomes = await new SynthesisCheckErasureCoordinator(new PostgresSynthesisCheckErasureRepository(erasure), runKeys, publicationCipher, () => undefined,
+      new PostgresCheckDeletedPublicPageRepository(api)).reconcile(100);
+    expect(outcomes).toContainEqual({ runId: debate.run, outcome: "TAKEN_DOWN" });
+    expect((await database.pool.query("SELECT state FROM core.run_visibility_event WHERE run_id=$1 ORDER BY at_seq DESC LIMIT 1", [debate.run])).rows[0]).toEqual({ state: "PRIVATE" });
+  });
 });
 
 describe("a debate already public when the end-of-debate check asks for its deletion", () => {
-  it("is not deleted: the deletion waits for as long as the debate is public, its page stays public and its key is kept, while its owner is told it was deleted and can no longer open it", async () => {
+  const POLICY = "synthesis.content-check.v1@0123456789abcdef";
+  const checks = () => new SynthesisCheckRepository(api);
+  const answerIdOf = async (root: string) => (await database.pool.query<{ answer_id: string }>("SELECT answer_id FROM serve.answer WHERE run_id=$1 LIMIT 1", [root])).rows[0]!.answer_id;
+  /** A verdict of the end-of-debate check for one answer version, stored as a check stores it; `deadlineMs` is the check's own time. */
+  async function verdict(root: string, version: number, outcome: Parameters<SynthesisCheckRepository["insertResult"]>[0]["outcome"], deadlineMs = 60_000) {
+    const answerId = await answerIdOf(root);
+    const attempt = await checks().startPublishAttempt({ runId: root, answerId, answerVersion: version });
+    if (deadlineMs < 1_000) await new Promise((resolve) => setTimeout(resolve, deadlineMs + 20));
+    return checks().insertResult({ attemptId: attempt.attemptId, runId: root, answerId, answerVersion: version, synthesisOriginVersion: version, outcome,
+      modelProviderRef: "anthropic", modelId: "claude-haiku-5-5", policyVersion: POLICY, callCount: 1, deadlineMs });
+  }
+  const DELETE = { verdict: "FLAGGED", categories: ["SUICIDE_OR_HARM_TO_OTHERS"] } as const;
+  /** The coordinator as main.ts builds it: the erasure login for 0126's steps, the API's system login for 0190's takedown. */
+  const coordinator = (lines: string[]) => new SynthesisCheckErasureCoordinator(new PostgresSynthesisCheckErasureRepository(erasure), runKeys, publicationCipher,
+    (line) => lines.push(line), new PostgresCheckDeletedPublicPageRepository(api));
+  const outcomesFor = async (lines: string[], run: string) => (await coordinator(lines).reconcile(100)).filter((outcome) => outcome.runId === run);
+  /** The API's publication key cleanup, on its own login, as main.ts runs it every 30 seconds. */
+  async function keyCleanup(): Promise<number> {
+    const cleanup = createPool(logins!.url("PUBLICATION_CLEANUP_DATABASE_URL"));
+    try {
+      const hasher = { hash: () => "sha256:0" } as never;
+      return await new PostgresPublicationApplication(new PostgresPublicationRepository(api, hasher), publicationCipher, undefined, new PostgresPublicationRepository(cleanup, hasher)).reconcileKeyCleanup();
+    } finally {
+      await cleanup.end();
+    }
+  }
+  const latestState = async (root: string) => (await database.pool.query<{ state: string }>("SELECT state FROM core.run_visibility_event WHERE run_id=$1 ORDER BY at_seq DESC LIMIT 1", [root])).rows[0]?.state;
+  const listed = async (ref: string) => (await application().list(100, 0)).items.some((item) => item.public_ref === ref);
+
+  it("comes down and is erased: its page goes private at once, then its publication's key and its run key go, and its owner is told", async () => {
     const author = await account();
     const { root, ref } = await publishedDebate(author);
-    const answerId = (await database.pool.query<{ answer_id: string }>("SELECT answer_id FROM serve.answer WHERE run_id=$1", [root])).rows[0]!.answer_id;
-    const checks = new SynthesisCheckRepository(api);
+    expect(await listed(ref)).toBe(true);
     // The check, run on a version of its answer after it went public (or on a debate published before it existed), asks for its deletion.
-    const attempt = await checks.startPublishAttempt({ runId: root, answerId, answerVersion: 1 });
-    expect(await checks.insertResult({ attemptId: attempt.attemptId, runId: root, answerId, answerVersion: 1, synthesisOriginVersion: 1,
-      outcome: { verdict: "FLAGGED", categories: ["SUICIDE_OR_HARM_TO_OTHERS"] }, modelProviderRef: "anthropic", modelId: "claude-haiku-5-5",
-      policyVersion: "synthesis.content-check.v1@0123456789abcdef", callCount: 1, deadlineMs: 60_000 })).toBe("INSERTED");
+    expect(await verdict(root, 1, DELETE)).toBe("INSERTED");
     const lines: string[] = [];
-    const coordinator = new SynthesisCheckErasureCoordinator(new PostgresSynthesisCheckErasureRepository(erasure), runKeys, publicationCipher, (line) => lines.push(line));
-    for (let tick = 0; tick < 2; tick += 1) {
-      expect((await coordinator.reconcile(100)).filter((outcome) => outcome.runId === root)).toEqual([{ runId: root, outcome: "PUBLISHED" }]);
-    }
-    expect(lines).toContain("[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED");
-    // Its page and its key stay; the deletion request stays, waiting.
-    expect((await page(ref)).question).toBe(QUESTION);
+    expect(await outcomesFor(lines, root)).toEqual([{ runId: root, outcome: "TAKEN_DOWN" }]);
+    expect(lines).toContain("[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEN_DOWN]");
+    expect(lines).not.toContain("[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED");
+    // The page is gone at once, from the page and the list, with the rows the owner's own unpublish writes.
+    expect(await application().readPublicDebate(ref)).toBeNull();
+    expect(await listed(ref)).toBe(false);
+    expect(await latestState(root)).toBe("PRIVATE");
+    expect((await database.pool.query("SELECT 1 FROM serve.publication_key_cleanup_intent WHERE publication_ref=$1 AND completed_at IS NULL", [ref])).rowCount).toBe(1);
+    expect((await database.pool.query("SELECT consumed_at FROM identity.publication_event_binding WHERE run_id=$1 AND action='UNPUBLISH'", [root])).rows)
+      .toEqual([{ consumed_at: expect.any(Date) }]);
+    // The debate itself waits for the publication's key to go first.
+    expect(await outcomesFor(lines, root)).toEqual([{ runId: root, outcome: "CONTENDED" }]);
     expect(await runKeys.exists(root)).toBe(true);
-    expect(await checks.runRemovedByCheck(root)).toBe(true);
+    expect(await keyCleanup()).toBeGreaterThanOrEqual(1);
+    expect(await publicationCipher.exists(ref)).toBe(false);
+    // Then it is erased as any private debate: its run key goes and the deletion request with it.
+    expect(await outcomesFor(lines, root)).toEqual([{ runId: root, outcome: "CLEANED" }]);
+    expect(await runKeys.exists(root)).toBe(false);
+    expect((await database.pool.query("SELECT 1 FROM serve.private_run_erasure_tombstone WHERE run_id=$1", [root])).rowCount).toBe(1);
+    expect(await application().readPublicDebate(ref)).toBeNull();
+    expect(await coordinator(lines).reconcile(100)).not.toContainEqual(expect.objectContaining({ runId: root }));
     // Its owner's own reads treat it as deleted, and the notice telling them so is there.
-    expect(await createSynthesisAnswerAccess({ repository: checks, deadlineMs: 60_000 }).stateOf({ runId: root })).toBe("REMOVED");
-    expect(await checks.removalNoticeExists(author.ownerRef)).toBe(true);
+    expect(await checks().runRemovedByCheck(root)).toBe(true);
+    expect(await createSynthesisAnswerAccess({ repository: checks(), deadlineMs: 60_000 }).stateOf({ runId: root })).toBe("REMOVED");
+    expect(await checks().removalNoticeExists(author.ownerRef)).toBe(true);
   });
+
+  it("only a final deletion verdict takes a page down: never a flag that needs a staff approval, an unavailable answer or one that came too late", async () => {
+    const author = await account();
+    const [flagged, unavailable, late] = [await publishedDebate(author), await publishedDebate(author), await publishedDebate(author)];
+    expect(await verdict(flagged.root, 1, { verdict: "FLAGGED", categories: ["HATE_SPEECH"] })).toBe("INSERTED");
+    expect(await verdict(unavailable.root, 1, { verdict: "UNAVAILABLE", categories: [], failureCode: "TRANSPORT_FAILED" })).toBe("INSERTED");
+    // A deletion verdict that comes after the check's own time is stored as unavailable: it neither allows nor deletes.
+    expect(await verdict(late.root, 1, DELETE, 1)).toBe("LATE");
+    const lines: string[] = [];
+    for (let pass = 0; pass < 2; pass += 1) {
+      const outcomes = await coordinator(lines).reconcile(100);
+      for (const debate of [flagged, unavailable, late]) expect(outcomes, debate.root).not.toContainEqual(expect.objectContaining({ runId: debate.root }));
+    }
+    for (const debate of [flagged, unavailable, late]) {
+      expect((await page(debate.ref)).question).toBe(QUESTION);
+      expect(await latestState(debate.root)).toBe("PUBLISHED");
+      expect(await runKeys.exists(debate.root)).toBe(true);
+      expect(await publicationCipher.exists(debate.ref)).toBe(true);
+      expect(await checks().runRemovedByCheck(debate.root)).toBe(false);
+    }
+  });
+
+  it("a deletion verdict on any version of the debate's answer takes its page down, as 0126 erases a private debate on it", async () => {
+    const author = await account();
+    const lines: string[] = [];
+    // A second version with a conclusion of its own, which the product's writer never stores: a verdict on the first still takes the page down.
+    const { root, ref } = await publishedDebate(author, { beforePublish: (run, answerId) => writeSecondAnswerVersion(run, answerId, "A second conclusion, checked clear.") });
+    expect(await verdict(root, 1, DELETE)).toBe("INSERTED");
+    expect(await outcomesFor(lines, root)).toEqual([{ runId: root, outcome: "TAKEN_DOWN" }]);
+    expect(await application().readPublicDebate(ref)).toBeNull();
+    expect(await latestState(root)).toBe("PRIVATE");
+    // A second version as the product writes it, keeping the first one's conclusion: a verdict on the first takes the page down.
+    const same = await publishedDebate(author, { beforePublish: async (run, answerId) => {
+      await database.pool.query(`INSERT INTO serve.answer (answer_id,answer_version,run_id,work_item_id,terminal,serve_state,verdict_state,answer_form,condition_marks,fact_bundle_id,
+          composed_text_id,conformance_record_id,sealed_at_seq,confidence_band,band_ceiling,reversal_point,builds_on_previous,badges,verdict_unavailable,memory_disclosure,
+          content_ciphertext,content_attestation)
+        SELECT answer_id,2,run_id,work_item_id,terminal,serve_state,verdict_state,answer_form,condition_marks,fact_bundle_id,composed_text_id,conformance_record_id,
+          ledger.allocate_sequence(),confidence_band,band_ceiling,reversal_point,builds_on_previous,badges,verdict_unavailable,memory_disclosure,$2::jsonb,$3
+        FROM serve.answer WHERE answer_id=$1 AND answer_version=1`, [answerId, ...await (async () => {
+          const sealed = await encryptAttestedContentForRun(database.pool, run, "serve.answer", `${answerId}:2`, { answerForm: null });
+          return [JSON.stringify(sealed!.envelope), sealed!.attestation];
+        })()]);
+    } });
+    expect(await verdict(same.root, 1, DELETE)).toBe("INSERTED");
+    expect(await outcomesFor(lines, same.root)).toEqual([{ runId: same.root, outcome: "TAKEN_DOWN" }]);
+    expect(await application().readPublicDebate(same.ref)).toBeNull();
+  });
+
+  it("what others put on the page goes with it: a running dig is kept private and stays theirs, a report being written ends, the page's copies go; nobody else is sent a statement", async () => {
+    const [ana, dan, eve, fay] = [await account(), await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const world = vendors();
+    const allowed = await dig(dan, debate, world);
+    await settleAll(world);
+    expect((await page(debate.ref)).contributions).toHaveLength(1);
+    const tree = new PostgresPublicTreeRepository(api);
+    // A dig still running (joined, nothing settled), and a report being written.
+    const running = await createEncryptedStoryRun(database.pool, fay, "Still running?");
+    expect((await tree.join({ ownerRef: fay.ownerRef, publicationRef: debate.ref, parentRunId: debate.root, childRunId: running, positionRef: debate.position })).outcome).toBe("JOINED");
+    expect(["OPENED", "ONGOING"]).toContain((await tree.openReport(eve.ownerRef, debate.ref, randomUUID(), false)).outcome);
+    const copies = async () => Number((await database.pool.query<{ n: string }>("SELECT count(*)::text AS n FROM identity.public_material WHERE publication_ref=$1", [debate.ref])).rows[0]!.n);
+    expect(await copies()).toBeGreaterThan(0);
+    expect(await verdict(debate.root, 1, DELETE)).toBe("INSERTED");
+    const lines: string[] = [];
+    expect(await outcomesFor(lines, debate.root)).toEqual([{ runId: debate.root, outcome: "TAKEN_DOWN" }]);
+    // The running dig is settled kept private and stays its person's; the allowed one stays theirs, its climb ended; the report ended.
+    const contributions = await new PostgresPublicDebateRepository(api).readOwn(fay.ownerRef, running);
+    expect(contributions.find((row) => row.dig_run_id === running)).toMatchObject({ outcome: "UNAVAILABLE" });
+    expect((await database.pool.query("SELECT outcome FROM identity.public_contribution WHERE dig_run_id=$1", [allowed])).rows).toEqual([{ outcome: "ALLOWED" }]);
+    expect((await database.pool.query("SELECT 1 FROM identity.public_climb_done WHERE dig_run_id=$1", [allowed])).rowCount).toBe(1);
+    // What its digger reads has no state for a deleted page: they are still told their dig changed the public page.
+    expect(contributionStateOf((await new PostgresPublicDebateRepository(api).readOwn(dan.ownerRef, allowed)).find((row) => row.dig_run_id === allowed)!)).toBe("ON_THE_PAGE");
+    expect((await database.pool.query("SELECT outcome,failure_code FROM identity.public_report WHERE publication_ref=$1", [debate.ref])).rows)
+      .toEqual([{ outcome: "FAILED", failure_code: "PUBLIC_PAGE_DELETED" }]);
+    // The copies of the page sealed for their digs and reports held the deleted text: they go.
+    expect(await copies()).toBe(0);
+    // Nothing new starts on it, and no sweep writes to it.
+    const late = await createEncryptedStoryRun(database.pool, eve, "Too late?");
+    expect((await tree.join({ ownerRef: eve.ownerRef, publicationRef: debate.ref, parentRunId: debate.root, childRunId: late, positionRef: debate.position })).outcome).toBe("NOT_PUBLIC");
+    await settleAll(world);
+    // The debate is erased; each digger's own dig stays theirs, with its key.
+    expect(await keyCleanup()).toBeGreaterThanOrEqual(1);
+    expect(await outcomesFor(lines, debate.root)).toEqual([{ runId: debate.root, outcome: "CLEANED" }]);
+    expect(await runKeys.exists(debate.root)).toBe(false);
+    for (const own of [allowed, running]) expect(await runKeys.exists(own), own).toBe(true);
+    // 0157's statements come from a review step or a decision: this deletion sends none, to anyone.
+    await database.pool.query("SELECT identity.queue_moderation_statements()");
+    expect((await database.pool.query("SELECT kind,owner_ref FROM identity.moderation_statement WHERE publication_ref=$1", [debate.ref])).rows).toEqual([]);
+    expect(await checks().removalNoticeExists(ana.ownerRef)).toBe(true);
+  }, 180_000);
+
+  it("the copies sealed for digs on a page its owner unpublished before go too, with those of the page public now", async () => {
+    const [ana, dan] = [await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const world = vendors();
+    await dig(dan, debate, world);
+    await settleAll(world);
+    const copiesOf = async (ref: string) => Number((await database.pool.query<{ n: string }>("SELECT count(*)::text AS n FROM identity.public_material WHERE publication_ref=$1", [ref])).rows[0]!.n);
+    expect(await copiesOf(debate.ref)).toBeGreaterThan(0);
+    // Its owner unpublished it and published it again under a new reference, with the rows their own unpublish and publish write.
+    const [again, at] = [randomUUID(), new Date()];
+    const prepared = await publicationCipher.create(again, debate.root);
+    const content = prepared.encrypt({ ...debate.snapshot, public_ref: again, published_at: at.toISOString() });
+    prepared.close();
+    const event = `INSERT INTO core.run_visibility_event (run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,actor_ref_version,warning_version,occurred_at,at_seq)
+      VALUES ($1,$2,$3,$4,$5,2,$6,now(),ledger.allocate_sequence())`;
+    await seeded([
+      ["INSERT INTO serve.publication_key_cleanup_intent (publication_ref,requested_at,completed_at,cleanup_state) VALUES ($1,now(),NULL,'PENDING')", [debate.ref]],
+      [event, [randomUUID(), debate.root, debate.ref, "PRIVATE", randomUUID(), "COPIES_MAY_PERSIST_V1"]],
+      ["INSERT INTO core.publication_ref_tombstone (ref,ref_kind,created_at) VALUES ($1,'publication_ref',now())", [again]],
+      ["INSERT INTO serve.publication_snapshot (publication_ref,run_id,format_version,content_ciphertext,created_at) VALUES ($1,$2,1,$3::jsonb,$4)", [again, debate.root, JSON.stringify(content), at]],
+      [event, [randomUUID(), debate.root, again, "PUBLISHED", randomUUID(), "PUBLIC_INDEXED_V1"]]
+    ]);
+    expect((await page(again)).question).toBe(QUESTION);
+    expect(await verdict(debate.root, 1, DELETE)).toBe("INSERTED");
+    const lines: string[] = [];
+    expect(await outcomesFor(lines, debate.root)).toEqual([{ runId: debate.root, outcome: "TAKEN_DOWN" }]);
+    expect(await application().readPublicDebate(again)).toBeNull();
+    // The earlier page's copies held the same deleted text: they go with the newer page's.
+    expect(await copiesOf(debate.ref)).toBe(0);
+    expect(await copiesOf(again)).toBe(0);
+    // Both pages' keys go, then the debate.
+    expect(await keyCleanup()).toBeGreaterThanOrEqual(2);
+    expect(await outcomesFor(lines, debate.root)).toEqual([{ runId: debate.root, outcome: "CLEANED" }]);
+    expect(await copiesOf(debate.ref)).toBe(0);
+  }, 180_000);
+
+  it("its list holds only the deletions it can act on, so no number of others keeps a newer one from it; the others are 0126's prepare's, as before", async () => {
+    const pages = new PostgresCheckDeletedPublicPageRepository(api);
+    // Three older deletions it cannot act on: an account with no session row, one whose closing has prepared, and one frozen by
+    // the age check with every session revoked (neither of the last two is active, and 0040's binding refuses both).
+    const [sessionless, closing, frozen] = [await account(), await account(), await account()];
+    const stuck = [await publishedDebate(sessionless), await publishedDebate(closing), await publishedDebate(frozen)];
+    for (const debate of stuck) expect(await verdict(debate.root, 1, DELETE)).toBe("INSERTED");
+    await database.pool.query("DELETE FROM identity.session WHERE user_id=$1", [sessionless.userId]);
+    await seeded([[`UPDATE identity."user" SET state='suspended' WHERE user_id=$1`, [closing.userId]],
+      ["UPDATE identity.session SET revoked_at=now() WHERE user_id=$1", [frozen.userId]], [`UPDATE identity."user" SET state='age_frozen' WHERE user_id=$1`, [frozen.userId]]]);
+    const newer = await publishedDebate(await account());
+    expect(await verdict(newer.root, 1, DELETE)).toBe("INSERTED");
+    // A list of one reaches the newer one at once: the older ones are never on it.
+    expect(await pages.takeDown(1)).toEqual([{ outcome: "TAKEN_DOWN", runId: newer.root, failureCode: null }]);
+    expect(await pages.takeDown(100)).toEqual([]);
+    for (const debate of stuck) expect(await latestState(debate.root)).toBe("PUBLISHED");
+    // 0126's prepare drops the deletion of a debate whose owner is not active, and the page stays (the runbook says so); the one
+    // with no session row waits, with the line that says so.
+    const lines: string[] = [];
+    const outcomes = await coordinator(lines).reconcile(100);
+    for (const debate of stuck.slice(1)) {
+      expect(outcomes.filter((outcome) => outcome.runId === debate.root)).toEqual([{ runId: debate.root, outcome: "ACCOUNT_CLOSED" }]);
+      expect(await latestState(debate.root)).toBe("PUBLISHED");
+    }
+    expect(outcomes.filter((outcome) => outcome.runId === stuck[0]!.root)).toEqual([{ runId: stuck[0]!.root, outcome: "PUBLISHED" }]);
+    expect(lines).toContain("[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED");
+    // Given a session row, the waiting one is on the list again and comes down.
+    await seeded([[`INSERT INTO identity.session(session_id,user_id,token_hash,csrf_token_hash,binding_context,created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at)
+      VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',now()+interval '2 hours',now())`,
+      [randomUUID(), sessionless.userId, `sha256:${randomBytes(32).toString("hex")}`, `sha256:${randomBytes(32).toString("hex")}`]]]);
+    expect(await pages.takeDown(100)).toEqual([{ outcome: "TAKEN_DOWN", runId: stuck[0]!.root, failureCode: null }]);
+  }, 180_000);
+
+  it("one deletion that fails for any other reason writes nothing, is logged with its SQLSTATE alone, and holds back none after it", async () => {
+    const [failing, after] = [await publishedDebate(await account()), await publishedDebate(await account())];
+    for (const debate of [failing, after]) expect(await verdict(debate.root, 1, DELETE)).toBe("INSERTED");
+    // A trigger refuses the failing one's PRIVATE event, as any error inside its takedown would.
+    await database.pool.query(`CREATE FUNCTION public.refuse_one_takedown() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN IF NEW.run_id = '${failing.root}'::uuid AND NEW.state = 'PRIVATE' THEN RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'REFUSED_IN_TEST'; END IF; RETURN NEW; END $$`);
+    await database.pool.query("CREATE TRIGGER refuse_one_takedown BEFORE INSERT ON core.run_visibility_event FOR EACH ROW EXECUTE FUNCTION public.refuse_one_takedown()");
+    const lines: string[] = [];
+    let outcomes: Awaited<ReturnType<SynthesisCheckErasureCoordinator["reconcile"]>>;
+    try {
+      outcomes = await coordinator(lines).reconcile(100);
+    } finally {
+      await database.pool.query("DROP TRIGGER refuse_one_takedown ON core.run_visibility_event");
+      await database.pool.query("DROP FUNCTION public.refuse_one_takedown()");
+    }
+    expect(outcomes.filter((outcome) => outcome.runId === failing.root)).toEqual([{ runId: failing.root, outcome: "FAILED" }]);
+    expect(outcomes.filter((outcome) => outcome.runId === after.root)).toEqual([{ runId: after.root, outcome: "TAKEN_DOWN" }]);
+    expect(lines).toContain("[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_FAILED] P0001");
+    expect(lines.join("\n")).not.toContain(failing.root);
+    // None of its rows were written: its page reads, with no key cleanup and no binding.
+    expect((await page(failing.ref)).question).toBe(QUESTION);
+    expect((await database.pool.query("SELECT 1 FROM serve.publication_key_cleanup_intent WHERE publication_ref=$1", [failing.ref])).rowCount).toBe(0);
+    expect((await database.pool.query("SELECT 1 FROM identity.publication_event_binding WHERE run_id=$1", [failing.root])).rowCount).toBe(0);
+    // The next pass takes it down.
+    expect(await outcomesFor(lines, failing.root)).toEqual([{ runId: failing.root, outcome: "TAKEN_DOWN" }]);
+  }, 180_000);
 });
 
 describe("over HTTP", () => {

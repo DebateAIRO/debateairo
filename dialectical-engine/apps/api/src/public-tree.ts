@@ -603,17 +603,25 @@ export async function sweepPublicPage(deps: PublicPageSweepDeps): Promise<Readon
  * by its age. While the judge itself is down the shared wait still bounds the calls: one per wait, the items in turn.
  * Kept in memory and keyed by the row each check is for: its `turnKey` when it names one (a page update, whose run id is its
  * dig's, shared by every page update of that dig), else the run id it names (a report's carries its prefix, main.ts). An item
- * a pass did not ask is forgotten (published, refused, given up or erased), and a restart starts again from the lists' own order.
+ * not asked in a whole round of the lists is forgotten (published, refused, given up or erased), and a restart starts again
+ * from the lists' own order. A round is one pass, except while a list the sweeps read across passes has not come back to its
+ * first row (`roundOpen`, the Free sweep's cursor): an item a pass did not ask may then lie further on, so it keeps its own
+ * wait until the round ends.
  * The end-of-debate check a Free debate's gate runs itself, when no decision of that check is stored, goes before its
  * publication check, in the same turn and under the same key (`checkBefore`): when it cannot answer, the debate waits its
  * own doubling time as when the publication check cannot. A decision already stored is read outside the turns. Such a
  * check may take the whole background time (two minutes on the gate) before it fails, and the pass holds every other
  * sweep's work while it runs. So once one has failed in a pass, no other `checkBefore` is asked in that pass: those
- * debates are left owed, as during the shared wait, and the next pass asks them. A pass waits for at most one that fails.
+ * debates are left owed, as during the shared wait, and are asked when the sweep reads them again (the next pass, or the
+ * next round once more than a list's worth wait). A pass waits for at most one that fails.
  */
 export type ChecksInTurn = Readonly<{
-  /** One pass of the sweeps: every check they ask through `check` belongs to it. */
-  pass: <T>(sweeps: () => Promise<T>) => Promise<T>;
+  /**
+   * One pass of the sweeps: every check they ask through `check` belongs to it. `roundOpen`, read once the sweeps are done:
+   * whether a list they read across passes has not yet come back to its first row; while it has not, no item's own wait is
+   * forgotten. Without it, each pass is a round.
+   */
+  pass: <T>(sweeps: () => Promise<T>, roundOpen?: () => boolean) => Promise<T>;
   check: PublicationContentCheck;
   /**
    * Another check that goes before an item's publication check (the end-of-debate check a Free debate's gate runs itself,
@@ -638,6 +646,8 @@ export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ no
   /** Whether a `checkBefore` has failed in this pass: the pass then asks no other. */
   let beforeFailed = false;
   let asked = new Set<string>();
+  /** Every item asked in the passes of this round so far. */
+  let round = new Set<string>();
   const fail = (key: string): void => {
     const before = failed.get(key)?.wait;
     const wait = before === undefined ? first : Math.min(before * 2, longest);
@@ -673,7 +683,7 @@ export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ no
     return answer;
   };
   return Object.freeze({
-    pass: async <T>(sweeps: () => Promise<T>): Promise<T> => {
+    pass: async <T>(sweeps: () => Promise<T>, roundOpen?: () => boolean): Promise<T> => {
       owed = Number.POSITIVE_INFINITY;
       answered = false;
       beforeFailed = false;
@@ -682,7 +692,11 @@ export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ no
         return await sweeps();
       } finally {
         owedBefore = owed;
-        for (const key of [...failed.keys()]) if (!asked.has(key)) failed.delete(key);
+        for (const key of asked) round.add(key);
+        if (roundOpen?.() !== true) {
+          for (const key of [...failed.keys()]) if (!round.has(key)) failed.delete(key);
+          round = new Set();
+        }
       }
     },
     check: Object.freeze({ check: async (request: Parameters<PublicationContentCheck["check"]>[0]): Promise<PublicationCheckResult> =>
@@ -698,18 +712,27 @@ export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ no
  * and the publication check allows it, or stays private for good on the publication check's refusal (publishFreeDebate). While the end-of-debate check may still answer, cannot answer, or
  * flagged it with no staff approval, it keeps waiting; one it asks to delete is never published. An unavailable check records nothing: the next pass tries again, so a crash anywhere loses
  * nothing. It waits for the story for a while: a debate published a minute earlier would go out without its short answer.
- * Each pass reads the oldest waiting debates, as many as the database's list gives (FREE_PUBLICATIONS_LISTED). A debate flagged with no approval, or one whose deletion cannot finish yet,
- * keeps its place at the head of that list, and the list has no way to read past it: once that many such debates wait, no newer one is read, checked or published.
+ * Each pass reads the waiting debates from where the pass before stopped (`cursor`), as many as the database's list gives (FREE_PUBLICATIONS_LISTED), in the list's own order, and
+ * starts again from the first once a read comes back short. So a debate flagged with no approval, or one whose deletion cannot finish yet, never keeps a newer one from being read:
+ * every waiting debate is read once in each round of the list, and a flagged one a staff member approved meanwhile goes public on its next turn. A restart starts from the first.
+ * The pass gives checksInTurn the cursor (`roundOpen`: not back at the first yet), so a debate whose own check keeps failing keeps its own wait while the cursor reads past it.
  */
 const FREE_PUBLICATIONS_LISTED = 100;
+/** Where the next pass of the Free sweep reads from: the last debate the pass before read, or null for the first. One per process. */
+export type FreeSweepCursor = { after: Readonly<{ notice_at: string; run_id: string }> | null };
+export const freeSweepCursor = (): FreeSweepCursor => ({ after: null });
 export type FreeSweepDeps = Readonly<{
-  contributions: Pick<PostgresPublicDebateRunnerRepository, "readFreeToPublish" | "refuseFree">;
+  contributions: Pick<PostgresPublicDebateRunnerRepository, "readFreeToPublishAfter" | "refuseFree">;
+  cursor: FreeSweepCursor;
   publishOne: (waiting: Readonly<{ run_id: string; owner_ref: string; notice_at: string }>) => Promise<string>;
   log?: (event: string, detail: Record<string, unknown>) => void;
 }>;
 export async function sweepFreePublications(deps: FreeSweepDeps): Promise<Readonly<{ listed: number; published: number }>> {
   let published = 0;
-  const waiting = await deps.contributions.readFreeToPublish(FREE_PUBLICATIONS_LISTED).catch(() => []);
+  const waiting = await deps.contributions.readFreeToPublishAfter(FREE_PUBLICATIONS_LISTED, deps.cursor.after).catch(() => null);
+  if (waiting === null) return Object.freeze({ listed: 0, published });
+  const last = waiting.at(-1);
+  deps.cursor.after = waiting.length < FREE_PUBLICATIONS_LISTED || last === undefined ? null : { notice_at: last.notice_at, run_id: last.run_id };
   for (const row of waiting) {
     try {
       const outcome = await deps.publishOne(row);

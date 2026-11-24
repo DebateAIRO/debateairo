@@ -1009,9 +1009,11 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains a Free debate the publication check kept private 0189 after 0188 as an expand step that keeps 0130's verifier, and documents it", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
-    // The chain head: one function of the API's billing role, its owner set by one reviewed DO block.
-    expect(names.slice(-2)).toEqual(["0188_recovery_permit.sql", "0189_free_debate_refused_by_check.sql"]);
-    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    // One function of the API's billing role, its owner set by one reviewed DO block. Found by name: the check deleting a public
+    // debate (0190) follows it.
+    const at = names.indexOf("0189_free_debate_refused_by_check.sql");
+    expect(names.slice(at - 1, at + 1)).toEqual(["0188_recovery_permit.sql", "0189_free_debate_refused_by_check.sql"]);
+    const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
     expect(JSON.parse((await bytesOf("lineage/free-debate-refused-by-check-forward0189.json")).toString("utf8"))).toEqual({
       version: "free-debate-refused-by-check-forward0189-v1",
       baseRecipeSha256: plan.recipeSha256,
@@ -1056,6 +1058,73 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     ]) expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
       "the recovery permit (0188, below) the seventy-eighth, and a Free debate the publication check kept private (0189, below) the seventy-ninth");
+  });
+
+  it("chains the check deleting a public debate 0190 after 0189 as an expand step that keeps 0130's verifier and gives the erasure login nothing, and documents it", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    // The chain head: three new functions, their owners set by one reviewed DO block.
+    expect(names.slice(-2)).toEqual(["0189_free_debate_refused_by_check.sql", "0190_check_deletes_public_debate.sql"]);
+    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    expect(JSON.parse((await bytesOf("lineage/check-deletes-public-debate-forward0190.json")).toString("utf8"))).toEqual({
+      version: "check-deletes-public-debate-forward0190-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: { name: "0189_free_debate_refused_by_check.sql", manifestSha256: sha256(await bytesOf("lineage/free-debate-refused-by-check-forward0189.json")), verifierSha256: previous.verifierSha256 },
+      migration: { name: "0190_check_deletes_public_debate.sql", sha256: sha256(await bytesOf("0190_check_deletes_public_debate.sql")) },
+      verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) },
+      amendsPostconditionsOf: []
+    });
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/check-deletes-public-debate-forward0190.json")));
+    expect(step.previousName).toBe(previous.name);
+    expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+    expect(step.previousVerifierSha256).toBe(previous.verifierSha256);
+    expect(step.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
+    expect(step.replayVerifierSql).toBeUndefined();
+    expect(step.amendsPostconditionsOf ?? []).toEqual([]);
+    // Three new functions, their owners, their revokes and their two grants; nothing earlier replaced, nothing of billing.
+    const statements = step.sql.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("--")).join("\n");
+    expect(statements.match(/^(?:CREATE|ALTER|REVOKE|GRANT|DROP|INSERT|UPDATE|DELETE|DO)\b.*$/gmu)).toEqual([
+      "CREATE OR REPLACE FUNCTION identity.close_public_page_of_deleted_debate(p_publication_ref uuid) RETURNS integer",
+      "CREATE OR REPLACE FUNCTION core.take_down_check_deleted_debates(p_limit integer)",
+      "CREATE OR REPLACE FUNCTION identity.read_free_debates_to_publish_after(p_limit integer, p_after_notice_at timestamptz, p_after_run_id uuid)",
+      "DO $check_deletes_public_debate_owner$",
+      "REVOKE ALL ON FUNCTION identity.close_public_page_of_deleted_debate(uuid)",
+      "REVOKE ALL ON FUNCTION core.take_down_check_deleted_debates(integer)",
+      "REVOKE ALL ON FUNCTION identity.read_free_debates_to_publish_after(integer,timestamptz,uuid)",
+      "GRANT EXECUTE ON FUNCTION core.take_down_check_deleted_debates(integer) TO debateai_rls_all_accounts;",
+      "GRANT EXECUTE ON FUNCTION identity.read_free_debates_to_publish_after(integer,timestamptz,uuid) TO debateai_rls_all_accounts;"
+    ]);
+    expect(statements).not.toMatch(/\bbilling\./u);
+    // The erasure login gains nothing: the release before counts the functions it may run at its start.
+    expect(statements).not.toMatch(/\bTO\b[^;]*\bdebateai_erasure_runtime\b/u);
+    const earlier = (await readdir(MIGRATIONS)).filter((name) => /^\d{4}_.*\.sql$/u.test(name) && name < step.name);
+    for (const name of earlier) {
+      const text = (await bytesOf(name)).toString("utf8");
+      for (const created of ["take_down_check_deleted_debates", "close_public_page_of_deleted_debate", "read_free_debates_to_publish_after"]) expect(text, name).not.toContain(created);
+    }
+    const lines = step.sql.split("\n");
+    const reviewed = lines.findIndex((line) => line.startsWith("-- n1: reviewed "));
+    expect(lines.filter((line) => line.startsWith("-- n1: reviewed "))).toHaveLength(1);
+    expect(lines[reviewed + 1]).toBe("DO $check_deletes_public_debate_owner$");
+    const loader = await readFile(new URL("migration-forward0190.ts", DB_SOURCE), "utf8");
+    for (const signature of ["core.take_down_check_deleted_debates(integer)", "identity.close_public_page_of_deleted_debate(uuid)",
+      "identity.read_free_debates_to_publish_after(integer,timestamp with time zone,uuid)"]) expect(loader).toContain(`"${signature}"`);
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The check deletes a public debate, and the Free sweep reads past waiting debates (0190)"));
+    expect(section.startsWith("## The check deletes a public debate, and the Free sweep reads past waiting debates (0190)")).toBe(true);
+    for (const needle of ["0189", "0190_check_deletes_public_debate.sql", "check-deletes-public-debate-forward0190.json", "packages/db/src/migration-forward0190.ts",
+      "MIGRATION_FORWARD0190_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "verify-effective-capabilities-130.sql", "replayVerifierSql",
+      "previous.manifestSha256", "migration.sha256", "renumber", "core.take_down_check_deleted_debates(integer)", "identity.close_public_page_of_deleted_debate(uuid)",
+      "identity.read_free_debates_to_publish_after(integer,timestamptz,uuid)", "core.prepare_synthesis_check_erasures", "assertAccountErasureDatabaseRole",
+      "debateai_rls_all_accounts", "TAKEN_DOWN", "CONTENDED", "FAILED", "enforce_active_user_child", "age_frozen", "every page the debate had", "[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_FAILED]",
+      "tests/integration/public-tree-flow.test.ts"
+    ]) expect(section, needle).toContain(needle);
+    // Any final deletion verdict takes the page down: no outcome waits on which answer version it was about.
+    expect(section).not.toContain("NOT_SHOWN");
+    expect(step.sql).not.toContain("NOT_SHOWN");
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "a Free debate the publication check kept private (0189, below) the seventy-ninth, and the check deleting a public debate with the Free sweep reading past waiting debates (0190, below) the eightieth");
   });
 
   // The release before refuses, at its restart on a database ahead of it, an amendment recorded by a step it does not

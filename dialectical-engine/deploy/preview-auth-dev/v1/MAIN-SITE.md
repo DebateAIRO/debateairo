@@ -2046,8 +2046,8 @@ payments are real (part 7). The site password keeps it small: only people who kn
   (the Anthropic gate refuses the call, is halted or busy, or its day is used up), nothing goes public: the finished
   debate stays private and waits. The API tries its check again by itself, a minute after a failure, then after longer
   and longer waits, up to an hour. No staff screen lists a Free debate that waits for a check, and no staff member can
-  publish one by hand: it goes public by itself once the checks allow it, unless too many older Free debates wait ahead of it
-  (the warning below). The person is not told that it waits. A debate whose own check keeps failing is tried again
+  publish one by hand: it goes public by itself once the checks allow it, however many older Free debates wait (the
+  point on the waiting list below). The person is not told that it waits. A debate whose own check keeps failing is tried again
   less and less often. The API makes its checks one at a time, contributions and reports included, so a check that
   runs long (up to two minutes on a busy gate) delays the others by that much; after one end-of-debate check fails,
   the other Free debates that need one wait for the API's next try, about 15 seconds later.
@@ -2080,17 +2080,42 @@ payments are real (part 7). The site password keeps it small: only people who kn
     Its owner sees nothing of this on the debate's page (`/v4/debate/<id>`): no flag, no "waiting" and no **Cereți
     aprobarea**. Only the older page `/debate/<id>`, which no V4 page links to, shows the flag and the button. So
     unless you tell the owner, nobody asks, and the debate stays private.
-  - The API looks at the 100 oldest waiting Free debates on each try, and cannot look past them. A flagged one stays
-    among them until it is approved, and so does one whose deletion cannot finish yet. So once 100 such debates wait,
-    no newer Free debate goes public, and nobody is told. AICHECK's `Free debates` line (6b.1) counts them among the
+  - The API looks at the waiting Free debates 100 at a time. Each try goes on from where the one before stopped, and
+    after the newest it starts again from the oldest. A flagged one stays on that list until it is approved, and so
+    does one whose deletion cannot finish yet. However many of them wait, every waiting debate is looked at once in
+    each round of the list (one try for each 100 that wait), so a newer one is never held back by them. A flagged one
+    a staff member approved goes public on its next turn, with nobody pressing anything. AICHECK's `Free debates` line (6b.1) counts them among the
     waiting: if that count keeps rising while none went public in the last day, ask.
-  - A debate that is already public when this check asks for its deletion is not deleted. This can happen to a debate
-    published before the check existed, or to a later version of its answer. Its public page stays readable, and the
-    API's log repeats `[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED` every 30 seconds for as long as it is public.
-    Meanwhile its owner is treated as if it were deleted: it leaves their list, their Publish answers that it is
-    gone, and they see "We deleted this debate". If you see that line, ask. Hide now can take the page down only
-    while the staff screens are on (STAFFCHECK says `staff tools are on`, and after the rename only once 5.7 is
-    done).
+  - A debate that is already public when this check asks for its deletion is deleted too, its public page first, when
+    its owner's account is active. This can happen to a debate that went public before the check existed. On the
+    API's next erasure pass (every 30 seconds) its page and its line in the public list go, and the API's log says
+    `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEN_DOWN]` once. The next pass of the publication key cleanup (also every 30
+    seconds) destroys the key of its public page, and the pass after that deletes the debate as any other. Its owner
+    sees "We deleted this debate". Nothing is asked of you.
+  - What other people put on that page goes with it. A dig still running on it is kept private and stays its
+    person's, and a report being written on it stops. The copies of the page made for digs and reports are deleted,
+    also those of an earlier page of the same debate. Each person's own digs stay theirs. Nobody but the owner is
+    told. A person whose dig had changed the page still reads "This changed the public page." on their dig, with a
+    link to a page that is gone: the site has no line yet that says the page was deleted.
+    A debate that staff had hidden before the check deleted it still shows as hidden on the staff Public tab. Do not
+    press "Put back" on it: its page is gone and stays gone, and the people who had a part on it would be told that
+    their part is back on the page.
+  - When it is not deleted, or waits:
+    - The owner's account is being closed (its deletion has started), or was frozen by the age check. Then the debate
+      is not deleted and its page stays public, and no log line says so. A closing account's own deletion takes the
+      page down only if the owner chose to delete their public debates too. If you learn of such a debate, ask. Hide
+      now can take the page down only while the staff screens are on (STAFFCHECK says `staff tools are on`, and after
+      the rename only once 5.7 is done).
+    - Someone is digging or reporting on the page at that moment, or a publish of it is still running. It is tried
+      again on the next pass, with no log line.
+    - The API's log repeats a line every 30 seconds: `[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED` (the owner's
+      account keeps no sign-in at all, so the page cannot be taken down),
+      `[SYNTHESIS_CHECK_ERASURE_WAITING] OWNERSHIP_MOVED` (the debate changed owner) or
+      `[SYNTHESIS_CHECK_ERASURE_WAITING] LEGACY_PLAINTEXT_RETAINED` (the debate is stored unencrypted). Ask.
+    - The API's log says `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_FAILED]` with a five-character code: one debate
+      could not be taken down, and the others still were. `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_PENDING]`: no
+      debate could be taken down on that pass. Both are tried again every 30 seconds. If one repeats, ask, and give
+      the code.
 - **Staff mails.** You still get the mails that say a report waits, or that a debate was hidden
   by itself. You cannot open them in the app until the staff screens come back. That is expected. (The threat report
   screen and its mail are gone since this upload: 1.6.)
@@ -3784,8 +3809,8 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
      debate at once (once per debate).
    - Off, or the gate not letting it through (`AICHECK_NOT_DONE`): no Free debate goes public. Each finished one stays
      private and waits; the API tries its checks again by itself, and the debate goes public once the checks allow it,
-     unless 100 older Free debates wait ahead of it (5.1b). No staff screen lists the waiting ones, and no staff member
-     can publish one by hand. Every report waits for you.
+     however many older Free debates wait (5.1b). No staff screen lists the waiting ones, and no staff member can
+     publish one by hand. Every report waits for you.
 
    Either way, read the Public tab and the report mails every day: with strangers in, the Terms' promises about
    reports and removals (section 10) are owed to real people. If you want the check and AICHECK says
@@ -3881,8 +3906,8 @@ Read the lines before the last one:
   `HTTP_STATUS`, the AI company answered with an error; `ANSWER_NOT_JSON` or `ANSWER_SCHEMA`, an answer cut off or not
   in the form asked for; `MONEY_REFUSED`, the site's own day was used up; `NOT_CONFIGURED`, the check is off. Any other
   cause: ask. `deleted` counts the debates the check deleted for touching "tendencies to suicide or harming other
-  people". It also counts a debate that was already public when the check asked for its deletion, which is not
-  deleted (5.1b).
+  people". It also counts a debate that was already public when the check asked for its deletion: its page comes
+  down and it is deleted too, when its owner's account is active (5.1b).
 
 ### 6b.2 The steps, in order
 

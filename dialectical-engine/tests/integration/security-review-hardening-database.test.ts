@@ -765,6 +765,9 @@ describe("F5: a request-facing function believes only the owner the database see
     ...CONSUMER_LOOP, ...PURGES,
     // 0151's flag settlement, which the API's press calls after the judge on its system login alone (X38): it believed the verdict it was handed.
     "identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)",
+    // 0190's takedown of a public debate the end-of-debate check deletes and its Free list read from a place, which the API calls only from
+    // its gated timers on its system login: each decides from the rows alone, and takes no owner, account or text it is handed.
+    "core.take_down_check_deleted_debates(integer)", "identity.read_free_debates_to_publish_after(integer,timestamptz,uuid)",
     // Staff's ceremonies and changes, on the API's staff repository's site (X14).
     ...STAFF_REQUESTS,
     // The three writers of the site's day that name no debate, which the API calls inside the paying request on its system login (X30 to X32).

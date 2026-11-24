@@ -10,13 +10,13 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first, the team's one limit (0142, below) the thirty-second, the hand-over (0143, below) the thirty-third, the small AI's quota charge (0144, below) the thirty-fourth, the pages waiting after "Add to researched" (0145, below) the thirty-fifth, the Owner's allowances for team members (0146, below) the thirty-sixth, the public tree (0147, below) the thirty-seventh, an erased account keeping its public debates (0148, below) the thirty-eighth, a funded person's public report in the team's month (0149, below) the thirty-ninth, a public debate under review (0150, below) the fortieth, the Report button with the sealed originals' six months (0151, below) the forty-first and a reporter's own reports in their export with what the AI checks on public rows used (0152, below) the forty-second, a finished dig's mark (0153, below) the forty-third, Iceland and Liechtenstein in the Region list (0154, below) the forty-fourth, the owner's two writes on their own answer (0155, below) the forty-fifth, the moderation notice (0156, below) the forty-sixth, the moderation statements (0157, below) the forty-seventh, the small AIs before Start in the person's quota (0158, below) the forty-eighth, the chosen paths sealed per run (0159, below) the forty-ninth, the path results per run (0160, below) the fiftieth, the path progress per run (0161, below) the fifty-first, the saved questions (0162, below) the fifty-second, the carry-on digs without a live sign-in (0163, below) the fifty-third, a dig under the main question updating the main answer (0164, below) the fifty-fourth, a failed question giving back its path-list charge (0165, below) the fifty-fifth, a later main-answer version revising the newest one, whichever table holds it (0166, below) the fifty-sixth, a visitor's report of a public debate carried by a run of their own (0167, below) the fifty-seventh, a debate an update set aside continuing where it stopped (0168, below) the fifty-eighth, the runner reading which settings are switched on (0169, below) the fifty-ninth, the daily outbound mail limit (0170, below) the sixtieth, the security review's fixes in the database (0171, below) the sixty-first, the moderation notice fixes (0172, below) the sixty-second, the check's answer on a report a person already closed (0173, below) the sixty-third, 0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth, the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth, everyone told "until the review ends" hearing how it ended (0176, below) the sixty-sixth, an erased account's owner reference leaving its debates (0177, below) the sixty-seventh, the security fixes of audit run 3 (0178, below) the sixty-eighth, the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, the MFA recovery control user index (0182, below) the seventy-second, a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third, and the staff re-key permit (0184, below) the seventy-fourth, and the reader of the release switches (0185, below) the seventy-fifth, and the preview's approved buyers (0186, below) the seventy-sixth, and the passkeys a sign-in after the first step may use (0187, below) the seventy-seventh, and the recovery permit (0188, below) the seventy-eighth, and a Free debate the publication check kept private (0189, below) the seventy-ninth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first, the team's one limit (0142, below) the thirty-second, the hand-over (0143, below) the thirty-third, the small AI's quota charge (0144, below) the thirty-fourth, the pages waiting after "Add to researched" (0145, below) the thirty-fifth, the Owner's allowances for team members (0146, below) the thirty-sixth, the public tree (0147, below) the thirty-seventh, an erased account keeping its public debates (0148, below) the thirty-eighth, a funded person's public report in the team's month (0149, below) the thirty-ninth, a public debate under review (0150, below) the fortieth, the Report button with the sealed originals' six months (0151, below) the forty-first and a reporter's own reports in their export with what the AI checks on public rows used (0152, below) the forty-second, a finished dig's mark (0153, below) the forty-third, Iceland and Liechtenstein in the Region list (0154, below) the forty-fourth, the owner's two writes on their own answer (0155, below) the forty-fifth, the moderation notice (0156, below) the forty-sixth, the moderation statements (0157, below) the forty-seventh, the small AIs before Start in the person's quota (0158, below) the forty-eighth, the chosen paths sealed per run (0159, below) the forty-ninth, the path results per run (0160, below) the fiftieth, the path progress per run (0161, below) the fifty-first, the saved questions (0162, below) the fifty-second, the carry-on digs without a live sign-in (0163, below) the fifty-third, a dig under the main question updating the main answer (0164, below) the fifty-fourth, a failed question giving back its path-list charge (0165, below) the fifty-fifth, a later main-answer version revising the newest one, whichever table holds it (0166, below) the fifty-sixth, a visitor's report of a public debate carried by a run of their own (0167, below) the fifty-seventh, a debate an update set aside continuing where it stopped (0168, below) the fifty-eighth, the runner reading which settings are switched on (0169, below) the fifty-ninth, the daily outbound mail limit (0170, below) the sixtieth, the security review's fixes in the database (0171, below) the sixty-first, the moderation notice fixes (0172, below) the sixty-second, the check's answer on a report a person already closed (0173, below) the sixty-third, 0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth, the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth, everyone told "until the review ends" hearing how it ended (0176, below) the sixty-sixth, an erased account's owner reference leaving its debates (0177, below) the sixty-seventh, the security fixes of audit run 3 (0178, below) the sixty-eighth, the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, the MFA recovery control user index (0182, below) the seventy-second, a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third, and the staff re-key permit (0184, below) the seventy-fourth, and the reader of the release switches (0185, below) the seventy-fifth, and the preview's approved buyers (0186, below) the seventy-sixth, and the passkeys a sign-in after the first step may use (0187, below) the seventy-seventh, and the recovery permit (0188, below) the seventy-eighth, and a Free debate the publication check kept private (0189, below) the seventy-ninth, and the check deleting a public debate with the Free sweep reading past waiting debates (0190, below) the eightieth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0189: 0189,
-   `free-debate-refused-by-check-forward0189.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's,
-   which 0112 to 0129 keep; 0131 to 0189 keep 0130's),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0190: 0190,
+   `check-deletes-public-debate-forward0190.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's,
+   which 0112 to 0129 keep; 0131 to 0190 keep 0130's),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -1615,3 +1615,88 @@ Until the step is applied anywhere its SQL may still change; after an SQL edit r
 manifest (the one-liner of 0184's section, with this step's manifest). If `origin/dev` takes 0189 first, renumber this
 step (rename every file and constant that carries the number, set `previous` to the step then before it, recompute the
 manifest, re-pin the chain lists).
+
+## The check deletes a public debate, and the Free sweep reads past waiting debates (0190)
+
+The eightieth chain step, after a Free debate the publication check kept private (0189). It closes two gaps.
+
+The first. When a debate finishes, the end-of-debate check reads its conclusion (0126). One verdict deletes the debate with
+no person involved, and the Terms say it is deleted even if it was already published. 0126's
+`core.prepare_synthesis_check_erasures` answered `PUBLISHED` and waited while the debate was public, so its page stayed
+readable and its keys were kept for as long as it was public.
+
+- `core.take_down_check_deleted_debates(integer)` takes such a page down with the rows the owner's own unpublish writes (0039
+  and 0085): the publication's key cleanup intent, a `PRIVATE` visibility event through 0040's one-shot binding (on the
+  account's newest session row, as 0137's `core.publish_free_debate`; nothing authenticates by it), and the
+  `debate.publication.unpublished` audit event. The API's publication key cleanup then destroys the publication's key, and
+  0126's prepare, unchanged, erases the debate on a later pass as a private one. Outcomes: `TAKEN_DOWN`; `CONTENDED` (the
+  debate, one of its pages' trees or a publish in flight is busy); `FAILED` with the SQLSTATE in `failure_code` (anything
+  else went wrong for that request: its rows roll back, and the other requests of the pass still go).
+- Its list holds only the requests it can act on now: the debate is stored encrypted, its first owner is its owner now, that
+  account is `active` and keeps a session row, and no erasure of the debate is under way. So no number of other requests
+  keeps a newer one from it. Those others are 0126's prepare's, which reports each as before (`OWNERSHIP_MOVED`,
+  `LEGACY_PLAINTEXT_RETAINED`, `ERASED`, `PUBLISHED` for an account with no session row).
+- An owner that is not active cannot be given 0040's one-shot binding (`identity.enforce_active_user_child` refuses it), so
+  the takedown never acts for one, and 0126's prepare drops the request (`ACCOUNT_CLOSED`): the page stays. Two such owners
+  can have a public page: one whose closing has prepared (`suspended`; that erasure, 0110, keeps or deletes the account's
+  pages as the owner chose) and one frozen by the age check (`age_frozen`), which nothing ends. Taking such a page down needs
+  another way than the owner's unpublish rows, and is not in this step.
+- Only a final deletion verdict does this: 0126 writes a deletion request only for a final result that asks for one, never for
+  a flag, an unavailable answer or an answer stored too late (the API stores it as unavailable). Any such verdict takes the page
+  down, whichever version of the answer it was about, as 0126 erases a private debate on the same request: a later version of
+  an answer keeps the first one's composed text (packages/serve's answer writer), so a verdict is always about what the page
+  shows.
+- `identity.close_public_page_of_deleted_debate(uuid)` closes one page, and the takedown calls it for every page the debate had
+  (`serve.publication_snapshot`), the one public now and any its owner unpublished before. It ends what was running on the page
+  with 0150's rules for a hide (a dig not settled is settled `UNAVAILABLE` and goes on as its person's own; an allowed dig's
+  climb ends; a report being written ends `FAILED` with `PUBLIC_PAGE_DELETED`) and deletes the page's copies sealed for digs
+  and reports (0147's `identity.public_material`), as 0151's purge does when an original goes. The page's own rows die with
+  the publication's key. No 0157 statement is queued: those come from a review log row or a decision. A digger whose dig was
+  on the page still reads `ON_THE_PAGE` ("This changed the public page."): no contribution state says the page was deleted.
+  EXECUTE is the takedown's owner's alone.
+- Not covered: a debate that is private when the verdict comes but was public before is erased by 0126 alone, as before this
+  step, and the copies sealed for digs on its earlier pages stay.
+- Why a function of its own on the cross-account marker (`debateai_rls_all_accounts`, the API's system login outside any
+  request, as 0171 gave 0137's Free publish) and not a new prepare on the erasure login: the API attests at start that its
+  erasure login can run exactly the functions it knows in identity, core, serve and erasure_reconcile
+  (`assertAccountErasureDatabaseRole`), so one more there would stop the release before from starting.
+- The coordinator (`SynthesisCheckErasureCoordinator`, `packages/db/src/synthesis-check-erasure.ts`) calls the takedown first
+  through `PostgresCheckDeletedPublicPageRepository`, logs `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEN_DOWN]` once per page it
+  takes down, `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_FAILED] <SQLSTATE>` for a request that failed and
+  `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_PENDING]` when the whole call failed, and reports each such debate once, by what the
+  takedown said.
+
+The second. A finished Free debate goes public after two checks (0137, 0189). The API's sweep read the 100 oldest waiting
+Free debates with no way to read past them, and a debate the end-of-debate check flagged waits there for a staff approval, as
+does a deleted one whose erasure cannot finish. `identity.read_free_debates_to_publish_after(integer,timestamptz,uuid)` reads
+0137's list as 0171 left it, after a given (notice time, run id) in that order; both null start from the first. The sweep
+(`sweepFreePublications`, `apps/api/src/public-tree.ts`) keeps where its last pass stopped and starts again from the first
+once a read comes back short, so every waiting debate is read once in each round, and a flagged one approved meanwhile goes
+public on its next turn. A list that leaves out what cannot move now was not possible here: whether the check flagged a
+debate is sealed under the debate's own key, and whether a check is in its own wait is known only to the API. EXECUTE is the
+cross-account marker's, as 0137's list is since 0171.
+
+- `0190_check_deletes_public_debate.sql`, `check-deletes-public-debate-forward0190.json`,
+  `packages/db/src/migration-forward0190.ts` (`loadForward0190`, appended last to `STEPS`, `MIGRATION_FORWARD0190_*`
+  refusals). Each function takes the owner of the older one it stands beside (the takedown 0137's
+  `core.publish_free_debate`'s, the closing 0150's `identity.public_review_apply`'s, the list 0137's
+  `identity.read_free_debates_to_publish`'s), and the step refuses to apply where an owner could not do what its function
+  does (`CHECK_DELETES_PUBLIC_DEBATE_OWNER_UNABLE`). The behaviour on real rows, through the coordinator, the publication key
+  cleanup and the sweep's own code, is in `tests/integration/public-tree-flow.test.ts`.
+
+Its header declares `-- n1: expand` and `-- n1: keeps-verifier`: three new functions the release before never calls, no
+table, no earlier function and no grant of an earlier object changed, the erasure login given nothing, and no billing
+relation or function, so its manifest names 0130's verifier (`verify-effective-capabilities-130.sql`) as both
+`previous.verifierSha256` and its own. One statement carries a `-- n1: reviewed <reason>` line: the `DO` block that gives the
+three functions their owners. It amends no earlier step and has no `replayVerifierSql`: its check is its postcondition digest
+(each function's owner, definer flag, settings, volatility, body and ACL), which every later `migrate()` compares.
+
+The release before keeps calling 0126's prepare and 0137's list, both unchanged. Beside this step it works as before: a public
+debate's deletion waits there, and a debate this step took down is private, so its prepare erases it. The step can stay if the
+site goes back to that release.
+
+Its `previous` is 0189, so its `previous.manifestSha256` is the SHA-256 of `free-debate-refused-by-check-forward0189.json`.
+Until the step is applied anywhere its SQL may still change; after an SQL edit recompute `migration.sha256` in its manifest
+(the one-liner of 0184's section, with this step's manifest). If `origin/dev` takes 0190 first, renumber this step (rename
+every file and constant that carries the number, set `previous` to the step then before it, recompute the manifest, re-pin
+the chain lists).

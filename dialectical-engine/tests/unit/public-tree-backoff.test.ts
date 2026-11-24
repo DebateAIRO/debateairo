@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PublicDebate } from "@debateai/contract";
 import type { PublicationCheckResult, PublicationContentCheck } from "../../apps/api/src/publication-check/check.js";
-import { PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, checksInTurn, sweepFreePublications } from "../../apps/api/src/public-tree.js";
+import { PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, checksInTurn, freeSweepCursor, sweepFreePublications } from "../../apps/api/src/public-tree.js";
 import { crisisWordsOf } from "../../apps/ui/lib/v4/askText.js";
 
 const request = { runId: "11111111-1111-4111-8111-111111111111", snapshot: {} as PublicDebate };
@@ -92,7 +92,8 @@ function sweepsWorld(input: Readonly<{ rows: readonly string[]; failing: (name: 
     await pageList("c", PUBLIC_PAGE_SWEEP_DEFAULTS.giveUpMs);
     await pageList("r", PUBLIC_PAGE_SWEEP_DEFAULTS.reportGiveUpMs);
     await sweepFreePublications({
-      contributions: { readFreeToPublish: async () => listOf("f").map((name) => ({ run_id: name, owner_ref: "o", notice_at: "2026-11-24T08:00:00.000Z" })), refuseFree: async () => "REFUSED" as never },
+      cursor: freeSweepCursor(),
+      contributions: { readFreeToPublishAfter: async () => listOf("f").map((name) => ({ run_id: name, owner_ref: "o", notice_at: "2026-11-24T08:00:00.000Z" })), refuseFree: async () => "REFUSED" as never },
       publishOne: async (row) => {
         const result = await check.check({ runId: row.run_id, snapshot: {} as PublicDebate });
         if (result.outcome !== "ALLOW") return "CHECK_UNAVAILABLE";
@@ -259,7 +260,8 @@ describe("one item whose check always fails holds back no other, in any of the s
     } }, { now: () => clock });
     const turn = checksInTurn(shared, { now: () => clock });
     const pass = () => turn.pass(() => sweepFreePublications({
-      contributions: { readFreeToPublish: async () => input.waiting.map((name) => ({ run_id: name, owner_ref: "o", notice_at: "2026-11-24T08:00:00.000Z" })), refuseFree: async () => "REFUSED" as never },
+      cursor: freeSweepCursor(),
+      contributions: { readFreeToPublishAfter: async () => input.waiting.map((name) => ({ run_id: name, owner_ref: "o", notice_at: "2026-11-24T08:00:00.000Z" })), refuseFree: async () => "REFUSED" as never },
       publishOne: async (row) => {
         const decision = input.stored.has(row.run_id) ? "PROCEED" : await turn.checkBefore(row.run_id, async () => {
           endAsked.push([row.run_id, clock]);
@@ -299,6 +301,41 @@ describe("one item whose check always fails holds back no other, in any of the s
     // publication check's wait: 1, 2 and then 4 minutes. It is never asked in a pass where the other one's check failed.
     expect(world.judged("f-judge-down")).toEqual([15_000, 90_000, 225_000, 480_000]);
     expect(world.endAsked("f-judge-down")).toEqual([15_000, 90_000, 225_000, 480_000]);
+  });
+
+  it("past a list's worth of waiting Free debates, one whose own end-of-debate check keeps failing keeps its own wait while the cursor reads past it, and loses it only once the round ends without it", async () => {
+    let clock = 0;
+    const endAsked: number[] = [];
+    // 150 waiting debates, more than the 100 a read gives: the cursor reads them in two passes a round.
+    const names = Array.from({ length: 150 }, (_, at) => `f-${String(at).padStart(3, "0")}`);
+    let waiting = [...names];
+    const turn = checksInTurn(backedOffContentCheck({ check: async () => ({ outcome: "ALLOW" }) }, { now: () => clock }), { now: () => clock });
+    const cursor = freeSweepCursor();
+    const pass = () => turn.pass(() => sweepFreePublications({
+      cursor,
+      contributions: { readFreeToPublishAfter: async (limit, after) => waiting.filter((name) => after === null || name > after.run_id).slice(0, limit)
+        .map((name) => ({ run_id: name, owner_ref: "o", notice_at: "2026-11-24T08:00:00.000Z" })), refuseFree: async () => "REFUSED" as never },
+      publishOne: async (row) => {
+        // Only the first one has no stored decision, and its own check never answers; the others wait for an approval.
+        if (row.run_id !== "f-000") return "WAITING_FOR_APPROVAL";
+        const decision = await turn.checkBefore(row.run_id, async () => { endAsked.push(clock); return "UNAVAILABLE" as const; }, (answer) => answer === "UNAVAILABLE");
+        return decision ?? "CHECK_UNAVAILABLE";
+      }
+    }), () => cursor.after !== null);
+    // The clock stands still: its own wait of a minute never ends, so it is asked once in ten passes (five rounds).
+    for (let at = 0; at < 10; at += 1) await pass();
+    expect(endAsked).toEqual([0]);
+    // Its wait ends with the clock, and it is asked again on its next turn.
+    clock += 60_000;
+    for (let at = 0; at < 2; at += 1) await pass();
+    expect(endAsked).toEqual([0, 60_000]);
+    // Gone from the list for a whole round (two passes), it is forgotten with its wait: back, it is asked at once.
+    waiting = names.slice(1);
+    for (let at = 0; at < 2; at += 1) await pass();
+    waiting = [...names];
+    expect(cursor.after).toBeNull();
+    await pass();
+    expect(endAsked).toEqual([0, 60_000, 60_000]);
   });
 
   it("a pass waits for at most one end-of-debate check that fails: each may take the whole background time, so the others are asked on the next passes, and a debate whose verdict is stored still goes public at once", async () => {

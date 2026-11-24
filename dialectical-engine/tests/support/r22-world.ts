@@ -64,7 +64,7 @@ import { investigationReportContentOpener } from "../../apps/api/src/investigati
 import { RepositoryAnswerMapViewApplication, runOwnerCheckFrom } from "../../apps/api/src/map-views.js";
 import { continuedRunWake, runHandoverOf } from "../../apps/api/src/month-pause.js";
 import { createProviderDiscoveryResolver, parseDeclaredProviderTargets } from "../../apps/api/src/provider-discovery.js";
-import { sweepFreePublications, sweepPublicPage } from "../../apps/api/src/public-tree.js";
+import { freeSweepCursor, sweepFreePublications, sweepPublicPage } from "../../apps/api/src/public-tree.js";
 import type { PublicationContentCheck, PublicationJudgePort } from "../../apps/api/src/publication-check/check.js";
 import { PostgresPublicationApplication, type FreeEndCheck } from "../../apps/api/src/publications.js";
 import { postgresPurposeLines, readPurposeLinesOf } from "../../apps/api/src/purpose-lines.js";
@@ -484,6 +484,8 @@ export async function startR22World(options: R22WorldOptions = {}) {
   const publicContributions = new PostgresPublicDebateRunnerRepository(apiPool);
   const publicTreeRepository = new PostgresPublicTreeRepository(apiPool);
   const ownerSession = (ownerRef: string) => ({ asker_id: `owner:${ownerRef}`, session_id: "00000000-0000-0000-0000-000000000000", caller_scope: "ASKER", ownership_provenance: "server_session", provisional_identity_model: false }) as never;
+  // One per world, as main.ts keeps one per process.
+  const freeCursor = freeSweepCursor();
   async function serverTimers(): Promise<void> {
     await sweepPathRewrites(pathRewrite.sweep);
     await sweepTreeUpdates(pathRewrite.treeSweep);
@@ -491,7 +493,7 @@ export async function startR22World(options: R22WorldOptions = {}) {
     await sweepPublicTree({ ...pathRewrite.publicTree, reports: publicReports, staleMs: 0 });
     await sweepPublicPage({ pool: apiPool, page: publicPage, contributions: publicContributions, tree: publicTreeRepository, contentCheck, reportContentCheck: contentCheck,
       withPublicationKey: (ref, use) => publications.withPublicationKey(ref, use) });
-    await sweepFreePublications({ contributions: publicContributions, publishOne: async (waiting) => {
+    await sweepFreePublications({ contributions: publicContributions, cursor: freeCursor, publishOne: async (waiting) => {
       const owner = await publicPage.readFreeOwner(waiting.run_id);
       if (owner === null) return "NOT_WAITING";
       const ownership = { ownerRef: owner.owner_ref, legacyAskerId: null };
