@@ -1783,6 +1783,22 @@ describe("P3-01 production database-principal manifest", () => {
   "roleName": "debateai_runtime",
   "source": "migrations/0186_preview_buyers.sql",
   "grants": ["EXECUTE ON FUNCTION staff.read_audit_page_v2(jsonb,text,integer,timestamptz,uuid)"]
+},
+// 0188: the Owner's permit for a locked-out account. The Owner's list and the one door are the API's billing role's alone, which the
+// runner's login does not hold; the audit page beside 0186's goes where 0142's went. The person's steps go to the email route's role,
+// which this manifest does not list.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0188_recovery_permit.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.read_recovery_permits(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.recovery_permit_act(jsonb,uuid,jsonb,jsonb,jsonb)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0188_recovery_permit.sql",
+  "grants": ["EXECUTE ON FUNCTION staff.read_audit_page_v3(jsonb,text,integer,timestamptz,uuid)"]
 }
 ]);
     expect(manifest.privilegeRevocations).toEqual([
@@ -2280,6 +2296,27 @@ it("discloses exactly 0124's grants to the runtime and the API's billing role (s
   // The pointer reader for the API's role; the two pass readers for the runtime. Nothing else, and no table grant.
   expect(declared).toHaveLength(2);
   expect(declared.some(grant => /\bON register\.settings_/u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0188's grants to the request logins: the Owner's list and door to the API's billing role, the audit page beside 0186's to the runtime", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0188_recovery_permit.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_billing_runtime|debateai_rls_all_accounts";
+  // As for 0186: every GRANT statement naming one of the disclosed roles is one line and names that role alone.
+  const statements = [...sql.matchAll(/^GRANT [^;]+;$/gm)].map(([statement]) => statement.replace(/\s+/gu, " ").trim());
+  expect(statements.filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+    && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = statements.filter(statement => new RegExp(` TO (?:${disclosed});$`, "u").test(statement))
+    .flatMap(statement => { const [, functions, role] = /^GRANT EXECUTE ON FUNCTION (.+) TO ([a-z_]+);$/u.exec(statement)!;
+      return functions!.split(/,(?=[a-z_]+\.)/u).map(name => `GRANT EXECUTE ON FUNCTION ${name} TO ${role};`); }).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0188_recovery_permit.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Three functions, no table grant: the four tables are no login's, and the person's steps go to the email route's role alone.
+  expect(declared).toHaveLength(3);
+  expect(statements.some(statement => /\bON (?:identity|staff)\.recovery_permit\w*\b(?!\()/u.test(statement))).toBe(false);
+  expect(statements.filter(statement => /identity\.recovery_permit_(?:prepare|start|request|finish|cancel|claim_notice|expire)\b/u.test(statement))
+    .every(statement => statement.endsWith(" TO debateai_mfa_recovery_runtime;"))).toBe(true);
 });
 
 it("discloses exactly 0186's grants: the preview buyers' three to the API's billing role, the audit page beside 0150's to the runtime", async () => {

@@ -851,9 +851,10 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains the preview's approved buyers 0186 after 0185 as an expand step that keeps 0130's verifier, and documents it", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
-    // The chain head: one table and five functions, and staff.audit_event's event list widened under one reviewed pair.
-    expect(names.slice(-2)).toEqual(["0185_release_history.sql", "0186_preview_buyers.sql"]);
-    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    // One table and five functions, and staff.audit_event's event list widened under one reviewed pair.
+    const at = names.indexOf("0186_preview_buyers.sql");
+    expect(names.slice(at - 1, at + 1)).toEqual(["0185_release_history.sql", "0186_preview_buyers.sql"]);
+    const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
     expect(JSON.parse((await bytesOf("lineage/preview-buyers-forward0186.json")).toString("utf8"))).toEqual({
       version: "preview-buyers-forward0186-v1",
       baseRecipeSha256: plan.recipeSha256,
@@ -892,6 +893,58 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     ]) expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
       "the reader of the release switches (0185, below) the seventy-fifth, and the preview's approved buyers (0186, below) the seventy-sixth");
+  });
+
+  it("chains the recovery permit 0188 after 0186 as an expand step that keeps 0130's verifier and amends 0186's event list, and documents it", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    // The chain head: four tables and twenty-seven functions, and staff.audit_event's event list widened under one reviewed pair.
+    expect(names.slice(-2)).toEqual(["0186_preview_buyers.sql", "0188_recovery_permit.sql"]);
+    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    const amends = [{ step: "0186_preview_buyers.sql", relations: ["staff.audit_event"], constraints: ["audit_event_funded_event_type_check"], field: "constraint_definition" }];
+    expect(JSON.parse((await bytesOf("lineage/recovery-permit-forward0188.json")).toString("utf8"))).toEqual({
+      version: "recovery-permit-forward0188-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: { name: "0186_preview_buyers.sql", manifestSha256: sha256(await bytesOf("lineage/preview-buyers-forward0186.json")), verifierSha256: previous.verifierSha256 },
+      migration: { name: "0188_recovery_permit.sql", sha256: sha256(await bytesOf("0188_recovery_permit.sql")) },
+      verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) },
+      amendsPostconditionsOf: amends
+    });
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/recovery-permit-forward0188.json")));
+    expect(step.previousName).toBe(previous.name);
+    expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+    expect(step.previousVerifierSha256).toBe(previous.verifierSha256);
+    expect(step.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
+    expect(step.replayVerifierSql).toBeUndefined();
+    // 0186's postcondition digests the event list this step widens, so 0186 is compared against its amendment from then on.
+    expect(step.amendsPostconditionsOf).toEqual(amends);
+    // No billing relation or function, so 0130's verifier stays in force.
+    expect(step.sql.split("\n").filter((line) => !line.startsWith("--")).join("\n")).not.toMatch(/\bbilling\./u);
+    // The loader digests every function and table the SQL creates, and the one earlier constraint it widens.
+    const loader = await readFile(new URL("migration-forward0188.ts", DB_SOURCE), "utf8");
+    const listed = (name: string): string[] => [...loader.slice(loader.indexOf(`const ${name}`), loader.indexOf("];", loader.indexOf(`const ${name}`)))
+      .matchAll(/"([a-z_]+\.[a-z_0-9]+)(?:\([^()]*\))?"/gu)].map((match) => match[1]!);
+    const created = (pattern: RegExp): string[] => [...step.sql.matchAll(pattern)].map((match) => match[1]!);
+    expect(listed("FUNCTIONS").sort()).toEqual(created(/^CREATE OR REPLACE FUNCTION ([a-z_]+\.[a-z_0-9]+)\(/gmu).sort());
+    expect(listed("FUNCTIONS")).toHaveLength(27);
+    expect(listed("TABLES")).toEqual(created(/^CREATE TABLE IF NOT EXISTS ([a-z_]+\.[a-z_0-9]+) \(/gmu));
+    expect(listed("TABLES")).toEqual(["identity.recovery_permit", "identity.recovery_permit_notice_binding", "identity.recovery_permit_notice", "staff.recovery_permit_decision"]);
+    expect(loader).toContain('[["staff.audit_event", "audit_event_funded_event_type_check"]]');
+    // Every earlier event stays allowed: the list is 0186's with this step's two at its end.
+    const eventList = (sql: string): string[] => [...sql.slice(sql.lastIndexOf("ADD CONSTRAINT audit_event_funded_event_type_check")).matchAll(/'([A-Z_]+)'/gu)].map((match) => match[1]!);
+    expect(eventList(step.sql)).toEqual([...eventList(previous.sql), "ACCOUNT_RECOVERY_APPROVED", "ACCOUNT_RECOVERY_REFUSED"]);
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The recovery permit (0188)"));
+    expect(section.startsWith("## The recovery permit (0188)")).toBe(true);
+    for (const needle of ["0186", "0188_recovery_permit.sql", "recovery-permit-forward0188.json", "packages/db/src/migration-forward0188.ts",
+      "MIGRATION_FORWARD0188_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "verify-effective-capabilities-130.sql", "replayVerifierSql",
+      "amendsPostconditionsOf", "previous.manifestSha256", "migration.sha256", "renumber", "0187", "audit_event_funded_event_type_check", "TEAM_GRANT",
+      "debateai_billing_runtime", "debateai_mfa_recovery_runtime", "tests/integration/recovery-permit-0188.test.ts",
+      ...listed("TABLES"), ...listed("FUNCTIONS")
+    ]) expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "the preview's approved buyers (0186, below) the seventy-sixth, and the recovery permit (0188, below) the seventy-seventh");
   });
 
   it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122, 0123, 0124, 0126, 0128 or 0178, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {

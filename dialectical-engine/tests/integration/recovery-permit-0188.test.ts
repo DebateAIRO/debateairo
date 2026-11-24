@@ -156,7 +156,7 @@ beforeAll(async () => {
   runner = await login("permit_runner", "debateai_runtime");
   recover = await login("permit_recover", "debateai_authorization_runtime");
   permits = new PostgresRecoveryPermitRepository(person);
-  staff = new PostgresRecoveryPermitStaffRepository(api);
+  staff = new PostgresRecoveryPermitStaffRepository(api, database.pool);
   owner = await internalFundingFixture(database.pool, api).fundedActor() as unknown as Actor;
 }, 180_000);
 afterAll(async () => { await Promise.all([person?.end(), api?.end(), runner?.end(), recover?.end()]); await database?.stop(); });

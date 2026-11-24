@@ -89,9 +89,23 @@ const count = (value: unknown, least = 0): number => {
 };
 const flag = (value: unknown): boolean => { if (typeof value !== "boolean") throw refusal(); return value; };
 
-/** The Owner's side: the API's request login, which holds the billing role 0188 grants the list and the door to. */
+/**
+ * The Owner's side. `pool`: the API's request login, which holds the billing role 0188 grants the list and the door to.
+ * `accounts`: the API's system login (main.ts, the cross-account site X40), the only one that reads another account's
+ * payments; the routes ask it only for the Owner, after the Owner's authority is checked.
+ */
 export class PostgresRecoveryPermitStaffRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(private readonly pool: Pool, private readonly accounts: Pick<Pool, "query">) {}
+
+  /** Whether any payment of the account ever succeeded: a yes or a no, never an amount or a date. */
+  async everPaid(userId: string): Promise<boolean> {
+    if (!UUID.test(userId)) throw refusal();
+    const value = (await this.accounts.query<{ paid: unknown }>(
+      `SELECT EXISTS(SELECT 1 FROM identity."user" u JOIN billing.charge c ON c.owner_ref=u.owner_ref JOIN billing.charge_event e ON e.charge_id=c.charge_id
+        WHERE u.user_id=$1::uuid AND e.kind='SUCCEEDED') AS paid`, [userId])).rows[0]?.paid;
+    if (typeof value !== "boolean") throw refusal();
+    return value;
+  }
 
   /** The asks that wait, each with the database's facts; the database refuses anyone but the Owner. */
   async readList(context: StaffContext, ordinaryTokenHash: string): Promise<RecoveryPermitList> {

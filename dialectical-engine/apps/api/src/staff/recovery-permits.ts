@@ -29,11 +29,10 @@ export class RecoveryPermitHttpError extends Error {
   constructor(readonly status: number, readonly code: string) { super(code); }
 }
 export interface RecoveryPermitStaffService {
-  repository: Pick<PostgresRecoveryPermitStaffRepository, "readList" | "act">;
+  /** `everPaid`: whether any payment of the account ever succeeded, a yes or a no, never an amount. */
+  repository: Pick<PostgresRecoveryPermitStaffRepository, "readList" | "act" | "everPaid">;
   /** Opens an account's sign-in address on the system login; null when there is none. Used only to show it shortened. */
   readEmail(userId: string): Promise<string | null>;
-  /** Whether the account ever paid: a yes or a no, never an amount. */
-  everPaid(userId: string): Promise<boolean>;
 }
 
 const sha = (bytes: string | Buffer) => createHash("sha256").update(bytes).digest("hex");
@@ -116,7 +115,7 @@ export function registerRecoveryPermitRoutes(route: Route, service: () => Recove
     for (const row of list.requests) {
       let address: string | null = null, everPaid: boolean | null = null;
       try { address = await value.readEmail(row.userId); } catch { address = null; }
-      try { everPaid = await value.everPaid(row.userId); } catch { everPaid = null; }
+      try { everPaid = await value.repository.everPaid(row.userId); } catch { everPaid = null; }
       requests.push({ ref: row.ref, revision: row.revision, stage: row.stage, masked_address: address === null ? null : maskedAddress(address),
         requested_at: row.requestedAt.toISOString(), request_expires_at: row.requestExpiresAt.toISOString(), approved_at: iso(row.approvedAt),
         not_before: iso(row.notBefore), finish_expires_at: iso(row.finishExpiresAt), account_created_at: row.accountCreatedAt.toISOString(),

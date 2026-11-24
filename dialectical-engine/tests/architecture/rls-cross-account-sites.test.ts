@@ -40,7 +40,8 @@ const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freez
   X33: [MAIN],
   X37: [MAIN],
   X38: [MAIN],
-  X39: [MAIN]
+  X39: [MAIN],
+  X40: [MAIN]
 });
 
 /**
@@ -55,11 +56,12 @@ const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freez
  * X31 the question check's, X32 the clarify charge's (its reservation stays the request login's) and X33 the synthesis check's
  * record; and X37 the ask-time discovery's writer of a provider's probe, the marker's alone too (its reader stays the request pool's);
  * and since 0186, X39 the Owner's list of the preview's approved buyers: an account found by its address's blind index, and each
- * listed account's address opened to be shown shortened, one site both use.
+ * listed account's address opened to be shown shortened, one site both use; and since 0188, X40 the Owner's list of asks to get back
+ * into an account: each asking account's address opened to be shown shortened, and whether it ever paid, one site both use.
  * The file-level map alone cannot see a site added under an id already mapped to that file.
  */
 const EXPECTED_SITE_COUNTS: Readonly<Record<string, number>> = Object.freeze({ X10: 1, X11: 3, X14: 4, X18h: 1, X21: 2, X27: 1, X28: 3, X29: 1, X30: 2,
-  X31: 2, X32: 2, X33: 1, X37: 1, X38: 1, X39: 1 });
+  X31: 2, X32: 2, X33: 1, X37: 1, X38: 1, X39: 1, X40: 1 });
 
 /** PLAN S4.3: main.ts's three `setCrossAccountTarget(pool, target)` calls, in this order. */
 const EXPECTED_TARGETS = Object.freeze([
@@ -179,7 +181,7 @@ async function crossAccountSites(): Promise<Sites> {
 }
 
 describe("row-level security S01 C4: the apps/api cross-account sites and the T1 pools' targets", () => {
-  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27, X28, X30, X31, X32, X33, X37, X38 and X39 in main.ts, X21 in preview-budget-estimate.ts, X29 in public-tree.ts and X10 in publications.ts, each id a literal, with 3, 4, 1, 1, 3, 2, 2, 2, 1, 1, 1, 1, 2, 1 and 1 sites", async () => {
+  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27, X28, X30, X31, X32, X33, X37, X38, X39 and X40 in main.ts, X21 in preview-budget-estimate.ts, X29 in public-tree.ts and X10 in publications.ts, each id a literal, with 3, 4, 1, 1, 3, 2, 2, 2, 1, 1, 1, 1, 1, 2, 1 and 1 sites", async () => {
     const { map, counts, unpinnable } = await crossAccountSites();
     expect(unpinnable).toEqual([]);
     expect(map).toEqual(EXPECTED_SITES);
@@ -190,7 +192,8 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
     const main = await parse(MAIN);
     const x27 = callsOf(main, "accountEmailReader").map((call) => call.arguments.map((argument) => argument.getText()));
     // 0186: the second reader is the Owner's list of approved buyers', on its own site X39 (the test below).
-    expect(x27).toEqual([['crossAccountPool(pool, "X27")', "dekStore"], ["previewBuyerAccounts", "dekStore"]]);
+    // 0188: the third is the Owner's list of asks to get back into an account, on its own site X40 (the test below).
+    expect(x27).toEqual([['crossAccountPool(pool, "X27")', "dekStore"], ["previewBuyerAccounts", "dekStore"], ["recoveryPermitAccounts", "dekStore"]]);
     // 2026-11-19: the threat-report reader, its staff variant and its alert loop are gone.
     expect(callsOf(main, "threatReportEmailReader")).toEqual([]);
     const service = callsOf(main, "createPublicationReviewStaffService");
@@ -245,6 +248,20 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
       .map((declaration) => declaration.initializer?.getText() ?? "");
     expect(declared("previewBuyerAccounts")).toEqual(['crossAccountPool(pool, "X39")']);
     expect(newsOf(main, "PostgresPreviewBuyerRepository").map((call) => (call.arguments ?? []).map((argument) => argument.getText()))).toEqual([["pool", "previewBuyerAccounts"]]);
+  });
+
+  /**
+   * 0188: the Owner's list of asks to get back into an account reads other accounts' rows twice, both on the request pool's system target:
+   * each asking account's address, shown shortened, and whether any payment of it ever succeeded. The list itself and the Owner's decisions
+   * stay on the request pool, whose billing role holds 0188's grants; the person's steps stay on it too (the email route's role).
+   */
+  it("S4.3 (0188) X40 is the Owner's recovery list's one account reader, and the list, the door and the person's steps stay on the request pool", async () => {
+    const main = await parse(MAIN);
+    const declared = (name: string): string[] => descendants(main).filter((node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) && node.name.getText() === name)
+      .map((declaration) => declaration.initializer?.getText() ?? "");
+    expect(declared("recoveryPermitAccounts")).toEqual(['crossAccountPool(pool, "X40")']);
+    expect(newsOf(main, "PostgresRecoveryPermitStaffRepository").map((call) => (call.arguments ?? []).map((argument) => argument.getText()))).toEqual([["pool", "recoveryPermitAccounts"]]);
+    expect(newsOf(main, "PostgresRecoveryPermitRepository").map((call) => (call.arguments ?? []).map((argument) => argument.getText()))).toEqual([["pool"]]);
   });
 
   /**

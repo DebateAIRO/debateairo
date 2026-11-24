@@ -10,13 +10,13 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first, the team's one limit (0142, below) the thirty-second, the hand-over (0143, below) the thirty-third, the small AI's quota charge (0144, below) the thirty-fourth, the pages waiting after "Add to researched" (0145, below) the thirty-fifth, the Owner's allowances for team members (0146, below) the thirty-sixth, the public tree (0147, below) the thirty-seventh, an erased account keeping its public debates (0148, below) the thirty-eighth, a funded person's public report in the team's month (0149, below) the thirty-ninth, a public debate under review (0150, below) the fortieth, the Report button with the sealed originals' six months (0151, below) the forty-first and a reporter's own reports in their export with what the AI checks on public rows used (0152, below) the forty-second, a finished dig's mark (0153, below) the forty-third, Iceland and Liechtenstein in the Region list (0154, below) the forty-fourth, the owner's two writes on their own answer (0155, below) the forty-fifth, the moderation notice (0156, below) the forty-sixth, the moderation statements (0157, below) the forty-seventh, the small AIs before Start in the person's quota (0158, below) the forty-eighth, the chosen paths sealed per run (0159, below) the forty-ninth, the path results per run (0160, below) the fiftieth, the path progress per run (0161, below) the fifty-first, the saved questions (0162, below) the fifty-second, the carry-on digs without a live sign-in (0163, below) the fifty-third, a dig under the main question updating the main answer (0164, below) the fifty-fourth, a failed question giving back its path-list charge (0165, below) the fifty-fifth, a later main-answer version revising the newest one, whichever table holds it (0166, below) the fifty-sixth, a visitor's report of a public debate carried by a run of their own (0167, below) the fifty-seventh, a debate an update set aside continuing where it stopped (0168, below) the fifty-eighth, the runner reading which settings are switched on (0169, below) the fifty-ninth, the daily outbound mail limit (0170, below) the sixtieth, the security review's fixes in the database (0171, below) the sixty-first, the moderation notice fixes (0172, below) the sixty-second, the check's answer on a report a person already closed (0173, below) the sixty-third, 0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth, the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth, everyone told "until the review ends" hearing how it ended (0176, below) the sixty-sixth, an erased account's owner reference leaving its debates (0177, below) the sixty-seventh, the security fixes of audit run 3 (0178, below) the sixty-eighth, the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, the MFA recovery control user index (0182, below) the seventy-second, a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third, and the staff re-key permit (0184, below) the seventy-fourth, and the reader of the release switches (0185, below) the seventy-fifth, and the preview's approved buyers (0186, below) the seventy-sixth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first, the team's one limit (0142, below) the thirty-second, the hand-over (0143, below) the thirty-third, the small AI's quota charge (0144, below) the thirty-fourth, the pages waiting after "Add to researched" (0145, below) the thirty-fifth, the Owner's allowances for team members (0146, below) the thirty-sixth, the public tree (0147, below) the thirty-seventh, an erased account keeping its public debates (0148, below) the thirty-eighth, a funded person's public report in the team's month (0149, below) the thirty-ninth, a public debate under review (0150, below) the fortieth, the Report button with the sealed originals' six months (0151, below) the forty-first and a reporter's own reports in their export with what the AI checks on public rows used (0152, below) the forty-second, a finished dig's mark (0153, below) the forty-third, Iceland and Liechtenstein in the Region list (0154, below) the forty-fourth, the owner's two writes on their own answer (0155, below) the forty-fifth, the moderation notice (0156, below) the forty-sixth, the moderation statements (0157, below) the forty-seventh, the small AIs before Start in the person's quota (0158, below) the forty-eighth, the chosen paths sealed per run (0159, below) the forty-ninth, the path results per run (0160, below) the fiftieth, the path progress per run (0161, below) the fifty-first, the saved questions (0162, below) the fifty-second, the carry-on digs without a live sign-in (0163, below) the fifty-third, a dig under the main question updating the main answer (0164, below) the fifty-fourth, a failed question giving back its path-list charge (0165, below) the fifty-fifth, a later main-answer version revising the newest one, whichever table holds it (0166, below) the fifty-sixth, a visitor's report of a public debate carried by a run of their own (0167, below) the fifty-seventh, a debate an update set aside continuing where it stopped (0168, below) the fifty-eighth, the runner reading which settings are switched on (0169, below) the fifty-ninth, the daily outbound mail limit (0170, below) the sixtieth, the security review's fixes in the database (0171, below) the sixty-first, the moderation notice fixes (0172, below) the sixty-second, the check's answer on a report a person already closed (0173, below) the sixty-third, 0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth, the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth, everyone told "until the review ends" hearing how it ended (0176, below) the sixty-sixth, an erased account's owner reference leaving its debates (0177, below) the sixty-seventh, the security fixes of audit run 3 (0178, below) the sixty-eighth, the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, the MFA recovery control user index (0182, below) the seventy-second, a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third, and the staff re-key permit (0184, below) the seventy-fourth, and the reader of the release switches (0185, below) the seventy-fifth, and the preview's approved buyers (0186, below) the seventy-sixth, and the recovery permit (0188, below) the seventy-seventh. A step is added with new files only; NNNN is its number, a number above the step before's (the next one, unless another branch already holds it, as 0187 was held when 0188 was written):
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0186: 0186,
-   `preview-buyers-forward0186.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
-   0112 to 0129 keep; 0131 to 0186 keep 0130's),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0188: 0188,
+   `recovery-permit-forward0188.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
+   0112 to 0129 keep; 0131 to 0188 keep 0130's),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -1428,3 +1428,99 @@ step is applied anywhere its SQL may still change; after an SQL edit recompute `
 one-liner of 0184's section, with this step's manifest). If `origin/dev` takes 0186 first, renumber this step (rename
 every file and constant that carries the number, set `previous` to the step then before it, recompute the manifest,
 re-pin the chain lists).
+
+## The recovery permit (0188)
+
+The seventy-seventh chain step, after the preview's approved buyers (0186): the Owner's permit for a locked-out account.
+An account whose passkey or authenticator app is lost and that has no saved recovery code had no way back in: `/recover`
+(0100) asks for a saved code, and the email route for a lost authenticator app (0106, 0112) replaces only an authenticator
+app. With this step the person proves the account's mailbox (a link emailed to its own sign-in address) and its password,
+the Owner approves on the Team page with a fresh touch of the staff key, the account waits 72 hours while every verified
+address is told and may cancel, and a finish link with the password opens the enrol-only step `/recover` already has
+(`identity.consumer_recovery_gate`): one new passkey or authenticator app, the old ones revoked, every session signed out.
+
+- `identity.recovery_permit`: one row per ask. Its stage (`LINK_SENT`, `REQUESTED`, `WAITING`, `OPENED`, then `USED`,
+  `REFUSED`, `CANCELLED` or `EXPIRED`), a revision that rises with every change of stage, the digests of the mailbox,
+  cancel and finish links, the account as it was when the password was proved, and the times each stage runs to. Its
+  CHECKs hold the wait themselves: a row cannot be approved with less than 72 hours, nor opened before they are over. One
+  ask before the Owner or running per account (`recovery_permit_one_open`).
+- `identity.recovery_permit_notice_binding` and `identity.recovery_permit_notice`: the sealed recipient of each verified
+  address, the sealed cancel link where the address may cancel, the sealed finish link on the proving address, and the
+  mails to send, leased and retried as 0106's are. The API seals them when the person proves the password; the Owner's
+  approval only switches them on.
+- `staff.recovery_permit_decision`: one append-only row per decision of the Owner (`APPROVED` or `REFUSED`), with the
+  operation, the digest of its request and whether an alert went with it. UPDATE and TRUNCATE are refused; a row leaves
+  only with its account.
+- The person's steps, owned by `debateai_mfa_recovery_owner` and EXECUTE for `debateai_mfa_recovery_runtime` alone (the
+  login the email route already uses): `identity.recovery_permit_prepare` and `identity.recovery_permit_start` (the same
+  answer for every address; at most three mailbox links an hour), `identity.recovery_permit_prepare_request` and
+  `identity.recovery_permit_request` (the link and the password; only then is the ask one the Owner sees),
+  `identity.recovery_permit_record_failure` (five wrong passwords end the ask and, at the mailbox link, give the account
+  the `RECOVERY_PROOF_FAILED` mark 0106's rule reads), `identity.recovery_permit_cancel` (the one-click link),
+  `identity.recovery_permit_prepare_finish` and `identity.recovery_permit_finish` (`TOO_EARLY` before the 72 hours whoever
+  calls; the link opens the enrol-only step at most three times until one new sign-in method is set up),
+  `identity.recovery_permit_claim_notice`, `identity.recovery_permit_finish_notice` and `identity.recovery_permit_expire`
+  (the mail worker's and the sweeper's).
+- What they share, callable by no login: `identity.recovery_permit_current` (the ask as it stands now; it ends the row
+  itself when a time ran out, the account may no longer have a permit, the account is not what it was, or anybody signed
+  in since), `identity.recovery_permit_close`, `identity.recovery_permit_notice_event`,
+  `identity.recovery_permit_account_ok`, `identity.recovery_permit_startable`, `identity.recovery_permit_adverse` (0106's
+  rule, word for word) and `identity.recovery_permit_channels`.
+- Three functions over `/recover`'s own tables, owned by those tables' owner (the owner of 0079's
+  `identity.read_email_settings`, set in a `-- n1: reviewed` `DO` block as 0100 sets its own) and EXECUTE for
+  `debateai_mfa_recovery_owner` alone: `identity.recovery_permit_facts_internal` (the sign-in methods in force, unused
+  saved codes, the enrol-only step's counter, the last change of the sign-in address, staff or former staff, erasure),
+  `identity.recovery_permit_open_gate_internal` (what 0112's proof of a saved code does once the code is accepted,
+  without a code) and `identity.recovery_permit_shut_gate_internal` (an opened step shut again when the permit ends
+  before a new sign-in method is set up).
+- The two internal doors the staff owner reaches, EXECUTE for `debateai_staff_security_owner` alone:
+  `identity.recovery_permit_queue_internal` (the asks that wait, each with facts the database knows and nothing the
+  person typed) and `identity.recovery_permit_decide_internal`.
+- The Owner's side, owned by `debateai_staff_security_owner` and EXECUTE for `debateai_billing_runtime` alone, which only
+  the API's logins hold: `staff.read_recovery_permits(jsonb,text)` (behind `staff.require_http_authority` with
+  `TEAM_GRANT` and the active owner designation) and `staff.recovery_permit_act(jsonb,uuid,jsonb,jsonb,jsonb)`, the one
+  door. Under both accounts' security-subject locks and one advisory lock it asks the Owner's `TEAM_GRANT` and the owner
+  designation, refuses an approval without the independent alert (`STAFF_ALERT_UNAVAILABLE`), checks the proof's binding
+  (the action `TEAM_GRANT`, the account, the revision, the operation, and the body digest it computes again through
+  `staff.recovery_permit_body(jsonb)`, which names the decision and the ask), answers a replay of the same operation with
+  its receipt (`STAFF_OPERATION_CONFLICT` for another request under it), refuses a fourth approval in any 24 hours
+  (`RECOVERY_PERMITS_DAILY_CAP`), a stale revision or an ask that is over (`RECOVERY_PERMITS_STALE`) and an account under
+  a security hold or with an adverse mark (`RECOVERY_PERMIT_NOT_ALLOWED`), then uses the proof (0085's
+  `staff.consume_action`), writes its row and, with an alert, 0085's `staff.record_mutation`
+  (`ACCOUNT_RECOVERY_APPROVED` or `ACCOUNT_RECOVERY_REFUSED`, reason `SECURITY_RESPONSE`, the Owner as actor and subject:
+  the audit row names no account). A refusal while the team tools are locked writes its row with `alerted` false and
+  nothing else.
+- `staff.read_audit_page_v3(jsonb,text,integer,timestamptz,uuid)`: 0186's audit page with the two events left out, EXECUTE
+  for `debateai_runtime`. The API's staff repository calls it; the release before keeps calling 0186's, which shows the
+  two events as no event, so its audit list answers 503 while such rows exist (`GET /v1/admin/audit`).
+
+The limits are the database's own and are asked again at every step: never an account that is or was staff
+(`staff.consumer_security_affiliated`), never under a security hold, an erasure or an adverse mark, never without a
+password, never within 30 days of a confirmed change of the sign-in address, one ask before the Owner or finished permit
+in any 90 days, none within 24 hours of a cancelled or refused one. A sign-in, or a change of the password, an address or
+a sign-in method after the ask, ends it (`tests/integration/recovery-permit-0188.test.ts`).
+
+While the step applies, the new tables' references take SHARE ROW EXCLUSIVE on `identity."user"` and on `staff.subject`
+until the step commits, and the widened event list takes ACCESS EXCLUSIVE on `staff.audit_event` for the last statements
+of the step. The step waits for a lock 2 s at a time, five times, and then ends `MIGRATION_LOCK_TIMEOUT`; run it again.
+
+Its files: `0188_recovery_permit.sql`, `recovery-permit-forward0188.json` and
+`packages/db/src/migration-forward0188.ts` (`loadForward0188`, appended last to `STEPS`, `MIGRATION_FORWARD0188_*`
+refusals). Its header declares `-- n1: expand` and `-- n1: keeps-verifier`: four new tables and twenty-seven new functions,
+nothing older altered, dropped, renamed, revoked or replaced but for two `-- n1: reviewed` statements: the `DO` block that
+gives the three functions over `/recover`'s tables their owner, and, last in the step, the pair `ALTER TABLE
+staff.audit_event DROP CONSTRAINT IF EXISTS audit_event_funded_event_type_check` with its `ADD CONSTRAINT ... NOT VALID`,
+0186's event list plus the two of this step, so every event the release before writes stays allowed. It adds no billing
+relation or function, so its manifest names 0130's verifier (`verify-effective-capabilities-130.sql`) as both
+`previous.verifierSha256` and its own. It has no supplemental verifier, so no `replayVerifierSql`: its checks are its
+postcondition digest (each of the four tables whole, each of the twenty-seven functions whole, and the widened
+constraint's definition). 0186's postcondition digests that same constraint, so this step declares it in
+`amendsPostconditionsOf` (`constraint_definition`, loader and manifest alike), and 0186 is compared against its digest
+re-measured after this step from then on.
+
+Its `previous` is 0186, so its `previous.manifestSha256` is the SHA-256 of `preview-buyers-forward0186.json`. The number
+0187 is left for a step another branch holds; if that step merges first it chains before this one, and this step re-points
+`previous` to it (set `previous` to the step then before it, recompute the manifest, re-pin the chain lists). Until the
+step is applied anywhere its SQL may still change; after an SQL edit recompute `migration.sha256` in its manifest (the
+one-liner of 0184's section, with this step's manifest). If `origin/dev` takes 0188 first, renumber this step (rename
+every file and constant that carries the number, recompute the manifest, re-pin the chain lists).

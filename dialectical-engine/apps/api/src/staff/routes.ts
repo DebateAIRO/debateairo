@@ -18,6 +18,7 @@ import { canonicalPublicFlagBinding, isPublicFlagIntent, publicFlagQueueOf, type
 import { canonicalPublicReviewBinding, isPublicReviewIntent, PublicReviewHttpError, registerPublicReviewRoutes, type PublicReviewIntent, type PublicReviewStaffService } from './public-review.js';
 import { canonicalTeamLimitActionBinding, isTeamLimitIntent, registerTeamLimitRoutes, TeamLimitHttpError, type TeamLimitIntent, type TeamLimitStaffService } from './team-limit.js';
 import { isPreviewBuyerIntent, PreviewBuyerHttpError, previewBuyerBinding, registerPreviewBuyerRoutes, type PreviewBuyerIntent, type PreviewBuyerStaffService } from './preview-buyers.js';
+import { isRecoveryPermitIntent, RecoveryPermitHttpError, recoveryPermitBinding, registerRecoveryPermitRoutes, type RecoveryPermitIntent, type RecoveryPermitStaffService } from './recovery-permits.js';
 export const staffAuthorizationPolicyInventory = Object.freeze([
     { route: 'GET /v1/admin/enrollment', auth: 'user', resource: 'staff-self', action: 'enrollment' },
     { route: 'POST /v1/admin/prerequisites/step-up', auth: 'user', resource: 'staff-self', action: 'prerequisite' },
@@ -65,7 +66,11 @@ export const staffAuthorizationPolicyInventory = Object.freeze([
     { route: 'GET /v1/admin/preview-buyers', auth: 'staff', resource: 'staff-team', action: 'preview-buyers-read' },
     { route: 'POST /v1/admin/preview-buyers/find', auth: 'staff', resource: 'staff-team', action: 'preview-buyers-find' },
     { route: 'POST /v1/admin/preview-buyers', auth: 'staff', resource: 'staff-team', action: 'preview-buyers-add' },
-    { route: 'DELETE /v1/admin/preview-buyers/{ref}', auth: 'staff', resource: 'staff-team', action: 'preview-buyers-remove' }
+    { route: 'DELETE /v1/admin/preview-buyers/{ref}', auth: 'staff', resource: 'staff-team', action: 'preview-buyers-remove' },
+    // 0188: the Owner's permit for a locked-out account. The Owner alone (TEAM_GRANT and the owner designation), asked inside each handler before anything is read.
+    { route: 'GET /v1/admin/recovery-permits', auth: 'staff', resource: 'staff-team', action: 'recovery-permits-read' },
+    { route: 'POST /v1/admin/recovery-permits/{ref}/approve', auth: 'staff', resource: 'staff-team', action: 'recovery-permits-approve' },
+    { route: 'POST /v1/admin/recovery-permits/{ref}/refuse', auth: 'staff', resource: 'staff-team', action: 'recovery-permits-refuse' }
 ] as const);
 /** Explicit v2 composition only. No ready flags, command prepare/commit, or private content readers. */
 export interface StaffHttpApplication {
@@ -82,6 +87,8 @@ export interface StaffHttpApplication {
     publicFlags?: PublicFlagStaffService;
     /** 0186: the preview's approved buyers; absent off the preview and with real payments, where the routes answer 404. */
     previewBuyers?: PreviewBuyerStaffService;
+    /** 0188: the asks to get back into an account that wait for the Owner; absent, the routes answer 404. */
+    recoveryPermits?: RecoveryPermitStaffService;
     /** Early lock check before any key ceremony (not the authority: the alert producer and the DB guard
      * still check every mutation). Production passes the runtime's readiness; absent, only those run. */
     readiness?: Readonly<{ readIndependentAlertReadiness(): Promise<'READY' | 'UNAVAILABLE'> }>;
@@ -120,7 +127,7 @@ const ordinary = (base: AuthenticatedSession) => ({ userId: base.userId, ordinar
 const reason = (wire: z.infer<typeof contract.ReasonSchema>): Reason => ({ code: wire.code, ...(wire.ticket_ref === undefined ? {} : { ticketRef: wire.ticket_ref }) });
 const receipt = (value: SecurityReceipt) => ({ operation_id: value.operationId, outcome: value.outcome, recorded_at: value.recordedAt.toISOString() });
 /** Fixed field order + sorted sets make the proof independent of browser object/key ordering. */
-export function canonicalStaffActionBinding(intent: Exclude<contract.StaffActionIntent, PublicationReviewIntent | TeamLimitIntent | PublicReviewIntent | PublicFlagIntent | PreviewBuyerIntent>, auth: StaffAuthentication): ActionBinding {
+export function canonicalStaffActionBinding(intent: Exclude<contract.StaffActionIntent, PublicationReviewIntent | TeamLimitIntent | PublicReviewIntent | PublicFlagIntent | PreviewBuyerIntent | RecoveryPermitIntent>, auth: StaffAuthentication): ActionBinding {
     if (intent.action === 'CREDENTIAL_REGISTER') {
         const body = { action: intent.action, target_id: auth.context.userId, expected_revision: auth.context.grantRevision, operation_id: intent.operation_id };
         return { action: intent.action, targetId: auth.context.userId, expectedRevision: auth.context.grantRevision,
@@ -160,6 +167,8 @@ function capability(intent: contract.FundedStaffActionIntent): StaffCapability |
     if (intent.action === 'PUBLICATION_REVIEW_APPROVE' || intent.action === 'PUBLICATION_REVIEW_REFUSE') return 'PUBLICATION_REVIEW';
     // 0186: both changes of the preview's buyers are the Owner's TEAM_GRANT, the action their proof is made under.
     if (isPreviewBuyerIntent(intent)) return 'TEAM_GRANT';
+    // 0188: both decisions on an ask are the Owner's TEAM_GRANT, the action their proof is made under.
+    if (isRecoveryPermitIntent(intent)) return 'TEAM_GRANT';
     return intent.action === 'CREDENTIAL_REGISTER' ? null : intent.action;
 }
 export function registerStaffRoutes(api: FastifyInstance, application: StaffHttpApplication | undefined, routePolicy: RoutePolicy, transport: StaffRouteTransport): void {
@@ -181,8 +190,8 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         memberState?: TeamAllowanceState;
     }>> {
         const authentication = auth(request), required = capability(intent);
-        // Containment (TEAM_DISABLE = OFFBOARD, EMERGENCY_DISABLE = COMPROMISE, decision 33's hide and 0186's removal of a buyer) stays available while locked.
-        if (intent.action !== 'TEAM_DISABLE' && intent.action !== 'EMERGENCY_DISABLE' && intent.action !== 'PUBLIC_REVIEW_HIDE' && intent.action !== 'PREVIEW_BUYER_REMOVE')
+        // Containment (TEAM_DISABLE = OFFBOARD, EMERGENCY_DISABLE = COMPROMISE, decision 33's hide, 0186's removal of a buyer and 0188's refusal of an ask) stays available while locked.
+        if (intent.action !== 'TEAM_DISABLE' && intent.action !== 'EMERGENCY_DISABLE' && intent.action !== 'PUBLIC_REVIEW_HIDE' && intent.action !== 'PREVIEW_BUYER_REMOVE' && intent.action !== 'RECOVERY_PERMIT_REFUSE')
             await requireUnlocked();
         let binding: ActionBinding;
         let allowanceState: InternalAllowanceCommandState | undefined;
@@ -230,6 +239,12 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
             if (authentication.context.designation !== 'OWNER') refuse();
             if (application!.previewBuyers === undefined) throw new PreviewBuyerHttpError(404, 'NOT_FOUND');
             binding = await previewBuyerBinding(application!.previewBuyers, authentication, intent);
+        } else if (isRecoveryPermitIntent(intent)) {
+            // The Owner first: which accounts asked goes to nobody else.
+            await application!.access.requireCapability(authentication, 'TEAM_GRANT');
+            if (authentication.context.designation !== 'OWNER') refuse();
+            if (application!.recoveryPermits === undefined) throw new RecoveryPermitHttpError(404, 'NOT_FOUND');
+            binding = await recoveryPermitBinding(application!.recoveryPermits, authentication, intent);
         } else binding = canonicalStaffActionBinding(intent, authentication);
         await application!.access.assertCurrent(authentication);
         if (required !== null)
@@ -257,7 +272,7 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
                 catch (error) {
                     if (error instanceof StaffHttpRefusal)
                         return reply.code(error.status).send({ error: error.code });
-                    if (error instanceof TeamLimitHttpError || error instanceof TeamAllowanceHttpError || error instanceof PublicReviewHttpError || error instanceof PreviewBuyerHttpError)
+                    if (error instanceof TeamLimitHttpError || error instanceof TeamAllowanceHttpError || error instanceof PublicReviewHttpError || error instanceof PreviewBuyerHttpError || error instanceof RecoveryPermitHttpError)
                         return reply.code(error.status).send({ error: error.code });
                     if (error instanceof PublicationReviewRefusal) {
                         const status = error.code === 'PUBLICATION_REVIEW_NOT_FOUND' ? 404
@@ -397,6 +412,8 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
     registerTeamLimitRoutes(route, () => application!.teamLimit, () => application!.access, () => application!.intents, auth, actionAuthority);
     registerTeamAllowanceRoutes(route, () => application!.funding, () => application!.access, () => application!.intents, auth, actionAuthority);
     registerPreviewBuyerRoutes(route, () => application!.previewBuyers, () => application!.access, () => application!.intents, auth,
+        async () => { try { await requireUnlocked(); return true; } catch { return false; } }, actionAuthority);
+    registerRecoveryPermitRoutes(route, () => application!.recoveryPermits, () => application!.access, () => application!.intents, auth,
         async () => { try { await requireUnlocked(); return true; } catch { return false; } }, actionAuthority);
     const reviewRef = (request: FastifyRequest): string => {
         const value = (request.params as { reviewRef?: unknown }).reviewRef;
