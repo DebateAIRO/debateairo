@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: PRIVACY POLICY · v1.2 · EFFECTIVE 26 NOVEMBER 2026
+eyebrow: PRIVACY POLICY · v1.2 · EFFECTIVE 25 NOVEMBER 2026
 title: What we store, and why
 lede: Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.
 endMarker: END OF POLICY · GDPR (EU) 2016/679 · v1.2
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 1.2 · Effective 26 November 2026 · Previous versions at dezbatere.ro/privacy/versions · Controller: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 25 November 2026 · Previous versions at dezbatere.ro/privacy/versions · Controller: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** We collect what an account needs and what you type into your debates. What you write to the support assistant goes to its AI model so it can answer you, and we keep none of it. Your questions go to the AI providers listed in our Register, mainly DeepInfra, in the United States. The terms of DeepInfra, Anthropic and Amazon do not allow them to train models on what you write. The web search provider receives only the short search phrases the models write (section 5). Our hosting provider stores your account and your debates in London, in the United Kingdom; section 5 says where else your data goes. On the Free plan debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Deleting your account destroys the keys to your private data in the live service, but it does not delete our backups, and some of them hold those keys (section 7); public debates stay public, and your pseudonym is removed from them. You can reach us at privacy@dezbatere.ro, and people named in a debate can write to us without an account.
 
@@ -268,7 +268,7 @@ To refuse these items, block or delete cookies and site data for this site in yo
 
 When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at dezbatere.ro/privacy/versions. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version.
 
-This policy was last updated on 26 November 2026. Version 1.2 replaced version 1.1: sections 2, 4 and 7 now say that you can ask for help getting back into your account when you have lost your passkey or authenticator app and have no recovery code, what a member of our team sees to decide on the request, and how long we keep it. Section 5 now says that, before a debate goes public, its public text is sent to Claude Haiku 5.5 to be checked, and that the same model checks what is added to a public debate, the reports written on a public debate and the reports made with the Report button. It also makes clear that only the synthesis text is sent for the end-of-debate check, and its list of what the Register states for each provider names the new check and the check of a report. The Register lists the new check for Anthropic. Section 8 now names the four decisions our automatic checks make with no person involved, and what you can do after each. Annex B.4 and Annex B.6 were changed to match. Version 1.1 replaced version 1.0: section 5 now says that DeepInfra runs on its own servers every model a debate is given through it, and the summary and section 4 were changed to match.
+This policy was last updated on 25 November 2026. Version 1.2 replaced version 1.1: sections 2, 4 and 7 now say that you can ask for help getting back into your account when you have lost your passkey or authenticator app and have no recovery code, what a member of our team sees to decide on the request, and how long we keep it. Section 5 now says that, before a debate goes public, its public text is sent to Claude Haiku 5.5 to be checked, and that the same model checks what is added to a public debate, the reports written on a public debate and the reports made with the Report button. It also makes clear that only the synthesis text is sent for the end-of-debate check, and its list of what the Register states for each provider names the new check and the check of a report. The Register lists the new check for Anthropic. Section 8 now names the four decisions our automatic checks make with no person involved, and what you can do after each. Annex B.4 and Annex B.6 were changed to match. Version 1.1 replaced version 1.0: section 5 now says that DeepInfra runs on its own servers every model a debate is given through it, and the summary and section 4 were changed to match.
 
 ## Annex B — Regional privacy terms
 

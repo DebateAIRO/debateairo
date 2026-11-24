@@ -143,16 +143,16 @@ automatic checks make with no person involved.
 
 ## The day
 
-The drafts carry Privacy Policy 1.2 with the working day 26 November 2026, in every language, as 1.1 carried a working
-day before its upload. Version 1.2 cannot take effect on 24 November 2026: 1.1 took effect that day, and
-`legal:redate` refuses a day that is not after the day of the version it replaces. The upload that carries the code and
-this text can therefore be no earlier than 25 November 2026. Terms 1.1 keeps 24 November 2026. Before the upload's
-SB1, on the Mac, with the upload day (the release guide, "The legal texts' day"): `pnpm run legal:redate --date
-YYYY-MM-DD --dry-run`, then the same without `--dry-run`, commit what it writes through a pull request into dev, then
-SB1. It dates the Privacy Policy only and prints "Terms of Service: released, keeps 24 November 2026". On 26 November
-2026 it changes nothing and prints "Privacy Policy: from 26 November 2026 to 26 November 2026; translations recorded
-again: none". On another day it can take, it re-dates the Privacy Policy in all 35 languages, records the 34
-translations again, makes the 35 archive copies of 1.2 again from the re-dated texts and runs the release check.
+Privacy Policy 1.2 takes effect on 25 November 2026, the upload day, in every language. Version 1.2 cannot take effect
+on 24 November 2026: 1.1 took effect that day, and `legal:redate` refuses a day that is not after the day of the
+version it replaces. So the upload that carries the code and this text can be no earlier than 25 November 2026. Terms
+1.1 keeps 24 November 2026. The drafts first carried the working day 26 November 2026, as 1.1 carried a working day
+before its upload. `pnpm run legal:redate --date 2026-11-25`, run with `--dry-run` first (the release guide, "The
+legal texts' day"), set the upload day: it printed "Privacy Policy: from 26 November 2026 to 25 November 2026" and
+"Terms of Service: released, keeps 24 November 2026", re-dated the Privacy Policy in all 35 languages, recorded the 34
+translations again, made the 35 archive copies of 1.2 again from the re-dated texts and passed the release check. Run
+again for 25 November 2026, it changes nothing. If the upload moves to a later day, run it again with that day, commit
+what it writes through a pull request into dev, and only then SB1.
 
 **The release guide's check follows the same rule.** Before this change, the drained upload's PRECHECK read both
 English texts for "Effective <upload day>", so with Terms 1.1 keeping 24 November 2026 it would have stopped every

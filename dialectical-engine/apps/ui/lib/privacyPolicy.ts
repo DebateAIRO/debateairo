@@ -438,7 +438,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at dezbatere.ro/privacy/versions. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version." },
-      { kind: "p", text: "This policy was last updated on 26 November 2026. Version 1.2 replaced version 1.1: sections 2, 4 and 7 now say that you can ask for help getting back into your account when you have lost your passkey or authenticator app and have no recovery code, what a member of our team sees to decide on the request, and how long we keep it. Section 5 now says that, before a debate goes public, its public text is sent to Claude Haiku 5.5 to be checked, and that the same model checks what is added to a public debate, the reports written on a public debate and the reports made with the Report button. It also makes clear that only the synthesis text is sent for the end-of-debate check, and its list of what the Register states for each provider names the new check and the check of a report. The Register lists the new check for Anthropic. Section 8 now names the four decisions our automatic checks make with no person involved, and what you can do after each. Annex B.4 and Annex B.6 were changed to match. Version 1.1 replaced version 1.0: section 5 now says that DeepInfra runs on its own servers every model a debate is given through it, and the summary and section 4 were changed to match." }
+      { kind: "p", text: "This policy was last updated on 25 November 2026. Version 1.2 replaced version 1.1: sections 2, 4 and 7 now say that you can ask for help getting back into your account when you have lost your passkey or authenticator app and have no recovery code, what a member of our team sees to decide on the request, and how long we keep it. Section 5 now says that, before a debate goes public, its public text is sent to Claude Haiku 5.5 to be checked, and that the same model checks what is added to a public debate, the reports written on a public debate and the reports made with the Report button. It also makes clear that only the synthesis text is sent for the end-of-debate check, and its list of what the Register states for each provider names the new check and the check of a report. The Register lists the new check for Anthropic. Section 8 now names the four decisions our automatic checks make with no person involved, and what you can do after each. Annex B.4 and Annex B.6 were changed to match. Version 1.1 replaced version 1.0: section 5 now says that DeepInfra runs on its own servers every model a debate is given through it, and the summary and section 4 were changed to match." }
     ]
   },
   {
@@ -503,8 +503,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.2",
-  sha256: "685439237dd98ae3f8e6d61e897780b7d036ff82f882ca1a3543221fd8b019be",
-  eyebrow: "PRIVACY POLICY · v1.2 · EFFECTIVE 26 NOVEMBER 2026",
+  sha256: "ff1a970f8705e03f43aeb4aeaa3e36a835fb5005a43f4911b2ca7d7ccfcc9f77",
+  eyebrow: "PRIVACY POLICY · v1.2 · EFFECTIVE 25 NOVEMBER 2026",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",
   endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v1.2",

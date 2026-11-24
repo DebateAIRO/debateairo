@@ -64,12 +64,12 @@ the account holder.
   changes were joined, since 1.2's text changed. The 1.0 copies (English, French, Romanian) and the 1.1 copies (all 35
   languages) are unchanged. The 1.2 copies are not released yet, so `legal:redate` removes them and makes them again
   when it re-dates 1.2.
-- **The working day is 26 November 2026**, in every language's Privacy Policy: the eyebrow, the version line and the
-  "last updated" sentence. The effective day is the upload day: `pnpm run legal:redate --date YYYY-MM-DD` (with
-  `--dry-run` first) sets it, regenerates, archives and runs the release check. For 26 November 2026 the dry run changes
-  nothing. For 27 November 2026 it lists the eyebrow, the version line and the "last updated" sentence of all 35
-  Privacy Policies, the 34 translations to record again and the 35 archive copies of 1.2 to make again, and keeps the
-  Terms at 24 November 2026.
+- **The effective day is 25 November 2026, the upload day**, in every language's Privacy Policy: the eyebrow, the
+  version line and the "last updated" sentence. The drafts first carried the working day 26 November 2026.
+  `pnpm run legal:redate --date 2026-11-25` (with `--dry-run` first) set the upload day: it re-dated those three places
+  in all 35 Privacy Policies, recorded the 34 translations again, made the 35 archive copies of 1.2 again, kept the
+  Terms at 24 November 2026 and passed the release check. Run again for 25 November 2026, it changes nothing. If the
+  upload moves to a later day, the same command with that day does the same again.
 - **The re-dating command now handles one document at a time.** `apps/ui/scripts/legal-redate.mjs` used to give both
   documents one day and refused when either current version was released. It now leaves a document whose current
   version was released as it is (the Terms 1.1 keep 24 November 2026) and re-dates the other; it refuses only when
