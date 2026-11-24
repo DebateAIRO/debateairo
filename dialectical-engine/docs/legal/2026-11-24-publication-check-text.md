@@ -157,9 +157,9 @@ upload on the Terms. This same change makes PRECHECK follow the rule `legal:reda
 commit of the release the site runs (`OREV`, read on the server from the release lock and the reference clone) must
 keep the day it has there; any other text must carry the upload day. So on the upload day PRECHECK reads Terms 1.1 as
 kept at 24 November 2026 and Privacy 1.2 as new, and stops only if 1.2 does not carry that day. The guide's section
-"The legal texts' day" now says what the command dates, leaves and refuses, and what else checks the day. It also says
-that the main-site runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`, 1.8 step 3 and 2.1 step 1) still asks for the
-upload day in both texts: that runbook is not part of this change.
+"The legal texts' day" now says what the command dates, leaves and refuses, and what else checks the day. The main-site
+runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`) follows the same rule in both places it checks the day, 1.8 step 3
+and 2.1 step 1, and 2.1 step 1 quotes the two `legal day:` lines PRECHECK prints for this upload.
 
 ## What was left, and why
 

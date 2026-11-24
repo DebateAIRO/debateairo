@@ -1160,9 +1160,17 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(prose).toContain('a `tests/n1-baseline.json` that names no commit');
     expect(prose).toContain('a clone that does not hold the commit `tests/n1-baseline.json` names (fetch it first)');
     expect(prose).toContain('any change while a translation of either document, in a language the release offers, follows an older English text');
-    // The main-site runbook still asks for the upload day in both texts, and the guide says so.
-    expect(prose).toContain('The main-site runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`, 1.8 step 3 and 2.1 step 1) still asks for the upload day in both English texts: it does not follow this rule yet.');
-    expect(read('deploy/preview-auth-dev/v1/MAIN-SITE.md')).toContain('It must print the same line twice, `Effective <the upload day>`');
+    // The main-site runbook follows the same rule in both places it checks the day, and the guide names them.
+    expect(prose).toContain('The main-site runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`) follows the same rule in both places it checks the day: 1.8 step 3, in the preparation, and 2.1 step 1, on the upload day before the downtime.');
+    expect(prose).not.toContain('it does not follow this rule yet');
+    const runbook = read('deploy/preview-auth-dev/v1/MAIN-SITE.md');
+    expect(runbook.replace(/\s+/g, ' ')).not.toContain('It must print the same line twice, `Effective <the upload day>`');
+    expect(sectionOf(runbook, '### 1.8 The preparation: the day before, or earlier on the upload day').replace(/\s+/g, ' '))
+      .toContain('**3. The legal texts, on the Mac.**');
+    expect(sectionOf(runbook, '### 1.8 The preparation: the day before, or earlier on the upload day').replace(/\s+/g, ' '))
+      .toContain('The day follows a rule for each text on its own (the release guide\'s section "The legal texts\' day"');
+    expect(sectionOf(runbook, '### 2.1 Before the downtime (the site is up)').replace(/\s+/g, ' '))
+      .toContain('**1. The texts\' days are still right** (Mac, the upload folder). Run the date line of 1.8, step 3, again. A version the live site already carries must show its live day');
     expect(prose).not.toContain('it is not changed here');
     // What else reads the day: no check on the side-by-side path; PRECHECK on the drained path, by the same rule.
     expect(prose).toContain('`legal:release-check` does not: it passes with any day the command accepts. On the side-by-side path nothing else does either, so this step is the check.');
@@ -1191,10 +1199,14 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(runbook).toContain('The same version must show the same day. A newer version must show the upload day.');
     expect(runbook).toContain('`Legal texts: ready for release.` with each text\'s day right (its live day for a version the site carries, the upload day for a new one: the release guide\'s section "The legal texts\' day")');
     expect(runbook).toContain('**1. The texts\' days are still right** (Mac, the upload folder). Run the date line of 1.8, step 3, again. A version the live site already carries must show its live day (in this upload the Terms 1.1: 24 November 2026), and a new version must show today (in this upload the Privacy Policy 1.2; the release guide\'s section "The legal texts\' day", `deploy/preview-release/v1/README.md`).');
-    // PRECHECK still asks both texts for the upload day, and the runbook says so until that changes.
-    expect(guide).toContain('for T in terms-of-service privacy-policy; do grep -qF "Effective $DAY "');
-    expect(runbook).toContain('PRECHECK (step 14) still asks both texts to take effect today: on an upload day after 24 November its `legal-date` subject stops it while the Terms 1.1 keep their live day, as they do in this upload; the Privacy Policy 1.2 takes the upload day and does not stop it.');
-    expect(runbook).not.toContain('as both do today');
+    // PRECHECK reads each text by its own rule, and the runbook quotes the two lines it prints for this upload.
+    const precheck = scriptOf('PRECHECK').lines;
+    expect(precheck).toContain('for KT in TERMS:terms-of-service PRIVACY:privacy-policy; do');
+    expect(precheck.join('\n')).toContain('echo "legal day: $T ${V:-unread}, in the live release, keeps ${WANT:-unread}"');
+    expect(precheck.join('\n')).toContain('echo "legal day: $T ${V:-unread}, new in this release, takes $DAY"');
+    expect(guide).not.toContain('for T in terms-of-service privacy-policy; do grep -qF "Effective $DAY "');
+    expect(runbook).toContain('PRECHECK (step 14) reads both texts by the same rule. In this upload it prints `legal day: terms-of-service 1.1, in the live release, keeps 24 November 2026` and `legal day: privacy-policy 1.2, new in this release, takes <today>`. Its `legal-date` subject stops it only when a text does not carry that day; a new day then needs a new commit (the release guide\'s section says how).');
+    for (const gone of ['still asks both texts to take effect today', 'Ask before the upload day how that is settled', 'as both do today']) expect(runbook, gone).not.toContain(gone);
     // The versions the runbook names for this upload are the ones in the texts.
     expect(read('apps/ui/legal/en/terms-of-service.md')).toContain('Version 1.1 · Effective 24 November 2026');
     expect(read('apps/ui/legal/en/privacy-policy.md')).toMatch(/Version 1\.2 · Effective /u);

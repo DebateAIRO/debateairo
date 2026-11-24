@@ -5379,8 +5379,8 @@ side-by-side path nothing else does either, so this step is the check. On the dr
 texts of the new release by the same rule, with the live release read on the server: a text whose current version has an
 archive copy in `OREV`'s commit (the live release, from the release lock, read in the reference clone A2 made) must keep
 the day it has in that commit; any other text must carry today (Bucharest). A text that does not stops PRECHECK with
-`legal-date`. The main-site runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`, 1.8 step 3 and 2.1 step 1) still asks
-for the upload day in both English texts: it does not follow this rule yet.
+`legal-date`. The main-site runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`) follows the same rule in both places it
+checks the day: 1.8 step 3, in the preparation, and 2.1 step 1, on the upload day before the downtime.
 
 ### SB1. Names, the archive `$S` and the copies the way back needs
 
