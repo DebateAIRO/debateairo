@@ -72,6 +72,16 @@ const ASK_PATH = /^v1\/asks$/u;
  */
 const PUBLISH_UPSTREAM_TIMEOUT_MS = 145_000;
 const RUN_PUBLISH_PATH = /^v1\/runs\/[^/]+\/publish$/u;
+/**
+ * A sign-in company's return (apps/api/src/index.ts, socialCallback): the API answers 303 to a page of this site,
+ * /social/complete#... or the page a linked account goes back to. Only for this one GET does the proxy leave the
+ * redirect unfollowed and pass its Location on, and only a path on this site. Apple's return is a form post.
+ */
+const SOCIAL_RETURN_PATH = /^v1\/auth\/social\/(?:google|facebook|x)\/callback$/u;
+const SOCIAL_RETURN_LOCATION = /^\/(?![/\\])[\x21-\x7e]{0,4095}$/u;
+function socialReturn(request: Request, path: readonly string[]): boolean {
+  return request.method === "GET" && SOCIAL_RETURN_PATH.test(path.join("/"));
+}
 const SESSION_COOKIE_NAME = "__Host-debateai-session";
 const CSRF_COOKIE_NAME = "__Host-debateai-csrf";
 const STAFF_COOKIE_NAME = "__Host-debateai-staff";
@@ -378,7 +388,9 @@ async function proxyApi(request: Request, context: ProxyContext): Promise<Respon
   const signal = upstreamSignal(request, path);
   let init: RequestInit;
   if (BODYLESS_METHODS.has(request.method)) {
-    init = { method: request.method, headers, cache: "no-store", signal };
+    init = socialReturn(request, path)
+      ? { method: request.method, headers, cache: "no-store", signal, redirect: "manual" }
+      : { method: request.method, headers, cache: "no-store", signal };
   } else {
     const body = await readBoundedBody(request);
     if (body === null) return payloadTooLarge();
@@ -408,12 +420,18 @@ async function proxyApi(request: Request, context: ProxyContext): Promise<Respon
     return Response.json({ error: "UPSTREAM_AUTH_COOKIES_INVALID" }, { status: 502, headers: { "cache-control": "no-store" } });
   }
 
+  const downstream = createDownstreamHeaders(response.headers);
+  if (socialReturn(request, path) && response.status === 303) {
+    const location = response.headers.get("location");
+    if (location !== null && SOCIAL_RETURN_LOCATION.test(location)) downstream.set("location", location);
+  }
+
   return new Response(
     request.method === "HEAD" || BODYLESS_STATUSES.has(response.status) ? null : response.body,
     {
       status: response.status,
       statusText: response.statusText,
-      headers: createDownstreamHeaders(response.headers)
+      headers: downstream
     }
   );
 }
