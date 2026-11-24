@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KEBIJAKAN PRIVASI · v1.1 · BERLAKU 25 NOVEMBER 2026
+eyebrow: KEBIJAKAN PRIVASI · v1.1 · BERLAKU 24 NOVEMBER 2026
 title: Apa yang kami simpan, dan alasannya
 lede: Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.
 endMarker: AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v1.1
@@ -19,7 +19,7 @@ jumps:
 13 KUKI
 -->
 
-**Version 1.1 · Effective 25 November 2026 · Versi sebelumnya di dezbatere.ro/privacy/versions · Pengendali: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.1 · Effective 24 November 2026 · Versi sebelumnya di dezbatere.ro/privacy/versions · Pengendali: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Kami mengumpulkan apa yang diperlukan akun dan apa yang Anda ketik ke dalam debat Anda. Apa yang Anda tulis kepada asisten dukungan dikirim ke model AI-nya agar dapat menjawab Anda, dan kami tidak menyimpan apa pun darinya. Pertanyaan Anda dikirim kepada penyedia AI yang tercantum dalam Daftar kami, terutama DeepInfra, di Amerika Serikat. Ketentuan DeepInfra, Anthropic, dan Perplexity tidak mengizinkan mereka melatih model dengan apa yang Anda tulis; bagian 5 menjelaskan untuk perusahaan mana hal ini belum kami konfirmasi. Penyedia hos kami menyimpan akun dan debat Anda di London, Britania Raya; bagian 5 menjelaskan ke mana lagi data Anda dikirim. Di paket gratis, debat bersifat publik setelah selesai, setelah pemeriksaan AI; di paket berbayar, debat bersifat privat kecuali Anda memublikasikannya. Penghapusan akun memusnahkan kunci data pribadi Anda di server kami, tetapi salinan terenkripsi di penyimpanan cadangan terpisah kami tidak dihapus secara otomatis (bagian 7); debat publik tetap publik, dan nama samaran Anda dihapus darinya. Anda dapat menghubungi kami di privacy@dezbatere.ro, dan orang yang disebut dalam debat dapat menulis kepada kami tanpa memiliki akun.
 

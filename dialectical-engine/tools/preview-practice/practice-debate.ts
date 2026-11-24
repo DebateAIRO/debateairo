@@ -392,7 +392,8 @@ export type PracticeLedgerTry = Readonly<{
 
 /**
  * Where one try belongs: `callKey`, the call it is a try of; `callModel`, that call's AI (its first try's); `recordModel`,
- * the AI the report's two tables name for this try (an accepted try's own writer, a refused try's call); `replyForm`.
+ * the AI the report's two tables name for this try (an accepted try's own writer, a structure-repair try's own writer, the
+ * repair model, accepted or refused; any other refused try's call); `replyForm`.
  */
 export type PracticeJoinedTry = Readonly<{ callKey: string; callModel: string; recordModel: string; replyForm: PracticeReplyForm | null }>;
 
@@ -417,7 +418,8 @@ export function practiceTryJoiner(): (attempt: PracticeLedgerTry, promptForm: ()
     callModels.set(callKey, callModel);
     if (attempt.formatFailed && !repair) lastRefusedCall.set(attempt.callSiteKey, callKey);
     const replyForm = (attempt.recordedForm as PracticeReplyForm | null) ?? (repair ? "STRUCTURE" : await promptForm());
-    return Object.freeze({ callKey, callModel, recordModel: attempt.outcome === "OK" ? attempt.model : callModel, replyForm });
+    // A refused structure repair is the repair model's own copy: its row names that model, never the AI it repaired.
+    return Object.freeze({ callKey, callModel, recordModel: attempt.outcome === "OK" || repair ? attempt.model : callModel, replyForm });
   };
 }
 
@@ -660,8 +662,8 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
         replyForm, latencyMs, replyText: reportableReplyText(content), fixedBySameCall: false
       }));
     }
-    // A refused try is the call's (the original AI's); an accepted one is its writer's own (a structure-repair try: the
-    // repair model's copy, whose own code repairs are counted under that model).
+    // A refused try is the call's (the original AI's); an accepted one is its writer's own, and so is a structure-repair
+    // try, accepted or refused (the repair model's copy, whose own code repairs and refusals are counted under that model).
     records.push(Object.freeze({ callKey, model: recordModel, callSiteKey: entry.call_site_key, outcome: entry.outcome,
       parseStatus: artifact === undefined ? null : parseStatus, replyForm, repairs: artifact?.reply_repairs ?? null,
       failureClass: artifact?.reply_failure_class ?? null, issue: refused?.issue ?? null, ...(refused === null ? {} : { issues: refused.issues }),

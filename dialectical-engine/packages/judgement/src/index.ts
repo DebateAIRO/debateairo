@@ -938,6 +938,17 @@ export class JudgeContentRefusedError extends TypedDomainError {
   }
 }
 
+/**
+ * A review's reply refused after the gateway's whole repair chain (code salvage, the structure-repair call, the follow-up
+ * its allowance leaves). To every reader it is today's NODE_REVIEW_SCHEMA_FAILURE, with the same message; it also carries
+ * the gateway's refusal, so the runner can offer the point to another reviewer instead of ending the debate.
+ */
+export class NodeReviewContentRefusedError extends TypedDomainError {
+  constructor(readonly refusal: ProviderContentUnacceptedError) {
+    super("NODE_REVIEW_SCHEMA_FAILURE", refusal.lastParseError);
+  }
+}
+
 export class Judge {
   constructor(private readonly provider: ProviderGateway) {}
 
@@ -1101,9 +1112,7 @@ export class Judge {
         classifyContent: reading.classifyContent
       });
     } catch (error) {
-      if (error instanceof ProviderContentUnacceptedError) {
-        throw new TypedDomainError("NODE_REVIEW_SCHEMA_FAILURE", error.lastParseError);
-      }
+      if (error instanceof ProviderContentUnacceptedError) throw new NodeReviewContentRefusedError(error);
       throw error;
     }
     const parsed = parseStructuredArtifact(response.content, schema, reading.acceptedAs(response.content).reply, REVIEW_ARTIFACT_READING);
