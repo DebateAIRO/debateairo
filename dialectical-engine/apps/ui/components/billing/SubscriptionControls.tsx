@@ -65,7 +65,10 @@ const UPGRADE_REFUSALS: Readonly<Record<string, FailureWords>> = Object.freeze({
   // The stored billing address is in a region the Terms exclude (Tennessee, Mississippi): the quote refuses before any money moves.
   REGION_TERMS_EXCLUDED: Object.freeze({ key: "billing.checkout.regionTermsExcluded", reload: false }),
   // The preview's buyer rule (403): only invited accounts may buy for now; the upgrade wrote nothing, the order page's sentence.
-  PREVIEW_TEAM_ONLY: Object.freeze({ key: "billing.checkout.invitedBuyersOnly", reload: false })
+  PREVIEW_TEAM_ONLY: Object.freeze({ key: "billing.checkout.invitedBuyersOnly", reload: false }),
+  // The preview's buyer rule could not read the Owner's list of approved buyers (503): it refused before any charge or
+  // payment page, so nothing is being confirmed; the order page's plain "try again", and the card is not read again.
+  PREVIEW_BUYERS_UNAVAILABLE: Object.freeze({ key: "billing.checkout.genericError", reload: false })
 });
 
 /** A request that may have reached the payment side: a network failure, a 5xx, or anything that is not an answer. */

@@ -621,6 +621,7 @@ apps/ui/components/OwnerPossessionPanel.tsx
 apps/ui/components/PasswordResetFlow.tsx
 apps/ui/components/PhoneProfileCard.tsx
 apps/ui/components/PositionTitle.tsx
+apps/ui/components/PreviewBuyersPanel.tsx
 apps/ui/components/PublicAnswerDisclosure.tsx
 apps/ui/components/PublicDebateOverview.tsx
 apps/ui/components/PublicHonestyDrawer.tsx
@@ -948,6 +949,7 @@ apps/ui/lib/observability/logger.ts
 apps/ui/lib/observability/suspiciousScoring.ts
 apps/ui/lib/phoneCompletionDraft.ts
 apps/ui/lib/previewAskProxyCeiling.ts
+apps/ui/lib/previewBuyersApi.ts
 apps/ui/lib/previewPlanRoster.test.mjs
 apps/ui/lib/previewPlanRoster.ts
 apps/ui/lib/privacyPolicy.ts

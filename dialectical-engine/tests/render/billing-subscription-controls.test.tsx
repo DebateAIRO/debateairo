@@ -664,6 +664,27 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(goToPayment).not.toHaveBeenCalled();
   });
 
+  // The preview's buyer rule could not read the Owner's list of approved buyers (503 PREVIEW_BUYERS_UNAVAILABLE): it refused
+  // before any charge or payment page, so the page says "try again", never "still confirming", and reads nothing again.
+  it("an upgrade refused because the list of approved buyers could not be read says try again, never still confirming", async () => {
+    client.quoteSubscriptionUpgrade.mockResolvedValue({
+      quote_ref: "44444444-4444-4444-8444-444444444444", plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", currency: "USD", tax_name: "TVA",
+      tax_rate_basis_points: 2100, tax_country: "RO", recurring_total: "60.50",
+      renews_on: "2026-10-29T10:00:00.000Z", expires_at: "2026-10-03T12:30:00.000Z"
+    });
+    client.upgradeSubscription.mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", 503, "x", "PREVIEW_BUYERS_UNAVAILABLE"));
+    await render();
+    await click("Change plan");
+    await click("Upgrade to Pro");
+    const readsBefore = client.getBillingSubscription.mock.calls.length;
+    await upgradeAndPay();
+    expect(client.upgradeSubscription).toHaveBeenCalledTimes(1);
+    expect(text()).toContain("Something went wrong. Please try again.");
+    expect(text()).not.toContain("We're still confirming this with the payment provider.");
+    expect(client.getBillingSubscription.mock.calls.length).toBe(readsBefore);
+    expect(goToPayment).not.toHaveBeenCalled();
+  });
+
   it("asks for the updated Terms first when D6b's routes answer LEGAL_REACCEPTANCE_REQUIRED, never 'try again'", async () => {
     const reaccept = "Please accept the updated Terms first, then come back to this page.";
     const refusal = () => new ContractHttpError("FORBIDDEN", 403, "x", "LEGAL_REACCEPTANCE_REQUIRED");
