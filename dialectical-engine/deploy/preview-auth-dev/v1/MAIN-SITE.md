@@ -2085,20 +2085,33 @@ payments are real (part 7). The site password keeps it small: only people who kn
     each round of the list (one try for each 100 that wait), so a newer one is never held back by them. A flagged one
     a staff member approved goes public on its next turn, with nobody pressing anything. AICHECK's `Free debates` line (6b.1) counts them among the
     waiting: if that count keeps rising while none went public in the last day, ask.
-  - A debate that is already public when this check asks for its deletion is deleted too, its public page first. This
-    can happen to a debate published before the check existed, or to a later version of its answer. On the API's next
-    erasure pass (every 30 seconds) its page and its place in the list go, and the API's log says
-    `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEN_DOWN]` once. A dig still running on it is kept private and stays its person's,
-    and a report being written on it stops. The next pass of the publication key cleanup (also every 30 seconds)
-    destroys the key of its public page, and the pass after that deletes the debate as any other. Its owner sees "We
-    deleted this debate". Other people's digs and reports leave the page with it; their own digs stay theirs, and
-    nobody but the owner is told. Nothing is asked of you.
-  - The one case it waits: the check's answer is for an older version of the debate's answer, whose conclusion is
-    not the one the page shows. Then the page stays readable, its owner is treated as if it were deleted (it leaves
-    their list, their Publish answers that it is gone, and they see "We deleted this debate"), and the API's log
-    repeats `[SYNTHESIS_CHECK_ERASURE_WAITING] NOT_SHOWN` every 30 seconds. If you see that line, ask. Hide now can
-    take the page down only while the staff screens are on (STAFFCHECK says `staff tools are on`, and after the rename
-    only once 5.7 is done).
+  - A debate that is already public when this check asks for its deletion is deleted too, its public page first, when
+    its owner's account is active. This can happen to a debate that went public before the check existed. On the
+    API's next erasure pass (every 30 seconds) its page and its line in the public list go, and the API's log says
+    `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEN_DOWN]` once. The next pass of the publication key cleanup (also every 30
+    seconds) destroys the key of its public page, and the pass after that deletes the debate as any other. Its owner
+    sees "We deleted this debate". Nothing is asked of you.
+  - What other people put on that page goes with it. A dig still running on it is kept private and stays its
+    person's, and a report being written on it stops. The copies of the page made for digs and reports are deleted,
+    also those of an earlier page of the same debate. Each person's own digs stay theirs. Nobody but the owner is
+    told. A person whose dig had changed the page still reads "This changed the public page." on their dig, with a
+    link to a page that is gone: the site has no line yet that says the page was deleted.
+  - When it is not deleted, or waits:
+    - The owner's account is being closed (its deletion has started), or was frozen by the age check. Then the debate
+      is not deleted and its page stays public, and no log line says so. A closing account's own deletion takes the
+      page down only if the owner chose to delete their public debates too. If you learn of such a debate, ask. Hide
+      now can take the page down only while the staff screens are on (STAFFCHECK says `staff tools are on`, and after
+      the rename only once 5.7 is done).
+    - Someone is digging or reporting on the page at that moment, or a publish of it is still running. It is tried
+      again on the next pass, with no log line.
+    - The API's log repeats a line every 30 seconds: `[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED` (the owner's
+      account keeps no sign-in at all, so the page cannot be taken down),
+      `[SYNTHESIS_CHECK_ERASURE_WAITING] OWNERSHIP_MOVED` (the debate changed owner) or
+      `[SYNTHESIS_CHECK_ERASURE_WAITING] LEGACY_PLAINTEXT_RETAINED` (the debate is stored unencrypted). Ask.
+    - The API's log says `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_FAILED]` with a five-character code: one debate
+      could not be taken down, and the others still were. `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_PENDING]`: no
+      debate could be taken down on that pass. Both are tried again every 30 seconds. If one repeats, ask, and give
+      the code.
 - **Staff mails.** You still get the mails that say a report waits, or that a debate was hidden
   by itself. You cannot open them in the app until the staff screens come back. That is expected. (The threat report
   screen and its mail are gone since this upload: 1.6.)
@@ -3890,7 +3903,7 @@ Read the lines before the last one:
   in the form asked for; `MONEY_REFUSED`, the site's own day was used up; `NOT_CONFIGURED`, the check is off. Any other
   cause: ask. `deleted` counts the debates the check deleted for touching "tendencies to suicide or harming other
   people". It also counts a debate that was already public when the check asked for its deletion: its page comes
-  down and it is deleted too (5.1b).
+  down and it is deleted too, when its owner's account is active (5.1b).
 
 ### 6b.2 The steps, in order
 

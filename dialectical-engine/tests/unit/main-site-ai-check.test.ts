@@ -215,6 +215,9 @@ describe('the runbook says what really happens to a Free debate and a report, an
     expect(flat).not.toContain('unless too many older Free debates wait ahead of it');
     expect(flat).not.toContain('unless 100 older Free debates wait ahead of it');
     expect(flat).not.toContain('however long after it finished');
+    // A debate's own wait is kept while the cursor reads past it (checksInTurn's round), so its own failing check is tried less and less often.
+    expect(flat).toContain('A debate whose own check keeps failing is tried again less and less often.');
+    expect(read('apps/api/src/main.ts')).toContain('}, () => freePublicationCursor.after !== null), () => console.error("[PUBLIC_PAGE_WORK_PENDING]"));');
   });
 
   it('says the checks take the gate\'s slots from the debates\' calls and the question check, as many as the code sends at once', () => {
@@ -293,15 +296,24 @@ describe('the runbook says what the end-of-debate check does by itself on this s
     expect(byItself).toContain('However many of them wait, every waiting debate is looked at once in each round of the list (one try for each 100 that wait), so a newer one is never held back by them. A flagged one a staff member approved goes public on its next turn, with nobody pressing anything.');
     expect(byItself).not.toContain('cannot look past them');
     expect(byItself).toContain('if that count keeps rising while none went public in the last day, ask.');
-    expect(byItself).toContain('If you see that line, ask. Hide now can take the page down only while the staff screens are on (STAFFCHECK says `staff tools are on`, and after the rename only once 5.7 is done).');
+    expect(byItself).toContain('If you learn of such a debate, ask. Hide now can take the page down only while the staff screens are on (STAFFCHECK says `staff tools are on`, and after the rename only once 5.7 is done).');
     expect(byItself).not.toContain('Hide now takes the page down; ask before anything else.');
-    expect(byItself).toContain('A debate that is already public when this check asks for its deletion is deleted too, its public page first.');
-    expect(byItself).not.toContain('is not deleted');
-    expect(byItself).toContain('On the API\'s next erasure pass (every 30 seconds) its page and its place in the list go, and the API\'s log says `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEN_DOWN]` once.');
-    expect(byItself).toContain('Other people\'s digs and reports leave the page with it; their own digs stay theirs, and nobody but the owner is told. Nothing is asked of you.');
-    expect(byItself).toContain('The one case it waits: the check\'s answer is for an older version of the debate\'s answer, whose conclusion is not the one the page shows.');
-    expect(byItself).toContain('its owner is treated as if it were deleted (it leaves their list, their Publish answers that it is gone, and they see "We deleted this debate"), and the API\'s log repeats `[SYNTHESIS_CHECK_ERASURE_WAITING] NOT_SHOWN` every 30 seconds.');
-    expect(byItself).not.toContain('`[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED`');
+    // A public debate the check deletes comes down when its owner is active (0190); the cases it does not, or waits, are named with their lines.
+    expect(byItself).toContain('A debate that is already public when this check asks for its deletion is deleted too, its public page first, when its owner\'s account is active.');
+    expect(byItself).not.toContain('or to a later version of its answer');
+    expect(byItself).toContain('On the API\'s next erasure pass (every 30 seconds) its page and its line in the public list go, and the API\'s log says `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEN_DOWN]` once.');
+    expect(byItself).toContain('The copies of the page made for digs and reports are deleted, also those of an earlier page of the same debate. Each person\'s own digs stay theirs. Nobody but the owner is told.');
+    expect(byItself).toContain('A person whose dig had changed the page still reads "This changed the public page." on their dig, with a link to a page that is gone: the site has no line yet that says the page was deleted.');
+    expect(byItself).toContain('The owner\'s account is being closed (its deletion has started), or was frozen by the age check. Then the debate is not deleted and its page stays public, and no log line says so.');
+    expect(byItself).toContain('`[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED` (the owner\'s account keeps no sign-in at all, so the page cannot be taken down)');
+    expect(byItself).toContain('`[SYNTHESIS_CHECK_ERASURE_WAITING] OWNERSHIP_MOVED` (the debate changed owner) or `[SYNTHESIS_CHECK_ERASURE_WAITING] LEGACY_PLAINTEXT_RETAINED` (the debate is stored unencrypted). Ask.');
+    expect(byItself).toContain('The API\'s log says `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_FAILED]` with a five-character code: one debate could not be taken down, and the others still were. `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_PENDING]`: no debate could be taken down on that pass.');
+    expect(byItself).not.toContain('NOT_SHOWN');
+    expect(byItself).not.toContain('The one case it waits');
+    // The owner's binding needs an active account (0040's enforce_active_user_child), so the takedown acts only for one, and 0126's
+    // prepare drops the deletion of any other before it reads whether the debate is public.
+    expect(read('migrations/0040_account_erasure.sql')).toContain("'identity.publication_event_binding','identity.run_execution_binding',");
+    expect(read('migrations/0126_synthesis_check.sql')).toContain("WHERE account.owner_ref=v_first_owner AND account.state='active' FOR KEY SHARE NOWAIT;\n      IF NOT FOUND THEN\n        DELETE FROM serve.synthesis_check_removal_request");
     // The sweep asks the owner's Publish gate first, waits on a flag without refusing, and publishes only an answer still shown.
     const publications = read('apps/api/src/publications.ts');
     expect(publications).toContain('if (decision === "APPROVAL_REQUIRED") return "WAITING_FOR_APPROVAL";');
@@ -343,7 +355,7 @@ describe('the runbook says what the end-of-debate check does by itself on this s
 
   it('6b: decision 1, the AICHECK reading and the test of 6b.2 step 4 say that a Free debate waits for the end-of-debate check', () => {
     expect(decision).toContain('- On (AICHECK ends with `AICHECK_DONE`): a stranger\'s finished Free debate goes public by itself when the end-of-debate check and then the AI check for publication allow it, and anyone with its link can read it. One the end-of-debate check flagged stays private until a staff approval (5.1b).');
-    expect(flat).toContain('It also counts a debate that was already public when the check asked for its deletion: its page comes down and it is deleted too (5.1b).');
+    expect(flat).toContain('It also counts a debate that was already public when the check asked for its deletion: its page comes down and it is deleted too, when its owner\'s account is active (5.1b).');
     expect(flat).toContain('the end-of-debate check answers first (at most two minutes after the debate finished), then the AI check for publication.');
     expect(flat).toContain('If it does not show and AICHECK has no `UNAVAILABLE` lines, the end-of-debate check may have flagged it: that account sees the flag only on `/debate/<id>` (5.1b). Ask.');
   });
