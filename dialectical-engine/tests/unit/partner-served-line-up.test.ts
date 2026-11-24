@@ -2,8 +2,8 @@
  * A model DeepInfra forwards to a partner company it does not name (its "Partner" tag) is never seated by a new settings
  * version, and the Provider Register, the Privacy Policy and the Terms name no such partner. This file pins both halves
  * and the tie between them:
- *  1. the mark: the set of partner-served models is pinned (Qwen3.8-Flash alone); its row, prices and maker stay, so
- *     debates already recorded with it read and price as before;
+ *  1. the mark: the set of partner-served models is pinned (Qwen3.8-Flash alone); its row and maker stay, so debates
+ *     already recorded with it keep their model row and read and show as before;
  *  2. the Register has no partner entry, and its DeepInfra row lists exactly the DeepInfra models a new version may seat;
  *  3. sealing refuses: the line-up row builder, the publish kit's carried line-up row and its answer seats;
  *  4. reading does not: a sealed version that seats Qwen still parses and composes, so a debate admitted on it finishes;
@@ -59,7 +59,7 @@ describe("the partner-served mark on the preview rows", () => {
     expect(previewModelSeatable(undefined)).toBe(false);
   });
 
-  it("keeps Qwen's row, prices, maker and ref, so debates recorded with it still read, show and price as before", () => {
+  it("keeps Qwen's row, maker and ref, so debates recorded with it keep their model row and read and show as before", () => {
     expect(previewModelRow(QWEN)).toMatchObject({ provider: "deepinfra", maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
       efforts: ["default", "low", "medium", "none"], sampling: { temperature: 0.6, top_p: 0.95, top_k: 20 } });
     expect(PREVIEW_PROVIDER_REF_MODELS[QWEN_REF]).toBe(QWEN);

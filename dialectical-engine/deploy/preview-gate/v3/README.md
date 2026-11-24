@@ -586,7 +586,7 @@ with GLM only, and before the app is pointed at it.
 **Qwen3.8-Flash is no longer switched on.** DeepInfra passes its requests to a partner company it does not name
 (`docs/legal/2026-11-24-partner-model-out.md`), so the app's line-up no longer seats it, and once the debates admitted
 before that have finished it leaves `enabled_models` (`deploy/preview-release/v1/README.md`, "Taking Qwen out of the live
-line-up"). Its row stays in this gate's table, as it does in the app, so the debates recorded with it keep their prices.
+line-up"). Its row stays in this gate's table, as it does in the app, so the debates recorded with it keep their model row.
 The steps below still hold for DeepSeek and MiMo; leave Qwen out of the probe and of `enabled_models`.
 
 **1. Probe the model (one paid call, a small fraction of a cent).** Probe when nobody is using the

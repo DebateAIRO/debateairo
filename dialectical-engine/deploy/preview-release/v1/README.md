@@ -3130,6 +3130,14 @@ activation keeps its version, and with it Qwen, until it finishes; so does one c
 is open on a version whose lists or answer seats name Qwen, QWENOUT stops: wait for those debates to finish, then run
 QWENOUT again. A version an open debate runs on that has no line-up row is named too: ask.
 
+A debate paused at the monthly limit is listed on its own line (`paused at the monthly limit, on version: …`) and does
+not stop QWENOUT. Its work is parked, as the runners and the release's retirement read it
+(`identity.run_work_is_parked`): no runner takes it until the person presses Continue. After the upload a Continue
+moves it to the new release and, since that release never passes a version that seats Qwen, to the active version,
+which has none. Before the switch, though, a Continue would run it on in the old release, on its own version, with Qwen.
+So between QWENOUT and the switch (SB13), do not press Continue on a debate from before the activation; if one is
+continued all the same, run QWENOUT again before the switch.
+
 ```sh
 set -euo pipefail
 # QWENOUT: read-only. Whether Qwen3.8-Flash can still be called: by the active settings version (its lists of AIs and its answer seats), or by an open debate on a version that seats it.
@@ -3145,7 +3153,11 @@ SEATED=$(psqlq "SELECT count(*) FROM register.register_row WHERE register_versio
 echo "active settings version $AV: Qwen in the lists $LISTED time(s), in the answer seats $SEATED time(s)"
 [ "$LISTED" = 0 ] && [ "$SEATED" = 0 ] || { echo "QWENOUT_NOT_DONE: the active version still seats Qwen: take it out first (the steps above)"; exit 1; }
 # SV5's open debates, by the version they run on: only the versions that name Qwen in a list or an answer seat, or have no line-up row.
-OPEN=$(psqlq "SELECT r.register_version||' '||count(DISTINCT r.run_id)||CASE WHEN bool_or(l.value_json IS NULL) THEN ' (no line-up row: ask)' ELSE '' END FROM core.run r JOIN core.work_item w ON w.run_id = r.run_id LEFT JOIN register.register_row l ON l.register_version = r.register_version AND l.row_key = 'previewLineUpPolicy' WHERE w.state IN ('READY', 'CLAIMED') AND (l.value_json IS NULL OR (l.value_json->'free_model_ids') ? 'Qwen/Qwen3.8-Flash' OR (l.value_json->'premium_model_ids') ? 'Qwen/Qwen3.8-Flash' OR EXISTS (SELECT 1 FROM register.register_row s WHERE s.register_version = r.register_version AND s.row_key IN ('synthesizerRoleRef', 'evaluatorRoleRef', 'storytellerRoleRef', 'storyCheckerRoleRef') AND s.value_json->>'providerRef' = 'preview:qwen-3-8-flash')) GROUP BY r.register_version ORDER BY r.register_version")
+QV="SELECT r.register_version||' '||count(DISTINCT r.run_id)||CASE WHEN bool_or(l.value_json IS NULL) THEN ' (no line-up row: ask)' ELSE '' END FROM core.run r JOIN core.work_item w ON w.run_id = r.run_id LEFT JOIN register.register_row l ON l.register_version = r.register_version AND l.row_key = 'previewLineUpPolicy' WHERE w.state IN ('READY', 'CLAIMED') AND (l.value_json IS NULL OR (l.value_json->'free_model_ids') ? 'Qwen/Qwen3.8-Flash' OR (l.value_json->'premium_model_ids') ? 'Qwen/Qwen3.8-Flash' OR EXISTS (SELECT 1 FROM register.register_row s WHERE s.register_version = r.register_version AND s.row_key IN ('synthesizerRoleRef', 'evaluatorRoleRef', 'storytellerRoleRef', 'storyCheckerRoleRef') AND s.value_json->>'providerRef' = 'preview:qwen-3-8-flash'))"
+# A debate paused at the monthly limit has its work parked (the runners' and the retirement's own test): listed apart, it does not stop QWENOUT.
+PAUSED=$(psqlq "$QV AND identity.run_work_is_parked(w.run_id, w.state, w.claim_deadline) GROUP BY r.register_version ORDER BY r.register_version")
+[ -z "$PAUSED" ] || printf '%s\n' "$PAUSED" | sed 's/^/paused at the monthly limit, on version: /'
+OPEN=$(psqlq "$QV AND NOT identity.run_work_is_parked(w.run_id, w.state, w.claim_deadline) GROUP BY r.register_version ORDER BY r.register_version")
 [ -z "$OPEN" ] || { printf '%s\n' "$OPEN" | sed 's/^/open debates that can still call Qwen, on version: /'; echo "QWENOUT_NOT_DONE: debates on a version that seats Qwen are still open: wait for them to finish, then run QWENOUT again"; exit 1; }
 echo "open debates on a version that seats Qwen: none"
 echo QWENOUT_DONE
@@ -5314,18 +5326,31 @@ and SB3 stop anyway, with the site unchanged; while an open debate can still cal
 and its texts would go live untrue.
 
 **The legal texts' day.** An upload that carries a new version of the Terms of Service or the Privacy Policy gives it the
-upload day as its effective day. Before the staging, on the Mac, in the branch the upload is built from, from
-`dialectical-engine/`, with the upload day:
+upload day as its effective day. Every upload is built from `origin/dev` (SB1's `REV`), and dev changes only through a
+pull request, so the day reaches the upload this way, on the Mac, before SB1:
+
+1. A branch from `origin/dev`.
+2. From `dialectical-engine/`, with the upload day, the dry run, then the real run:
 
 ```sh
 pnpm run legal:redate --date YYYY-MM-DD --dry-run   # every line it would change; nothing is written
 pnpm run legal:redate --date YYYY-MM-DD             # sets the day everywhere, regenerates, archives, runs legal:release-check
 ```
 
-Then commit what it wrote, and build the upload from that commit. A day before the upload would read as a change made
-retroactive, which the Terms promise never to do. The command refuses a day before today, a day not after the previous
-version's, and a version the release the site runs already carries (`tests/n1-baseline.json`): a released text keeps its
-day.
+3. Commit what it wrote, open a pull request into dev, and merge it.
+4. Only then SB1: its `REV` is that merge.
+
+A day before the upload would read as a change made retroactive, which the Terms promise never to do. So if the switch
+(SB13) happens on a later day than the one set, run the command again with the new day, through the same four steps,
+before SB1. Nothing else checks the day (`legal:release-check` passes with any day the command accepts), so this step is the
+check. When the note of the change asks for the owner's answer on when a version takes effect (for Terms 1.1:
+`docs/legal/2026-11-24-partner-model-out.md`, "Terms section 14 and this change"), that answer is recorded in the note
+before SB1, and the day given to the command follows it.
+
+The command refuses a day before today, a day not after the previous version's, and a version the release the site runs
+already carries (`tests/n1-baseline.json`): a released text keeps its day. That file names a new release only once the
+pull request after its upload (SB13c) is merged, so the refusal lags the live release: after an upload, do not re-date
+the version that upload carried.
 
 ### SB1. Names, the archive `$S` and the copies the way back needs
 

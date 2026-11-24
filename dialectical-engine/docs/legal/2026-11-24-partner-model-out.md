@@ -83,10 +83,16 @@ is seated they are no longer true.
   No outside person has accepted Terms 1.0, so nobody outside the operator would receive the email.
 - **What 1.1 changes.** It removes the description of a company DeepInfra forwarded one model's requests to, which no
   longer receives anything. It changes no right or duty of anyone, and the re-acceptance floors stay at 1.0.
-- **The choice.** Whether Terms 1.1 takes effect on the upload day without the 30-day wait is the owner's choice, and it is
-  recorded in the line below once made. Either answer fits that line: "Terms 1.1 takes effect on the upload day,
-  posted with its summary and without the email", or "Terms 1.0 stays in force for 30 days after the email to account
-  holders, and Terms 1.1 takes effect then".
+- **The choice.** Whether Terms 1.1 takes effect on the upload day without the 30-day wait is the owner's choice. It is
+  recorded in the line below before the upload that carries 1.1 (the release guide's "The legal texts' day" asks for
+  it before SB1). The two possible answers, and what the upload then does with today's tools:
+  - "Terms 1.1 takes effect on the upload day, posted with its summary and without the email". The upload runs
+    `legal:redate` with the upload day, as the release guide says.
+  - "Terms 1.0 stays in force for 30 days after the email to account holders, and Terms 1.1 takes effect then". The
+    email goes from the operator to every account holder first. `legal:redate` sets one day for both documents, so the
+    upload runs it with the day 30 days after the email, and Privacy Policy 1.1 and Terms 1.1 both carry that day. The
+    1.0 texts stay in force until then; they only say more than is needed (they still describe the partner, which no
+    longer receives anything).
 - **Not reviewed by counsel.** This reading of section 14 has not been reviewed by counsel.
 
 The owner's answer: OPEN (not yet given).

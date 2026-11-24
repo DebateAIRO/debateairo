@@ -149,7 +149,7 @@ export type PreviewModelRow = Readonly<{
    * them. Their privacy policy applies") and does not name the company. The Privacy Policy, the Terms and the Provider
    * Register name every company that receives debate text, and they name no such partner, so no new settings version may
    * seat a partner-served model (`previewModelSeatable`). The row itself stays: debates already recorded with the model
-   * keep their prices, maker and badges, and a debate admitted on an older version still finishes on it. App only: the
+   * keep their model row, maker and badges, and a debate admitted on an older version still finishes on it. App only: the
    * gate's row and the parity files do not carry it. tests/unit/partner-served-line-up.test.ts pins the set of marked
    * models: taking the mark off one needs its provider's facts checked and its Register entry filled first.
    */

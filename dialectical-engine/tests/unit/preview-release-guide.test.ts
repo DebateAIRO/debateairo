@@ -1086,6 +1086,10 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(check).toContain("WHERE w.state IN ('READY', 'CLAIMED')");
     expect(check).toContain("(l.value_json->'free_model_ids') ? 'Qwen/Qwen3.8-Flash' OR (l.value_json->'premium_model_ids') ? 'Qwen/Qwen3.8-Flash'");
     expect(check).toContain("s.value_json->>'providerRef' = 'preview:qwen-3-8-flash'");
+    // A debate paused at the monthly limit is told apart by the runners' own parked test, and listed apart.
+    expect(check).toContain('PAUSED=$(psqlq "$QV AND identity.run_work_is_parked(w.run_id, w.state, w.claim_deadline)');
+    expect(check).toContain('OPEN=$(psqlq "$QV AND NOT identity.run_work_is_parked(w.run_id, w.state, w.claim_deadline)');
+    expect(prose).toContain('do not press Continue on a debate from before the activation');
     // The guide reads for a server where the activation is done: the steps are the record, QWENOUT is the upload's.
     expect(prose).toContain('On the live server this is done');
     expect(prose).toContain('QWENOUT (below) is what that upload runs first, before its SB1');
@@ -1100,13 +1104,13 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
   it('QWENOUT, run by bash with the server answered: done only when neither the active version nor an open debate can call Qwen', () => {
     const block = blocksOf(sectionOf(guide, '### Taking Qwen out of the live line-up')).find(block => stepOf(block) === 'QWENOUT')!;
     // The block as written, with its two server helpers stood in for: the status line names version 27, and psqlq
-    // answers the three queries from ROW, SEATED and OPEN (OPEN as psql -XAt prints rows: one per line).
+    // answers the four queries from ROW, SEATED, PAUSED and OPEN (PAUSED and OPEN as psql -XAt prints rows: one per line).
     const body = block.lines.filter(line => !line.startsWith('lc() {') && !line.startsWith('psqlq() {'));
     expect(body).toHaveLength(block.lines.length - 2);
-    const run = (row: string, seated: string, open: string) => {
+    const run = (row: string, seated: string, open: string, paused = '') => {
       const stubs = ['lc() { echo \'DEBATEAI_SETTINGS_STATUS {"effectiveActive":"27"}\'; }',
-        'psqlq() { case "$1" in *core.work_item*) printf \'%s\' "$OPEN";; *"SELECT value_json::text"*) printf \'%s\\n\' "$ROW";; *"SELECT count(*)"*) echo "$SEATED";; *) echo "unexpected query"; return 1;; esac; }'];
-      const result = spawnSync('bash', ['-c', [body[0]!, ...stubs, ...body.slice(1)].join('\n')], { encoding: 'utf8', env: { ...process.env, ROW: row, SEATED: seated, OPEN: open } });
+        'psqlq() { case "$1" in *"AND identity.run_work_is_parked"*) printf \'%s\' "$PAUSED";; *"AND NOT identity.run_work_is_parked"*) printf \'%s\' "$OPEN";; *"SELECT value_json::text"*) printf \'%s\\n\' "$ROW";; *"SELECT count(*)"*) echo "$SEATED";; *) echo "unexpected query"; return 1;; esac; }'];
+      const result = spawnSync('bash', ['-c', [body[0]!, ...stubs, ...body.slice(1)].join('\n')], { encoding: 'utf8', env: { ...process.env, ROW: row, SEATED: seated, OPEN: open, PAUSED: paused } });
       return { status: result.status, out: result.stdout.trim().split('\n') };
     };
     const value = (premium: readonly string[], table: unknown = null) => JSON.stringify({ kind: 'PREVIEW_LINE_UP_POLICY',
@@ -1118,6 +1122,14 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     // Debates still open on a version that seats Qwen: wait for them.
     expect(run(live, '0', '25 1 (no line-up row: ask)\n26 2')).toEqual({ status: 1, out: ['active settings version 27: Qwen in the lists 0 time(s), in the answer seats 0 time(s)',
       'open debates that can still call Qwen, on version: 25 1 (no line-up row: ask)', 'open debates that can still call Qwen, on version: 26 2',
+      'QWENOUT_NOT_DONE: debates on a version that seats Qwen are still open: wait for them to finish, then run QWENOUT again'] });
+    // Debates paused at the monthly limit are listed on their own line and do not stop it: a Continue after the upload
+    // moves them to the active version.
+    expect(run(live, '0', '', '26 3')).toEqual({ status: 0, out: ['active settings version 27: Qwen in the lists 0 time(s), in the answer seats 0 time(s)',
+      'paused at the monthly limit, on version: 26 3', 'open debates on a version that seats Qwen: none', 'QWENOUT_DONE'] });
+    // A paused debate next to an open one: the open one still stops it.
+    expect(run(live, '0', '26 1', '26 2')).toEqual({ status: 1, out: ['active settings version 27: Qwen in the lists 0 time(s), in the answer seats 0 time(s)',
+      'paused at the monthly limit, on version: 26 2', 'open debates that can still call Qwen, on version: 26 1',
       'QWENOUT_NOT_DONE: debates on a version that seats Qwen are still open: wait for them to finish, then run QWENOUT again'] });
     // The active version still seats it, in a list or in a seat: take it out first.
     for (const [row, seated] of [[value(['zai-org/GLM-5.3-Flash', 'Qwen/Qwen3.8-Flash']), '0'], [live, '1']] as const) {
@@ -1131,6 +1143,12 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(prose).toContain('pnpm run legal:redate --date YYYY-MM-DD --dry-run');
     expect(prose).toContain('pnpm run legal:redate --date YYYY-MM-DD # sets the day everywhere');
     expect(prose).toContain('A day before the upload would read as a change made retroactive, which the Terms promise never to do.');
+    // The day reaches the upload through dev (SB1's REV), re-set when the switch slips, and nothing else checks it.
+    expect(prose).toContain('Commit what it wrote, open a pull request into dev, and merge it. 4. Only then SB1: its `REV` is that merge.');
+    expect(prose).toContain('run the command again with the new day, through the same four steps, before SB1');
+    expect(prose).toContain('Nothing else checks the day');
+    expect(prose).toContain('that answer is recorded in the note before SB1');
+    expect(prose).toContain('after an upload, do not re-date the version that upload carried');
     const scripts = (JSON.parse(read('package.json')) as { scripts: Record<string, string> }).scripts;
     expect(scripts['legal:redate']).toBe('node apps/ui/scripts/legal-redate.mjs');
   });

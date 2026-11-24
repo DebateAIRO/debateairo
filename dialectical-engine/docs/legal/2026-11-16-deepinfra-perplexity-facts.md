@@ -60,7 +60,7 @@ fill the row; or take Qwen3.8-Flash out of the line-up, and then the row and the
 partner in the Privacy Policy (section 5) and the Terms (section 8) go.
 
 Decided on 24 November 2026: Qwen3.8-Flash leaves the line-up, and the row and the sentences go; a letter
-asking DeepInfra to name the company was drafted. See `2026-11-24-partner-model-out.md`.
+asking DeepInfra to name the company was sent on 24 November 2026 to DeepInfra's privacy and policy addresses. See `2026-11-24-partner-model-out.md`.
 
 ## Perplexity (Search API)
 

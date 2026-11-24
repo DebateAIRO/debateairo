@@ -22,7 +22,10 @@
  *   - a day that is not YYYY-MM-DD, a day before today (Romanian time), or a day that is not after the day the
  *     document's previous version took effect (read from that version's archived English text);
  *   - a current version that was released: its archive copy is in the commit of the release the site runs, which
- *     tests/n1-baseline.json names. A released text is kept as it was, so a change to it needs a new version number;
+ *     tests/n1-baseline.json names. A released text is kept as it was, so a change to it needs a new version number.
+ *     That file is the only record of the live release in the repository, and it lags: it names a new release only
+ *     once the pull request after that upload is merged. Until then this refusal does not see the new release, so a
+ *     version an upload has just carried must not be re-dated after that upload;
  *   - a draft whose eyebrow or version line does not carry the current day in the words this command would write.
  * The tests read the day from the English Privacy Policy's version line (tests/support/legalText.ts), so they need no
  * edit when the day changes.
@@ -210,7 +213,8 @@ export function planLegalRedate({ to, today, readDraft, manifest, translations, 
 
 /**
  * `isReleased` for `planLegalRedate`, by git: an archive copy is released when it is in the commit tests/n1-baseline.json
- * names (the release the site runs). A clone without that commit cannot tell, so it refuses.
+ * names (the release the site runs). A clone without that commit cannot tell, so it refuses. The file names a new release
+ * only once the pull request after its upload is merged, so between the two this answers for the release before.
  */
 export function releasedByLiveRelease(root) {
   const commit = JSON.parse(readFileSync(resolve(root, "tests/n1-baseline.json"), "utf8")).commit;
