@@ -2,7 +2,7 @@ import { GET as proxyGet } from "../../../../../api/[...path]/route.js";
 
 /**
  * The address a sign-in company sends the browser back to. apps/api/src/social-providers/provider.ts derives it from
- * PUBLIC_APP_URL as <site>/v1/auth/social/<provider>/callback and the relay accepts no other path, but the website is
+ * the site's public address as <site>/v1/auth/social/<provider>/callback and the relay accepts no other path, but the website is
  * all that answers on the site's address. This route hands the return to the API through the /api proxy (its header
  * and cookie rules unchanged) and gives the browser the API's redirect to a page of this site. Whatever else comes
  * back (a refusal, a limit, a provider that is off, an unreachable API) goes to the sign-in page, which says that
