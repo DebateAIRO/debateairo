@@ -8,6 +8,8 @@ export * from "./public-flag.js";
 export * from "./tree-updates.js";
 export * from "./passage-retention.js";
 export * from "./team-limit.js";
+// 0186: the preview's approved buyers.
+export * from "./preview-buyers.js";
 export * from "./path-suggestions.js";
 import type { InvestigationRead } from "./investigations.js";
 import type { PieceSettingsVersion, WebSealed } from "./web-evidence.js";

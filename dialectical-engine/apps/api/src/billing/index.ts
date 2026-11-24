@@ -16,7 +16,7 @@ import type { DisplayedTaxPort } from "./displayed-tax.js";
 import type { NetopiaNoticeIntakePort } from "./netopia-intake.js";
 import { pricingPlace } from "./place.js";
 import type { QuoteResult, QuoteServicePort } from "./quote.js";
-import { answerRefusal, BillingRefusal, billingNotFound, refuseBuyer, type BillingBuyerAdmits } from "./refusal.js";
+import { answerRefusal, BillingRefusal, billingNotFound, refusedByBuyerRule, type BillingBuyerAdmits } from "./refusal.js";
 import { installSubscriptionRoutes, SUBSCRIPTION_ROUTE_PATHS } from "./subscription-routes.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 
@@ -318,7 +318,8 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     if (checkout === undefined || legal === undefined) return billingNotFound(reply);
     const authenticated = request.authenticatedSession;
     if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
-    if (deps.buyerAdmits !== undefined && !deps.buyerAdmits(authenticated)) return refuseBuyer(reply);
+    const refused = await refusedByBuyerRule(reply, deps.buyerAdmits, authenticated);
+    if (refused !== null) return refused;
     if (!admit.gate(reply, "billingCheckout", "POST /v1/billing/checkout", authenticated.ownerRef)) return reply;
     const parsed = BillingCheckoutRequestSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });

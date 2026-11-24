@@ -1767,6 +1767,22 @@ describe("P3-01 production database-principal manifest", () => {
   "roleName": "debateai_runtime",
   "source": "migrations/0185_release_history.sql",
   "grants": ["EXECUTE ON FUNCTION core.read_release_history()"]
+},
+// 0186: the preview's approved buyers. The yes or no at the pay button, the Owner's list and the one door are the API's billing role's
+// alone, which the runner's login does not hold; the audit page beside 0150's goes where 0142's went.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0186_preview_buyers.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.preview_buyer_listed(uuid)",
+    "EXECUTE ON FUNCTION staff.read_preview_buyers(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.preview_buyer_act(jsonb,uuid,jsonb,jsonb,jsonb)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0186_preview_buyers.sql",
+  "grants": ["EXECUTE ON FUNCTION staff.read_audit_page_v2(jsonb,text,integer,timestamptz,uuid)"]
 }
 ]);
     expect(manifest.privilegeRevocations).toEqual([
@@ -2264,6 +2280,24 @@ it("discloses exactly 0124's grants to the runtime and the API's billing role (s
   // The pointer reader for the API's role; the two pass readers for the runtime. Nothing else, and no table grant.
   expect(declared).toHaveLength(2);
   expect(declared.some(grant => /\bON register\.settings_/u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0186's grants: the preview buyers' three to the API's billing role, the audit page beside 0150's to the runtime", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0186_preview_buyers.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_rls_all_accounts";
+  // As for 0124: every GRANT line naming one of the disclosed roles names it alone.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0186_preview_buyers.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Four functions, no table grant: the table is no login's.
+  expect(declared).toHaveLength(4);
+  expect(declared.some(grant => /\bON staff\.preview_buyer_event\b/u.test(grant))).toBe(false);
 });
 
 it("discloses exactly 0125's grants to the API's billing role and the export worker (italy-clause-approval S01)", async () => {

@@ -5318,7 +5318,12 @@ release that may run, or be gone back to, carries it: an older API refuses it at
 and lets any signed-in account buy on NETOPIA's sandbox. So 6b opens only after the upload that brings it is over
 and you have decided not to go back to the release before (WB2 is still possible after SB14), and before any way
 back to a release older than that one (WB2 included) come MAIN-SITE.md's PWON, then ASKS_CLOSE. After SB13b, edit
-the first line of MAIN-SITE.md's names file, then run its OPENCHECK.
+the first line of MAIN-SITE.md's names file, then run its OPENCHECK. The Team page's list of approved buyers
+(MAIN-SITE.md 6b.3, on a release that carries it) is in the database, so both releases read the same one and nothing
+is copied. Removing an account there works at any time; adding one waits from SB3 until the upload is over, and before
+a WB2 to a release older than the one that carries the list, the security alert of every addition, and every removal
+made with the tools unlocked, that day must have arrived (MAIN-SITE.md 5.6): that release does not know the alert, and
+once current again it would drop one still waiting to go out.
 
 **The upload that first carries the partner rule** (`docs/legal/2026-11-24-partner-model-out.md`): before its SB1,
 QWENOUT ("Taking Qwen out of the live line-up") must print `QWENOUT_DONE`. While the active version seats Qwen, its SB2
@@ -6925,11 +6930,11 @@ stay issued. If LIVEAFTER does not end with `LIVEAFTER_DONE`, never run rbD-B: f
 **While MAIN-SITE.md's 6b is open** (`PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers`: the site open before real
 payments, buying only for the accounts on the team line), DR1's `derive` copies the value and the team line into the
 new release's files, and its SAME checks hold both releases to the same value and the same list; never change the list
-(MAIN-SITE.md's BUYERS) from SB3 on. Run MAIN-SITE.md's PWON before DR2: the site is down from DR2 to DR6 anyway, and
-rbD-B would lose everything strangers write after DR3. rbD-B to a release older than the one that brought 6b needs
-MAIN-SITE.md's ASKS_CLOSE first (an older API refuses the value, and lets any signed-in account buy on NETOPIA's
-sandbox). After SB13b, edit the first line of MAIN-SITE.md's names file, run its PWOFF1, the hand edit and PWOFF2
-again, then its OPENCHECK.
+(MAIN-SITE.md's BUYERS, and additions on its Team page's list) from SB3 on. Run MAIN-SITE.md's PWON before DR2: the
+site is down from DR2 to DR6 anyway, and rbD-B would lose everything strangers write after DR3. rbD-B to a release
+older than the one that brought 6b needs MAIN-SITE.md's ASKS_CLOSE first (an older API refuses the value, and lets any
+signed-in account buy on NETOPIA's sandbox). After SB13b, edit the first line of MAIN-SITE.md's names file, run its
+PWOFF1, the hand edit and PWOFF2 again, then its OPENCHECK.
 
 #### DR1. The three env files
 

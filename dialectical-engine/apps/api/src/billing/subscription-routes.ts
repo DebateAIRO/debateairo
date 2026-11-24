@@ -21,7 +21,7 @@ import { clientIpNetworkScope } from "../client-ip.js";
 import { mailLocaleOfCookieHeader } from "../mail-locale.js";
 import { readCardDetails, startCardChange } from "./card-change.js";
 import type { BillingAdmission, BillingRequestSource, BillingRoutePolicy } from "./index.js";
-import { answerRefusal as answer, billingNotFound as notFound, refuseBuyer, type BillingBuyerAdmits } from "./refusal.js";
+import { answerRefusal as answer, billingNotFound as notFound, refusedByBuyerRule, type BillingBuyerAdmits } from "./refusal.js";
 import { failureCode } from "./renewal.js";
 import { cancelForOwner, revokeCancelForOwner, scheduleDowngrade } from "./subscription-actions.js";
 import { refuse } from "./subscription-core.js";
@@ -148,7 +148,8 @@ export function installSubscriptionRoutes(
     if (deps === undefined) return notFound(reply);
     const authenticated = request.authenticatedSession;
     if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
-    if (buyerAdmits !== undefined && !buyerAdmits(authenticated)) return refuseBuyer(reply);
+    const refused = await refusedByBuyerRule(reply, buyerAdmits, authenticated);
+    if (refused !== null) return refused;
     const parsed = BillingUpgradeRequestSchema.safeParse(request.body);
     if (!parsed.success) return malformed(reply);
     const from = source(request);

@@ -373,6 +373,8 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
       ["ACCOUNT_ERASURE_PENDING", 409, "billing.checkout.erasurePending"],
       ["ADMISSION_RATE_LIMITED", 429, "billing.checkout.rateLimited"],
       ["AGE_CHECK_UNAVAILABLE", 503, "billing.checkout.genericError"],
+      // The preview's buyer rule could not read the Owner's list of approved buyers: refused before anything was written.
+      ["PREVIEW_BUYERS_UNAVAILABLE", 503, "billing.checkout.genericError"],
       // Payment region blocks (2026-10-20): checkout start re-checks the full address.
       ["REGION_PAYMENT_UNAVAILABLE", 403, "billing.checkout.regionUnavailable"],
       ["REGION_TERMS_EXCLUDED", 403, "billing.checkout.regionTermsExcluded"],

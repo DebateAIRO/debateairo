@@ -1,4 +1,4 @@
-import { previewGateSocket, validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewAskAdmits, previewBuyerAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, PREVIEW_ACCOUNT_RUNS_SQL, type PreviewAsksOpenTo, type PreviewProviderTestConfig } from "@debateai/providers";
+import { previewGateSocket, validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewAskAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, PREVIEW_ACCOUNT_RUNS_SQL, type PreviewAsksOpenTo, type PreviewProviderTestConfig } from "@debateai/providers";
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
@@ -396,6 +396,7 @@ import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication, LoginResult } from "./sessions.js";
 import type { StaffCapability } from "@debateai/kernel";
 import { registerStaffRoutes, staffAuthorizationPolicyInventory, type StaffHttpApplication } from "./staff/routes.js";
+import { previewBuyerVerdict, type PreviewApprovedBuyers } from "./preview-approved-buyers.js";
 import { exactStaffCookie, exactStaffCsrfPair, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER, streamAuthorizedEvents, type StaffAccessApplication, type StaffAuthentication } from "./staff/access.js";
 export { staffRoutePolicy, staffCookies, clearStaffCookies, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER } from "./staff/access.js";
 import type { PublicationApplication } from "./publications.js";
@@ -2012,6 +2013,12 @@ export interface ApiOptions {
    * sandbox, and keeps buying to the team list otherwise. Absent, buying is the team list's on the preview.
    */
   readonly previewAsksOpenTo?: PreviewAsksOpenTo;
+  /**
+   * The Owner's list of approved buyers (migration 0186), read by the buyer rule only, and only for an account not on the
+   * team line while asks are open to everyone with buying kept to listed accounts on the sandbox
+   * (previewBuyerNeedsApproval). Absent there, such an account is refused 503 PREVIEW_BUYERS_UNAVAILABLE: it fails closed.
+   */
+  readonly previewApprovedBuyers?: PreviewApprovedBuyers;
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
   /** Mandatory for signup and resend; absent configuration fails closed. */
@@ -6000,12 +6007,15 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // SessionService reads its repository through `this` (apps/api/src/sessions.ts:561-564).
   const billingSessions = options.sessions;
   const billingAgeConfirmation = billingSessions?.readAgeConfirmation?.bind(billingSessions);
-  // Who may start a purchase (a checkout or a plan upgrade) on the preview, by previewBuyerAdmits: any signed-in account
+  // Who may start a purchase (a checkout or a plan upgrade) on the preview, by previewBuyerVerdict: any signed-in account
   // only with real payments and asks open to everyone, or in the friends' test on the sandbox (everyone-with-test-payments);
-  // otherwise only the team list. The price requests and the card change carry no rule. Off the preview nothing changes.
+  // otherwise the team list, and under everyone-with-listed-buyers on the sandbox also the Owner's list of approved buyers
+  // (0186), read only for an account not on the team list and refusing when it cannot be read. The price requests and the
+  // card change carry no rule. Off the preview nothing changes.
   const previewBuyerRule = previewConfig === undefined ? undefined
-    : (session: AuthenticatedSession) => previewBuyerAdmits(previewConfig, options.previewTeamUserIds, options.previewAsksOpenTo,
-      options.billing?.paymentEnvironment === "live", session.userId);
+    : (session: AuthenticatedSession) => previewBuyerVerdict({ config: previewConfig, teamUserIds: options.previewTeamUserIds,
+      asksOpenTo: options.previewAsksOpenTo, livePayments: options.billing?.paymentEnvironment === "live", userId: session.userId,
+      approved: options.previewApprovedBuyers, log: (line) => console.error(line) });
   installBillingRoutes(api, {
     ...(options.billing ?? {}),
     policy: (route: BillingRoutePath) => routePolicy(route),

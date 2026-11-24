@@ -154,6 +154,7 @@ apps/api/src/password-reset-routes.ts
 apps/api/src/password-reset.ts
 apps/api/src/person-room-picker.ts
 apps/api/src/phone-profile.ts
+apps/api/src/preview-approved-buyers.ts
 apps/api/src/preview-asks-open.ts
 apps/api/src/preview-budget-estimate.ts
 apps/api/src/preview-origin.ts
@@ -213,6 +214,7 @@ apps/api/src/staff/access.ts
 apps/api/src/staff/account-email.ts
 apps/api/src/staff/alerts.ts
 apps/api/src/staff/internal-allowances.ts
+apps/api/src/staff/preview-buyers.ts
 apps/api/src/staff/public-review.ts
 apps/api/src/staff/routes.ts
 apps/api/src/staff/runtime.ts
@@ -619,6 +621,7 @@ apps/ui/components/OwnerPossessionPanel.tsx
 apps/ui/components/PasswordResetFlow.tsx
 apps/ui/components/PhoneProfileCard.tsx
 apps/ui/components/PositionTitle.tsx
+apps/ui/components/PreviewBuyersPanel.tsx
 apps/ui/components/PublicAnswerDisclosure.tsx
 apps/ui/components/PublicDebateOverview.tsx
 apps/ui/components/PublicHonestyDrawer.tsx
@@ -946,6 +949,7 @@ apps/ui/lib/observability/logger.ts
 apps/ui/lib/observability/suspiciousScoring.ts
 apps/ui/lib/phoneCompletionDraft.ts
 apps/ui/lib/previewAskProxyCeiling.ts
+apps/ui/lib/previewBuyersApi.ts
 apps/ui/lib/previewPlanRoster.test.mjs
 apps/ui/lib/previewPlanRoster.ts
 apps/ui/lib/privacyPolicy.ts
@@ -1334,6 +1338,7 @@ packages/db/src/migration-forward0182.ts
 packages/db/src/migration-forward0183.ts
 packages/db/src/migration-forward0184.ts
 packages/db/src/migration-forward0185.ts
+packages/db/src/migration-forward0186.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -1352,6 +1357,7 @@ packages/db/src/path-progress.ts
 packages/db/src/path-results.ts
 packages/db/src/path-suggestions.ts
 packages/db/src/pool-budget.ts
+packages/db/src/preview-buyers.ts
 packages/db/src/private-stream.ts
 packages/db/src/public-debates.ts
 packages/db/src/public-flag.ts

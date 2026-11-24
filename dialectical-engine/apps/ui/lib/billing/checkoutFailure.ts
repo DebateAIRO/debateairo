@@ -33,6 +33,9 @@ const KEY_BY_SERVER_CODE: Readonly<Record<string, string>> = Object.freeze({
   ACCOUNT_ERASURE_PENDING: "billing.checkout.erasurePending",
   // The preview's buyer rule (403): only invited accounts may buy for now. The price was shown; nothing was written.
   PREVIEW_TEAM_ONLY: "billing.checkout.invitedBuyersOnly",
+  // The preview's buyer rule could not read the Owner's list of approved buyers (503): it refused before anything was
+  // written or charged, so the plain "try again".
+  PREVIEW_BUYERS_UNAVAILABLE: "billing.checkout.genericError",
   // P8c's age guard (R3-2, 503): the server could not read the one-time age check, so it took nothing. Try again.
   AGE_CHECK_UNAVAILABLE: "billing.checkout.genericError",
   // P8c's age guard (R3-2, 403): CheckoutFlow sends the person to the age gate's interstitial instead of a sentence;
