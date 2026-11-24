@@ -701,7 +701,7 @@ export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ no
  * Each pass reads the oldest waiting debates, as many as the database's list gives (FREE_PUBLICATIONS_LISTED). A debate flagged with no approval, or one whose deletion cannot finish yet,
  * keeps its place at the head of that list, and the list has no way to read past it: once that many such debates wait, no newer one is read, checked or published.
  */
-export const FREE_PUBLICATIONS_LISTED = 100;
+const FREE_PUBLICATIONS_LISTED = 100;
 export type FreeSweepDeps = Readonly<{
   contributions: Pick<PostgresPublicDebateRunnerRepository, "readFreeToPublish" | "refuseFree">;
   publishOne: (waiting: Readonly<{ run_id: string; owner_ref: string; notice_at: string }>) => Promise<string>;

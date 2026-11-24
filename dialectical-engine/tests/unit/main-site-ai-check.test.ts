@@ -303,7 +303,7 @@ describe('the runbook says what the end-of-debate check does by itself on this s
     expect(read('packages/serve/src/synthesis-check.ts')).toContain('return Math.max(1_000, longestHoldMs - SYNTHESIS_CHECK_SEAL_MARGIN_MS);');
     // The sweep's list is the 100 oldest waiting asks, the most the database's list gives, with no way to read past them; the
     // erasure waits while the debate is public, and says so in the log.
-    expect(read('apps/api/src/public-tree.ts')).toContain('export const FREE_PUBLICATIONS_LISTED = 100;');
+    expect(read('apps/api/src/public-tree.ts')).toContain('\nconst FREE_PUBLICATIONS_LISTED = 100;');
     expect(read('apps/api/src/public-tree.ts')).toContain('await deps.contributions.readFreeToPublish(FREE_PUBLICATIONS_LISTED)');
     expect(read('migrations/0137_public_debates.sql')).toContain('IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 100 THEN');
     expect(read('migrations/0137_public_debates.sql')).toContain('ORDER BY ask.notice_at, ask.run_id\n      LIMIT p_limit');
