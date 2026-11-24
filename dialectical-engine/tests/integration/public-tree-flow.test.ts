@@ -50,6 +50,8 @@ import { canonicalPublicReviewBinding, groundFieldsOf } from "../../apps/api/src
 import { drainTeamLimitNotices } from "../../apps/api/src/staff/team-limit.js";
 import { authorizeStaffAlertFixture } from "../support/staffAlertReadiness.js";
 import { persistTerminalRun } from "../support/settledRun.js";
+import { wirePacket } from "../support/framed-packet.js";
+import { stubChatBody } from "../support/preview-gate-stubs.js";
 import { createEncryptedStoryRun, type StoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -193,7 +195,9 @@ function anthropicGate(answer: (call: string) => string) {
   const executed: PreviewBudgetExecution[] = [];
   const port = { async execute(input: PreviewBudgetExecution) {
     executed.push(input);
-    const call = /DEBATEAI-FENCE-([0-9a-f]{32})/u.exec(input.requestBody)![1]!;
+    // The frame is read by the door's own reader, from the Anthropic body turned back into the packet it was built from.
+    const packet = wirePacket(stubChatBody("anthropic", JSON.parse(input.requestBody) as Record<string, unknown>)) as PromptPacket;
+    const call = judgeCallValue(readPromptFrame(packet).fence);
     return { status: 200, body: JSON.stringify({ id: "msg_1", type: "message", role: "assistant", model: "claude-haiku-5-5", stop_reason: "end_turn",
       content: [{ type: "text", text: answer(call) }], usage: { input_tokens: 900, output_tokens: 40 } }) };
   } };
