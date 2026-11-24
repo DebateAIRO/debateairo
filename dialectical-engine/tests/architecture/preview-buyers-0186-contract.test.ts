@@ -51,6 +51,17 @@ describe("0186 beside the release before", () => {
     expect(lines.at(-1)).toMatch(/\) NOT VALID;$/u);
     expect(body).not.toMatch(/\bDROP (?:TABLE|FUNCTION|TRIGGER|VIEW|INDEX)\b/u);
   });
+  it("the kit's README tells the operator what the step locks while it applies, and what to do on a lock timeout", async () => {
+    const kit = (await readFile("deploy/preview-auth-dev/v1/README.md", "utf8")).replace(/\s+/gu, " ");
+    const note = kit.slice(kit.indexOf("**The preview's approved buyers (0186).**"));
+    expect(note.startsWith("**The preview's approved buyers (0186).** `apply-and-plan` applies it after 0185, in one transaction (`n1: expand`)")).toBe(true);
+    for (const needle of ["`staff.preview_buyer_event`", "SHARE ROW EXCLUSIVE on `identity.\"user\"` and on `staff.subject`", "ACCESS EXCLUSIVE on `staff.audit_event`",
+      "`MIGRATION_LOCK_TIMEOUT 0186_…`", "`MAIN-SITE.md` 6b.3"]) expect(note, needle).toContain(needle);
+    // The two references and the reviewed pair the note names are the step's own.
+    const sql = statements(await sqlOf(SQL_PATH));
+    expect(sql).toContain("REFERENCES identity.\"user\" ON DELETE CASCADE");
+    expect(sql).toContain("REFERENCES staff.subject");
+  });
 });
 
 describe("0186's event list and numbers", () => {
