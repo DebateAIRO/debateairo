@@ -14,6 +14,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { PREVIEW_TEAM_MAX_MEMBERS, parsePreviewAsksOpenTo, parsePreviewTeamUserIds } from '@debateai/providers';
 import { previewAsksOpenBootLine, previewListedBuyersBootLine } from '../../apps/api/src/preview-asks-open.js';
+import { PREVIEW_BUYER_CHECK_UNAVAILABLE_LINE } from '../../apps/api/src/preview-approved-buyers.js';
+import { maskedAddress } from '../../apps/api/src/staff/preview-buyers.js';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const read = (path: string) => readFileSync(resolve(ROOT, path), 'utf8');
@@ -89,6 +91,8 @@ function envFiles(files: Files): Readonly<{ api: string; runner: string; ui: str
 const STUBS = [
   'A=$D/etc/api-cur.env; RF=$D/etc/runner-cur.env; UF=$D/etc/ui-cur.env; API=debateai-preview-api@cur; WEB=debateai-preview-ui@cur',
   `LABEL=cur; SLOT=A; KEY=${KEY}; M=$D/m; C=$D/Caddyfile; MP=$D/mail-plan.json; CAPI='${dirname(ROOT)}'`,
+  // A release before the Team page's list: its code folder holds the cap's file and not the list's routes.
+  '[ ! -d "$D/capi" ] || CAPI=$D/capi',
   `HOST=$(sed -n 's|^PUBLIC_APP_URL=https://||p' "$A")`,
   'inv() { cat "$D/journal" 2>/dev/null || true; }', helper('said'), helper('upfail'),
   'gatesok() { [ ! -e "$D/gates-closed" ]; }', 'gates() { echo "the gates (stand-in)"; }',
@@ -106,6 +110,13 @@ const STUBS = [
   'notify() { cat "$D/notify-now"; }',
   'psqlq() { printf "%s\\n" "$1" >> "$D/queries"; case "$1" in',
   `  *'FROM identity."user" WHERE owner_ref'*) cat "$D/user-id";;`,
+  // The Team page's list (0186): whether the database holds it, how many are on it, with the team line, its changes, the API login's grant.
+  `  *"to_regclass('staff.preview_buyer_event')"*) cat "$D/buyer-table";;`,
+  '  *"SELECT count(*) FROM (SELECT DISTINCT ON (user_id) kind"*) cat "$D/approved";;',
+  '  *" UNION SELECT user_id::text"*) cat "$D/may-buy";;',
+  `  *"FILTER (WHERE kind = 'ADDED')"*) cat "$D/buyer-changes";;`,
+  '  *has_function_privilege*) cat "$D/buyer-grant";;',
+  `  *'NOT EXISTS (SELECT 1 FROM identity."user" x'*) cat "$D/erased";;`,
   '  *outbound_mail_daily_count*) cat "$D/mail";;',
   `  *"g.created_at >= to_timestamp("*) cat "$D/since";;`,
   `  *"WHERE s.owner_ref = '"*) cat "$D/held";;`,
@@ -118,6 +129,8 @@ const STUBS = [
 
 type World = Readonly<{ dir: string; api: () => string; runner: () => string; file: (path: string) => string }>;
 type Setup = Files & Readonly<{
+  /** The release is one before the Team page's list (database step 0186): its code has no routes for it. */
+  beforeList?: boolean;
   /** Asks were opened by ASKS_OPEN: its names file, with the team line kept before the opening. */
   opened?: readonly string[]; openedAt?: string | null;
   /** The copies BUYERS kept before each change, oldest first. */
@@ -156,11 +169,17 @@ function world(setup: Setup): World {
     login: '401', headers: `HTTP/2 200\r\n${ROBOTS}\r\nstrict-transport-security: max-age=31536000\r\n`, readyz: '404', edge: '200',
     'notify-now': '400', 'user-id': `${FRIEND}\n`, held: '0\n', plans: '0\n', pages: '0\n', since: '0\n',
     mail: '2026-11-23 120 6 false false\n2026-11-24 8 0 false false\n', tty: `${FRIEND_ADDRESS}\n`,
+    'buyer-table': 't\n', approved: '0\n', 'may-buy': '2\n', 'buyer-changes': '0 0\n', 'buyer-grant': 't\n', erased: '0\n',
     'm/name/notify-code.before-dezbatere': '400', Caddyfile: 'dezbatere.ro {\n}\n', 'm/password/Caddyfile.open': 'dezbatere.ro {\n}\n',
     ...setup.answers
   };
   for (const [name, text] of Object.entries(answers)) writeFileSync(join(dir, name), text);
   for (const flag of setup.flags ?? []) writeFileSync(join(dir, flag), '');
+  if (setup.beforeList) {
+    const providers = join(dir, 'capi/dialectical-engine/packages/providers/src');
+    mkdirSync(providers, { recursive: true });
+    writeFileSync(join(providers, 'preview-test.ts'), read('packages/providers/src/preview-test.ts'));
+  }
   return { dir, api: () => readFileSync(join(etc, 'api-cur.env'), 'utf8'), runner: () => readFileSync(join(etc, 'runner-cur.env'), 'utf8'),
     file: (path: string) => readFileSync(join(dir, path), 'utf8') };
 }
@@ -244,6 +263,41 @@ describe('ASKS_OPEN with the third value (6b)', () => {
     });
   });
 
+  it('refuses, with nothing changed, while an account allowed on the Team page in an earlier opening is still on its list, or when that list does not read', () => {
+    const DOES_NOT_READ = 'ASKS_OPEN_NOT_DONE: the Team page\'s list of approved buyers does not read (the database did not answer); nothing changed: ask';
+    const cases: ReadonlyArray<readonly [Setup, string]> = [
+      [{ answers: { approved: '2\n' } }, 'ASKS_OPEN_NOT_DONE: 2 account(s) allowed on the Team page in an earlier opening are still on its list; nothing changed: remove them on the Team page (Who may buy while payments are in test mode; removing works while the team tools are locked), then ASKS_OPEN again'],
+      [{ answers: { approved: '' } }, DOES_NOT_READ],
+      [{ answers: { 'buyer-table': '' } }, DOES_NOT_READ]
+    ];
+    for (const [setup, last] of cases) withWorld(setup, w => {
+      const api = w.api(), runner = w.runner();
+      expect(run('ASKS_OPEN', w, V6B).last, last).toBe(last);
+      expect([w.api(), w.runner()]).toEqual([api, runner]);
+      expect(existsSync(join(w.dir, 'starts'))).toBe(false);
+      expect(existsSync(join(w.dir, 'm/asks/names.sh'))).toBe(false);
+    });
+  });
+
+  it('on an empty Team page list it opens and says buyers are allowed there from now on; an older database or release is not asked about it', () => {
+    withWorld({}, w => {
+      expect(run('ASKS_OPEN', w, V6B).lines.slice(-3)).toEqual(['listed buyers: 2 (the team line)',
+        'the Team page\'s list of approved buyers: empty; from now on you allow buyers there (6b.3)', 'ASKS_OPEN_DONE']);
+    });
+    withWorld({ answers: { 'buyer-table': 'f\n' } }, w => {
+      expect(run('ASKS_OPEN', w, V6B).lines.slice(-2)).toEqual(['listed buyers: 2 (the team line)', 'ASKS_OPEN_DONE']);
+      expect(w.file('queries')).not.toContain('FROM staff.preview_buyer_event');
+    });
+    withWorld({ beforeList: true }, w => {
+      expect(run('ASKS_OPEN', w, V6B).lines.slice(-2)).toEqual(['listed buyers: 2 (the team line)', 'ASKS_OPEN_DONE']);
+    });
+    // The friends' value never reads the Team page's list.
+    withWorld({ answers: { approved: '2\n' } }, w => {
+      expect(run('ASKS_OPEN', w).last).toBe('ASKS_OPEN_DONE');
+      expect(existsSync(join(w.dir, 'queries'))).toBe(false);
+    });
+  });
+
   it('with the friends\' value it still takes the team line out of both files', () => withWorld({}, w => {
     expect(run('ASKS_OPEN', w).last).toBe('ASKS_OPEN_DONE');
     expect(w.api()).not.toContain('PREVIEW_TEAM_USER_IDS_JSON=');
@@ -268,6 +322,17 @@ describe('ASKS_CLOSE and MAIL_CLOSE need the site password on, whatever the paym
     expect(checked(w)).toEqual({ bad: [], asks: undefined, team: [OWNER, PARTNER] });
   }));
 
+  it('ASKS_CLOSE says how many accounts are still on the Team page\'s list, and closes whatever the count', () => {
+    const closing = (answers: Readonly<Record<string, string>>) => withWorld({ value: VALUE, opened: [OWNER, PARTNER], answers }, w => {
+      const result = run('ASKS_CLOSE', w);
+      expect(checked(w)).toEqual({ bad: [], asks: undefined, team: [OWNER, PARTNER] });
+      return result.lines.slice(-2);
+    });
+    expect(closing({ approved: '3\n' })).toEqual(['accounts still on the Team page\'s list of approved buyers: 3 (they count for nothing now; the next opening with listed buyers waits until you remove them there)', 'ASKS_CLOSE_DONE']);
+    expect(closing({ approved: '' })).toEqual(['accounts still on the Team page\'s list of approved buyers: did not read (they count for nothing now; the next opening with listed buyers waits until you remove them there)', 'ASKS_CLOSE_DONE']);
+    expect(closing({ 'buyer-table': 'f\n' })).toEqual(['open work now: 0', 'ASKS_CLOSE_DONE']);
+  });
+
   it('MAIL_CLOSE refuses on an open site on the sandbox before it changes anything, and goes on with the password on', () => {
     const lines = script('MAIL_CLOSE').split('\n');
     const guard = lines.findIndex(entry => entry.includes('MAIL_CLOSE_NOT_DONE: the Log in page does not ask for the site password'));
@@ -284,9 +349,26 @@ describe('ASKS_CLOSE and MAIL_CLOSE need the site password on, whatever the paym
 
 describe('BUYERS', () => {
   const open = (team: readonly string[], more: Setup = {}): Setup => ({ value: VALUE, team, opened: [OWNER, PARTNER], ...more });
+  /** An addition runs only on a release before the Team page's list; a release that carries it adds buyers there. */
+  const before = (team: readonly string[], more: Setup = {}): Setup => open(team, { beforeList: true, ...more });
   const REMOVE = { 'W=add ': 'W=remove ' };
 
-  it('adds the account in both files alike, checks the count line, keeps the files before, and never prints or keeps the address', () => withWorld(open([OWNER, PARTNER]), w => {
+  it('on a release that carries the Team page\'s list, refuses an addition with nothing changed, and still removes', () => {
+    withWorld(open([OWNER, PARTNER]), w => {
+      const api = w.api(), runner = w.runner();
+      const result = run('BUYERS', w);
+      expect(result.last).toBe('BUYERS_NOT_DONE: this release carries the Team page\'s list: allow the account there (6b.3), with no restart; BUYERS only takes off an account an earlier BUYERS run put on the team line; nothing changed');
+      expect([w.api(), w.runner()]).toEqual([api, runner]);
+      expect(existsSync(join(w.dir, 'starts'))).toBe(false);
+      expect(existsSync(join(w.dir, 'queries'))).toBe(false);
+    });
+    withWorld(open([OWNER, FRIEND]), w => {
+      expect(run('BUYERS', w, REMOVE).last).toBe('BUYERS_DONE');
+      expect(checked(w)).toEqual({ bad: [], asks: VALUE, team: [OWNER] });
+    });
+  });
+
+  it('adds the account in both files alike, checks the count line, keeps the files before, and never prints or keeps the address', () => withWorld(before([OWNER, PARTNER]), w => {
     const before = w.api();
     const result = run('BUYERS', w);
     expect(result.lines.slice(-2)).toEqual(['listed buyers now: 3', 'BUYERS_DONE']);
@@ -326,10 +408,10 @@ describe('BUYERS', () => {
     const cases: ReadonlyArray<readonly [Setup, Readonly<Record<string, string>>, string]> = [
       [{ opened: [OWNER, PARTNER] }, {}, `BUYERS_NOT_DONE: the two files do not both hold ${VALUE} (ASKS_OPEN first, 6b.2); nothing changed`],
       [open([OWNER]), { 'W=add ': 'W=list ' }, 'BUYERS_NOT_DONE: W is not add or remove; nothing changed'],
-      [open([OWNER], { answers: { tty: 'nobody@example.invalid\n' } }), {}, 'BUYERS_NOT_DONE: no account with that address; nothing changed'],
-      [open([OWNER, FRIEND]), {}, 'BUYERS_NOT_DONE: that account is on the list already; nothing changed'],
+      [before([OWNER], { answers: { tty: 'nobody@example.invalid\n' } }), {}, 'BUYERS_NOT_DONE: no account with that address; nothing changed'],
+      [before([OWNER, FRIEND]), {}, 'BUYERS_NOT_DONE: that account is on the list already; nothing changed'],
       [open([OWNER]), REMOVE, 'BUYERS_NOT_DONE: that account is not on the list; nothing changed'],
-      [open(full), {}, 'BUYERS_NOT_DONE: the list would hold more accounts than PREVIEW_TEAM_MAX_MEMBERS allows; nothing changed: take one off first'],
+      [before(full), {}, 'BUYERS_NOT_DONE: the list would hold more accounts than PREVIEW_TEAM_MAX_MEMBERS allows; nothing changed: take one off first'],
       [open([OWNER], { runnerTeam: [OWNER, PARTNER] }), {}, 'BUYERS_NOT_DONE: the API and runner files do not hold the same one list; nothing changed: ask']
     ];
     for (const [setup, swap, last] of cases) withWorld(setup, w => {
@@ -344,18 +426,18 @@ describe('BUYERS', () => {
   });
 
   it('puts both files back on a BAD release check or a refused start, and says when the count line is missing', () => {
-    withWorld(open([OWNER], { flags: ['same-bad'] }), w => {
+    withWorld(before([OWNER], { flags: ['same-bad'] }), w => {
       const api = w.api(), runner = w.runner();
       expect(run('BUYERS', w).last).toBe('BUYERS_NOT_DONE: a SAME check is BAD (above); both files are back, nothing restarted');
       expect([w.api(), w.runner()]).toEqual([api, runner]);
       expect(existsSync(join(w.dir, 'starts'))).toBe(false);
     });
-    withWorld(open([OWNER], { flags: ['api-refuses'] }), w => {
+    withWorld(before([OWNER], { flags: ['api-refuses'] }), w => {
       const api = w.api(), runner = w.runner();
       expect(run('BUYERS', w).last).toBe('BUYERS_NOT_DONE: the API refused the new list (its code is above); both files are back, and the API and the website started on them');
       expect([w.api(), w.runner()]).toEqual([api, runner]);
     });
-    withWorld(open([OWNER], { flags: ['no-count-line'] }), w => {
+    withWorld(before([OWNER], { flags: ['no-count-line'] }), w => {
       expect(run('BUYERS', w).last).toBe('BUYERS_NOT_DONE: the API does not say the 2 listed buyers the files hold: ask');
     });
   });
@@ -378,6 +460,8 @@ describe('OPENCHECK', () => {
     'listed buyers in the files: 2', 'the four spending gates: active, with their window open',
     'mail on 2026-11-23 (UTC): 120 handed to the mail program, 6% of daily_limit; sign-up mail stopped: no; all mail stopped: no',
     'mail on 2026-11-24 (UTC): 8 handed to the mail program, 0% of daily_limit; sign-up mail stopped: no; all mail stopped: no',
+    'accounts on the Team page\'s list: 0; accounts that may buy, the team line included: 2',
+    'changes on the Team page\'s list since the opening: 0 added, 0 removed',
     'accounts not on the list now: open sandbox plans 0, unfinished payment pages 0',
     'checkouts and upgrades started since the opening by accounts never on the list: 0', 'OPENCHECK_DONE'
   ];
@@ -389,7 +473,8 @@ describe('OPENCHECK', () => {
     const queries = w.file('queries').split('\n').filter(Boolean);
     const now = `jsonb_array_elements_text('${JSON.stringify([OWNER, FRIEND])}'::jsonb)`;
     const ever = `jsonb_array_elements_text('${JSON.stringify([OWNER, PARTNER, FRIEND].sort())}'::jsonb)`;
-    expect(queries.filter(query => query.includes(now))).toHaveLength(2);
+    // The plans, the payment pages, and how many may buy with the Team page's list.
+    expect(queries.filter(query => query.includes(now))).toHaveLength(3);
     expect(queries.filter(query => query.includes(ever) && query.includes('g.created_at >= to_timestamp(1795939200)'))).toHaveLength(1);
     expect(queries.find(query => query.includes('outbound_mail_daily_count'))).toContain("r.register_version = 18 AND r.row_key = 'outboundMailPolicy'");
   }));
@@ -434,6 +519,68 @@ describe('OPENCHECK', () => {
     expect(result.lines).toContain('LOOK: mail stopped on 2026-11-23: new sign-ups could not finish that day (and with all mail stopped, password resets and receipts waited too): decide with SIGNUPS (6.5 (c)), or ask');
     expect(result.last).toBe('OPENCHECK_DONE');
   }));
+
+  it('reads the Team page\'s list: its count, with the team line against the cap, its changes since the opening, and asks for no id', () => withWorld({ ...OPEN, answers: { login: '200', approved: '3\n', 'may-buy': '5\n', 'buyer-changes': '4 1\n' } }, w => {
+    const result = run('OPENCHECK', w);
+    expect(result.lines).toContain('accounts on the Team page\'s list: 3; accounts that may buy, the team line included: 5');
+    expect(result.lines).toContain('changes on the Team page\'s list since the opening: 4 added, 1 removed');
+    expect(result.last).toBe('OPENCHECK_DONE');
+    const queries = w.file('queries').split('\n').filter(Boolean);
+    expect(queries.find(query => query.includes('FILTER (WHERE'))).toContain('recorded_at >= to_timestamp(1795939200)');
+    expect(queries.find(query => query.includes('has_function_privilege'))).toBe("SELECT has_function_privilege('debateai_prod_api_runtime', 'staff.preview_buyer_listed(uuid)', 'EXECUTE')");
+    // Accounts not on the list now leave out the Team page's list too; a start since the opening leaves out an account on it in the two minutes before.
+    expect(queries.find(query => query.includes("'ERASURE_STOPPED', 'CREATED')"))).toContain('staff.preview_buyer_listed(u.user_id)');
+    expect(queries.find(query => query.includes('g.created_at >= to_timestamp(1795939200) AND EXISTS'))).toContain("n.recorded_at < g.created_at - interval '2 minutes'");
+    // The cap is read from the release and never printed.
+    expect(result.out).not.toMatch(new RegExp(`\\b${PREVIEW_TEAM_MAX_MEMBERS}\\b`, 'u'));
+  }));
+
+  it('fails past the cap and when the API\'s login may not read the list; looks at refusals the API logged and at purchases of accounts erased since', () => {
+    withWorld({ ...OPEN, answers: { login: '200', 'may-buy': `${PREVIEW_TEAM_MAX_MEMBERS + 1}\n` } }, w => {
+      const result = run('OPENCHECK', w);
+      expect(result.lines).toContain('CHECK_FAILED: more accounts may buy than PREVIEW_TEAM_MAX_MEMBERS allows: remove some on the Team page, then ask');
+      expect(result.last).toMatch(/^OPENCHECK_NOT_DONE: /u);
+    });
+    withWorld({ ...OPEN, answers: { login: '200', 'buyer-grant': 'f\n' } }, w => {
+      expect(run('OPENCHECK', w).lines).toContain('CHECK_FAILED: the API\'s login may not read the Team page\'s list, so every account allowed there is refused at the pay button (503): ask');
+    });
+    withWorld({ ...OPEN, answers: { login: '200', approved: '' } }, w => {
+      expect(run('OPENCHECK', w).lines).toContain('CHECK_FAILED: the Team page\'s list does not read (the database did not answer, or the cap does not read from this release\'s code)');
+    });
+    withWorld({ ...OPEN, answers: { login: '200', 'buyer-table': '' } }, w => {
+      expect(run('OPENCHECK', w).lines).toContain('CHECK_FAILED: whether the database holds the Team page\'s list does not read (the database did not answer)');
+    });
+    const unreadable = JSON.stringify({ event: 'api.preview.buyer_check_unavailable' });
+    withWorld({ ...OPEN, answers: { login: '200', erased: '1\n' }, journal: [JSON.stringify({ event: 'api.preview.asks_open', to: VALUE }),
+      JSON.stringify({ event: 'api.preview.listed_buyers', count: 2 }), unreadable, unreadable] }, w => {
+      const result = run('OPENCHECK', w);
+      expect(result.lines).toContain('LOOK: since its start the API could not read the Team page\'s list 2 time(s), and refused those purchases with nothing charged: if it happens again, ask');
+      expect(result.lines).toContain('LOOK: 1 checkout(s) or upgrade(s) since the opening by accounts erased since: whether they were on the list no longer reads; if you know of no such erasure, ask');
+      expect(result.last).toBe('OPENCHECK_DONE');
+    });
+  });
+
+  it('on an older database asks nothing of the Team page\'s list; on an older release says its accounts cannot buy there', () => {
+    withWorld({ ...OPEN, beforeList: true, answers: { login: '200', 'buyer-table': 'f\n' } }, w => {
+      const result = run('OPENCHECK', w);
+      expect(result.lines.filter(entry => entry.includes('Team page'))).toEqual([]);
+      expect(result.last).toBe('OPENCHECK_DONE');
+      expect(w.file('queries')).not.toContain('FROM staff.preview_buyer');
+      expect(w.file('queries')).not.toContain('staff.preview_buyer_listed');
+    });
+    withWorld({ ...OPEN, beforeList: true, answers: { login: '200', approved: '2\n', 'may-buy': '4\n' } }, w => {
+      const result = run('OPENCHECK', w);
+      expect(result.lines).toContain('LOOK: the accounts on the Team page\'s list cannot buy on this release, which does not carry that list (after a way back): they can again once a release that carries it is the current one');
+      expect(w.file('queries')).not.toContain('has_function_privilege');
+      expect(result.last).toBe('OPENCHECK_DONE');
+    });
+    // A release that carries the list on a database without it: its database step is missing.
+    withWorld({ ...OPEN, answers: { login: '200', 'buyer-table': 'f\n' } }, w => {
+      const result = run('OPENCHECK', w);
+      expect(result.lines).toContain('CHECK_FAILED: this release carries the Team page\'s list, but the database does not hold it: ask');
+      expect(result.last).toMatch(/^OPENCHECK_NOT_DONE: /u);
+    });
+  });
 });
 
 describe('PWOFF1 accepts 6b\'s pairing beside part 8\'s', () => {
@@ -487,6 +634,24 @@ describe('CLOSED flags the third value', () => {
   });
 });
 
+describe('CLOSED counts the Team page\'s list without flagging it', () => {
+  const closed = script('CLOSED').split('\n');
+  const from = closed.findIndex(entry => entry.startsWith('# The Team page\'s list of approved buyers (6b.3)'));
+  const lines = closed.slice(from, closed.findIndex(entry => entry.startsWith('[ -z "$OPEN" ]')));
+  const said = (answers: Readonly<Record<string, string>>) => withWorld({ answers }, w => {
+    const text = ['set -euo pipefail', `D='${w.dir}'`, ...STUBS, 'flag() { echo "NOT CLOSED: $1"; }', ...lines, 'echo END'].join('\n');
+    return spawnSync('bash', ['-c', text], { encoding: 'utf8' }).stdout.trim().split('\n');
+  });
+
+  it('prints the count, "did not read" when the database does not answer, and nothing on a database without the list', () => {
+    expect(from).toBeGreaterThan(0);
+    expect(said({ approved: '3\n' })).toEqual(['accounts on the Team page\'s list of approved buyers: 3 (inert while asks are closed)', 'END']);
+    expect(said({ approved: '' })).toEqual(['accounts on the Team page\'s list of approved buyers: did not read (inert while asks are closed)', 'END']);
+    expect(said({ 'buyer-table': '' })).toEqual(['accounts on the Team page\'s list of approved buyers: did not read (inert while asks are closed)', 'END']);
+    expect(said({ 'buyer-table': 'f\n' })).toEqual(['END']);
+  });
+});
+
 describe('the words of 6b', () => {
   it('names both new refusal codes in part 10, and both are the code\'s own, printed by name', () => {
     const part10 = runbook.slice(runbook.indexOf('## 10. Every named refusal code of these locks'));
@@ -510,7 +675,8 @@ describe('the words of 6b', () => {
   it('puts 6b in the order table and the order rules, and says what NETOPIA is told while it is open', () => {
     expect(runbook).toContain('\n| 6b | the whole site open while payments are NETOPIA\'s sandbox:');
     expect(runbook).toContain('\n## 6b. The whole site open before real payments, buying only for listed accounts\n');
-    for (const heading of ['6b.1 Before you open', '6b.2 The steps, in order', '6b.3 Add or remove a buyer (BUYERS)', '6b.4 The morning check (OPENCHECK)',
+    for (const heading of ['6b.1 Before you open', '6b.2 The steps, in order', '6b.3 Add or remove a buyer on the Team page',
+      '6b.3b Add or remove a buyer at the server (BUYERS)', '6b.4 The morning check (OPENCHECK)',
       '6b.5 The brakes, and the way back', '6b.6 Before part 7']) expect(runbook.split('\n')).toContain(`### ${heading}`);
     expect(flat).toContain('**The one exception is 6b:** the password may come off before real payments only with `everyone-with-listed-buyers`');
     expect(flat).toContain('no page of the site asks for an access password');
@@ -518,10 +684,35 @@ describe('the words of 6b', () => {
     expect(flat).toContain('Never list the tester when it will buy as a Romanian buyer');
   });
 
+  it('quotes the Team page\'s box in the words the website prints, and its shortened address as the API makes it', () => {
+    const staff = JSON.parse(read('apps/ui/messages/en/staff.json')) as Record<string, string>;
+    const said = (key: string) => staff[`staff.previewBuyers.${key}`]!;
+    expect(flat).toContain(`**${said('title')}**`);
+    for (const key of ['address', 'add', 'remove', 'confirm', 'cancel']) expect(flat, key).toContain(`**${said(key)}**`);
+    for (const key of ['added', 'removed', 'unknown', 'onTeam', 'already', 'stale', 'nothingChanged']) expect(flat, key).toContain(`"${said(key)}"`);
+    const confirm = said('confirmAdd').replace('{address}', maskedAddress('stefan.nour@example.com')!);
+    expect(flat).toContain(`"${confirm}"`);
+    expect(flat).toContain('stefan.nour@example.com reads `ste•••n.n•••our@example.com`');
+    expect(maskedAddress('stefan.nour@example.com')).toBe('ste•••n.n•••our@example.com');
+    // The page's sentences for an unreadable list, in part 10 and in 6b.
+    const billing = JSON.parse(read('apps/ui/messages/en/billing.json')) as Record<string, string>;
+    expect(flat).toContain(`the page says "${billing['billing.checkout.genericError']}"`);
+    const part10 = runbook.slice(runbook.indexOf('## 10. Every named refusal code of these locks'));
+    expect(part10).toContain('| `PREVIEW_BUYERS_UNAVAILABLE` (HTTP 503');
+    expect(part10).toContain(`\`${PREVIEW_BUYER_CHECK_UNAVAILABLE_LINE}\``);
+    expect(read('apps/api/src/billing/refusal.ts')).toContain('"PREVIEW_BUYERS_UNAVAILABLE"');
+    expect(script('OPENCHECK')).toContain(`grep -cxF '${PREVIEW_BUYER_CHECK_UNAVAILABLE_LINE}'`);
+  });
+
   it('the release guide says what an upload does while 6b is open, on both paths', () => {
     const guide = read('deploy/preview-release/v1/README.md').replace(/\s+/g, ' ');
     expect(guide.split("**While MAIN-SITE.md's 6b is open**").length - 1).toBe(2);
     expect(guide).toContain('Run MAIN-SITE.md\'s PWON before DR2');
     expect(guide).toContain('before any way back to a release older than that one (WB2 included) come MAIN-SITE.md\'s PWON, then ASKS_CLOSE');
+    // The Team page's list: nothing to copy, additions wait from SB3, and its alerts arrive before a way back to a release without it.
+    expect(guide).toContain('Removing an account there works at any time; adding one waits from SB3 until the upload is over');
+    expect(guide).toContain('the security alert of every addition made that day must have arrived (MAIN-SITE.md 5.6)');
+    expect(guide).toContain('never change the list (MAIN-SITE.md\'s BUYERS, and additions on its Team page\'s list) from SB3 on');
+    expect(flat).toContain('before any WB2 to such a release, check that the alert of every addition you made that day has arrived');
   });
 });
