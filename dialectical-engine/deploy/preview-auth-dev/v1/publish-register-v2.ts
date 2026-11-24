@@ -64,7 +64,7 @@ import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps
 import { resolveEngineRunnerSettings } from '../../../apps/runner/src/engine-boot.js';
 import { engineContractHash } from '../../../apps/runner/src/engine-contracts.js';
 import { assertQuestionLanguagePolicyBootable } from '../../../apps/api/src/question-language/boot.js';
-import { parseProviderDiscoveryTargets, parsePreviewLineUp, type PreviewLineUp } from '@debateai/providers';
+import { assertPreviewLineUpSeatable, parseProviderDiscoveryTargets, parsePreviewLineUp, previewPartnerServedSeatRefs, type PreviewLineUp } from '@debateai/providers';
 import { PREVIEW_GLM_PROVIDER_REFS, assertPreviewProviderTargets } from '../../../packages/providers/src/preview-test.js';
 import { PREVIEW_MODEL_ROWS, PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRowForRef, previewRefsAreReviewedSet, previewTargetJsonRow } from '../../../packages/providers/src/preview-models.js';
 import { staffAccessPolicyFromValue } from '../../../packages/register/src/staff-access-policy.js';
@@ -148,7 +148,9 @@ const ANSWER_SEAT_KEYS = Object.freeze(['checker','storyChecker','storyteller','
  * ref outside the reviewed rows as answer-seat-unreviewed, a writer seated as its own checker as
  * answer-seats-writer-is-checker (Ruling R27b) and a storyteller seated as its own story checker as
  * answer-seats-storyteller-is-story-checker (Ruling R28: the effective seats, `storyteller ?? writer` against
- * `storyChecker ?? checker`), each before any row is built.
+ * `storyChecker ?? checker`), each before any row is built. A reviewed ref whose model its provider forwards to a company
+ * the legal texts do not name refuses as answer-seat-partner-served (previewPartnerServedSeatRefs): a debate admitted
+ * on an older version that seats it still finishes, but no new version seats it.
  */
 export function previewAnswerSeatRefs(seats:unknown, checker?:unknown):PreviewAnswerSeatRefs {
   if(seats===undefined||seats===null){
@@ -160,6 +162,7 @@ export function previewAnswerSeatRefs(seats:unknown, checker?:unknown):PreviewAn
   if(!Object.hasOwn(value,'writer')||!Object.hasOwn(value,'checker')||keys.some(key=>!ANSWER_SEAT_KEYS.includes(key))
     ||keys.some(key=>typeof value[key]!=='string'))fail('answer-seats-choice');
   if(keys.some(key=>!(PREVIEW_REVIEWED_PROVIDER_REFS as readonly string[]).includes(value[key] as string)))fail('answer-seat-unreviewed');
+  if(previewPartnerServedSeatRefs(keys.map(key=>value[key] as string)).length>0)fail('answer-seat-partner-served');
   // Ruling R27b (SA9 fix round 1): one AI must not check its own answer.
   if(value.writer===value.checker)fail('answer-seats-writer-is-checker');
   const synthesizerRoleRef=value.writer as string,evaluatorRoleRef=value.checker as string;
@@ -390,7 +393,8 @@ export function composePreviewSnapshotV2(input:Readonly<{sourceRows:readonly Reg
     if(row.rowKey===QUESTION_LANGUAGE_POLICY_ROW_KEY)parseQuestionLanguagePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===LENGTH_GUIDANCE_POLICY_ROW_KEY)parseLengthGuidancePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===ENGINE_VERSION_POLICY_ROW_KEY)parseEngineVersionPolicy(JSON.parse(row.valueJsonText));
-    if(row.rowKey===PREVIEW_LINE_UP_POLICY_ROW_KEY)previewLineUpPolicyFromValue(JSON.parse(row.valueJsonText));
+    // A carried line-up is sealed again into the new version, so it must also seat no partner-served model.
+    if(row.rowKey===PREVIEW_LINE_UP_POLICY_ROW_KEY)assertPreviewLineUpSeatable(previewLineUpPolicyFromValue(JSON.parse(row.valueJsonText)));
   }
   // Any other base row the source no longer builds is never dropped silently.
   if(base.some(row=>!sourceMap.has(row.rowKey)&&!owned.includes(row.rowKey)&&!optional.includes(row.rowKey)))fail('base-row-dropped');

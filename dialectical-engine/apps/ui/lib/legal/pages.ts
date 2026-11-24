@@ -303,25 +303,17 @@ export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
- * The four open-weight models DeepInfra serves on the private preview, each made by another company (named in
- * brackets). Kept as the DeepInfra row's `models` fact; the page no longer shows models (addition D24, owner
- * 2026-10-22: providers only, not the models). Facts checked against the vendors' published terms: see
- * `docs/legal/2026-10-10-preview-provider-facts.md`.
+ * The open-weight models a debate may be given through DeepInfra, each made by another company (named in brackets),
+ * all run on DeepInfra's own servers. Kept as the DeepInfra row's `models` fact; the page shows providers, not models.
+ * Qwen3.8-Flash is not here: DeepInfra forwards its requests to a partner company it does not name, so no new settings
+ * version may seat it (its preview row's `partnerServed` mark). tests/unit/partner-served-line-up.test.ts holds this
+ * list to the DeepInfra models a new version may seat.
  */
-const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: string]> = Object.freeze([
+export const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: string]> = Object.freeze([
   ["zai-org/GLM-5.3-Flash", "GLM-5.3-Flash (Z.AI)"],
   ["deepseek-ai/DeepSeek-V4.1-Flash", "DeepSeek-V4.1-Flash (DeepSeek)"],
-  ["XiaomiMiMo/MiMo-V2.6-Pro", "MiMo-V2.6-Pro (Xiaomi)"],
-  ["Qwen/Qwen3.8-Flash", "Qwen3.8-Flash (Alibaba)"]
+  ["XiaomiMiMo/MiMo-V2.6-Pro", "MiMo-V2.6-Pro (Xiaomi)"]
 ] as const);
-
-/**
- * The one DeepInfra model DeepInfra does not run itself. Its model page carries a "Partner" tag ("This model is
- * served by a partner. Your requests are forwarded to them. Their privacy policy applies"), and DeepInfra's trust
- * centre names it among the partner models (read 16 November 2026: `docs/legal/2026-11-16-deepinfra-perplexity-facts.md`).
- * The other three have no tag and run on DeepInfra's own servers.
- */
-const DEEPINFRA_PARTNER_MODEL_IDS: ReadonlySet<string> = new Set(["Qwen/Qwen3.8-Flash"]);
 
 /**
  * Serving company for the private preview's open-weight models, the main recipient of debate text. Listed whenever
@@ -336,9 +328,10 @@ const DEEPINFRA_PARTNER_MODEL_IDS: ReadonlySet<string> = new Set(["Qwen/Qwen3.8-
  * the logs hold request metadata, never the text (Terms 7(b), every account); no training on customer data (Terms
  * 7(b)); the data processing agreement is part of the Terms (section 5) and carries the EU standard contractual
  * clauses; DeepInfra is not certified under the EU–US Data Privacy Framework. These facts cover the models DeepInfra
- * runs itself: the location and retention sentences say so, and the partner model has its own row
- * (`DEEPINFRA_PARTNER_PROVIDER`). The preview sends no batch request and asks for no longer prompt cache, the two
- * features DeepInfra stores text for.
+ * runs itself, which are the only ones a debate may be given through it (`PREVIEW_DEEPINFRA_MODELS`): a model DeepInfra
+ * forwards to a partner company is never seated, so no partner of DeepInfra receives debate text and the Register has
+ * no entry for one. The preview sends no batch request and asks for no longer prompt cache, the two features DeepInfra
+ * stores text for.
  */
 export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -358,28 +351,6 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   basisKey: "legal.providers.sccBasis",
   contact: "policy@deepinfra.com",
   checkedOn: "2026-11-17"
-});
-
-/**
- * The company DeepInfra forwards its partner model's requests to (`DEEPINFRA_PARTNER_MODEL_IDS`). DeepInfra names
- * neither the company nor its terms, so the row is headed by what we know and every fact stays "[to confirm]": it
- * receives debate text, and a legal page discloses rather than hides (ruling R20; the 10 October 2026 facts note:
- * "that company receives debate text and needs its own row on the page"). Its jobs are the partner model's: a panel
- * member that writes and judges arguments, and one of the AIs that suggest what to look into. Shown right after
- * the DeepInfra row, whenever that row is shown. The row goes when the owner names the company and its terms are
- * checked (then it becomes a checked row), or when no partner model is left in the line-up.
- */
-export const DEEPINFRA_PARTNER_PROVIDER: ProviderRegisterEntry = Object.freeze({
-  ...UNCHECKED_CLOUD,
-  key: "deepinfra-partner",
-  provider: null,
-  nameKey: "legal.providers.deepinfraPartnerName",
-  models: PREVIEW_DEEPINFRA_MODELS.filter(([id]) => DEEPINFRA_PARTNER_MODEL_IDS.has(id)).map(([, label]) => label).join(", "),
-  entity: "[…]",
-  homeCountryKey: "legal.providers.unconfirmed",
-  purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "suggestPaths"]),
-  purposesConfirmed: true,
-  basisKey: "legal.providers.unconfirmed"
 });
 
 /**
@@ -576,8 +547,7 @@ function uncheckedCompanyEntry(company: string): ProviderRegisterEntry {
  * The AI Provider Register, in the order `/providers` shows it (addition D24, owner 2026-10-22: "providers only,
  * not the models, listed automatically"). `companies` is the API's answer (`readAiProviderCompanies`): the
  * companies its declared provider targets reach. Each reviewed company it names gets its checked row, Anthropic
- * then DeepInfra then Amazon, and DeepInfra's row is followed by the unchecked row of the partner company it forwards one model
- * to (`DEEPINFRA_PARTNER_PROVIDER`); each other company (`host:<hostname>`) one unchecked row headed by its host name, sorted; the
+ * then DeepInfra then Amazon; each other company (`host:<hostname>`) one unchecked row headed by its host name, sorted; the
  * support chat's model always last. No answer (`null`) or an empty list lists the whole reviewed catalogue: a legal
  * page discloses rather than hides. No row names a model, so a model or line-up change never changes the page, and
  * the hosted cloud rows (`MODEL_PROVIDERS`: OpenAI, xAI, Google, the own-servers Qwen) never show, since no
@@ -588,11 +558,9 @@ export function providerRegister(companies: readonly string[] | null): readonly 
   const named = companies === null || companies.length === 0
     ? null
     : new Set(companies.filter((company) => typeof company === "string" && company.length > 0));
-  // The company DeepInfra forwards its partner model to receives debate text whenever DeepInfra does, so its
-  // unchecked row follows DeepInfra's own.
   const reviewed = REVIEWED_PROVIDER_COMPANIES
     .filter(([company]) => named === null || named.size === 0 || named.has(company))
-    .flatMap(([, entry]): ProviderRegisterEntry[] => entry === DEEPINFRA_PROVIDER ? [entry, DEEPINFRA_PARTNER_PROVIDER] : [entry]);
+    .map(([, entry]) => entry);
   const unchecked = named === null ? [] : [...named]
     .filter((company) => !REVIEWED_COMPANY_KEYS.has(company) && company !== PERPLEXITY_PROVIDER.key).sort()
     .map(uncheckedCompanyEntry);
@@ -623,10 +591,12 @@ export type TermsVersion = Readonly<{
 }>;
 
 /**
- * Every version of the terms, newest first. Version 1.0 is the first published text (owner's decision of 19 November
- * 2026: the pre-launch drafts numbered 2.0–2.19 were never offered to the public, so launch starts the count again and
- * keeps no archive of them). When the terms change, the version they replace gets a row that links to its archived text.
+ * Every version of the terms, newest first. Version 1.0 is the first published text: the pre-launch drafts numbered
+ * 2.0–2.19 were never offered to the public, so the count starts again at launch and keeps no archive of them. When the
+ * terms change, the version they replace gets a row that links to its archived English text, by that text's sha256.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "1.0", noteKey: "legal.versions.v2.note", current: true, href: "/terms" }
+  { version: "1.1", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "1.0", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/737971b09f371ef4c0266610b58c563df067caf3a4ddf52ae55204aa689610d2" }
 ]);

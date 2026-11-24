@@ -46,7 +46,7 @@ import { loadAdmissionSettings, type AdmissionRunMembers } from "../../apps/api/
 import { createActiveSettingsVersionReader } from "../../apps/api/src/active-settings-version.js";
 import { activateSettingsVersion, recordSettingsVerdict, settingsVerdictOf } from "../../tools/settings-version/settings-operator.js";
 import {
-  DEEPSEEK, GLM, HAIKU, MIMO, QWEN, RUN_RESILIENCE, TARGETS, previewDebateHarness, type AdmittedRun, type PreviewGates
+  DEEPSEEK, GLM, HAIKU, MIMO, RUN_RESILIENCE, TARGETS, previewDebateHarness, type AdmittedRun, type PreviewGates
 } from "../support/preview-debate-harness.js";
 import type { GateOverride, GateRequest } from "../support/preview-gate-stubs.js";
 import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
@@ -71,8 +71,11 @@ import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase
  *    the room's read budget, a per-run ceiling of seven tenths of a dollar) and a funded staff publication (case 9). Its call lanes
  *    allow one call at a time;
  *  - S+1, a copy of S with (a) a lower per-run ceiling, (b) three story rounds instead of two, (c) `perDebate: 3`, and
- *    (SA11) a new line-up: Free [GLM, Claude Haiku], Premium [GLM, Qwen, Claude Haiku], Qwen's pros-and-cons at "low";
- *  - S+2, S+1 with Qwen at "medium" everywhere (case 8's PASS verdict; activated in case 10 while a debate of S waits);
+ *    (SA11) a new line-up: Free [GLM, Claude Haiku], Premium [GLM, DeepSeek, Claude Haiku], DeepSeek's pros-and-cons at
+ *    "low";
+ *  - S+2, S+1 with DeepSeek at "none" everywhere (case 8's PASS verdict; activated in case 10 while a debate of S waits).
+ *  No line-up seats Qwen: no new version may seat a model its provider forwards to a partner company the legal texts do
+ *  not name (tests/unit/partner-served-line-up.test.ts), and check-version names one;
  *  - BAD, S with a stale judge prompt fingerprint (case 3: a version this release cannot run).
  * The release r<S>-… is current; check-version's two real halves PASS S+1 and S+2 (the verdicts the operator records).
  * The cases run in order on one database (S+1 is activated in case 2, S+2 in case 10). Embedded Postgres; CI skips this
@@ -88,15 +91,15 @@ const OBSERVATION = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevi
   operatorSha256: "c".repeat(64), observedAt: "2026-10-23T08:00:00.000Z" };
 const SOURCE_REF = "fixture:settings-per-debate";
 /** The site's line-up (today's live values, the kit's plan `lineUp`, addition D23). */
-const SITE_LINE_UP = parsePreviewLineUp({ free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU], thinking_levels: null });
+const SITE_LINE_UP = parsePreviewLineUp({ free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, HAIKU], thinking_levels: null });
 /** The site's lanes: one call at a time per debate; the runner-wide limits are a site member (S+1 keeps them). */
 const SITE_CALL_CONCURRENCY = Object.freeze({ perDebate: 1, perModelPerDebate: 1, perModelPerRunner: Object.freeze({ default: 50, deepinfra: 150, anthropic: 50 }) });
-/** SA11 case 10: S+1's line-up (Free [GLM, Haiku]; Qwen's pros-and-cons at "low"). */
-const NEXT_THINKING: PreviewThinkingLevels = Object.freeze({ [QWEN]: Object.freeze({ steps: Object.freeze({ pros_cons: "low" as const }) }) });
-const NEXT_LINE_UP = Object.freeze({ kind: "PREVIEW_LINE_UP_POLICY", free_model_ids: [GLM, HAIKU], premium_model_ids: [GLM, QWEN, HAIKU],
+/** SA11 case 10: S+1's line-up (Free [GLM, Haiku]; DeepSeek's pros-and-cons at "low"). */
+const NEXT_THINKING: PreviewThinkingLevels = Object.freeze({ [DEEPSEEK]: Object.freeze({ steps: Object.freeze({ pros_cons: "low" as const }) }) });
+const NEXT_LINE_UP = Object.freeze({ kind: "PREVIEW_LINE_UP_POLICY", free_model_ids: [GLM, HAIKU], premium_model_ids: [GLM, DEEPSEEK, HAIKU],
   thinking_levels: NEXT_THINKING });
-/** S+2: Qwen at "medium" on every step (a debate of S that took S+2's table would show it). */
-const LATER_LINE_UP = Object.freeze({ ...NEXT_LINE_UP, thinking_levels: Object.freeze({ [QWEN]: Object.freeze({ level: "medium" as const }) }) });
+/** S+2: DeepSeek at "none" on every step (a debate of S that took S+2's table would show it). */
+const LATER_LINE_UP = Object.freeze({ ...NEXT_LINE_UP, thinking_levels: Object.freeze({ [DEEPSEEK]: Object.freeze({ level: "none" as const }) }) });
 /**
  * The per-run ceilings (micro-dollars; each version keeps the site's 30% answer reserve, so the body, the arguing, has 70%
  * of it). S: seven tenths of a dollar, a body of 490,000. S+1: five hundredths, a body of 35,000 — room for its three opening calls
@@ -117,7 +120,7 @@ const SOCKETS_ONLY = parsePreviewEnvironmentConfig(JSON.stringify({ deployment: 
 const TARGETS_JSON = JSON.stringify(PREVIEW_REVIEWED_PROVIDER_REFS.map(previewTargetJsonRow));
 const DECLARED_MODELS = Object.freeze([...new Set(TARGETS.map((target) => target.model))]);
 /** Condition 6, live (the activation's): every gate serves every reviewed model. */
-const ALL_GATES = Object.freeze({ deepinfra: Object.freeze([GLM, DEEPSEEK, MIMO, QWEN]), anthropic: Object.freeze([HAIKU]) });
+const ALL_GATES = Object.freeze({ deepinfra: Object.freeze([GLM, DEEPSEEK, MIMO]), anthropic: Object.freeze([HAIKU]) });
 const DIGEST_SEPARATOR = "-";
 
 let S = 0;
@@ -400,10 +403,10 @@ async function loseThenReclaim(composed: PerVersionRunner, debate: AdmittedRun, 
   return { result, lostAt };
 }
 
-/** Qwen's row and each of a run's Qwen calls: the level its version's table gives the call's step. */
-const QWEN_ROW = previewModelRow(QWEN)!;
-const expectedQwenLevel = (levels: PreviewThinkingLevels | undefined, callSiteKey: string): string => previewThinkingLevelOnRequest(
-  previewThinkingLevelFor(levels, QWEN_ROW, previewThinkingStepOf({ callSiteKey, lane: callSiteKey.startsWith("STORY:") ? "story" : "debate" })));
+/** DeepSeek's row and each of a run's DeepSeek calls: the level its version's table gives the call's step. */
+const DEEPSEEK_ROW = previewModelRow(DEEPSEEK)!;
+const expectedDeepSeekLevel = (levels: PreviewThinkingLevels | undefined, callSiteKey: string): string => previewThinkingLevelOnRequest(
+  previewThinkingLevelFor(levels, DEEPSEEK_ROW, previewThinkingStepOf({ callSiteKey, lane: callSiteKey.startsWith("STORY:") ? "story" : "debate" })));
 
 
 /** A debate whose first copy is lost at its first review call (loseThenReclaim): set its question before it runs. */
@@ -692,7 +695,7 @@ describe("each debate runs on its own settings version (side-by-side spec §13 T
     // Admission (the API's own per-version loader): S+1's rosters are its row's, S's the site's.
     expect(await admissionRoster(S, "free")).toEqual([GLM, DEEPSEEK]);
     expect(await admissionRoster(S1, "free")).toEqual([GLM, HAIKU]);
-    expect(await admissionRoster(S1, "premium")).toEqual([GLM, QWEN, HAIKU]);
+    expect(await admissionRoster(S1, "premium")).toEqual([GLM, DEEPSEEK, HAIKU]);
     // Final fix wave S8a: BOTH debates are lost partway and re-claimed by the same runner. B (on S+1, a NON-site version)
     // is re-claimed after S+2 is activated, so its second claim reads its version again (the runner's
     // RUN_SETTINGS_VERSION_DRIFT guard path) and must keep S+1's table, never the newly active S+2's.
@@ -717,32 +720,32 @@ describe("each debate runs on its own settings version (side-by-side spec §13 T
     // A (on S, the site version) is lost and re-claimed with S+2 already active.
     const { lostAt } = await loseThenReclaim(composed, a, gates, loseA.state.abort, async () => undefined);
     expect([composed.versions.versionOf(a.runId), composed.versions.versionOf(b.runId)]).toEqual([S, S1]);
-    // B's panel is S+1's roster: every model its calls reached is on it, Qwen included; A's are S's.
+    // B's panel is S+1's roster: every model its calls reached is on it, DeepSeek included; A's are S's.
     const requestsOfRun = (debate: AdmittedRun) => (debate === b ? gates.requests.slice(0, bRequests) : gates.requests.slice(bRequests))
       .filter((request) => request.kind !== "PROBE");
     const modelsOf = (debate: AdmittedRun) => new Set(requestsOfRun(debate).map((request) => request.model));
-    expect([...modelsOf(b)].sort()).toEqual([GLM, QWEN, HAIKU].sort());
+    expect([...modelsOf(b)].sort()).toEqual([GLM, DEEPSEEK, HAIKU].sort());
     expect([...modelsOf(a)].every((model) => SITE_LINE_UP.premium_model_ids.includes(model))).toBe(true);
-    // Every Qwen call carried its own version's level for its step: B's pros-and-cons "low", everything else (and every
-    // call of A, before and after its re-claim under the activated S+2) Qwen's default, never S+2's "medium".
-    const qwenCalls = async (runId: string) => (await ledgerCalls(runId)).filter((call) => TARGETS.find((target) => target.providerRef === call.actor_ref)?.model === QWEN);
-    const callsB = await qwenCalls(b.runId);
-    const callsA = await qwenCalls(a.runId);
-    expect(callsB.map((call) => call.thinking_level)).toEqual(callsB.map((call) => expectedQwenLevel(NEXT_THINKING, call.call_site_key)));
-    expect(callsA.map((call) => call.thinking_level)).toEqual(callsA.map((call) => expectedQwenLevel(undefined, call.call_site_key)));
+    // Every DeepSeek call carried its own version's level for its step: B's pros-and-cons "low", everything else (and every
+    // call of A, before and after its re-claim under the activated S+2) DeepSeek's default, never S+2's "none".
+    const deepseekCalls = async (runId: string) => (await ledgerCalls(runId)).filter((call) => TARGETS.find((target) => target.providerRef === call.actor_ref)?.model === DEEPSEEK);
+    const callsB = await deepseekCalls(b.runId);
+    const callsA = await deepseekCalls(a.runId);
+    expect(callsB.map((call) => call.thinking_level)).toEqual(callsB.map((call) => expectedDeepSeekLevel(NEXT_THINKING, call.call_site_key)));
+    expect(callsA.map((call) => call.thinking_level)).toEqual(callsA.map((call) => expectedDeepSeekLevel(undefined, call.call_site_key)));
     expect(callsB.filter((call) => /^JUDGE:(?:defender|critic):/u.test(call.call_site_key) && call.thinking_level === "low").length).toBeGreaterThan(0);
-    // S8a: B's Qwen calls after its re-claim (S+2 active by then) still carry S+1's table, step for step. S+2 puts Qwen at
-    // "medium" on EVERY step, so a re-claim that took the newly active version would show "medium" on each of them; B's
+    // S8a: B's DeepSeek calls after its re-claim (S+2 active by then) still carry S+1's table, step for step. S+2 puts
+    // DeepSeek at "none" on EVERY step, so a re-claim that took the newly active version would show "none" on each of them; B's
     // pros-and-cons "low" (asserted above) all ran before its first review call, where its first copy was lost.
     const afterReclaimB = callsB.filter((call) => Number(call.sequence) > lostAtB);
     expect(afterReclaimB.length).toBeGreaterThan(0);
-    expect(afterReclaimB.map((call) => call.thinking_level)).toEqual(afterReclaimB.map((call) => expectedQwenLevel(NEXT_THINKING, call.call_site_key)));
-    expect(callsB.some((call) => call.thinking_level === "medium")).toBe(false);
+    expect(afterReclaimB.map((call) => call.thinking_level)).toEqual(afterReclaimB.map((call) => expectedDeepSeekLevel(NEXT_THINKING, call.call_site_key)));
+    expect(callsB.some((call) => call.thinking_level === "none")).toBe(false);
     expect(callsA.filter((call) => Number(call.sequence) > lostAt).length).toBeGreaterThan(0);
-    expect(callsA.some((call) => call.thinking_level === "medium")).toBe(false);
+    expect(callsA.some((call) => call.thinking_level === "none")).toBe(false);
     // The scripted gate's record of each call's effort matches: its reasoning_effort per level, for each debate (every
     // request the gate answered OK is one OK ledger row; a replayed call is neither).
-    const gateEfforts = (debate: AdmittedRun) => requestsOfRun(debate).filter((request) => request.model === QWEN && request.answer === "OK")
+    const gateEfforts = (debate: AdmittedRun) => requestsOfRun(debate).filter((request) => request.model === DEEPSEEK && request.answer === "OK")
       .map((request) => (typeof request.body.reasoning_effort === "string" ? request.body.reasoning_effort : "DEFAULT_ONLY")).sort();
     const ledgerEfforts = (calls: readonly { thinking_level: string | null; outcome: string }[]) =>
       calls.filter((call) => call.outcome === "OK").map((call) => call.thinking_level ?? "NONE").sort();

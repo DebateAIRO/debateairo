@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "Klawżoli kuntrattwali standard tal-UE (il-kuntratt mudell tal-Kummissjoni Ewropea għat-trasferiment tad-data barra l-UE)",
   "legal.providers.locationDeepInfra": "L-Istati Uniti biss. Dan jinkludi l-mudelli li DeepInfra imexxi fuq is-servers tiegħu stess; jgħaddi t-talbiet ta’ mudell wieħed lil kumpanija sieħba, elenkata fl-entrata li jmiss",
   "legal.providers.retentionDeepInfra": "Ma jinżammx. DeepInfra iżomm it-test fil-memorja biss waqt li jwieġeb talba, imbagħad iħassru. Il-logs tiegħu fihom dettalji tat-talba bħall-ħin u l-ispiża, qatt mhux it-test. Dan jinkludi l-mudelli li DeepInfra imexxi fuq is-servers tiegħu stess",
-  "legal.providers.deepinfraPartnerName": "Is-sieħeb ta’ DeepInfra għal mudell wieħed (DeepInfra ma jsemmix il-kumpanija)",
   "legal.providers.locationPerplexity": "L-Istati Uniti, fejn jinsabu Perplexity u l-kumpaniji li huwa jelenka bħala li jaħdmu għalih. Perplexity ma jsemmi l-ebda reġjun",
   "legal.providers.retentionPerplexity": "Perplexity ma jippubblikax perjodu fiss għat-talbiet ta’ tfittxija: jgħid li dan jiddependi mis-servizz u mill-kont. Skont it-termini tiegħu dwar l-ipproċessar tad-data, iħassar id-data personali fi żmien 30 jum wara li nieqfu nużaw is-servizz",
   "legal.providers.luxembourg": "Luxembourg",

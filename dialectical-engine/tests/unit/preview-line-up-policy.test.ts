@@ -112,9 +112,16 @@ describe("readPreviewLineUpPolicy (addition D12, D14)", () => {
   });
 });
 
+/**
+ * The builder seals NEW versions, so its line-up must also seat no partner-served model: the live Premium list without
+ * Qwen3.8-Flash, which DeepInfra forwards to a partner company it does not name (tests/unit/partner-served-line-up.test.ts).
+ * The reader above still reads a sealed value that seats it.
+ */
 describe("previewLineUpPolicyRow (addition D12, D23)", () => {
+  const SEALABLE_PREMIUM = [GLM, DEEPSEEK, MIMO, HAIKU];
+  const sealable = (change: Record<string, unknown> = {}): Record<string, unknown> => value({ premium_model_ids: SEALABLE_PREMIUM, ...change });
   it("seals canonical register JSON that re-parses to the same line-up", () => {
-    const lineUp = previewLineUpPolicyFromValue(value());
+    const lineUp = previewLineUpPolicyFromValue(sealable());
     const row = previewLineUpPolicyRow(lineUp, "side-by-side spec §13 addition D12; owner 2026-10-22");
     expect(Object.isFrozen(row)).toBe(true);
     expect(Object.keys(row).sort()).toEqual(["rowKey", "sourceRef", "valueJsonText"]);
@@ -123,30 +130,38 @@ describe("previewLineUpPolicyRow (addition D12, D23)", () => {
     // Canonical: re-parsing the sealed text through the register's own parser gives the same bytes.
     expect(parseCanonicalRegisterJson(Buffer.from(row.valueJsonText, "utf8"))).toBe(row.valueJsonText);
     const sealed = JSON.parse(row.valueJsonText) as unknown;
-    expect(sealed).toEqual(value());
+    expect(sealed).toEqual(sealable());
     expect(previewLineUpPolicyFromValue(sealed)).toEqual(lineUp);
   });
 
   it("does not depend on the key order of the value it is handed", () => {
     const reordered = previewLineUpPolicyFromValue({
       thinking_levels: Object.fromEntries(Object.entries(OWNER_LIVE_TABLE).reverse()),
-      premium_model_ids: LIVE_PREMIUM, free_model_ids: LIVE_FREE, kind: "PREVIEW_LINE_UP_POLICY"
+      premium_model_ids: SEALABLE_PREMIUM, free_model_ids: LIVE_FREE, kind: "PREVIEW_LINE_UP_POLICY"
     });
-    const a = previewLineUpPolicyRow(previewLineUpPolicyFromValue(value()), "s").valueJsonText;
+    const a = previewLineUpPolicyRow(previewLineUpPolicyFromValue(sealable()), "s").valueJsonText;
     const b = previewLineUpPolicyRow(reordered, "s").valueJsonText;
     expect(b).toBe(a);
   });
 
   it("seals a null table as null", () => {
-    const row = previewLineUpPolicyRow(previewLineUpPolicyFromValue(value({ thinking_levels: null })), "s");
-    expect(JSON.parse(row.valueJsonText)).toEqual(value({ thinking_levels: null }));
+    const row = previewLineUpPolicyRow(previewLineUpPolicyFromValue(sealable({ thinking_levels: null })), "s");
+    expect(JSON.parse(row.valueJsonText)).toEqual(sealable({ thinking_levels: null }));
   });
 
   it("refuses a line-up the parser would refuse, and a blank source ref", () => {
-    const lineUp = previewLineUpPolicyFromValue(value());
+    const lineUp = previewLineUpPolicyFromValue(sealable());
     expect(() => previewLineUpPolicyRow({ ...lineUp, free_model_ids: [GLM] }, "s"))
       .toThrow(new TypeError("PREVIEW_LINE_UP_POLICY_INVALID:maker_rule"));
     expect(() => previewLineUpPolicyRow(lineUp, " ")).toThrow(new TypeError("PREVIEW_LINE_UP_POLICY_INVALID:source_ref"));
+  });
+
+  it("refuses a line-up that seats a partner-served model, which the reader still reads", () => {
+    const withQwen = previewLineUpPolicyFromValue(value());
+    expect(withQwen.premium_model_ids).toContain(QWEN);
+    expect(() => previewLineUpPolicyRow(withQwen, "s")).toThrow(new TypeError("PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:partner_served"));
+    expect(() => previewLineUpPolicyRow({ ...withQwen, free_model_ids: [QWEN, GLM] }, "s"))
+      .toThrow(new TypeError("PREVIEW_LINE_UP_POLICY_INVALID:free_model_ids:partner_served"));
   });
 });
 

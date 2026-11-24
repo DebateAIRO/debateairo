@@ -3,6 +3,7 @@ import {
   PREVIEW_UNREVIEWED_REF_PREFIX,
   previewCallBound,
   previewModelRow,
+  previewModelSeatable,
   previewProviderSocket,
   previewSeatableModels,
   type PreviewGateSettings,
@@ -110,6 +111,24 @@ export function settingsGateUnreviewedCodes(input: Readonly<{
   }
   for (const model of Object.keys(input.lineUp?.thinking_levels ?? {})) {
     if (previewModelRow(model) === undefined) codes.add(`SETTINGS_GATE_UNREVIEWED:${model}`);
+  }
+  return Object.freeze([...codes].sort());
+}
+
+/**
+ * Condition 6, the code copy: SETTINGS_GATE_PARTNER_SERVED:<model> for every seatable model that is a reviewed row its
+ * provider does not run itself (previewModelSeatable: the row's `partnerServed` mark). The legal texts name no company
+ * such a model's text would go to, so a version that seats one, a list of AIs or an answer seat alike, is not activated
+ * on this code. It concerns versions sealed by an older code (going back to one, or checking one again): the publish kit
+ * of this code refuses to seal such a version. A version that seats one is still READ and run as before, so debates
+ * admitted on it finish. A model that is no reviewed row is SETTINGS_GATE_UNREVIEWED's (above). Sorted, unique.
+ */
+export function settingsGatePartnerServedCodes(input: Readonly<{ seatable: readonly string[] }>): readonly string[] {
+  const codes = new Set<string>();
+  for (const entry of input.seatable) {
+    if (unreviewedSeatRef(entry) === null && previewModelRow(entry) !== undefined && !previewModelSeatable(entry)) {
+      codes.add(`SETTINGS_GATE_PARTNER_SERVED:${entry}`);
+    }
   }
   return Object.freeze([...codes].sort());
 }

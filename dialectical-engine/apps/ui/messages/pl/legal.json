@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "Standardowe klauzule umowne UE (wzorcowa umowa Komisji Europejskiej dotycząca przesyłania danych poza UE)",
   "legal.providers.locationDeepInfra": "Wyłącznie Stany Zjednoczone. Dotyczy to modeli, które DeepInfra uruchamia na własnych serwerach; żądania dotyczące jednego modelu przekazuje spółce-partnerowi, ujętemu w następnym wpisie",
   "legal.providers.retentionDeepInfra": "Nie jest przechowywane. DeepInfra trzyma tekst w pamięci tylko wtedy, gdy odpowiada na żądanie, a potem go usuwa. Jego dzienniki zawierają dane żądania, takie jak czas i koszt, nigdy tekst. Dotyczy to modeli, które DeepInfra uruchamia na własnych serwerach",
-  "legal.providers.deepinfraPartnerName": "Partner DeepInfra dla jednego modelu (DeepInfra nie podaje nazwy tej spółki)",
   "legal.providers.locationPerplexity": "Stany Zjednoczone, gdzie mają siedzibę Perplexity i spółki, które wymienia jako działające na jego rzecz. Perplexity nie podaje żadnego regionu",
   "legal.providers.retentionPerplexity": "Perplexity nie publikuje stałego okresu przechowywania zapytań wyszukiwania: podaje, że zależy to od usługi i konta. Zgodnie ze swoimi warunkami przetwarzania danych usuwa dane osobowe w ciągu 30 dni od zakończenia przez nas korzystania z usługi",
   "legal.providers.luxembourg": "Luxembourg",

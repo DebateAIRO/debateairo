@@ -9,7 +9,6 @@ import { LegalProvidersBody } from "../../apps/ui/components/legal/LegalBodies.j
 import {
   AMAZON_BEDROCK_PROVIDER,
   ANTHROPIC_PREVIEW_PROVIDER,
-  DEEPINFRA_PARTNER_PROVIDER,
   DEEPINFRA_PROVIDER,
   GOOGLE_PREVIEW_PROVIDER,
   MODEL_PROVIDERS,
@@ -28,9 +27,8 @@ import {
  * (ruling R20), the support chat's model always last; no answer lists the whole reviewed catalogue. No row names a
  * model, in any of the 35 languages, and the hosted cloud rows (OpenAI, xAI, Google, the own-servers Qwen) never show.
  *
- * 16 November 2026 (docs/legal/2026-11-16-deepinfra-perplexity-facts.md): DeepInfra forwards one of its models to a
- * partner company it does not name, so DeepInfra's row is always followed by that company's unchecked row
- * (`deepinfra-partner`); DeepInfra's and Perplexity's rows carry the facts their published terms give.
+ * DeepInfra's and Perplexity's rows carry the facts their published terms give. No model DeepInfra forwards to a partner
+ * company is seated any more (its preview row's `partnerServed` mark), so the Register has no row for such a company.
  */
 const MODEL_NAMES = ["GLM-5.3-Flash", "DeepSeek-V4.1-Flash", "MiMo-V2.6-Pro", "Qwen3.8-Flash", "Claude Haiku 5.5", "Gemini"] as const;
 /** The labels every row shows, in order: the Privacy Policy §5 facts without the old models line. */
@@ -55,11 +53,9 @@ const NEW_KEYS = [
   "legal.providers.sccBasis",
   "legal.providers.locationDeepInfra",
   "legal.providers.retentionDeepInfra",
-  "legal.providers.deepinfraPartnerName",
   "legal.providers.locationPerplexity",
   "legal.providers.retentionPerplexity"
 ] as const;
-const PARTNER = "deepinfra-partner";
 const ACME = "host:api.acme.example";
 
 /** Text as React's static renderer escapes it. */
@@ -73,17 +69,17 @@ const catalogOf = (locale: string) =>
 
 /** Every company list the page can be built from, and the rows each gives. */
 const CASES: ReadonlyArray<readonly [label: string, companies: readonly string[] | null, keys: readonly string[]]> = [
-  ["anthropic + deepinfra", ["anthropic", "deepinfra"], ["claude", "deepinfra", PARTNER, "perplexity", "support"]],
-  ["the answer's order does not matter", ["deepinfra", "anthropic"], ["claude", "deepinfra", PARTNER, "perplexity", "support"]],
-  ["deepinfra alone (the GLM-only set)", ["deepinfra"], ["deepinfra", PARTNER, "perplexity", "support"]],
+  ["anthropic + deepinfra", ["anthropic", "deepinfra"], ["claude", "deepinfra", "perplexity", "support"]],
+  ["the answer's order does not matter", ["deepinfra", "anthropic"], ["claude", "deepinfra", "perplexity", "support"]],
+  ["deepinfra alone (the GLM-only set)", ["deepinfra"], ["deepinfra", "perplexity", "support"]],
   ["anthropic alone", ["anthropic"], ["claude", "perplexity", "support"]],
-  ["no answer", null, ["claude", "deepinfra", PARTNER, "amazon", "perplexity", "support"]],
-  ["an empty answer", [], ["claude", "deepinfra", PARTNER, "amazon", "perplexity", "support"]],
-  // Amazon Bedrock serves one debate model: its row comes after DeepInfra's two, whatever the answer's order.
-  ["amazon + anthropic + deepinfra", ["amazon", "anthropic", "deepinfra"], ["claude", "deepinfra", PARTNER, "amazon", "perplexity", "support"]],
-  ["deepinfra + amazon", ["deepinfra", "amazon"], ["deepinfra", PARTNER, "amazon", "perplexity", "support"]],
-  ["deepinfra + an unknown host", ["deepinfra", ACME], ["deepinfra", PARTNER, ACME, "perplexity", "support"]],
-  ["perplexity named by the API is still listed once", ["deepinfra", "perplexity"], ["deepinfra", PARTNER, "perplexity", "support"]]
+  ["no answer", null, ["claude", "deepinfra", "amazon", "perplexity", "support"]],
+  ["an empty answer", [], ["claude", "deepinfra", "amazon", "perplexity", "support"]],
+  // Amazon Bedrock serves one debate model: its row comes after DeepInfra's, whatever the answer's order.
+  ["amazon + anthropic + deepinfra", ["amazon", "anthropic", "deepinfra"], ["claude", "deepinfra", "amazon", "perplexity", "support"]],
+  ["deepinfra + amazon", ["deepinfra", "amazon"], ["deepinfra", "amazon", "perplexity", "support"]],
+  ["deepinfra + an unknown host", ["deepinfra", ACME], ["deepinfra", ACME, "perplexity", "support"]],
+  ["perplexity named by the API is still listed once", ["deepinfra", "perplexity"], ["deepinfra", "perplexity", "support"]]
 ];
 
 describe("the rows are the companies the API answers (addition D24)", () => {
@@ -99,15 +95,14 @@ describe("the rows are the companies the API answers (addition D24)", () => {
       else expect(entries.at(-1)).toEqual({ ...SUPPORT_PROVIDER, purposes: ["synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support"] });
       if (keys.includes("claude")) expect(entries.find((entry) => entry.key === "claude")).toBe(ANTHROPIC_PREVIEW_PROVIDER);
       if (keys.includes("deepinfra")) expect(entries.find((entry) => entry.key === "deepinfra")).toBe(DEEPINFRA_PROVIDER);
-      // The partner's row stands right after DeepInfra's, and only when DeepInfra's is shown.
-      expect(keys.includes(PARTNER)).toBe(keys.includes("deepinfra"));
-      if (keys.includes(PARTNER)) expect(entries[keys.indexOf("deepinfra") + 1]).toBe(DEEPINFRA_PARTNER_PROVIDER);
+      // No row for a partner of DeepInfra: no model DeepInfra forwards to one is seated.
+      expect(keys.filter((key) => key.includes("partner"))).toEqual([]);
     });
   }
 
   it("unknown hosts come after the reviewed rows, sorted, once each", () => {
     expect(keysOf(providerRegister(["host:b.example", "deepinfra", "host:a.example", "host:b.example", "anthropic"])))
-      .toEqual(["claude", "deepinfra", PARTNER, "host:a.example", "host:b.example", "perplexity", "support"]);
+      .toEqual(["claude", "deepinfra", "host:a.example", "host:b.example", "perplexity", "support"]);
   });
 
   it("every company the API's host table can name is a reviewed row, never an unchecked one", () => {
@@ -380,14 +375,18 @@ describe("the Register words still exist in all 35 languages", () => {
       // it keep search phrases, and the row says that instead. The other languages still carry the older row.
       if (locale !== "en" && locale !== "ro") expect(catalog["legal.providers.retentionPerplexity"], locale).toContain("30");
       else expect(catalog["legal.providers.retentionPerplexity"], locale).not.toMatch(/\b30\b/u);
-      for (const key of ["legal.providers.locationDeepInfra", "legal.providers.retentionDeepInfra", "legal.providers.deepinfraPartnerName"]) expect(catalog[key], `${locale} ${key}`).toContain("DeepInfra");
+      expect(catalog["legal.providers.retentionDeepInfra"], locale).toContain("DeepInfra");
+      // The languages a release offers say where DeepInfra processes and nothing about another company; the others
+      // still carry the older line, which pointed to a partner's entry, until a release offers them.
+      if (["en", "fr", "ro"].includes(locale)) expect(catalog["legal.providers.locationDeepInfra"], locale).not.toContain("DeepInfra");
+      else expect(catalog["legal.providers.locationDeepInfra"], locale).toContain("DeepInfra");
       for (const key of ["legal.providers.locationPerplexity", "legal.providers.retentionPerplexity"]) expect(catalog[key], `${locale} ${key}`).toContain("Perplexity");
       expect(catalog["legal.providers.retentionAnthropic"], locale).toMatch(/30[^0-9][\s\S]*7[^0-9]|30[^0-9][\s\S]*7$/);
       expect(catalog["legal.providers.retentionGoogle"], locale).toContain("55");
       if (locale !== "en") {
         // Facts other than the brand names are translated, not copied from English.
         expect(catalog["legal.providers.retentionGoogle"], locale).not.toBe(en["legal.providers.retentionGoogle"]);
-        for (const key of NEW_KEYS.slice(-5)) expect(catalog[key], `${locale} ${key}`).not.toBe(en[key]);
+        for (const key of NEW_KEYS.slice(-4)) expect(catalog[key], `${locale} ${key}`).not.toBe(en[key]);
       }
       // Addition D24: the models label is gone from every catalogue (nothing reads it any more).
       expect(Object.keys(catalog).filter((key) => key === "legal.providers.colModels"), locale).toEqual([]);

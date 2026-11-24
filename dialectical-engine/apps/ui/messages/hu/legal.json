@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "Az EU általános szerződési feltételei (az Európai Bizottság mintaszerződése az adatok EU-n kívülre történő küldéséhez)",
   "legal.providers.locationDeepInfra": "Kizárólag az Egyesült Államok. Ez azokra a modellekre vonatkozik, amelyeket a DeepInfra saját szervereken futtat; egy modell kéréseit egy partnercégnek adja át, amely a következő bejegyzésben szerepel",
   "legal.providers.retentionDeepInfra": "Nem őrzik meg. A DeepInfra a szöveget csak a memóriában tartja, amíg a kérésre válaszol, utána törli. A naplóiban a kérés adatai szerepelnek, például az idő és a költség, a szöveg soha. Ez azokra a modellekre vonatkozik, amelyeket a DeepInfra saját szervereken futtat",
-  "legal.providers.deepinfraPartnerName": "A DeepInfra partnere egy modellhez (a DeepInfra nem nevezi meg a céget)",
   "legal.providers.locationPerplexity": "Egyesült Államok, ahol a Perplexity és azok a cégek találhatók, amelyeket a Perplexity a nevében dolgozóként sorol fel. A Perplexity nem nevez meg régiót",
   "legal.providers.retentionPerplexity": "A Perplexity a keresési kérésekre nem tesz közzé rögzített időtartamot: közlése szerint ez a szolgáltatástól és a fióktól függ. Adatfeldolgozási feltételei szerint a személyes adatokat 30 napon belül törli azután, hogy a szolgáltatás használatát megszüntetjük",
   "legal.providers.luxembourg": "Luxembourg",

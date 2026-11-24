@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "ES līguma standartklauzulas (Eiropas Komisijas parauglīgums datu nosūtīšanai ārpus ES)",
   "legal.providers.locationDeepInfra": "Tikai Amerikas Savienotās Valstis. Tas attiecas uz modeļiem, ko DeepInfra darbina savos serveros; viena modeļa pieprasījumus DeepInfra nodod partneruzņēmumam, kas norādīts nākamajā ierakstā",
   "legal.providers.retentionDeepInfra": "Netiek glabāts. DeepInfra tur tekstu tikai atmiņā, kamēr atbild uz pieprasījumu, un pēc tam to dzēš. Tā žurnālos ir pieprasījuma dati, piemēram, laiks un izmaksas, nekad ne teksts. Tas attiecas uz modeļiem, ko DeepInfra darbina savos serveros",
-  "legal.providers.deepinfraPartnerName": "DeepInfra partneruzņēmums vienam modelim (DeepInfra šo uzņēmumu nenosauc)",
   "legal.providers.locationPerplexity": "Amerikas Savienotās Valstis, kur atrodas Perplexity un uzņēmumi, kurus tas norāda kā strādājošus tā labā. Perplexity reģionu nenorāda",
   "legal.providers.retentionPerplexity": "Perplexity nepublicē noteiktu meklēšanas vaicājumu glabāšanas laiku: tas norāda, ka laiks ir atkarīgs no pakalpojuma un konta. Saskaņā ar tā datu apstrādes noteikumiem tas dzēš personas datus 30 dienu laikā pēc tam, kad mēs pārtraucam izmantot pakalpojumu",
   "legal.providers.luxembourg": "Luxembourg",

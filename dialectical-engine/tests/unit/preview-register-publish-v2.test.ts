@@ -704,7 +704,11 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
   const GLM = 'zai-org/GLM-5.3-Flash', DEEPSEEK_MODEL = 'deepseek-ai/DeepSeek-V4.1-Flash', MIMO = 'XiaomiMiMo/MiMo-V2.6-Pro', QWEN = 'Qwen/Qwen3.8-Flash', HAIKU = 'claude-haiku-5-5';
   /** The owner's live table (final, 2026-10-13), pasted verbatim as SA1's and SA2's tests carry it. */
   const OWNER_LIVE_TABLE = JSON.parse(`{"zai-org/GLM-5.3-Flash":{"level":"high"},"deepseek-ai/DeepSeek-V4.1-Flash":{"level":"none"},"Qwen/Qwen3.8-Flash":{"level":"medium"},"XiaomiMiMo/MiMo-V2.6-Pro":{"level":"default","steps":{"pros_cons":"none","cross_exchange":"none"}},"claude-haiku-5-5":{"level":"medium","steps":{"judge_panel":"high","reviewer":"high","answer_checker":"high","story_checker":"high","answer_writer":"high","story_writer":"high","slip_fix":"medium"}}}`) as Record<string, unknown>;
-  const LIVE = { free_model_ids: [GLM, DEEPSEEK_MODEL], premium_model_ids: [GLM, DEEPSEEK_MODEL, MIMO, QWEN, HAIKU], thinking_levels: OWNER_LIVE_TABLE };
+  /**
+   * The live line-up without Qwen3.8-Flash: DeepInfra forwards that model to a partner company it does not name, so no new
+   * version may seat it (tests/unit/partner-served-line-up.test.ts). The table keeps its entry: an entry seats nothing.
+   */
+  const LIVE = { free_model_ids: [GLM, DEEPSEEK_MODEL], premium_model_ids: [GLM, DEEPSEEK_MODEL, MIMO, HAIKU], thinking_levels: OWNER_LIVE_TABLE };
   const HAIKU_REF = 'preview:claude-haiku-5-5';
   /** v2's tenth argument is the line-up and its eleventh the answer seats; the checker choice is the third. */
   const build = async (lineUp?: unknown, answerSeats?: unknown, checker?: unknown, at = runtime) =>
@@ -773,6 +777,7 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
     // Checked before anything else: even a runtime the gate refuses never gets that far.
     await expect(build(qwenHigh, undefined, undefined, { ...runtime, nodeVersion: 'v22.23.1' })).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`);
     await expect(build({ ...LIVE, free_model_ids: [GLM] })).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:maker_rule');
+    await expect(build({ ...LIVE, premium_model_ids: [...LIVE.premium_model_ids, QWEN] })).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:partner_served');
     await expect(build({ ...LIVE, extra: true })).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:members');
     await expect(build({ free_model_ids: LIVE.free_model_ids, premium_model_ids: LIVE.premium_model_ids })).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:members');
     await expect(build('off')).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:value');
@@ -805,6 +810,10 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
       [{ ...LIVE, premium_model_ids: [GLM, 'not/a-reviewed-model'] }, undefined, 'PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:unreviewed'],
       [undefined, { writer: HAIKU_REF, checker: HAIKU_REF }, 'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-writer-is-checker'],
       [undefined, { writer: 'preview:not-reviewed', checker: HAIKU_REF }, 'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-unreviewed'],
+      // A partner-served model (Qwen3.8-Flash) in either list or in a seat: the owner reads which, and takes it out.
+      [{ ...LIVE, free_model_ids: [...LIVE.free_model_ids, QWEN] }, undefined, 'PREVIEW_LINE_UP_POLICY_INVALID:free_model_ids:partner_served'],
+      [{ ...LIVE, premium_model_ids: [...LIVE.premium_model_ids, QWEN] }, undefined, 'PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:partner_served'],
+      [undefined, { writer: 'preview:qwen-3-8-flash', checker: HAIKU_REF }, 'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-partner-served'],
       // Ruling R28 (final fix wave F3): the storyteller as its own story checker, printed like R27b's code.
       [undefined, { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, storyteller: PREVIEW_DEEPSEEK_CHECKER_ROLE_REF, storyChecker: PREVIEW_DEEPSEEK_CHECKER_ROLE_REF },
         'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-storyteller-is-story-checker']

@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "AB standart sözleşme maddeleri (Avrupa Komisyonu'nun, verilerin AB dışına gönderilmesi için hazırladığı model sözleşme)",
   "legal.providers.locationDeepInfra": "Yalnızca Amerika Birleşik Devletleri. Bu, DeepInfra'nın kendi sunucularında çalıştırdığı modelleri kapsar; bir modelin isteklerini bir sonraki kayıtta listelenen ortak şirkete iletir",
   "legal.providers.retentionDeepInfra": "Saklanmaz. DeepInfra metni yalnızca bir isteği yanıtlarken bellekte tutar, ardından siler. Günlükleri zaman ve maliyet gibi istek ayrıntılarını içerir, metni asla içermez. Bu, DeepInfra'nın kendi sunucularında çalıştırdığı modelleri kapsar",
-  "legal.providers.deepinfraPartnerName": "DeepInfra'nın bir model için ortağı (DeepInfra şirketin adını açıklamaz)",
   "legal.providers.locationPerplexity": "Amerika Birleşik Devletleri; Perplexity ve onun kendisi için çalıştığını belirttiği şirketler oradadır. Perplexity herhangi bir bölge belirtmez",
   "legal.providers.retentionPerplexity": "Perplexity arama istekleri için sabit bir süre yayımlamaz: bunun hizmete ve hesaba bağlı olduğunu söyler. Veri işleme koşulları uyarınca, hizmeti kullanmayı bırakmamızdan sonra 30 gün içinde kişisel verileri siler",
   "legal.providers.luxembourg": "Luxembourg",

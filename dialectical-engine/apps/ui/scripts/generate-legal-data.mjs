@@ -42,7 +42,9 @@
  *     every language this release offers (RELEASE_LEGAL_LOCALES) into the archive, and
  *     `pnpm run legal:release-check` (legal-release-check.mjs), which the release step runs, refuses
  *     a release while one of those languages lags the English text, a current text of one of them is
- *     not archived, or a changed text still carries an archived version number.
+ *     not archived, or a changed text still carries an archived version number;
+ *   - the effective day is the upload day: `pnpm run legal:redate --date YYYY-MM-DD` (legal-redate.mjs)
+ *     sets it in every draft and then runs the steps above and the release check.
  */
 
 import { createHash } from "node:crypto";
@@ -90,7 +92,7 @@ const DOCUMENTS = {
     draft: "privacy-policy.md",
     module: "privacyPolicy.ts",
     englishOutput: "apps/ui/lib/privacyPolicy.ts",
-    versionAnchor: "Version 1.0",
+    versionAnchor: "Version 1.1",
     numberedSections: 14,
     annexLetter: "B",
     annexParts: 6,
@@ -107,7 +109,7 @@ const DOCUMENTS = {
     draft: "terms-of-service.md",
     module: "termsOfService.ts",
     englishOutput: "apps/ui/lib/termsOfService.ts",
-    versionAnchor: "Version 1.0",
+    versionAnchor: "Version 1.1",
     numberedSections: 19,
     annexLetter: "A",
     annexParts: 6,

@@ -818,7 +818,8 @@ describe("case 4, condition 6, and the SA10 extra: the preview release (history 
   const QWEN = "Qwen/Qwen3.8-Flash", HAIKU = "claude-haiku-5-5";
   const OBSERVATION = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
     operatorSha256: "c".repeat(64), observedAt: "2026-10-22T08:00:00.000Z" };
-  const SITE_LINE_UP = parsePreviewLineUp({ free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU], thinking_levels: null });
+  /** The live line-up without Qwen: the kit seals no partner-served model, and check-version names one (condition 6). */
+  const SITE_LINE_UP = parsePreviewLineUp({ free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, HAIKU], thinking_levels: null });
   const SOCKETS_ONLY = parsePreviewEnvironmentConfig(JSON.stringify({ deployment: "v3-preview", requested_thinking_level: "high",
     budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock", anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock",
     scope_id: "settings-per-debate-ops" }))!;
@@ -915,23 +916,23 @@ describe("case 4, condition 6, and the SA10 extra: the preview release (history 
     const version = await publishFromPreview({ evaluatorCallBound: (current) => ({ ...(current as Record<string, unknown>), tokenCeiling: above }) });
     const halves = await checkPreview(version);
     // Every model the version can seat is named; nothing else (no other condition) fails.
-    const seatable = [...new Set([GLM, DEEPSEEK, MIMO, QWEN, HAIKU])].sort();
+    const seatable = [...new Set([GLM, DEEPSEEK, MIMO, HAIKU])].sort();
     await expectRefusedByCondition(preview, version, halves, {
       runner: seatable.map((model) => `SETTINGS_GATE_TOKEN_CEILING:evaluatorCallBound:${model}`).sort(), api: []
     }, (target) => activateOnPreview(target, gatesWithout()));
   });
 
   it("condition 6, live: a clean, PASSED candidate is refused SETTINGS_GATE_LIVE_CHECK_FAILED when a gate does not serve a model it seats; accepted when every gate does", async () => {
-    const lineUp = { kind: "PREVIEW_LINE_UP_POLICY", free_model_ids: [QWEN, GLM], premium_model_ids: [GLM, DEEPSEEK, QWEN, HAIKU],
-      thinking_levels: { [QWEN]: { level: "low", steps: { judge_panel: "medium" } }, [GLM]: { level: "high" } } };
+    const lineUp = { kind: "PREVIEW_LINE_UP_POLICY", free_model_ids: [MIMO, GLM], premium_model_ids: [GLM, DEEPSEEK, MIMO, HAIKU],
+      thinking_levels: { [HAIKU]: { level: "low", steps: { judge_panel: "medium" } }, [GLM]: { level: "high" } } };
     const version = await publishFromPreview({ previewLineUpPolicy: () => lineUp });
     await checkedPass(version);
     const before = await statusOf(preview);
     const rows = await activationRows(preview);
-    const refused = await refusal(activateOnPreview(version, gatesWithout(QWEN)));
+    const refused = await refusal(activateOnPreview(version, gatesWithout(MIMO)));
     expect(refused).toBeInstanceOf(SettingsOperatorRefusal);
     expect([(refused as SettingsOperatorRefusal).code, (refused as SettingsOperatorRefusal).codes])
-      .toEqual(["SETTINGS_GATE_LIVE_CHECK_FAILED", [`SETTINGS_GATE_MODEL_DISABLED:deepinfra:${QWEN}`]]);
+      .toEqual(["SETTINGS_GATE_LIVE_CHECK_FAILED", [`SETTINGS_GATE_MODEL_DISABLED:deepinfra:${MIMO}`]]);
     expect(await statusOf(preview)).toEqual(before);
     expect(await activationRows(preview)).toBe(rows);
     // Control: every gate serves every model it can seat: activated.
@@ -940,9 +941,9 @@ describe("case 4, condition 6, and the SA10 extra: the preview release (history 
     expect(await statusOf(preview)).toMatchObject({ currentRelease: P, pointer: version, effectiveActive: version });
   });
 
-  it("SA10 extra: the production reader checks the candidate's OWN previewLineUpPolicy roster (Free [GLM, Haiku], Qwen pros_cons low)", async () => {
-    const lineUp = { kind: "PREVIEW_LINE_UP_POLICY", free_model_ids: [GLM, HAIKU], premium_model_ids: [GLM, DEEPSEEK, QWEN, HAIKU],
-      thinking_levels: { [QWEN]: { level: "medium", steps: { pros_cons: "low" } } } };
+  it("SA10 extra: the production reader checks the candidate's OWN previewLineUpPolicy roster (Free [GLM, Haiku], DeepSeek pros_cons low)", async () => {
+    const lineUp = { kind: "PREVIEW_LINE_UP_POLICY", free_model_ids: [GLM, HAIKU], premium_model_ids: [GLM, DEEPSEEK, HAIKU],
+      thinking_levels: { [DEEPSEEK]: { level: "high", steps: { pros_cons: "low" } } } };
     const version = await publishFromPreview({ previewLineUpPolicy: () => lineUp });
     await checkedPass(version);
     // The candidate's roster model (Haiku, on its Free roster) is checked: a gate that does not serve it refuses.

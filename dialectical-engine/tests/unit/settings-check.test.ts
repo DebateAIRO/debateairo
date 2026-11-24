@@ -309,6 +309,20 @@ describe("check-version on the preview: the line-up and every model it can seat 
       .toEqual([`SETTINGS_GATE_UNREVIEWED:${DROPPED}`, `SETTINGS_NEEDS_ENV_CHANGE:TARGET:${DROPPED}`]);
   });
 
+  it("SETTINGS_GATE_PARTNER_SERVED:<model>: a version an older code sealed that seats Qwen, in a list of AIs or in an answer seat; the API half leaves it to the runner half", async () => {
+    // Qwen is a reviewed row its provider forwards to a partner company the legal texts do not name.
+    expect(previewModelRow(QWEN)?.partnerServed).toBe(true);
+    const listed = runnerReaders({ readLineUp: async () => sealedPreviewLineUpFromValue(sealed([GLM, DEEPSEEK], [GLM, DEEPSEEK, QWEN])) });
+    expect((await checkRunner(listed.readers, previewRunner())).codes).toEqual([`SETTINGS_GATE_PARTNER_SERVED:${QWEN}`]);
+    const seated = runnerReaders({ readRoleRefs: async () => [REF_A, "preview:qwen-3-8-flash", REF_A, REF_B] });
+    expect((await checkRunner(seated.readers, previewRunner())).codes).toEqual([`SETTINGS_GATE_PARTNER_SERVED:${QWEN}`]);
+    // A table entry for it seats nothing, and the same version without it passes.
+    const tableOnly = runnerReaders({ readLineUp: async () => sealedPreviewLineUpFromValue(sealed([GLM, DEEPSEEK], [GLM, DEEPSEEK], { [QWEN]: { level: "low" } })) });
+    expect(await checkRunner(tableOnly.readers, previewRunner())).toMatchObject({ verdict: "PASS", codes: [] });
+    const api = apiReaders({ readSite: async () => apiSite(), readLineUp: async () => sealedPreviewLineUpFromValue(sealed([GLM, DEEPSEEK], [GLM, DEEPSEEK, QWEN])) });
+    expect((await checkApi(api.readers, previewApi())).codes).toEqual([]);
+  });
+
   it("SETTINGS_GATE_THINKING_UNREVIEWED:<model>:<level>: a table an older, wider menu sealed, read as sealed and checked against this code's menus", async () => {
     const table = { [QWEN]: { level: "high" }, [GLM]: { level: "low", steps: { judge_panel: "max", opening: "high" } } };
     // Today's row parser refuses such a table at publish (Qwen has no "high", GLM no "max"): only an older code sealed it.

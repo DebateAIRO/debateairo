@@ -158,7 +158,6 @@
   "legal.providers.sccBasis": "EU 표준계약조항(EU 밖으로 데이터를 보낼 때 쓰도록 유럽연합 집행위원회가 마련한 모범 계약)",
   "legal.providers.locationDeepInfra": "미국에 한함. DeepInfra가 자체 서버에서 실행하는 모델에 해당하며, 모델 하나의 요청은 파트너 회사로 전달되고 그 회사는 다음 항목에 기재",
   "legal.providers.retentionDeepInfra": "저장하지 않음. DeepInfra는 요청에 답하는 동안에만 텍스트를 메모리에 보관한 뒤 삭제함. 로그에는 시각과 비용 같은 요청 정보만 남고 텍스트는 남지 않음. DeepInfra가 자체 서버에서 실행하는 모델에 해당",
-  "legal.providers.deepinfraPartnerName": "DeepInfra의 모델 하나에 대한 파트너(DeepInfra는 해당 회사의 이름을 밝히지 않음)",
   "legal.providers.locationPerplexity": "미국. Perplexity와 Perplexity가 자사를 위해 일한다고 밝힌 회사들이 있는 곳임. Perplexity는 지역을 밝히지 않음",
   "legal.providers.retentionPerplexity": "Perplexity는 검색 요청에 대한 고정된 기간을 공개하지 않으며, 서비스와 계정에 따라 다르다고 밝힘. 데이터 처리 약관에 따라 당사가 서비스 이용을 중단한 후 30일 이내에 개인 데이터를 삭제함",
   "legal.providers.luxembourg": "Luxembourg",

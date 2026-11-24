@@ -21,6 +21,7 @@ import {
   providerRegister,
   TERMS_VERSIONS
 } from "../../apps/ui/lib/legal/pages.js";
+import { archivedLegalText } from "../../apps/ui/lib/legal/archive.js";
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
 import { TERMS_OF_SERVICE } from "../../apps/ui/lib/termsOfService.js";
 import { LegalPageLayout } from "../../apps/ui/components/legal/LegalPageLayout.js";
@@ -353,18 +354,23 @@ describe("the text pages render the same documents as the sign-up modals", () =>
 describe("the terms versions page lists only versions that exist", () => {
   const minor = (version: string): number => Number(version.split(".")[1]);
 
-  // Version 1.0 is the first published text (owner's decisions of 19 and 20 November 2026: the pre-launch drafts, Terms
-  // 2.x and 1.1, were never offered to the public and are not kept), so the page lists it alone and says no earlier
-  // version exists.
-  it("names the current version, linked to its text, and says no earlier version has been published", () => {
+  // Version 1.0 is the first published text: the pre-launch drafts were never offered to the public and are not kept.
+  // Version 1.1 replaced it, so the page lists 1.1, in force, and 1.0, linked to its archived text.
+  it("names the current version, linked to its text, and the version it replaced, linked to its archived text", () => {
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
     const rows = view.querySelectorAll(".legalVersionRow");
     expect(rows).toHaveLength(TERMS_VERSIONS.length);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
     expect(rows[0]?.querySelector(".legalVersionTag")?.textContent).toBe(legalEnglish["legal.versions.current"]);
-    expect(TERMS_VERSIONS.map(({ version }) => version)).toEqual(["1.0"]);
-    expect(view.querySelector(".legalVersionsNone")?.textContent).toBe(legalEnglish["legal.versions.none"]);
+    expect(TERMS_VERSIONS.map(({ version }) => version)).toEqual(["1.1", "1.0"]);
+    const older = rows[1]?.querySelector("a")?.getAttribute("href") ?? "";
+    expect(rows[1]?.querySelector(".legalVersionTag")).toBeNull();
+    expect(rows[1]?.textContent).toContain(legalEnglish["legal.archive.meta"]);
+    const archived = archivedLegalText("TERMS", older.replace("/terms/versions/", ""), "en");
+    expect(archived?.version, older).toBe("1.0");
+    expect(archived?.text).toMatch(/^\*\*Version 1\.0 · Effective /mu);
+    expect(view.querySelector(".legalVersionsNone")).toBeNull();
   });
 
   it("has a row for every version from 1.0 to the current one, newest first, so a skipped number shows up here", () => {
@@ -575,11 +581,11 @@ describe("the model providers page lists the companies the API's targets reach (
   });
 
   it("renders one register entry per provider, the support chat's model last", () => {
-    // No answer from the API: every reviewed company (Anthropic, DeepInfra and Amazon), not the hosted cloud rows. DeepInfra is
-    // followed by the company it forwards one model to (16 November 2026: that company receives debate text).
+    // No answer from the API: every reviewed company (Anthropic, DeepInfra and Amazon), not the hosted cloud rows. No row for a
+    // partner of DeepInfra: no model DeepInfra forwards to one is seated (tests/unit/partner-served-line-up.test.ts).
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={PROVIDER_REGISTER} />);
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
-    expect(headings).toEqual(["Anthropic", "DeepInfra", legalEnglish["legal.providers.deepinfraPartnerName"], "Amazon (OpenAI models)", "Perplexity", "Support chat model"]);
+    expect(headings).toEqual(["Anthropic", "DeepInfra", "Amazon (OpenAI models)", "Perplexity", "Support chat model"]);
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
   });
 
@@ -607,11 +613,11 @@ describe("the model providers page lists the companies the API's targets reach (
     expect(support?.textContent).not.toMatch(/\[/u);
   });
 
-  it("when the API's targets reach DeepInfra alone (the GLM-only set), lists DeepInfra and its partner, then Perplexity, then the support chat's model, and no hosted cloud row", () => {
+  it("when the API's targets reach DeepInfra alone (the GLM-only set), lists DeepInfra, then Perplexity, then the support chat's model, and no hosted cloud row", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={providerRegister(["deepinfra"])} />);
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
     // Owner, 10 October 2026: the page names only the companies that receive text; addition D24: no own-servers Qwen row.
-    expect(headings).toEqual(["DeepInfra", legalEnglish["legal.providers.deepinfraPartnerName"], "Perplexity", "Support chat model"]);
+    expect(headings).toEqual(["DeepInfra", "Perplexity", "Support chat model"]);
   });
 
   it("states the Privacy Policy's Register facts for every provider (PP §5, Japan and Korea)", () => {
@@ -697,8 +703,8 @@ describe("the model providers page lists the companies the API's targets reach (
 
   it("claims nothing unverified: a cloud provider's contract facts stay bracketed until someone checks the row", () => {
     const uncheckedRows = WITH_UNCHECKED.filter(({ checkedOn }) => checkedOn === null);
-    // DeepInfra's partner for one model (a company DeepInfra does not name) and a host no catalogue row knows.
-    expect(uncheckedRows.map(({ key }) => key)).toEqual(["deepinfra-partner", "host:api.acme.example"]);
+    // A host no catalogue row knows.
+    expect(uncheckedRows.map(({ key }) => key)).toEqual(["host:api.acme.example"]);
     for (const entry of uncheckedRows) {
       expect(isUnverified(entry.entity)).toBe(true);
       expect(isUnverified(entry.contact)).toBe(true);
@@ -723,8 +729,8 @@ describe("the model providers page lists the companies the API's targets reach (
       const unchecked = register.some(({ checkedOn }) => checkedOn === null);
       expect(view.textContent.includes("[not checked yet]")).toBe(unchecked);
     }
-    // Perplexity's row is checked against its terms; only DeepInfra's unnamed partner is left.
-    expect(PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null).map(({ key }) => key)).toEqual(["deepinfra-partner"]);
+    // Every row of the whole reviewed catalogue is checked against its provider's terms.
+    expect(PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null).map(({ key }) => key)).toEqual([]);
   });
 
   it("shows every register label in every locale's catalogue", () => {
