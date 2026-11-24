@@ -1529,13 +1529,17 @@ address is told and may cancel, and a finish link with the password opens the en
   its receipt (`STAFF_OPERATION_CONFLICT` for another request under it), refuses a fourth approval in any 24 hours
   (`RECOVERY_PERMITS_DAILY_CAP`), a stale revision or an ask that is over (`RECOVERY_PERMITS_STALE`) and an account under
   a security hold or with an adverse mark (`RECOVERY_PERMIT_NOT_ALLOWED`), then uses the proof (0085's
-  `staff.consume_action`), writes its row and, with an alert, 0085's `staff.record_mutation`
-  (`ACCOUNT_RECOVERY_APPROVED` or `ACCOUNT_RECOVERY_REFUSED`, reason `SECURITY_RESPONSE`, the Owner as actor and subject:
-  the audit row names no account). A refusal while the team tools are locked writes its row with `alerted` false and
-  nothing else.
-- `staff.read_audit_page_v3(jsonb,text,integer,timestamptz,uuid)`: 0186's audit page with the two events left out, EXECUTE
-  for `debateai_runtime`. The API's staff repository calls it; the release before keeps calling 0186's, which shows the
-  two events as no event, so its audit list answers 503 while such rows exist (`GET /v1/admin/audit`).
+  `staff.consume_action`), writes its row and, with an alert, 0085's `staff.record_mutation`: the existing event `GRANT`
+  (a grant made under `TEAM_GRANT`), reason `SECURITY_RESPONSE`, reference `account-recovery:approved` or
+  `account-recovery:refused`, the Owner as actor and subject (the audit row names no account). A refusal while the team
+  tools are locked writes its row with `alerted` false and nothing else.
+
+The step writes no new kind of audit event on purpose. 0186's postcondition digests the event list of
+`staff.audit_event` (`audit_event_funded_event_type_check`), and a release restarting on a database ahead of it refuses
+an amendment recorded by a step it does not know (`MIGRATION_FORWARD_CHAIN_AMENDMENT_BINDING_DRIFT`, checked before the
+database-ahead rule). A step that widened that list would therefore have to be a drained one. With the existing event
+the general audit list (0186's `staff.read_audit_page_v2`, unchanged) shows a decision as a grant change with its
+reference, on this release and on the one before.
 
 The limits are the database's own and are asked again at every step: never an account that is or was staff
 (`staff.consumer_security_affiliated`), never under a security hold, an erasure or an adverse mark, never without a
@@ -1544,22 +1548,17 @@ in any 90 days, none within 24 hours of a cancelled or refused one. A sign-in, o
 a sign-in method after the ask, ends it (`tests/integration/recovery-permit-0188.test.ts`).
 
 While the step applies, the new tables' references take SHARE ROW EXCLUSIVE on `identity."user"` and on `staff.subject`
-until the step commits, and the widened event list takes ACCESS EXCLUSIVE on `staff.audit_event` for the last statements
-of the step. The step waits for a lock 2 s at a time, five times, and then ends `MIGRATION_LOCK_TIMEOUT`; run it again.
+until the step commits. The step waits for a lock 2 s at a time, five times, and then ends `MIGRATION_LOCK_TIMEOUT`; run it again.
 
 Its files: `0188_recovery_permit.sql`, `recovery-permit-forward0188.json` and
 `packages/db/src/migration-forward0188.ts` (`loadForward0188`, appended last to `STEPS`, `MIGRATION_FORWARD0188_*`
-refusals). Its header declares `-- n1: expand` and `-- n1: keeps-verifier`: four new tables and twenty-seven new functions,
-nothing older altered, dropped, renamed, revoked or replaced but for two `-- n1: reviewed` statements: the `DO` block that
-gives the three functions over `/recover`'s tables their owner, and, last in the step, the pair `ALTER TABLE
-staff.audit_event DROP CONSTRAINT IF EXISTS audit_event_funded_event_type_check` with its `ADD CONSTRAINT ... NOT VALID`,
-0186's event list plus the two of this step, so every event the release before writes stays allowed. It adds no billing
-relation or function, so its manifest names 0130's verifier (`verify-effective-capabilities-130.sql`) as both
-`previous.verifierSha256` and its own. It has no supplemental verifier, so no `replayVerifierSql`: its checks are its
-postcondition digest (each of the four tables whole, each of the twenty-seven functions whole, and the widened
-constraint's definition). 0186's postcondition digests that same constraint, so this step declares it in
-`amendsPostconditionsOf` (`constraint_definition`, loader and manifest alike), and 0186 is compared against its digest
-re-measured after this step from then on.
+refusals). Its header declares `-- n1: expand` and `-- n1: keeps-verifier`: four new tables and twenty-six new functions,
+nothing older altered, dropped, renamed, revoked or replaced. One statement carries a `-- n1: reviewed <reason>` line:
+the `DO` block that gives the three functions over `/recover`'s tables their owner. It adds no billing relation or
+function, so its manifest names 0130's verifier (`verify-effective-capabilities-130.sql`) as both
+`previous.verifierSha256` and its own. It amends no chain step (`amendsPostconditionsOf` is empty) and has no
+supplemental verifier, so no `replayVerifierSql`: its checks are its postcondition digest (each of the four tables
+whole and each of the twenty-six functions whole).
 
 Its `previous` is 0187, so its `previous.manifestSha256` is the SHA-256 of
 `passkey-allow-credentials-forward0187.json`. Until the step is applied anywhere its SQL may still change; after an SQL edit recompute `migration.sha256` in its manifest (the

@@ -9,7 +9,7 @@ export type StaffAlertIntent = Readonly<{
     schema: 'staff-alert-v1';
     event: 'INVITE' | 'ACCEPT' | 'GRANT' | 'DISABLE' | 'BOOTSTRAP' | 'RECOVER_OWNER' | 'KEY_CHANGE' | 'ALLOWANCE_CONFIGURED' | 'ALLOWANCE_REVOKED'
       | 'TEAM_LIMIT_CHANGED' | 'TEAM_LIMIT_PARTNER_GRANTED' | 'TEAM_LIMIT_PARTNER_REVOKED' | 'TEAM_PRACTICE_RECORDED' | 'PUBLIC_REVIEW_CHANGED'
-      | 'PREVIEW_BUYER_ADDED' | 'PREVIEW_BUYER_REMOVED' | 'ACCOUNT_RECOVERY_APPROVED' | 'ACCOUNT_RECOVERY_REFUSED';
+      | 'PREVIEW_BUYER_ADDED' | 'PREVIEW_BUYER_REMOVED';
     operationId: string;
     envelope: CryptoEnvelope;
 }>;
@@ -474,12 +474,12 @@ export class PostgresStaffRepository implements StaffRepository, StaffWebAuthnRe
         return { members: result.members.map(row => ({ ...row, last_privilege_at: row.last_privilege_at === null ? null : date(row.last_privilege_at).toISOString() })),
             next_cursor: nextCursor(result.nextPosition), order: result.order };
     }
-    /** 0188's reader: 0150's page with the events of the Owner's own lists left out (the team limit's, the approved buyers' and the recovery asks'). */
+    /** 0186's reader: 0150's page with the preview buyers' two events left out, as the team limit's are (the Owner's list shows them). */
     async readAuditPage(input: StaffProjectionRead): Promise<StaffAuditPageRecord> {
         const [afterTime, afterId] = cursorPosition(input.cursor);
         const result = await this.guarded<Omit<StaffAuditPageRecord, 'next_cursor'> & {
             nextPosition: unknown;
-        }>('SELECT staff.read_audit_page_v3($1::jsonb,$2,$3,$4,$5) AS value', [input.context, input.ordinaryTokenHash, input.limit, afterTime, afterId]);
+        }>('SELECT staff.read_audit_page_v2($1::jsonb,$2,$3,$4,$5) AS value', [input.context, input.ordinaryTokenHash, input.limit, afterTime, afterId]);
         return { events: result.events.map(row => ({ ...row, recorded_at: date(row.recorded_at).toISOString() })),
             next_cursor: nextCursor(result.nextPosition), order: result.order };
     }

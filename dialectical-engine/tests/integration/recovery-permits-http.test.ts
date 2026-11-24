@@ -266,7 +266,8 @@ describe("the Owner's decision through the key ceremony", () => {
     expect(response.json()).toEqual({ operation_id: intent.operation_id, outcome: "COMPLETED", recorded_at: expect.any(String) });
     expect(await stage(ref)).toEqual({ stage: "WAITING", revision: 3 });
     expect((await database.pool.query("SELECT kind,alerted,actor_staff_id FROM staff.recovery_permit_decision WHERE permit_id=$1", [ref])).rows).toEqual([{ kind: "APPROVED", alerted: true, actor_staff_id: owner.staffId }]);
-    expect((await database.pool.query("SELECT event_type FROM staff.audit_event WHERE operation_id=$1", [intent.operation_id])).rows).toEqual([{ event_type: "ACCOUNT_RECOVERY_APPROVED" }]);
+    expect((await database.pool.query("SELECT event_type,reason_code,ticket_ref FROM staff.audit_event WHERE operation_id=$1", [intent.operation_id])).rows)
+      .toEqual([{ event_type: "GRANT", reason_code: "SECURITY_RESPONSE", ticket_ref: "account-recovery:approved" }]);
     const row = (await rowOf(ref))!;
     expect(row).toMatchObject({ stage: "WAITING", revision: 3, approved_at: expect.any(String), not_before: expect.any(String), finish_expires_at: expect.any(String) });
     expect(Date.parse(row.not_before as string) - Date.parse(row.approved_at as string)).toBe(72 * 3_600_000);

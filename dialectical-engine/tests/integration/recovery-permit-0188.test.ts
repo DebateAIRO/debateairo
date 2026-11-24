@@ -24,7 +24,8 @@ type Actor = Readonly<{ userId: string; sessionId: string; staffId: string; priv
 type Decision = "RECOVERY_PERMIT_APPROVE" | "RECOVERY_PERMIT_REFUSE";
 let owner: Actor;
 const ACT = "SELECT staff.recovery_permit_act($1::jsonb,$2::uuid,$3::jsonb,$4::jsonb,$5::jsonb) AS value";
-const EVENT: Record<Decision, string> = { RECOVERY_PERMIT_APPROVE: "ACCOUNT_RECOVERY_APPROVED", RECOVERY_PERMIT_REFUSE: "ACCOUNT_RECOVERY_REFUSED" };
+/** Both decisions are audited and alerted as the existing event of a grant made under TEAM_GRANT; the reference tells them apart. */
+const EVENT: Record<Decision, string> = { RECOVERY_PERMIT_APPROVE: "GRANT", RECOVERY_PERMIT_REFUSE: "GRANT" };
 
 type Account = Readonly<{ userId: string; index: Buffer; primary: string; backup: string | null; passkey: string | null }>;
 /** An active account whose sign-in address was verified 60 days ago, with one passkey and, when asked, a backup address. */
@@ -323,8 +324,8 @@ describe("the Owner's decision", () => {
     // One decision row, one audit row and its independent alert, under the decision's operation.
     const decision = (await database.pool.query("SELECT kind,alerted,actor_staff_id,operation_id FROM staff.recovery_permit_decision WHERE permit_id=$1", [s.permitId])).rows;
     expect(decision).toEqual([{ kind: "APPROVED", alerted: true, actor_staff_id: owner.staffId, operation_id: result.rows[0].value.operationId }]);
-    const audit = (await database.pool.query("SELECT a.event_type,a.reason_code,a.actor_staff_id,a.subject_staff_id,(SELECT count(*)::int FROM staff.alert_outbox o WHERE o.event_id=a.event_id) AS alerts FROM staff.audit_event a WHERE a.operation_id=$1", [decision[0].operation_id])).rows;
-    expect(audit).toEqual([{ event_type: "ACCOUNT_RECOVERY_APPROVED", reason_code: "SECURITY_RESPONSE", actor_staff_id: owner.staffId, subject_staff_id: owner.staffId, alerts: 1 }]);
+    const audit = (await database.pool.query("SELECT a.event_type,a.reason_code,a.ticket_ref,a.actor_staff_id,a.subject_staff_id,(SELECT count(*)::int FROM staff.alert_outbox o WHERE o.event_id=a.event_id) AS alerts FROM staff.audit_event a WHERE a.operation_id=$1", [decision[0].operation_id])).rows;
+    expect(audit).toEqual([{ event_type: "GRANT", reason_code: "SECURITY_RESPONSE", ticket_ref: "account-recovery:approved", actor_staff_id: owner.staffId, subject_staff_id: owner.staffId, alerts: 1 }]);
   });
   it("a staff member who is not the Owner is refused, by the door and by the list's reader, and nothing changes", async () => {
     const d = await delegate(), a = await account(), s = await asked(a);
@@ -338,14 +339,14 @@ describe("the Owner's decision", () => {
     const a = await account(), s = await asked(a), at = (await row(s.permitId)).revision as number;
     const proven = binding("RECOVERY_PERMIT_APPROVE", a, s.permitId, at), cmd = command("RECOVERY_PERMIT_APPROVE", a, s.permitId, at, proven.operationId as string);
     await authorizeStaffAlertFixture(database.pool, proven.operationId as string);
-    const alert = { schema: "staff-alert-v1", event: "ACCOUNT_RECOVERY_APPROVED", operationId: proven.operationId, envelope: envelope("YQ==") };
+    const alert = { schema: "staff-alert-v1", event: "GRANT", operationId: proven.operationId, envelope: envelope("YQ==") };
     // No proof was ever made for this binding.
     await expect(api.query(ACT, [owner.context, randomUUID(), proven, cmd, alert])).rejects.toThrow("STAFF_PROOF_INVALID");
     const expired = await storedProof(owner, proven, null, "expired");
     await expect(api.query(ACT, [owner.context, expired.proofId, proven, cmd, alert])).rejects.toThrow("STAFF_PROOF_INVALID");
     expect((await row(s.permitId)).stage).toBe("REQUESTED");
     // A live proof is used once: the same proof under a new operation for the same ask is refused.
-    const live = await storedProof(owner, proven, "ACCOUNT_RECOVERY_APPROVED");
+    const live = await storedProof(owner, proven, "GRANT");
     await api.query(ACT, [owner.context, live.proofId, proven, cmd, live.alert]);
     expect((await row(s.permitId)).stage).toBe("WAITING");
     const b = await account(), t = await asked(b), other = binding("RECOVERY_PERMIT_APPROVE", b, t.permitId, 2);
@@ -356,16 +357,16 @@ describe("the Owner's decision", () => {
     await clearToday();
     const a = await account(), b = await account(), sa = await asked(a), sb = await asked(b);
     // Made for b's request, presented with a's.
-    const forB = binding("RECOVERY_PERMIT_APPROVE", b, sb.permitId, 2), proofB = await storedProof(owner, forB, "ACCOUNT_RECOVERY_APPROVED");
+    const forB = binding("RECOVERY_PERMIT_APPROVE", b, sb.permitId, 2), proofB = await storedProof(owner, forB, "GRANT");
     await expect(api.query(ACT, [owner.context, proofB.proofId, forB, command("RECOVERY_PERMIT_APPROVE", a, sa.permitId, 2, forB.operationId as string), proofB.alert])).rejects.toThrow("STAFF_PROOF_INVALID");
     // Same account, another request of it: the body names the request.
-    const elsewhere = binding("RECOVERY_PERMIT_APPROVE", a, randomUUID(), 2), proofElsewhere = await storedProof(owner, elsewhere, "ACCOUNT_RECOVERY_APPROVED");
+    const elsewhere = binding("RECOVERY_PERMIT_APPROVE", a, randomUUID(), 2), proofElsewhere = await storedProof(owner, elsewhere, "GRANT");
     await expect(api.query(ACT, [owner.context, proofElsewhere.proofId, elsewhere, command("RECOVERY_PERMIT_APPROVE", a, sa.permitId, 2, elsewhere.operationId as string), proofElsewhere.alert])).rejects.toThrow("STAFF_PROOF_INVALID");
     // A proof to refuse a's request, presented as an approval of it.
-    const refusing = binding("RECOVERY_PERMIT_REFUSE", a, sa.permitId, 2), proofRefusing = await storedProof(owner, refusing, "ACCOUNT_RECOVERY_APPROVED");
+    const refusing = binding("RECOVERY_PERMIT_REFUSE", a, sa.permitId, 2), proofRefusing = await storedProof(owner, refusing, "GRANT");
     await expect(api.query(ACT, [owner.context, proofRefusing.proofId, refusing, command("RECOVERY_PERMIT_APPROVE", a, sa.permitId, 2, refusing.operationId as string), proofRefusing.alert])).rejects.toThrow("STAFF_PROOF_INVALID");
     // A proof made for the approved buyers' list (0186), for the same account, revision and operation.
-    const buyers = canonicalPreviewBuyerBinding("PREVIEW_BUYER_ADD", a.userId, 2, randomUUID()) as unknown as Record<string, unknown>, proofBuyers = await storedProof(owner, buyers, "ACCOUNT_RECOVERY_APPROVED");
+    const buyers = canonicalPreviewBuyerBinding("PREVIEW_BUYER_ADD", a.userId, 2, randomUUID()) as unknown as Record<string, unknown>, proofBuyers = await storedProof(owner, buyers, "GRANT");
     await expect(api.query(ACT, [owner.context, proofBuyers.proofId, buyers, command("RECOVERY_PERMIT_APPROVE", a, sa.permitId, 2, buyers.operationId as string), proofBuyers.alert])).rejects.toThrow("STAFF_PROOF_INVALID");
     expect((await row(sa.permitId)).stage).toBe("REQUESTED");
     expect((await row(sb.permitId)).stage).toBe("REQUESTED");
@@ -373,10 +374,10 @@ describe("the Owner's decision", () => {
       expect((await database.pool.query("SELECT consumed_at FROM staff.action_proof WHERE proof_id=$1", [proof.proofId])).rows[0].consumed_at).toBeNull();
   });
   it("a proof made at the revision the Owner saw is stale once the request changed", async () => {
-    const a = await account(), s = await asked(a), old = binding("RECOVERY_PERMIT_APPROVE", a, s.permitId, 1), proof = await storedProof(owner, old, "ACCOUNT_RECOVERY_APPROVED");
+    const a = await account(), s = await asked(a), old = binding("RECOVERY_PERMIT_APPROVE", a, s.permitId, 1), proof = await storedProof(owner, old, "GRANT");
     await expect(api.query(ACT, [owner.context, proof.proofId, old, command("RECOVERY_PERMIT_APPROVE", a, s.permitId, 1, old.operationId as string), proof.alert])).rejects.toThrow("RECOVERY_PERMITS_STALE");
     expect(await permits.cancel(s.cancel, source)).toBe("CANCELLED");
-    const late = binding("RECOVERY_PERMIT_APPROVE", a, s.permitId, 2), lateProof = await storedProof(owner, late, "ACCOUNT_RECOVERY_APPROVED");
+    const late = binding("RECOVERY_PERMIT_APPROVE", a, s.permitId, 2), lateProof = await storedProof(owner, late, "GRANT");
     await expect(api.query(ACT, [owner.context, lateProof.proofId, late, command("RECOVERY_PERMIT_APPROVE", a, s.permitId, 2, late.operationId as string), lateProof.alert])).rejects.toThrow("RECOVERY_PERMITS_STALE");
   });
   it("an approval waits for the team tools; a refusal does not, and then leaves its own row and no audit row", async () => {
@@ -423,7 +424,7 @@ describe("the Owner's decision", () => {
   it("the same operation sent again answers its receipt, and another request under it is refused", async () => {
     await clearToday();
     const a = await account(), s = await asked(a), proven = binding("RECOVERY_PERMIT_APPROVE", a, s.permitId, 2), cmd = command("RECOVERY_PERMIT_APPROVE", a, s.permitId, 2, proven.operationId as string);
-    const proof = await storedProof(owner, proven, "ACCOUNT_RECOVERY_APPROVED");
+    const proof = await storedProof(owner, proven, "GRANT");
     const first = (await api.query(ACT, [owner.context, proof.proofId, proven, cmd, proof.alert])).rows[0].value;
     const again = (await api.query(ACT, [owner.context, proof.proofId, proven, cmd, proof.alert])).rows[0].value;
     expect(again).toEqual(first);
@@ -444,10 +445,22 @@ describe("the Owner's decision", () => {
     expect(await row(s.permitId)).toMatchObject({ stage: "EXPIRED", close_reason: "TIMED_OUT" });
     expect((await notices(s.permitId)).filter((n) => n.event_kind !== "PROOF")).toEqual([{ channel_id: a.primary, event_kind: "REFUSED", later: false }]);
   });
-  it("the general audit page leaves the two events out, as it leaves out the approved buyers'", async () => {
-    const page = (await api.query("SELECT staff.read_audit_page_v3($1::jsonb,$2,100,NULL,NULL) AS value", [owner.context, hash(owner.sessionId)])).rows[0].value;
-    expect((await database.pool.query("SELECT count(*)::int AS n FROM staff.audit_event WHERE event_type LIKE 'ACCOUNT_RECOVERY_%'")).rows[0].n).toBeGreaterThan(0);
-    expect((page.events as { event: string | null }[]).every((e) => e.event !== null)).toBe(true);
+  it("a refusal's audit row carries its own reference, and the list of audit events is the one 0186 left", async () => {
+    const a = await account(), s = await asked(a), refused = await decide(owner, "RECOVERY_PERMIT_REFUSE", a, s.permitId);
+    expect((await database.pool.query("SELECT event_type,reason_code,ticket_ref FROM staff.audit_event WHERE operation_id=$1", [refused.rows[0].value.operationId])).rows)
+      .toEqual([{ event_type: "GRANT", reason_code: "SECURITY_RESPONSE", ticket_ref: "account-recovery:refused" }]);
+    // No event name of this step's own: every audit row holds one of 0186's events, so the release before reads them all.
+    const allowed = (await database.pool.query("SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conrelid='staff.audit_event'::regclass AND conname='audit_event_funded_event_type_check'")).rows[0].def as string;
+    expect(allowed).toContain("PREVIEW_BUYER_REMOVED");
+    expect(allowed).not.toMatch(/RECOVERY/u);
+  });
+  it("the general audit list, as the release before reads it too, shows each decision as a grant change with its reference", async () => {
+    const page = (await api.query("SELECT staff.read_audit_page_v2($1::jsonb,$2,100,NULL,NULL) AS value", [owner.context, hash(owner.sessionId)])).rows[0].value;
+    const events = page.events as { event: string | null; reason?: { code?: string; ticket_ref?: string } }[];
+    expect(events.every((e) => e.event !== null)).toBe(true);
+    const decisions = events.filter((e) => e.reason?.ticket_ref?.startsWith("account-recovery:"));
+    expect(decisions.length).toBeGreaterThan(0);
+    expect(decisions.every((e) => e.event === "GRANTS_CHANGED" && e.reason?.code === "SECURITY_RESPONSE")).toBe(true);
   });
 });
 
