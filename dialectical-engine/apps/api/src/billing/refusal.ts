@@ -85,7 +85,12 @@ export type BillingRefusalCode =
    * ask questions there, so it would pay and then be refused every question; on the sandbox the account is not on the
    * team list. Nothing was written (403).
    */
-  | "PREVIEW_TEAM_ONLY";
+  | "PREVIEW_TEAM_ONLY"
+  /**
+   * On the hosted preview, the buyer rule had to ask the Owner's list of approved buyers (migration 0186) and could not
+   * read it. It fails closed: nothing was written and no payment page opened (503).
+   */
+  | "PREVIEW_BUYERS_UNAVAILABLE";
 
 export type BillingRefusalStatus = 403 | 404 | 409 | 422 | 503;
 
@@ -103,15 +108,40 @@ export function billingNotFound(reply: FastifyReply): FastifyReply {
 }
 
 /**
- * Who may buy or upgrade a plan, when a rule applies: buildApi hands one over only on the hosted preview
- * (previewBuyerAdmits in @debateai/providers). Absent, everyone signed in may, as before.
+ * The buyer rule's answer for one account: ADMIT, REFUSE (not a buyer here), or UNAVAILABLE (the rule had to read the
+ * Owner's list of approved buyers and could not, so it fails closed).
  */
-export type BillingBuyerAdmits = (session: AuthenticatedSession) => boolean;
+export type BillingBuyerVerdict = "ADMIT" | "REFUSE" | "UNAVAILABLE";
+/**
+ * Who may buy or upgrade a plan, when a rule applies: buildApi hands one over only on the hosted preview
+ * (previewBuyerAdmits in @debateai/providers, and the Owner's list where previewBuyerNeedsApproval says it counts).
+ * Absent, everyone signed in may, as before.
+ */
+export type BillingBuyerAdmits = (session: AuthenticatedSession) => Promise<BillingBuyerVerdict>;
 
 /** The buyer rule's refusal, answered before any budget, check or payment page: nothing is spent or written. */
 export function refuseBuyer(reply: FastifyReply): FastifyReply {
   const code: BillingRefusalCode = "PREVIEW_TEAM_ONLY";
   return reply.status(403).send({ error: code, message: code });
+}
+
+/** The buyer rule could not read the Owner's list: answered at the same place as refuseBuyer, so nothing is spent or written. */
+export function refuseBuyerUnavailable(reply: FastifyReply): FastifyReply {
+  const code: BillingRefusalCode = "PREVIEW_BUYERS_UNAVAILABLE";
+  return reply.status(503).send({ error: code, message: code });
+}
+
+/**
+ * Asks the buyer rule, when there is one, and answers its refusal: the reply when the purchase stops here, null when it
+ * may go on. Anything but ADMIT stops it, a throw included.
+ */
+export async function refusedByBuyerRule(reply: FastifyReply, buyerAdmits: BillingBuyerAdmits | undefined,
+  session: AuthenticatedSession): Promise<FastifyReply | null> {
+  if (buyerAdmits === undefined) return null;
+  let verdict: BillingBuyerVerdict;
+  try { verdict = await buyerAdmits(session); } catch { verdict = "UNAVAILABLE"; }
+  if (verdict === "ADMIT") return null;
+  return verdict === "REFUSE" ? refuseBuyer(reply) : refuseBuyerUnavailable(reply);
 }
 
 /**

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { parsePreviewProviderTestConfig, type PreviewAsksOpenTo } from "@debateai/providers";
 import { startBillingStack, type BillingPerson, type BillingStack, type HttpAnswer } from "../support/billingStack.js";
+import { previewBuyerOwner } from "../support/previewBuyerOwner.js";
 
 /**
  * The preview's buyer rule on NETOPIA's sandbox, on the fake stack (the real billing routes, runtime and jobs over
@@ -10,6 +11,11 @@ import { startBillingStack, type BillingPerson, type BillingStack, type HttpAnsw
  * account on the team line may start a purchase. An account not on it gets every price as before, and is refused 403
  * PREVIEW_TEAM_ONLY at the checkout and at the upgrade with nothing written: no charge, no payment page, no subscription
  * event, no job and no NETOPIA request. A listed account buys and upgrades as before.
+ *
+ * The Owner's list of approved buyers (0186) is handed as main.ts hands it. Under everyone-with-listed-buyers an account
+ * the Owner approved through the list's door buys like a team account, and is refused again once removed; under the team
+ * rule the list counts for nothing. A list that cannot be read refuses an account not on the team line 503
+ * PREVIEW_BUYERS_UNAVAILABLE with nothing written, and is never read for a team account.
  *
  * Each mode has its own stack; inside one, the cases share it, so their order matters only through the counts each one
  * takes before and after itself.
@@ -24,6 +30,8 @@ type Counts = Readonly<Record<"charges" | "chargeEvents" | "hostedPayments" | "q
 const withoutQuotes = ({ quotes: _quotes, ...rest }: Counts) => rest;
 const refusedAsBuyer = (answer: HttpAnswer) =>
   expect({ status: answer.status, error: answer.body.error }).toEqual({ status: 403, error: "PREVIEW_TEAM_ONLY" });
+const refusedUnreadable = (answer: HttpAnswer) =>
+  expect({ status: answer.status, error: answer.body.error }).toEqual({ status: 503, error: "PREVIEW_BUYERS_UNAVAILABLE" });
 
 const MODES: ReadonlyArray<readonly [string, PreviewAsksOpenTo | undefined]> = [
   ["everyone-with-listed-buyers", "everyone-with-listed-buyers"],
@@ -39,6 +47,12 @@ describe.each(MODES)("%s on the sandbox: only the team line may buy", (_name, as
   let listedSubscriber: BillingPerson;
   /** Bought a plan while listed, then taken off the line (the API restarted on the shorter one). */
   let removedSubscriber: BillingPerson;
+  /** Not on the team line: the Owner allows it to buy on the Team page (0186). */
+  let approved: BillingPerson;
+  /** On the team line, with no checkout of its own yet. */
+  let teamBuyer: BillingPerson;
+  let owner: ReturnType<typeof previewBuyerOwner>;
+  const listCounts = asksOpenTo === "everyone-with-listed-buyers";
 
   async function counts(): Promise<Counts> {
     const count = async (table: string): Promise<number> =>
@@ -53,12 +67,15 @@ describe.each(MODES)("%s on the sandbox: only the team line may buy", (_name, as
   const upgradeBody = (quoteRef: string) => ({ plan_id: "PRO", quote_ref: quoteRef, locale: "en", renewal_terms: stack.consents("en").renewal_terms });
 
   beforeAll(async () => {
-    stack = await startBillingStack({ preview: { config: PREVIEW, teamUserIds: team, ...(asksOpenTo === undefined ? {} : { asksOpenTo }) } });
+    stack = await startBillingStack({ preview: { config: PREVIEW, teamUserIds: team, approvedBuyers: true, ...(asksOpenTo === undefined ? {} : { asksOpenTo }) } });
+    owner = previewBuyerOwner(stack.database.pool);
     listedBuyer = await stack.signUp("listed.buyer@example.test", "DE");
     stranger = await stack.signUp("not.listed@example.test", "DE");
     listedSubscriber = await stack.signUp("listed.subscriber@example.test", "DE");
     removedSubscriber = await stack.signUp("removed.subscriber@example.test", "DE");
-    team.push(listedBuyer.userId, listedSubscriber.userId, removedSubscriber.userId);
+    approved = await stack.signUp("approved.buyer@example.test", "DE");
+    teamBuyer = await stack.signUp("team.buyer@example.test", "DE");
+    team.push(listedBuyer.userId, listedSubscriber.userId, removedSubscriber.userId, teamBuyer.userId);
     await stack.subscribe(listedSubscriber, "PLUS", "DE");
     await stack.subscribe(removedSubscriber, "PLUS", "DE");
     team.splice(team.indexOf(removedSubscriber.userId), 1);
@@ -114,5 +131,51 @@ describe.each(MODES)("%s on the sandbox: only the team line may buy", (_name, as
     expect(upgraded.status).toBe(200);
     expect(String(upgraded.body.redirect_url).startsWith(`${stack.netopia.baseUrl}/ui/card?p=`)).toBe(true);
     expect((await counts()).charges).toBe(before.charges + 1);
+  });
+
+  it(listCounts ? "an account the Owner approved buys; removed, it is refused again with nothing written"
+    : "an account the Owner approved is still refused: the list counts only while asks are open with listed buyers", async () => {
+    await owner.change("PREVIEW_BUYER_ADD", approved.userId);
+    const quote = await stack.quote(approved, "PLUS");
+    expect(quote.status).toBe(200);
+    const before = await counts();
+    const checkout = await stack.checkout(approved, String(quote.body.quote_ref));
+    if (listCounts) {
+      expect(checkout.status).toBe(200);
+      expect(checkout.body.environment).toBe("sandbox");
+      expect(String(checkout.body.redirect_url).startsWith(`${stack.netopia.baseUrl}/ui/card?p=`)).toBe(true);
+      expect((await counts()).charges).toBe(before.charges + 1);
+    } else {
+      refusedAsBuyer(checkout);
+      await stack.runJobs();
+      expect(await counts()).toEqual(before);
+    }
+    await owner.change("PREVIEW_BUYER_REMOVE", approved.userId, { locked: true });
+    const again = await stack.quote(approved, "PLUS");
+    const priced = await counts();
+    refusedAsBuyer(await stack.checkout(approved, String(again.body.quote_ref)));
+    await stack.runJobs();
+    expect(await counts()).toEqual(priced);
+  });
+
+  it("with the list unreadable an account not on the team line is refused with nothing written, and a team account still buys", async () => {
+    // The list's one reader gone from the database: any read of it fails, as it would with the database unreachable.
+    await stack.database.pool.query("ALTER FUNCTION staff.preview_buyer_listed(uuid) RENAME TO preview_buyer_listed_hidden_for_the_test");
+    try {
+      const quote = await stack.quote(stranger, "PLUS");
+      expect(quote.status).toBe(200);
+      const priced = await counts();
+      const checkout = await stack.checkout(stranger, String(quote.body.quote_ref));
+      // Under the team rule the list is never read, so its loss changes nothing there.
+      if (listCounts) refusedUnreadable(checkout); else refusedAsBuyer(checkout);
+      await stack.runJobs();
+      expect(await counts()).toEqual(priced);
+      const member = await stack.quote(teamBuyer, "PLUS");
+      const before = await counts();
+      expect((await stack.checkout(teamBuyer, String(member.body.quote_ref))).status).toBe(200);
+      expect((await counts()).charges).toBe(before.charges + 1);
+    } finally {
+      await stack.database.pool.query("ALTER FUNCTION staff.preview_buyer_listed_hidden_for_the_test(uuid) RENAME TO preview_buyer_listed");
+    }
   });
 });

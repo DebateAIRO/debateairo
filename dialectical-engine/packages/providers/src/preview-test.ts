@@ -282,6 +282,20 @@ export function previewBuyerAdmits(
   return anyAccount ? userId !== undefined : previewTeamAdmits(config, teamUserIds, userId);
 }
 /**
+ * Whether the buyer rule above refused an account that the Owner's list of approved buyers (migration 0186,
+ * staff.preview_buyer_listed) may still admit: only on the preview, only with the sandbox's payments and asks open to
+ * everyone with buying kept to listed accounts ("everyone-with-listed-buyers"), only for a signed-in account, and only
+ * when the team line did not admit it. Everywhere else the list counts for nothing and is never read: with real payments,
+ * with asks closed (the team rule), in the friends' test (anyone may buy there) and off the preview. Pure, like the rule.
+ */
+export function previewBuyerNeedsApproval(
+  config: PreviewProviderTestConfig | undefined, teamUserIds: readonly string[] | undefined,
+  asksOpenTo: PreviewAsksOpenTo | undefined, livePayments: boolean, userId: string | undefined
+): boolean {
+  return config !== undefined && !livePayments && asksOpenTo === "everyone-with-listed-buyers" && userId !== undefined
+    && !previewBuyerAdmits(config, teamUserIds, asksOpenTo, livePayments, userId);
+}
+/**
  * Step 1 — THE ONE READ BEHIND THE TEAM RULE FOR RUNS ALREADY IN THE SYSTEM, shared by the
  * API's waker (`#previewTeamRuns`) and the runner's start-up gate so both apply the same rule.
  * $1 = run ids (uuid[]), $2 = team identity user ids (uuid[]). Returns the ids of the runs a

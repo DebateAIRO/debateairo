@@ -4,6 +4,9 @@
 // preview only an account on the team list may: with the team rule while payments are real, and on the sandbox under the
 // team rule and under everyone-with-listed-buyers, where anyone may ask but only the listed accounts may buy. Off the
 // preview there is no rule. The price requests before the last button carry no rule, and neither does the card change.
+// Under everyone-with-listed-buyers on the sandbox, an account not on the team list may also buy when the Owner's list of
+// approved buyers (migration 0186) says so; the list is read for nobody else, and when it cannot be read the purchase is
+// refused (503 PREVIEW_BUYERS_UNAVAILABLE) with nothing written.
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { buildApi } from "@debateai/api";
@@ -13,6 +16,7 @@ import type { CheckoutResult } from "../../apps/api/src/billing/checkout.js";
 import type { BillingRouteOptions } from "../../apps/api/src/billing/index.js";
 import type { SubscriptionRouteDeps } from "../../apps/api/src/billing/subscription-deps.js";
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
+import { previewBuyerVerdict, PREVIEW_BUYER_CHECK_UNAVAILABLE_LINE, type PreviewApprovedBuyers } from "../../apps/api/src/preview-approved-buyers.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders, type TestHttpIdentity } from "../support/httpSession.js";
 import { testBillingPlans, unusedAskApplication } from "../support/billingFixtures.js";
 
@@ -26,6 +30,7 @@ const QUOTE_BODY = { plan_id: "PLUS" };
 const CHECKOUT_BODY = { quote_ref: "5f0c2a8e-8a61-4d1f-9a55-0d6f3a1b2c4d", locale: "en", consents: { renewal_terms: PAIR, immediate_start: PAIR } };
 const RESULT: CheckoutResult = { chargeId: "0123456789abcdef0123456789abcdef", redirectUrl: "https://secure.netopia-payments.com/ui/card?p=abc", environment: "live", reused: false };
 const REFUSED = Object.freeze({ error: "PREVIEW_TEAM_ONLY", message: "PREVIEW_TEAM_ONLY" });
+const UNAVAILABLE = Object.freeze({ error: "PREVIEW_BUYERS_UNAVAILABLE", message: "PREVIEW_BUYERS_UNAVAILABLE" });
 /** What the quote service answers when a price request reaches it (QuoteResult, the fields the route reads). */
 const QUOTE_REF = "11111111-1111-4111-8111-111111111111";
 const QUOTED = Object.freeze({
@@ -43,7 +48,12 @@ type Setup = Readonly<{ preview: boolean; payments: "sandbox" | "live"; asks: Pr
 /** Whether the file can hold a team line, which lists the member: the parser refuses one beside these two values. */
 const teamListed = (setup: Setup): boolean => setup.asks !== "everyone" && setup.asks !== "everyone-with-test-payments";
 
-function harness(setup: Setup, member: TestHttpIdentity, stranger: TestHttpIdentity) {
+/** The Owner's list as main.ts hands it on the preview; by default it lists nobody. `null`: no list handed at all. */
+function approvedList(answer: (userId: string) => Promise<boolean> = async () => false) {
+  const listed = vi.fn(answer);
+  return { listed } satisfies PreviewApprovedBuyers;
+}
+function harness(setup: Setup, member: TestHttpIdentity, stranger: TestHttpIdentity, approved: PreviewApprovedBuyers | null = approvedList()) {
   const checkout = { start: vi.fn(async () => RESULT) };
   const quotes = { create: vi.fn(async () => { throw new Error("QUOTE_SERVICE_REACHED"); }) };
   const decide = vi.fn(() => ({ allowed: true as const }));
@@ -65,7 +75,8 @@ function harness(setup: Setup, member: TestHttpIdentity, stranger: TestHttpIdent
     application: unusedAskApplication(), sessions, allowedOrigin: TEST_APP_ORIGIN, billing,
     admission: { configured: () => true, decide } as unknown as AdmissionLimiter,
     ...(setup.preview ? { previewProviderTestConfig: PREVIEW, previewTeamUserIds: team } : {}),
-    ...(setup.preview && setup.asks !== undefined ? { previewAsksOpen: true as const, previewAsksOpenTo: setup.asks } : {})
+    ...(setup.preview && setup.asks !== undefined ? { previewAsksOpen: true as const, previewAsksOpenTo: setup.asks } : {}),
+    ...(setup.preview && approved !== null ? { previewApprovedBuyers: approved } : {})
   });
   return { api, checkout, quotes, decide };
 }
@@ -180,10 +191,97 @@ describe("the price requests and the card change carry no buyer rule", () => {
 describe("apps/api/src/index.ts hands the rule over on the preview only, as one new member of the billing routes' options", () => {
   const index = readFileSync(new URL("../../apps/api/src/index.ts", import.meta.url), "utf8");
 
-  it("decides by previewBuyerAdmits, with the team list, the value and whether payments are real", () => {
+  it("decides by previewBuyerVerdict, with the team list, the value, whether payments are real and the Owner's list", () => {
     expect(index).toContain("const previewBuyerRule = previewConfig === undefined ? undefined");
-    expect(index.replace(/\s+/gu, " ")).toContain("(session: AuthenticatedSession) => previewBuyerAdmits(previewConfig, options.previewTeamUserIds, options.previewAsksOpenTo, options.billing?.paymentEnvironment === \"live\", session.userId);");
+    expect(index.replace(/\s+/gu, " ")).toContain("(session: AuthenticatedSession) => previewBuyerVerdict({ config: previewConfig, teamUserIds: options.previewTeamUserIds, asksOpenTo: options.previewAsksOpenTo, livePayments: options.billing?.paymentEnvironment === \"live\", userId: session.userId, approved: options.previewApprovedBuyers, log: (line) => console.error(line) });");
     expect(index).toContain("...(previewBuyerRule === undefined ? {} : { buyerAdmits: previewBuyerRule })");
     expect(index.split("buyerAdmits:").length - 1).toBe(1);
+  });
+});
+
+/**
+ * The Owner's list of approved buyers (0186), the whole matrix: each asks value and payment system (the pairings the boot
+ * refuses too), an account on the team list or not, and the list's answer for it (listed, not listed, a throw, or no list
+ * handed at all). Written out: the list is asked only under everyone-with-listed-buyers on the sandbox, only for an
+ * account not on the team list; listed buys, not listed is refused 403, and a list that cannot be read is refused 503;
+ * every refusal comes before the checkout budget and the checkout service (the only writer of a charge row), and before
+ * the upgrade's body is read.
+ */
+type ListAnswer = "listed" | "not listed" | "throws" | "no list";
+const ANSWERS: readonly ListAnswer[] = ["listed", "not listed", "throws", "no list"];
+const listCounts = (setup: Setup): boolean => setup.preview && setup.payments === "sandbox" && setup.asks === "everyone-with-listed-buyers";
+function expected(setup: Setup, onTeam: boolean, answer: ListAnswer): "BUYS" | "REFUSED" | "UNAVAILABLE" {
+  if (!refusesStranger(setup)) return "BUYS";
+  if (onTeam && teamListed(setup)) return "BUYS";
+  if (!listCounts(setup)) return "REFUSED";
+  return answer === "listed" ? "BUYS" : answer === "not listed" ? "REFUSED" : "UNAVAILABLE";
+}
+const MATRIX = [...SETUPS, ...REFUSED_AT_BOOT].flatMap(([name, setup]) => [true, false].flatMap((onTeam) => ANSWERS.map((answer) =>
+  [`${name}, ${onTeam ? "on the team list" : "not on it"}, ${answer}`, setup, onTeam, answer] as const)));
+
+describe("the Owner's list of approved buyers decides only where it counts", () => {
+  it("covers every asks value, both payment systems, the team list and the four answers", () => {
+    expect(MATRIX).toHaveLength(10 * 2 * 4);
+    expect(MATRIX.filter(([, setup, onTeam]) => listCounts(setup) && !onTeam)).toHaveLength(4);
+  });
+  it.each(MATRIX)("%s", async (_label, setup, onTeam, answer) => {
+    const member = testHttpIdentity("approved-member"), stranger = testHttpIdentity("approved-stranger");
+    const who = onTeam ? member : stranger;
+    const list = answer === "no list" ? null : approvedList(async (userId) => {
+      if (answer === "throws") throw new Error("database down");
+      return answer === "listed" && userId === stranger.authenticated.userId;
+    });
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { api, checkout, decide } = harness(setup, member, stranger, list);
+    try {
+      const bought = await post(api, who, "/v1/billing/checkout", CHECKOUT_BODY);
+      const upgraded = await post(api, who, "/v1/billing/subscription/upgrade", { malformed: true });
+      const outcome = expected(setup, onTeam, answer);
+      if (outcome === "BUYS") {
+        expect(bought.statusCode).toBe(200);
+        expect(checkout.start).toHaveBeenCalledTimes(1);
+        expect(upgraded.statusCode).toBe(400);
+      } else {
+        const body = outcome === "REFUSED" ? REFUSED : UNAVAILABLE, status = outcome === "REFUSED" ? 403 : 503;
+        expect([bought.statusCode, bought.json()]).toEqual([status, body]);
+        expect([upgraded.statusCode, upgraded.json()]).toEqual([status, body]);
+        expect(decide).not.toHaveBeenCalled();
+        expect(checkout.start).not.toHaveBeenCalled();
+      }
+      // The list is read only where it counts, and only for an account not on the team list: never with real payments,
+      // never with asks closed, never in the friends' test, never off the preview, never for a team member.
+      const asked = listCounts(setup) && !(onTeam && teamListed(setup));
+      if (list !== null) expect(list.listed).toHaveBeenCalledTimes(asked ? 2 : 0);
+      // Each unreadable answer leaves one content-free line; nothing else is logged.
+      const lines = errors.mock.calls.map((call) => String(call[0]));
+      expect(lines).toEqual(outcome === "UNAVAILABLE" ? [PREVIEW_BUYER_CHECK_UNAVAILABLE_LINE, PREVIEW_BUYER_CHECK_UNAVAILABLE_LINE] : []);
+    } finally {
+      errors.mockRestore();
+      await api.close();
+    }
+  });
+});
+
+describe("previewBuyerVerdict fails closed", () => {
+  const listed = { config: PREVIEW, teamUserIds: [] as string[], asksOpenTo: "everyone-with-listed-buyers" as const, livePayments: false, userId: "11111111-1111-4111-8111-111111111111" };
+  it("an answer that never comes is refused after its time, and the late answer is never read", async () => {
+    const lines: string[] = [];
+    let release: (value: boolean) => void = () => undefined;
+    const late = new Promise<boolean>((resolve) => { release = resolve; });
+    const verdict = previewBuyerVerdict({ ...listed, approved: { listed: () => late }, log: (line) => lines.push(line), timeoutMs: 20 });
+    await expect(verdict).resolves.toBe("UNAVAILABLE");
+    release(true);
+    await late;
+    expect(lines).toEqual([PREVIEW_BUYER_CHECK_UNAVAILABLE_LINE]);
+  });
+  it("an answer that is not a plain yes or no is refused", async () => {
+    for (const odd of [null, undefined, "true", 1, {}]) {
+      const lines: string[] = [];
+      await expect(previewBuyerVerdict({ ...listed, approved: { listed: async () => odd as unknown as boolean }, log: (line) => lines.push(line) }), String(odd)).resolves.toBe("UNAVAILABLE");
+      expect(lines).toHaveLength(1);
+    }
+  });
+  it("its one line names no account and no address", () => {
+    expect(JSON.parse(PREVIEW_BUYER_CHECK_UNAVAILABLE_LINE)).toEqual({ event: "api.preview.buyer_check_unavailable" });
   });
 });

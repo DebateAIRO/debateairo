@@ -42,8 +42,10 @@ export function previewAsksOpenBootLine(asksOpen: PreviewAsksOpenTo | undefined)
 }
 
 /**
- * With "everyone-with-listed-buyers", a second content-free line: how many accounts the team line lists, which are the
- * accounts that may buy. A count only, never an id. Null with any other value.
+ * With "everyone-with-listed-buyers", a second content-free line: how many accounts the team line lists, which may buy
+ * besides the accounts the Owner approves on the Team page (migration 0186). That list changes with no restart, so a line
+ * written at start cannot count it; the morning check reads it in the database. A count only, never an id. Null with any
+ * other value.
  */
 export function previewListedBuyersBootLine(
   asksOpen: PreviewAsksOpenTo | undefined, teamUserIds: readonly string[] | undefined

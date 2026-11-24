@@ -79,6 +79,7 @@ import {
   assertPublicationSecretDomains,
   configureCustodyGroup,
   ContentCipher,
+  createEmailBlindIndex,
   decrypt,
   openRecord,
   FilePublicationKeyStore,
@@ -91,7 +92,7 @@ import {
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import type { PreparedPublicationCipher } from "@debateai/crypto";
-import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportShredRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
+import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, PostgresPreviewBuyerRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportShredRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
 import { recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
 // FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
@@ -1047,7 +1048,8 @@ boot.runSync("preview-asks-open", () => assertPreviewAsksOpenBoot({
 }));
 const previewAsksOpenLine = previewAsksOpenBootLine(environment.PREVIEW_ASKS_OPEN);
 if (previewAsksOpenLine !== null) console.warn(previewAsksOpenLine);
-// With the listed buyers' value, how many accounts may buy: a count, never an id.
+// With the listed buyers' value, how many accounts the team line lets buy: a count, never an id. The Owner's list of
+// approved buyers (0186) changes with no restart, so this line leaves it out; the morning check reads it in the database.
 const previewListedBuyersLine = previewListedBuyersBootLine(environment.PREVIEW_ASKS_OPEN, environment.PREVIEW_TEAM_USER_IDS);
 if (previewListedBuyersLine !== null) console.warn(previewListedBuyersLine);
 // V-3: over the RING, so a record still wrapped by the previous key opens for
@@ -1228,6 +1230,18 @@ const readAccountEmail = accountEmailReader(crossAccountPool(pool, "X27"), dekSt
 const teamLimitRepository = new PostgresTeamLimitRepository(pool);
 const publicReviewRepository = new PostgresPublicReviewRepository(pool);
 const publicFlagRepository = new PostgresPublicFlagRepository(pool);
+// 0186: the preview's approved buyers. The yes or no at the pay button and the Owner's list and changes run on the request
+// login, whose billing role holds 0186's grants. The Owner's look-up of a typed address and the shortened addresses on the
+// list read other accounts' rows, so they run on the system login (X39), and only after the Owner's authority is checked.
+// The list counts only on the preview with the sandbox's payments; with real payments the routes answer 404 and the buyer
+// rule never reads it.
+const previewBuyerAccounts = crossAccountPool(pool, "X39");
+const previewBuyerRepository = previewGate === undefined ? undefined : new PostgresPreviewBuyerRepository(pool, previewBuyerAccounts);
+const previewBuyerStaff = previewBuyerRepository === undefined || billingConnectors?.paymentEnvironment !== "sandbox" ? undefined : {
+  repository: previewBuyerRepository, readEmail: accountEmailReader(previewBuyerAccounts, dekStore),
+  blindIndex: (address: string) => createEmailBlindIndex(blindIndexKey, address),
+  teamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [], applies: environment.PREVIEW_ASKS_OPEN === "everyone-with-listed-buyers"
+};
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(crossAccountPool(pool, "X14")),
   webauthn: new StaffWebAuthnService(new PostgresStaffRepository(crossAccountPool(pool, "X14")), {publicAppUrl: environment.PUBLIC_APP_URL}),
@@ -1242,7 +1256,8 @@ const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undef
     if (publications === undefined) throw new Error("STAFF_UNAVAILABLE");
     return publications.withReviewKey(publicationRef, runId, use);
   } },
-  ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding })
+  ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding }),
+  ...(previewBuyerStaff === undefined ? {} : { previewBuyers: previewBuyerStaff })
 };
 // Self-service profile/recovery capabilities use the existing authorization
 // role and account DEK custody, beside purpose-bound TOTP grant rotation.
@@ -2085,6 +2100,8 @@ const api = buildApi({
   ...(previewGate === undefined || environment.PREVIEW_ASKS_OPEN === undefined ? {} : { previewAsksOpen: true as const }),
   // The value itself, read by the buyer rule only: it says whether anyone beyond the team line may buy.
   ...(previewGate === undefined || environment.PREVIEW_ASKS_OPEN === undefined ? {} : { previewAsksOpenTo: environment.PREVIEW_ASKS_OPEN }),
+  // 0186: the Owner's list of approved buyers, read by the buyer rule only where it counts (previewBuyerNeedsApproval).
+  ...(previewBuyerRepository === undefined ? {} : { previewApprovedBuyers: previewBuyerRepository }),
   application,
   stories: ownerStories,
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
