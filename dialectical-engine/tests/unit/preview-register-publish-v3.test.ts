@@ -534,6 +534,11 @@ describe('publish kit v3: the optional previewLineUpPolicy row and the answer se
     expect(lineUpRow(older)?.valueJsonText).toContain(QWEN);
     const source = await v3();
     expect(refusal(() => compose(source, older, '13'))).toContain('PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:partner_served');
+    // SB3's native operator prints that refusal in full, so the owner reads the code the release guide names.
+    const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
+    let thrown: unknown;
+    try { compose(source, older, '13'); } catch (error) { thrown = error; }
+    expect(operator.operatorRefusalLine(thrown)).toBe('PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:partner_served\n');
     // A plan with a new line-up without it replaces the carried row and passes: the order the release guide gives.
     const replaced = compose(await v3(LIVE), older, '13');
     expect(lineUpRow([...replaced.rows] as Row[])).toEqual(lineUpRow(base));
@@ -544,6 +549,9 @@ describe('publish kit v3: the optional previewLineUpPolicy row and the answer se
     for (const choice of [{ writer: 'preview:qwen-3-8-flash', checker: GLM_B }, { writer: HAIKU_REF, checker: 'preview:qwen-3-8-flash' },
       { writer: HAIKU_REF, checker: GLM_B, storyChecker: 'preview:qwen-3-8-flash' }])
       await expect(v3(null, choice)).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-partner-served');
+    const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
+    const thrown = await v3(null, { writer: 'preview:qwen-3-8-flash', checker: GLM_B }).then(() => undefined, (error: unknown) => error);
+    expect(operator.operatorRefusalLine(thrown)).toBe('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-partner-served\n');
   });
 
   it('the answer seats reach the hosted story rows: the Haiku writer seals the synthesizer and the storyteller; the story seats may move alone', async () => {

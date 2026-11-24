@@ -810,6 +810,10 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
       [{ ...LIVE, premium_model_ids: [GLM, 'not/a-reviewed-model'] }, undefined, 'PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:unreviewed'],
       [undefined, { writer: HAIKU_REF, checker: HAIKU_REF }, 'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-writer-is-checker'],
       [undefined, { writer: 'preview:not-reviewed', checker: HAIKU_REF }, 'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-unreviewed'],
+      // A partner-served model (Qwen3.8-Flash) in either list or in a seat: the owner reads which, and takes it out.
+      [{ ...LIVE, free_model_ids: [...LIVE.free_model_ids, QWEN] }, undefined, 'PREVIEW_LINE_UP_POLICY_INVALID:free_model_ids:partner_served'],
+      [{ ...LIVE, premium_model_ids: [...LIVE.premium_model_ids, QWEN] }, undefined, 'PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:partner_served'],
+      [undefined, { writer: 'preview:qwen-3-8-flash', checker: HAIKU_REF }, 'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-partner-served'],
       // Ruling R28 (final fix wave F3): the storyteller as its own story checker, printed like R27b's code.
       [undefined, { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, storyteller: PREVIEW_DEEPSEEK_CHECKER_ROLE_REF, storyChecker: PREVIEW_DEEPSEEK_CHECKER_ROLE_REF },
         'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-storyteller-is-story-checker']

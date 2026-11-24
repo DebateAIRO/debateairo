@@ -59,8 +59,7 @@ import {
  *      the sealed table names is a reviewed row (SETTINGS_GATE_UNREVIEWED:<model or ref>), every level of the sealed
  *      table is on its model's reviewed menu in this code (SETTINGS_GATE_THINKING_UNREVIEWED:<model>:<level>), no seatable
  *      model is one its provider forwards to a company the legal texts do not name (SETTINGS_GATE_PARTNER_SERVED:<model>),
- *      and no
- *      sealed ceiling the preview sends is above a seatable model's output bound
+ *      and no sealed ceiling the preview sends is above a seatable model's output bound
  *      (SETTINGS_GATE_TOKEN_CEILING:<rowKey>:<model>; the storyteller's bound exempt). The line-up is read as sealed
  *      (shape only, `readSealedPreviewLineUp`), so a version an older, wider code sealed is named code by code;
  *  - first of the version's own steps, the activation's rule (0124): a sealed GENERAL version, else

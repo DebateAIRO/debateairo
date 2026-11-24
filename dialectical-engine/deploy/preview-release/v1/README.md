@@ -3073,18 +3073,22 @@ launchers print only `PREVIEW_API_STARTUP_REFUSED` / `PREVIEW_RUNNER_STARTUP_REF
 **In plain words.** DeepInfra does not run Qwen3.8-Flash itself: it passes those requests to a partner company it does
 not name (`docs/legal/2026-11-24-partner-model-out.md`). From the release that carries that note on, the Privacy Policy,
 the Terms and the Provider Register name no such company, and that release's code refuses every new settings version
-that seats Qwen, in a list of AIs or in an answer seat. Its row stays, so debates already recorded with Qwen read, show
-and price as before, and a debate admitted on an older version still finishes on it. So the order is fixed:
+that seats Qwen, in a list of AIs or in an answer seat. Its row stays, so debates already recorded with Qwen read and
+show as before, and a debate admitted on an older version still finishes on it. So the order is fixed:
 
-1. **First, with the release that runs now, an activation without Qwen** (the steps below). Nothing is uploaded.
-2. **Then the upload** that carries the new texts. Run QWENOUT (below) before its SB1: it must print `QWENOUT_DONE`.
+1. **First, with the release that runs now, an activation without Qwen** (the steps below). Nothing is uploaded. On the
+   live server this is done (the dated note above says when and with which version); the steps stay here as the record
+   of how, and for any server that still seats Qwen.
+2. **Then the upload** that carries the new texts. QWENOUT (below) is what that upload runs first, before its SB1: it
+   prints `QWENOUT_DONE` only when the active version seats no Qwen and no open debate runs on a version that does, so
+   the texts are true from the moment the upload switches the site.
 3. **Last, the gate**: Qwen out of the DeepInfra gate's `enabled_models`, once nothing can still call it.
 
 **If the order is wrong.** Nothing goes down and nothing is half-uploaded: the new code stops before anything is written
 whenever the active version still seats Qwen. The practice (SB2, on the Mac) stops when it composes the next version,
-and SB3 stops with `SB3_NOT_DONE: the native operator refused the plan`, the proposal file naming
-`PREVIEW_LINE_UP_POLICY_INVALID:free_model_ids:partner_served` (or `premium_model_ids`), or
-`PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-partner-served` for a seat. The site keeps running the old release. Set
+and SB3 stops with `SB3_NOT_DONE: the native operator refused the plan`; the line the native operator printed just above
+`nat: exit 1` names the cause, `PREVIEW_LINE_UP_POLICY_INVALID:free_model_ids:partner_served` (or `premium_model_ids`),
+or `PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-partner-served` for a seat. The site keeps running the old release. Set
 SB3's files aside with SB3b, take Qwen out (the steps below), and start the upload again from SB1 (SB1 records the active
 version; the new one must be the base). The new release's API and runner never refuse to start over it: they load an
 older version that seats Qwen for the debates admitted on it, and its check (SV3) names such a version
@@ -3108,7 +3112,10 @@ jq -r '(.answerSeats // {}) | to_entries[] | select(.value == "preview:qwen-3-8-
 ```
 
    Neither list may be left with one maker only: SV1 would stop with `PREVIEW_LINE_UP_POLICY_INVALID:maker_rule`. Then
-   add another AI to that list in the file (for example DeepSeek).
+   add another AI to that list in the file (for example DeepSeek). The jq line is the general recipe; a version that
+   keeps Qwen's entry in the thinking table while neither list names Qwen is harmless as well: an entry seats nothing,
+   and the kits, check-version and the activation's gate check all accept it (`tests/unit/partner-served-line-up.test.ts`).
+   The activation on the live server kept that entry.
 4. SV1 with `LINEUP="$SART/line-up-no-qwen.json"` (and `SEATS` without Qwen, if the last command printed a seat). The
    owner reads one changed row, `changed previewLineUpPolicy (…)`: its `old:` value names `Qwen/Qwen3.8-Flash` in the
    lists, its `new:` value does not, and everything else in it is the same; with new `SEATS`, the seat rows change too.
@@ -3117,11 +3124,15 @@ jq -r '(.answerSeats // {}) | to_entries[] | select(.value == "preview:qwen-3-8-
    leaves both lists for new debates", SV4, then SV5. SV5's last lines (`open debates on version: …`) show the debates
    still running on the version before: they keep Qwen until they finish.
 
-**QWENOUT (read-only), right before the upload's SB1.**
+**QWENOUT (read-only), right before the upload's SB1.** It reads the active version's lists and answer seats, then
+SV5's open debates (a work item `READY` or `CLAIMED`) by the version they run on. A debate admitted before the
+activation keeps its version, and with it Qwen, until it finishes; so does one continued in the old release. While one
+is open on a version whose lists or answer seats name Qwen, QWENOUT stops: wait for those debates to finish, then run
+QWENOUT again. A version an open debate runs on that has no line-up row is named too: ask.
 
 ```sh
 set -euo pipefail
-# QWENOUT: read-only. Whether the active settings version still seats Qwen3.8-Flash, in a list of AIs or in an answer seat.
+# QWENOUT: read-only. Whether Qwen3.8-Flash can still be called: by the active settings version (its lists of AIs and its answer seats), or by an open debate on a version that seats it.
 L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
 lc() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$L/$1" "${@:2}"; }
 psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
@@ -3133,6 +3144,10 @@ LISTED=$(jq -r '[.free_model_ids[], .premium_model_ids[]] | map(select(. == "Qwe
 SEATED=$(psqlq "SELECT count(*) FROM register.register_row WHERE register_version = $AV AND row_key IN ('synthesizerRoleRef', 'evaluatorRoleRef', 'storytellerRoleRef', 'storyCheckerRoleRef') AND value_json->>'providerRef' = 'preview:qwen-3-8-flash'")
 echo "active settings version $AV: Qwen in the lists $LISTED time(s), in the answer seats $SEATED time(s)"
 [ "$LISTED" = 0 ] && [ "$SEATED" = 0 ] || { echo "QWENOUT_NOT_DONE: the active version still seats Qwen: take it out first (the steps above)"; exit 1; }
+# SV5's open debates, by the version they run on: only the versions that name Qwen in a list or an answer seat, or have no line-up row.
+OPEN=$(psqlq "SELECT r.register_version||' '||count(DISTINCT r.run_id)||CASE WHEN bool_or(l.value_json IS NULL) THEN ' (no line-up row: ask)' ELSE '' END FROM core.run r JOIN core.work_item w ON w.run_id = r.run_id LEFT JOIN register.register_row l ON l.register_version = r.register_version AND l.row_key = 'previewLineUpPolicy' WHERE w.state IN ('READY', 'CLAIMED') AND (l.value_json IS NULL OR (l.value_json->'free_model_ids') ? 'Qwen/Qwen3.8-Flash' OR (l.value_json->'premium_model_ids') ? 'Qwen/Qwen3.8-Flash' OR EXISTS (SELECT 1 FROM register.register_row s WHERE s.register_version = r.register_version AND s.row_key IN ('synthesizerRoleRef', 'evaluatorRoleRef', 'storytellerRoleRef', 'storyCheckerRoleRef') AND s.value_json->>'providerRef' = 'preview:qwen-3-8-flash')) GROUP BY r.register_version ORDER BY r.register_version")
+[ -z "$OPEN" ] || { printf '%s\n' "$OPEN" | sed 's/^/open debates that can still call Qwen, on version: /'; echo "QWENOUT_NOT_DONE: debates on a version that seats Qwen are still open: wait for them to finish, then run QWENOUT again"; exit 1; }
+echo "open debates on a version that seats Qwen: none"
 echo QWENOUT_DONE
 ```
 
@@ -3149,9 +3164,9 @@ recorded in a dated note under `docs/legal/`; that company's entry in the Regist
 Privacy Policy and the Terms naming it in a new version (a new recipient: Privacy Policy section 14 says people are told
 before it receives anything); then the code, in an upload: the `partnerServed` mark off Qwen's row in
 `packages/providers/src/preview-models.ts`, or a rule that seats a partner-served model only beside its checked entry,
-with `tests/unit/partner-served-line-up.test.ts` holding the Register to it; then the gate's `enabled_models` and an
-activation with Qwen in a list. If DeepInfra instead runs Qwen on its own servers (no "Partner" tag on its model page),
-the mark comes off in an upload and no new entry is needed.
+with the set of partner-served models pinned in `tests/unit/partner-served-line-up.test.ts` changed with it; then the
+gate's `enabled_models` and an activation with Qwen in a list. If DeepInfra instead runs Qwen on its own servers (no
+"Partner" tag on its model page), the mark comes off in an upload and no new entry is needed.
 
 ### The first upload with this change (T+1)
 
@@ -5294,8 +5309,23 @@ back to a release older than that one (WB2 included) come MAIN-SITE.md's PWON, t
 the first line of MAIN-SITE.md's names file, then run its OPENCHECK.
 
 **The upload that first carries the partner rule** (`docs/legal/2026-11-24-partner-model-out.md`): before its SB1,
-QWENOUT ("Taking Qwen out of the live line-up") must print `QWENOUT_DONE`; otherwise its SB2 and SB3 stop, with the site
-unchanged.
+QWENOUT ("Taking Qwen out of the live line-up") must print `QWENOUT_DONE`. While the active version seats Qwen, its SB2
+and SB3 stop anyway, with the site unchanged; while an open debate can still call Qwen, nothing else stops the upload,
+and its texts would go live untrue.
+
+**The legal texts' day.** An upload that carries a new version of the Terms of Service or the Privacy Policy gives it the
+upload day as its effective day. Before the staging, on the Mac, in the branch the upload is built from, from
+`dialectical-engine/`, with the upload day:
+
+```sh
+pnpm run legal:redate --date YYYY-MM-DD --dry-run   # every line it would change; nothing is written
+pnpm run legal:redate --date YYYY-MM-DD             # sets the day everywhere, regenerates, archives, runs legal:release-check
+```
+
+Then commit what it wrote, and build the upload from that commit. A day before the upload would read as a change made
+retroactive, which the Terms promise never to do. The command refuses a day before today, a day not after the previous
+version's, and a version the release the site runs already carries (`tests/n1-baseline.json`): a released text keeps its
+day.
 
 ### SB1. Names, the archive `$S` and the copies the way back needs
 
