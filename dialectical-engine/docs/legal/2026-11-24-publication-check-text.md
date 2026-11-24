@@ -23,9 +23,12 @@ These notes are not legal advice.
   left out (`apps/api/src/publication-check/material.ts`). It checks the text against rules 1 and 2 of the content rule:
   no hate speech, and no denying, justifying or making light of genocides and crimes against humanity
   (`apps/api/src/publication-check/policy.ts`, `packages/providers/src/content-rule.ts`).
-- When the publication check answers BLOCK or UNSURE, the debate stays private for good, with no person involved
-  (`apps/api/src/publications.ts`, `packages/db/src/public-debates.ts`). For a finished Free debate nothing tells the
-  person yet: the site's "Kept private" mark reads a field the API does not send (`apps/ui/lib/v4/publicState.ts`).
+- When the publication check answers BLOCK or UNSURE on a finished Free debate, the debate stays private for good, with
+  no person involved (`apps/api/src/publications.ts`, `packages/db/src/public-debates.ts`). When it answers so on a
+  debate its owner publishes, the debate is not published and stays private, and the owner can press Publish again,
+  which runs the check again (`apps/api/src/publications.ts`, `publish`). On a refused Free debate's page, its owner
+  reads "Kept private: it did not pass the check, so it has no public page." (`v4.publicMark.KEPT_PRIVATE`): the API
+  sends that stage to the owner alone (`apps/api/src/publications.ts`, migration 0189, `apps/ui/lib/v4/publicState.ts`).
   When the owner presses Publish, the refusal is shown on screen with the parts the check found, that an automated tool
   decided, and that a person reviews it on a request to office@dezbatere.ro
   (`apps/ui/components/PublicationControl.tsx`, `public.publication.contentCheck.*`). A refused contribution is shown
@@ -99,8 +102,9 @@ automatic checks make with no person involved.
   It says "If we automate a decision" instead of "If we ever automate a decision", since refusing to publish is now
   automated. Annex B.4 (Australia) now lists five kinds of decisions (the publication check and the Report button's
   check added, each with the personal information it uses). Annex B.6 (South Korea) names the four decisions instead
-  of two, and no longer says that each tells you on screen what happened, because a refused Free debate is not told
-  yet (see "The facts"); it says that section 8 says what you can do after each, and that you can complain about each.
+  of two, and no longer says that each tells you on screen what happened: when 1.2 was written a refused Free debate
+  was not told, and a refused report written on a debate and a refused later text of a dig are still not told (see
+  "The facts"); it says that section 8 says what you can do after each, and that you can complain about each.
 - Section 14 has one summary of 1.2, before the 1.1 line, naming both changes. Its first sentence is the one on help
   getting back into an account (`2026-11-24-recovery-help-privacy-1-2.md`); then: "Section 5 now says that, before a
   debate goes public, its public text is sent to Claude Haiku 5.5 to be checked, and that the same model checks what is
@@ -169,9 +173,9 @@ and 2.1 step 1, and 2.1 step 1 quotes the two `legal day:` lines PRECHECK prints
   - **(a) Terms section 10, "Statement of reasons". Still open, for the owner and counsel, before the upload.** It
     promises a statement of reasons, by email, "whenever we remove or restrict the visibility of your content". With
     the checks running, a Free debate the publication check refuses (BLOCK or UNSURE) stays private for good, and a
-    contribution the check refuses does not reach the public page. Nothing tells the person about a refused Free debate
-    today, a refused publish or contribution is told on screen but not by email, and a refused report written on a
-    debate or a refused later text of a dig is not told at all (see "The facts"). Whether a refusal to publish counts
+    contribution the check refuses does not reach the public page. A refused Free debate, a refused publish and a
+    refused contribution are told on screen but not by email, and a refused report written on a debate or a refused
+    later text of a dig is not told at all (see "The facts"). Whether a refusal to publish counts
     as restricting visibility under that paragraph, when no statement of reasons is sent, is not decided. Privacy Policy 1.2 promises no statement of reasons for it: section 8 says a person reviews a
     complaint. The Report button's automatic hide does send one.
   - **(b) The count of automatic decisions. Decided.** Version 1.1 said in Annex B.6 (South Korea) "Two automatic checks
