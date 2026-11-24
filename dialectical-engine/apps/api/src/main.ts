@@ -1763,6 +1763,9 @@ const questionCheck = await boot.run("question-check", () => composeQuestionChec
   report: line => console.error(JSON.stringify(line)),
   preview: previewGate === undefined ? null : { fetch: previewFetch, anthropicSocket: previewProviderSocket(previewGate, "anthropic") }
 }));
+// The end-of-debate check's own local off flag, apart from the judge's. With it set, no check of that kind can answer, so a
+// Free debate with no verdict stored stays private and waits (the Free sweep asks this check before it publishes), as an
+// owner's Publish of such a debate answers unavailable.
 const synthesisCheckOffFlag = environment.DEPLOYMENT_MODE === "hosted" ? null : synthesisCheckOffFlagPath(environment.API_PORT);
 // The end-of-debate synthesis check takes the judge's route: the gate on a preview that names its socket, no check on a
 // preview without it, and with no preview the support target when it is set.
