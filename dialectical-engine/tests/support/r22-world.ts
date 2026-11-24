@@ -7,8 +7,10 @@
 // What is scripted, and only this: the AIs' replies (tests/support/preview-gate-stubs.ts, tests/support/gate-later-steps.ts, and each
 // test's `script`), the search replies (made-up pages), the sign-in (tests/support/httpSession.ts: the same seam every HTTP test uses,
 // never a password or a passkey), the two publication judges (the content check on a public page and the Report button's judge,
-// `contentCheck` and `flagJudge`; the checks' own code is the shipped one: tests/integration/public-tree-flow.test.ts), and time: the
-// work a server does on its timers runs when the test calls `settle`, in the servers' own passes.
+// `contentCheck` and `flagJudge`; the checks' own code is the shipped one: tests/integration/public-tree-flow.test.ts), the end-of-debate
+// check a Free debate passes before it goes public (`endCheck`, which allows every answer at once: this world runs no check worker;
+// the hold and the gate are tested in tests/integration/public-tree-flow.test.ts), and time: the work a server does on its timers runs
+// when the test calls `settle`, in the servers' own passes.
 //
 // Requests reach the API by real HTTP, through the typed client a page uses, with the cookies and the CSRF header a browser sends
 // through the /api proxy. No browser is involved here.
@@ -64,7 +66,7 @@ import { continuedRunWake, runHandoverOf } from "../../apps/api/src/month-pause.
 import { createProviderDiscoveryResolver, parseDeclaredProviderTargets } from "../../apps/api/src/provider-discovery.js";
 import { sweepFreePublications, sweepPublicPage } from "../../apps/api/src/public-tree.js";
 import type { PublicationContentCheck, PublicationJudgePort } from "../../apps/api/src/publication-check/check.js";
-import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
+import { PostgresPublicationApplication, type FreeEndCheck } from "../../apps/api/src/publications.js";
 import { postgresPurposeLines, readPurposeLinesOf } from "../../apps/api/src/purpose-lines.js";
 import { questionLanguageRouteFor } from "../../apps/api/src/question-language/boot.js";
 import { questionLanguageSiteRoute } from "../../apps/api/src/question-language/boot.js";
@@ -375,6 +377,8 @@ export async function startR22World(options: R22WorldOptions = {}) {
   const content: { refuse: (snapshot: PublicDebate) => boolean } = { refuse: () => false };
   const contentCheck: PublicationContentCheck = { check: async ({ snapshot }) => content.refuse(snapshot)
     ? { outcome: "REFUSE", reason: "CONTENT" } as never : { outcome: "ALLOW" } };
+  /** The end-of-debate check a Free debate passes first: scripted, allowing every answer at once (no check worker runs here). */
+  const endCheck: FreeEndCheck = { stateOf: async () => "SHOW", decide: async () => "PROCEED" };
   /** The Report button's judge: the framing and the reading are the shipped code's, the judge's reply is the test's. */
   const flag: { reply: (packetText: string) => string } = { reply: () => JSON.stringify({ verdict: "NOT_FOUND", reason: null, quote: null }) };
   const flagJudge: PublicationJudgePort = { providerRef: "r22-world-judge", modelId: "r22-world-model",
@@ -496,7 +500,7 @@ export async function startR22World(options: R22WorldOptions = {}) {
       if (answer === null) return "NO_ANSWER_YET";
       const lines = await readPurposeLinesOf(apiPool, owner.owner_ref, waiting.run_id);
       return publications.publishFreeDebate({ runId: waiting.run_id, answer, owner: { userId: owner.user_id, ownerRef: owner.owner_ref }, purposeLines: lines, contentCheck,
-        source: { ip: "", userAgent: "", requestId: "free-publication-sweep" }, lease,
+        endCheck, source: { ip: "", userAgent: "", requestId: "free-publication-sweep" }, lease,
         store: { prepare: (runId, ref) => publicContributions.prepareFreePublication(runId, ref),
           publish: (input) => publicContributions.publishFree({ runId: input.runId, publicationRef: input.publicationRef, grantTokenHash: input.grantTokenHash, content: input.content, presentedAt: input.presentedAt }),
           refuse: (runId) => publicContributions.refuseFree(runId) } });

@@ -81,7 +81,8 @@ describe("publication review production composition", () => {
         createSynthesisPublishGate: (input: unknown) => input,
         synthesisCheckRepository: {},
         publicationReviewRepository: { approvalCovers: async () => true },
-        synthesisCheckDeps: {}, publicationCheckPolicy: { deadlineMs: 1 }, backgroundCheckDeadlineMs: 2, synthesisCheckWindow: 2
+        synthesisCheckDeps: {}, publicationCheckPolicy: { deadlineMs: 1 }, backgroundCheckDeadlineMs: 2, synthesisCheckWindow: 2,
+        readSynthesisAnswerVersions: async () => new Map()
       }
     );
     expect(await gate.approvalCovers({ answerId: "approved" })).toBe(true);

@@ -16,22 +16,26 @@ import {
   MAIN_ANSWER_UPDATE_CARRIER, PATH_REWRITE_CARRIER, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, RUN_PURPOSE_LINES_CARRIER, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository,
   PostgresDigPicksRepository, PostgresInvestigationRepository, PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresPublicTreeRunnerRepository, PostgresPublicationRepository, PostgresStartPathsStore, PostgresTreeUpdateRepository, configureContentEncryption, contentCipherFor, createPool,
   decryptContentForRun, migrate, PostgresModerationStatementRepository, PostgresPublicFlagMailRepository, withRunContentLease, type Pool, type PublicFlagLimits,
-  PUBLIC_REPORT_CARRIER_MARK, PostgresPublicationCheckRecordRepository, RunRepository, withOwnerAskAdmissionLease
+  PUBLIC_REPORT_CARRIER_MARK, PostgresPublicationCheckRecordRepository, RunRepository, withOwnerAskAdmissionLease,
+  PostgresSynthesisCheckErasureRepository, SynthesisCheckErasureCoordinator
 } from "@debateai/db";
-import { ServeRepository } from "@debateai/serve";
+import { ServeRepository, SynthesisCheckRepository, synthesisCheckWindowMs } from "@debateai/serve";
 import { renderMail } from "@debateai/mail-templates";
 import { MemoryTemplatedMailSender } from "../../apps/api/src/mail-channel.js";
 import { ModerationStatementReconciler, PublicFlagAnswerReconciler } from "../../apps/api/src/moderation-statements.js";
 import { createPostgresProviderGateway } from "@debateai/runner";
-import { createPreviewGuardedFetch, readPromptFrame, type PreviewBudgetExecution, type PromptPacket } from "@debateai/providers";
+import { createPreviewGuardedFetch, previewModelRow, readPromptFrame, type PreviewBudgetExecution, type PromptPacket } from "@debateai/providers";
 import { StoryRepository, type StoryWriteInput } from "@debateai/story";
 import { buildApi, contributionStateOf, type ApiOptions } from "../../apps/api/src/index.js";
 import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
 import type { PublicationContentCheck } from "../../apps/api/src/publication-check/check.js";
 import { createPublicationContentCheck } from "../../apps/api/src/publication-check/check.js";
 import { contentCheckBackgroundDeadlineMs, contentCheckCallsAtOnce, createPreviewPublicationJudgeTransport } from "../../apps/api/src/publication-check/gate-transport.js";
-import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
-import { admitPublicDig, backedOffContentCheck, checksInTurn, joinPublicDigAtStart, pressPublicReport, publicReportCarrierMaker, sweepPublicPage, type PublicDigAdmission } from "../../apps/api/src/public-tree.js";
+import { PostgresPublicationApplication, type FreeEndCheck } from "../../apps/api/src/publications.js";
+import { admitPublicDig, backedOffContentCheck, checksInTurn, joinPublicDigAtStart, pressPublicReport, publicReportCarrierMaker, sweepFreePublications, sweepPublicPage, type PublicDigAdmission } from "../../apps/api/src/public-tree.js";
+import { judgeCallValue } from "../../apps/api/src/publication-check/verdict.js";
+import { createSynthesisPublishGate } from "../../apps/api/src/synthesis-check/publish-gate.js";
+import { createSynthesisAnswerAccess } from "../../apps/api/src/synthesis-check/hold.js";
 import { postgresInvestigationCloseSources } from "../../apps/runner/src/investigation-close-sources.js";
 import { PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL, composePathRewrite } from "../../apps/runner/src/path-rewrite-composition.js";
 import { pathUpdateIdOf } from "../../apps/runner/src/path-climb.js";
@@ -1316,6 +1320,8 @@ describe("Free debates go public when finished", () => {
   const answerOf = (run: string, question = QUESTION) => ({ run_ref: run, terminal: "COMPONENTS_ONLY", question_line: question, answer_id: randomUUID(), answer_version: 1, verdict_state: null, confidence_band: null,
     composed_text: [{ text: "The first answer." }], badges: [], residual_objections: [], reversal_point: "none", as_of: new Date().toISOString(), nodes: [], edges: [] }) as unknown as Answer;
   const stageLease = (answer: Answer) => ({ run: <T>(use: () => Promise<T>) => use(), readAnswer: async () => answer });
+  /** The end-of-debate check allowing every answer at once, for the tests of the publication check (that check's own tests follow). */
+  const endCheckAllows: FreeEndCheck = { stateOf: async () => "SHOW", decide: async () => "PROCEED" };
 
   it("publishes with the clarifying answers in its question and no session present; a refusal stays private; a check that cannot run is tried again", async () => {
     const ana = await account();
@@ -1329,14 +1335,14 @@ describe("Free debates go public when finished", () => {
     const block: PublicationContentCheck = { check: async () => ({ outcome: "BLOCK", statement: { outcome: "BLOCK", parts: ["QUESTION"], ground: "TERMS", automated: true, visibility: "PRIVATE" } }) };
     const purposeLines = { answers: [{ question: "Which town?", answer: "Harbour Town, this decade" }] } as never;
     const answer = answerOf(published);
-    expect(await pub.publishFreeDebate({ runId: published, answer, owner, purposeLines, source, contentCheck: unavailable, store: freeStore(), lease: stageLease(answer) })).toBe("CHECK_UNAVAILABLE");
+    expect(await pub.publishFreeDebate({ runId: published, answer, owner, purposeLines, source, contentCheck: unavailable, endCheck: endCheckAllows, store: freeStore(), lease: stageLease(answer) })).toBe("CHECK_UNAVAILABLE");
     expect((await new PostgresPublicDebateRunnerRepository(runner).readFreeToPublish(50)).map((row) => row.run_id)).toContain(published);
-    expect(await pub.publishFreeDebate({ runId: published, answer, owner, purposeLines, source, contentCheck: allow, store: freeStore(), lease: stageLease(answer) })).toBe("PUBLISHED");
+    expect(await pub.publishFreeDebate({ runId: published, answer, owner, purposeLines, source, contentCheck: allow, endCheck: endCheckAllows, store: freeStore(), lease: stageLease(answer) })).toBe("PUBLISHED");
     expect(seen.at(-1)).toContain("Harbour Town, this decade");
     const ref = (await database.pool.query<{ publication_ref: string }>("SELECT publication_ref FROM identity.free_public_ask WHERE run_id=$1", [published])).rows[0]!.publication_ref;
     expect((await page(ref)).question).toContain("Harbour Town, this decade");
     const blockedAnswer = answerOf(refused);
-    expect(await pub.publishFreeDebate({ runId: refused, answer: blockedAnswer, owner, purposeLines: null, source, contentCheck: block, store: freeStore(), lease: stageLease(blockedAnswer) })).toBe("REFUSED");
+    expect(await pub.publishFreeDebate({ runId: refused, answer: blockedAnswer, owner, purposeLines: null, source, contentCheck: block, endCheck: endCheckAllows, store: freeStore(), lease: stageLease(blockedAnswer) })).toBe("REFUSED");
     expect((await new PostgresPublicDebateRunnerRepository(runner).readFreeToPublish(50)).map((row) => row.run_id)).not.toContain(refused);
     expect((await database.pool.query("SELECT 1 FROM core.run_visibility_event WHERE run_id=$1", [refused])).rowCount).toBe(0);
   });
@@ -1353,13 +1359,273 @@ describe("Free debates go public when finished", () => {
     const inTurn = checksInTurn(backedOffContentCheck(sweepCheck));
     const answer = answerOf(run);
     expect(await inTurn.pass(() => application().publishFreeDebate({ runId: run, answer, owner: { userId: ana.userId, ownerRef: ana.ownerRef }, purposeLines: null,
-      source: { ip: "", userAgent: "", requestId: "test" }, contentCheck: inTurn.check, store: freeStore(), lease: stageLease(answer) }))).toBe("PUBLISHED");
+      source: { ip: "", userAgent: "", requestId: "test" }, contentCheck: inTurn.check, endCheck: endCheckAllows, store: freeStore(), lease: stageLease(answer) }))).toBe("PUBLISHED");
     const ref = (await database.pool.query<{ publication_ref: string }>("SELECT publication_ref FROM identity.free_public_ask WHERE run_id=$1", [run])).rows[0]!.publication_ref;
     expect((await page(ref)).question).toBe(QUESTION);
     asTheGateTakesIt(gate.executed);
     const records = (await database.pool.query("SELECT outcome,judge_provider_ref,judge_model_id,judge_call_count FROM serve.publication_check_record WHERE run_id=$1", [run])).rows;
     expect(records).toEqual([{ outcome: "ALLOW", judge_provider_ref: "anthropic", judge_model_id: "claude-haiku-5-5", judge_call_count: gate.executed.length }]);
   });
+});
+
+/*
+ * The Free sweep as main.ts composes it, with seconds for minutes: the answer's hold over the end-of-debate check's window, then
+ * the gate an owner's Publish passes (its own check with the background time, never waiting for a check running elsewhere),
+ * asked in the debate's turn; then the publication check (here a stand-in that allows); then, under the run's lease, the publish.
+ */
+describe("a Free debate goes public only when the end-of-debate check allows it", () => {
+  const BACKGROUND_MS = 6_000;
+  const WINDOW_MS = synthesisCheckWindowMs(BACKGROUND_MS);
+  const POLICY = "synthesis.content-check.v1@0123456789abcdef";
+  const checks = () => new SynthesisCheckRepository(api);
+  /** Each answer's synthesis by version, as the gate reads it: the fixture answers hold none of their own. */
+  const syntheses = new Map<string, Map<number, string>>();
+  /** The answers a staff approval covers; the approval's own rule is tested in tests/integration/publication-review-*.test.ts. */
+  const approved = new Set<string>();
+  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, Math.max(0, ms)));
+  type FreeDebate = Readonly<{ run: string; answerId: string; owner: StoryEncryptedOwner }>;
+
+  async function finished(owner: StoryEncryptedOwner): Promise<FreeDebate> {
+    const run = await createEncryptedStoryRun(database.pool, owner, QUESTION);
+    const { answerId } = await persistTerminalRun({ pool: database.pool, runId: run, fixtureKey: randomUUID(), factBundle: FACTS });
+    expect(await new PostgresPublicDebateRepository(api).recordFreeNotice(owner.ownerRef, run)).toBe("RECORDED");
+    syntheses.set(answerId, new Map([[1, `The town should build pier ${answerId.slice(0, 8)}.`]]));
+    return { run, answerId, owner };
+  }
+  /** The end-of-debate check asked when the debate finished, as the runner asks it; `ago`: that long ago. */
+  async function asked(debate: FreeDebate, version = 1, ago = 0): Promise<void> {
+    if (ago === 0) {
+      expect(await checks().insertRequest({ runId: debate.run, answerId: debate.answerId, answerVersion: version })).toBe("INSERTED");
+      return;
+    }
+    await database.pool.query(`INSERT INTO serve.synthesis_check_request(request_id,run_id,answer_id,answer_version,requested_at)
+      VALUES (gen_random_uuid(),$1,$2,$3,clock_timestamp() - make_interval(secs => $4::double precision / 1000.0))`, [debate.run, debate.answerId, version, ago]);
+  }
+  /** A verdict of the end-of-debate check, stored for one answer version as a check stores it. */
+  async function verdict(debate: FreeDebate, version: number, categories: readonly ("TERRORISM" | "HATE_SPEECH" | "SUICIDE_OR_HARM_TO_OTHERS" | "WEAPONS_OR_DRUGS")[]): Promise<void> {
+    const attempt = await checks().startPublishAttempt({ runId: debate.run, answerId: debate.answerId, answerVersion: version });
+    expect(await checks().insertResult({ attemptId: attempt.attemptId, runId: debate.run, answerId: debate.answerId, answerVersion: version, synthesisOriginVersion: version,
+      outcome: categories.length === 0 ? { verdict: "CLEAR", categories: [] } : { verdict: "FLAGGED", categories: [...categories] },
+      modelProviderRef: "anthropic", modelId: "claude-haiku-5-5", policyVersion: POLICY, callCount: 1, deadlineMs: 60_000 })).toBe("INSERTED");
+  }
+  /** A newer version of the debate's answer with a composed text of its own, so a synthesis of its own, as a later write of the answer stores it. */
+  async function newerVersion(debate: FreeDebate): Promise<void> {
+    const text = "A newer synthesis that urges harm.";
+    const [composedId, rawId] = [randomUUID(), randomUUID()];
+    const composed = await encryptAttestedContentForRun(database.pool, debate.run, "serve.composed_text", composedId,
+      { segments: [{ segment_id: randomUUID(), text, load_bearing: true, served_number_refs: [] }] });
+    const raw = await encryptAttestedContentForRun(database.pool, debate.run, "ledger.raw_artifact", rawId, { rawText: "fixture", metadataJson: {} });
+    const sealed = await encryptAttestedContentForRun(database.pool, debate.run, "serve.answer", `${debate.answerId}:2`, { answerForm: null });
+    await database.pool.query(`INSERT INTO ledger.raw_artifact (raw_artifact_id,attempt_id,run_id,provider_ref,provider,model_id,maker,raw_text,metadata_json,parse_status,input_hash,
+        input_hash_version,contract_hash,content_hash,content_hash_version,at_seq,content_ciphertext,content_attestation)
+      VALUES ($1,$2,$3,'test','test','test','test','⟦DEBATEAI:CIPHERTEXT:V1⟧','{}'::jsonb,'PARSED','test',1,'test','test',1,ledger.allocate_sequence(),$4::jsonb,$5)`,
+      [rawId, randomUUID(), debate.run, JSON.stringify(raw!.envelope), raw!.attestation]);
+    await database.pool.query(`INSERT INTO serve.composed_text (composed_text_id,fact_bundle_id,segments,raw_artifact_ref,attempt,content_ciphertext,content_attestation)
+      SELECT $2,fact_bundle_id,'[]'::jsonb,$3,1,$4::jsonb,$5 FROM serve.answer WHERE answer_id=$1 AND answer_version=1`,
+      [debate.answerId, composedId, rawId, JSON.stringify(composed!.envelope), composed!.attestation]);
+    await database.pool.query(`INSERT INTO serve.answer (answer_id,answer_version,run_id,work_item_id,terminal,serve_state,verdict_state,answer_form,condition_marks,fact_bundle_id,
+        composed_text_id,conformance_record_id,sealed_at_seq,confidence_band,band_ceiling,reversal_point,builds_on_previous,badges,verdict_unavailable,memory_disclosure,
+        content_ciphertext,content_attestation)
+      SELECT answer_id,2,run_id,work_item_id,terminal,'COMPOSED',verdict_state,answer_form,condition_marks,fact_bundle_id,$2,conformance_record_id,
+        ledger.allocate_sequence(),confidence_band,band_ceiling,reversal_point,builds_on_previous,badges,verdict_unavailable,memory_disclosure,$3::jsonb,$4
+      FROM serve.answer WHERE answer_id=$1 AND answer_version=1`, [debate.answerId, composedId, JSON.stringify(sealed!.envelope), sealed!.attestation]);
+    syntheses.get(debate.answerId)!.set(2, text);
+  }
+  const isPublic = async (debate: FreeDebate) => (await database.pool.query("SELECT 1 FROM core.run_visibility_event WHERE run_id=$1 AND state='PUBLISHED'", [debate.run])).rowCount === 1;
+  const askOf = async (debate: FreeDebate) => (await database.pool.query<{ outcome: string | null }>("SELECT outcome FROM identity.free_public_ask WHERE run_id=$1", [debate.run])).rows[0];
+  const listed = async (debate: FreeDebate) => (await new PostgresPublicDebateRunnerRepository(runner).readFreeToPublish(100)).some((row) => row.run_id === debate.run);
+  const attemptsOf = async (debate: FreeDebate) => Number((await database.pool.query<{ n: string }>("SELECT count(*)::text AS n FROM serve.synthesis_check_attempt WHERE answer_id=$1", [debate.answerId])).rows[0]!.n);
+
+  /**
+   * The sweep, fresh as after a start of the API. `flags`: what the model answers when the gate runs its own check (the four
+   * categories, in the check's order), or null while the check cannot be reached. `duringPublicationCheck` runs while the
+   * publication check works on a debate, between the end-of-debate check's answer and the publish.
+   */
+  function freeSweep(options: { flags: readonly number[] | null; duringPublicationCheck?: (debate: FreeDebate) => Promise<void>; afterAnswerRead?: (debate: FreeDebate) => Promise<void> }) {
+    let clock = 0;
+    const modelCalls: string[] = [];
+    const judged: string[] = [];
+    const ours = new Map<string, FreeDebate>();
+    const outcomes = new Map<string, string>();
+    const publication: PublicationContentCheck = { check: async ({ runId }) => {
+      judged.push(runId);
+      await options.duringPublicationCheck?.(ours.get(runId)!);
+      return { outcome: "ALLOW" };
+    } };
+    const inTurn = checksInTurn(backedOffContentCheck(publication, { now: () => clock }), { now: () => clock });
+    const gate = createSynthesisPublishGate({
+      repository: checks(), approvalCovers: async ({ answerId }) => approved.has(answerId),
+      readAnswerVersions: async (_runId, answerId, maxVersion) => new Map([...(syntheses.get(answerId) ?? [])].filter(([version]) => version <= maxVersion)),
+      check: {
+        port: () => options.flags === null ? null : { providerRef: "anthropic", modelId: "claude-haiku-5-5", complete: async ({ packet }: { packet: PromptPacket; signal: AbortSignal }) => {
+          const flags = options.flags!;
+          modelCalls.push(packet.messages.map((message) => message.content).join(""));
+          return { text: `{"call":"${judgeCallValue(readPromptFrame(packet).fence)}","TERRORISM":${flags[0]},"HATE_SPEECH":${flags[1]},"SUICIDE_OR_HARM_TO_OTHERS":${flags[2]},"WEAPONS_OR_DRUGS":${flags[3]}}` };
+        } },
+        deadlineMs: BACKGROUND_MS, recordSpend: async () => undefined, priceOf: (model) => previewModelRow(model) ?? null, clock: () => new Date(), log: () => undefined
+      },
+      deadlineMs: BACKGROUND_MS, inFlightWindowMs: BACKGROUND_MS, inFlightWaitMs: 0, clock: () => new Date(), sleep
+    });
+    const access = createSynthesisAnswerAccess({ repository: checks(), deadlineMs: WINDOW_MS });
+    const endCheck: FreeEndCheck = { stateOf: (target) => access.stateOf(target),
+      decide: async (target) => await inTurn.checkBefore(target.runId, () => gate.decide(target), (decision) => decision === "UNAVAILABLE") ?? "UNAVAILABLE" };
+    const pass = async (...debates: FreeDebate[]): Promise<void> => {
+      for (const debate of debates) ours.set(debate.run, debate);
+      await inTurn.pass(() => sweepFreePublications({ contributions: new PostgresPublicDebateRunnerRepository(runner),
+        log: (event, detail) => { const runId = String(detail.runId); if (ours.has(runId)) outcomes.set(runId, event === "FREE_PUBLICATION" ? String(detail.outcome) : `${event} ${String(detail.code)}`); },
+        publishOne: async (waiting) => {
+          const debate = ours.get(waiting.run_id);
+          if (debate === undefined) return "NOT_THIS_TEST";
+          const read = () => new ServeRepository(api).readAnswerProjection(debate.answerId, { ownerRef: debate.owner.ownerRef, legacyAskerId: null });
+          const lease = { run: <T>(use: () => Promise<T>) => withRunContentLease(api, [debate.run], use), readAnswer: read };
+          const answer = await lease.run(lease.readAnswer);
+          if (answer === null) return "NO_ANSWER_YET";
+          await options.afterAnswerRead?.(debate);
+          return application().publishFreeDebate({ runId: debate.run, answer, owner: { userId: debate.owner.userId, ownerRef: debate.owner.ownerRef }, purposeLines: null,
+            source: { ip: "", userAgent: "", requestId: "free-publication-sweep" }, contentCheck: inTurn.check, endCheck, store: freeStore(), lease });
+        } }));
+    };
+    return { pass, outcomeOf: (debate: FreeDebate) => outcomes.get(debate.run), modelCalls, judged, wait: (ms: number) => { clock += ms; } };
+  }
+  function freeStore() {
+    const contributions = new PostgresPublicDebateRunnerRepository(runner);
+    return { prepare: (runId: string, ref: string) => contributions.prepareFreePublication(runId, ref),
+      publish: (input: Parameters<typeof contributions.publishFree>[0]) => contributions.publishFree(input), refuse: (runId: string) => contributions.refuseFree(runId) };
+  }
+
+  it("waits while the end-of-debate check may still answer, and goes public once it answers clear; the sweep calls no model of its own", async () => {
+    const debate = await finished(await account());
+    await asked(debate);
+    const sweep = freeSweep({ flags: null });
+    await sweep.pass(debate);
+    expect(sweep.outcomeOf(debate)).toBe("WAITING_FOR_CHECK");
+    expect(sweep.judged).toEqual([]);
+    expect(await isPublic(debate)).toBe(false);
+    await verdict(debate, 1, []);
+    await sweep.pass(debate);
+    expect(sweep.outcomeOf(debate)).toBe("PUBLISHED");
+    expect(sweep.judged).toEqual([debate.run]);
+    expect(await isPublic(debate)).toBe(true);
+    expect(sweep.modelCalls).toEqual([]);
+  });
+
+  it("a flag that needs a staff approval keeps it waiting, never refused for good: no publication check is spent on it, and once an approval covers the flag it goes public", async () => {
+    const debate = await finished(await account());
+    await verdict(debate, 1, ["HATE_SPEECH"]);
+    const sweep = freeSweep({ flags: null });
+    for (let pass = 0; pass < 2; pass += 1) {
+      await sweep.pass(debate);
+      expect(sweep.outcomeOf(debate)).toBe("WAITING_FOR_APPROVAL");
+    }
+    expect(sweep.judged).toEqual([]);
+    expect(await isPublic(debate)).toBe(false);
+    expect(await askOf(debate)).toEqual({ outcome: null });
+    expect(await listed(debate)).toBe(true);
+    approved.add(debate.answerId);
+    await sweep.pass(debate);
+    expect(sweep.outcomeOf(debate)).toBe("PUBLISHED");
+    expect(await isPublic(debate)).toBe(true);
+    expect(sweep.modelCalls).toEqual([]);
+  });
+
+  it("one the check asks to delete is never published, and its deletion goes ahead", async () => {
+    const debate = await finished(await account());
+    await verdict(debate, 1, ["SUICIDE_OR_HARM_TO_OTHERS"]);
+    const sweep = freeSweep({ flags: [0, 0, 0, 0] });
+    await sweep.pass(debate);
+    expect(sweep.outcomeOf(debate)).toBe("REMOVED");
+    expect(sweep.judged).toEqual([]);
+    expect(await isPublic(debate)).toBe(false);
+    const erased = await new SynthesisCheckErasureCoordinator(new PostgresSynthesisCheckErasureRepository(erasure), runKeys, publicationCipher, () => undefined).reconcile(100);
+    expect(erased).toContainEqual({ runId: debate.run, outcome: "CLEANED" });
+    expect(await runKeys.exists(debate.run)).toBe(false);
+    expect(await listed(debate)).toBe(false);
+    expect(await isPublic(debate)).toBe(false);
+    expect(sweep.modelCalls).toEqual([]);
+  });
+
+  it("a check that cannot answer never refuses and never publishes: the debate waits its own doubling time and holds back no other; once the check answers it goes public", async () => {
+    const owner = await account();
+    // The worker's window passed long ago and nobody answered: the sweep's gate asks the check itself, as an owner's Publish does.
+    const unchecked = await finished(owner);
+    await asked(unchecked, 1, 60 * 60_000);
+    const clear = await finished(owner);
+    await verdict(clear, 1, []);
+    const down = freeSweep({ flags: null });
+    await down.pass(unchecked, clear);
+    expect(down.outcomeOf(unchecked)).toBe("CHECK_UNAVAILABLE");
+    expect(down.outcomeOf(clear)).toBe("PUBLISHED");
+    expect(await isPublic(unchecked)).toBe(false);
+    expect(await askOf(unchecked)).toEqual({ outcome: null });
+    expect(await attemptsOf(unchecked)).toBe(1);
+    // Inside its own wait the sweep asks nothing for it; after the wait it asks again, and again it cannot answer.
+    await down.pass(unchecked);
+    expect(await attemptsOf(unchecked)).toBe(1);
+    down.wait(60_000);
+    await down.pass(unchecked);
+    expect(down.outcomeOf(unchecked)).toBe("CHECK_UNAVAILABLE");
+    expect(await attemptsOf(unchecked)).toBe(2);
+    expect(await listed(unchecked)).toBe(true);
+    // The check is back: the sweep's own check answers clear, and the debate goes public.
+    const back = freeSweep({ flags: [0, 0, 0, 0] });
+    await back.pass(unchecked);
+    expect(back.outcomeOf(unchecked)).toBe("PUBLISHED");
+    expect(back.modelCalls).toHaveLength(1);
+    expect(back.modelCalls[0]).toContain(syntheses.get(unchecked.answerId)!.get(1));
+  });
+
+  it("the verdict arrives between the sweep's read of the answer and its publish: the end-of-debate check is read when it decides, so a deletion that came meanwhile publishes nothing", async () => {
+    const debate = await finished(await account());
+    await asked(debate);
+    const sweep = freeSweep({ flags: null, afterAnswerRead: async (read) => verdict(read, 1, ["SUICIDE_OR_HARM_TO_OTHERS"]) });
+    await sweep.pass(debate);
+    expect(sweep.outcomeOf(debate)).toBe("REMOVED");
+    expect(sweep.judged).toEqual([]);
+    expect(await isPublic(debate)).toBe(false);
+  });
+
+  it("a newer answer version appears while the checks run: the older answer's clear verdict publishes nothing, and the newer one's deletion keeps it off the page", async () => {
+    const debate = await finished(await account());
+    await verdict(debate, 1, []);
+    let wrote = false;
+    const sweep = freeSweep({ flags: null, duringPublicationCheck: async (checked) => {
+      if (wrote) return;
+      wrote = true;
+      await newerVersion(checked);
+      await asked(checked, 2);
+      await verdict(checked, 2, ["SUICIDE_OR_HARM_TO_OTHERS"]);
+    } });
+    await sweep.pass(debate);
+    expect(sweep.judged).toEqual([debate.run]);
+    expect(sweep.outcomeOf(debate)).toBe("WAITING_FOR_CHECK");
+    expect(await isPublic(debate)).toBe(false);
+    await sweep.pass(debate);
+    expect(sweep.outcomeOf(debate)).toBe("REMOVED");
+    expect(await isPublic(debate)).toBe(false);
+  });
+
+  it("the API restarts mid-pass: a check the stopped process left without an answer holds no pass and publishes nothing; once it is old, the sweep checks the answer itself", async () => {
+    const debate = await finished(await account());
+    await asked(debate, 1, 60 * 60_000);
+    // The stopped process's gate had started its own check: the attempt is written before the model is called.
+    await checks().startPublishAttempt({ runId: debate.run, answerId: debate.answerId, answerVersion: 1 });
+    const restarted = freeSweep({ flags: [0, 0, 0, 0] });
+    const startedAt = Date.now();
+    await restarted.pass(debate);
+    // Not waited for (an owner's Publish would wait up to its whole time), not checked beside it, not refused, not published.
+    expect(Date.now() - startedAt).toBeLessThan(BACKGROUND_MS / 2);
+    expect(restarted.outcomeOf(debate)).toBe("CHECK_UNAVAILABLE");
+    expect(restarted.modelCalls).toEqual([]);
+    expect(await askOf(debate)).toEqual({ outcome: null });
+    expect(await isPublic(debate)).toBe(false);
+    // Once that attempt is older than any check may run, and the debate's own wait has passed, the sweep checks it itself.
+    await sleep(BACKGROUND_MS + 300 - (Date.now() - startedAt));
+    restarted.wait(60_000);
+    await restarted.pass(debate);
+    expect(restarted.outcomeOf(debate)).toBe("PUBLISHED");
+    expect(restarted.modelCalls).toHaveLength(1);
+    expect(await attemptsOf(debate)).toBe(2);
+  }, 30_000);
 });
 
 describe("over HTTP", () => {

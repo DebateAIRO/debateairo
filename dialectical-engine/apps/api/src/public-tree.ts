@@ -604,11 +604,20 @@ export async function sweepPublicPage(deps: PublicPageSweepDeps): Promise<Readon
  * Kept in memory and keyed by the row each check is for: its `turnKey` when it names one (a page update, whose run id is its
  * dig's, shared by every page update of that dig), else the run id it names (a report's carries its prefix, main.ts). An item
  * a pass did not ask is forgotten (published, refused, given up or erased), and a restart starts again from the lists' own order.
+ * A Free debate's end-of-debate check goes before its publication check, in the same turn and under the same key
+ * (`checkBefore`): when it cannot answer, the debate waits its own doubling time as when the publication check cannot.
  */
 export type ChecksInTurn = Readonly<{
   /** One pass of the sweeps: every check they ask through `check` belongs to it. */
   pass: <T>(sweeps: () => Promise<T>) => Promise<T>;
   check: PublicationContentCheck;
+  /**
+   * Another check that goes before an item's publication check (a Free debate's end-of-debate check), asked in the same
+   * turns under the same key. Null: the item's turn has not come, and nothing was asked. An answer `failed` calls a failure
+   * starts or doubles the item's own wait, as an unavailable publication check does. Any other answer changes nothing:
+   * only the publication check's own answer ends an item's wait and tells the turns that the judge has answered.
+   */
+  checkBefore: <T>(key: string, check: () => Promise<T>, failed: (answer: T) => boolean) => Promise<T | null>;
 }>;
 export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ now?: () => number; firstWaitMs?: number; longestWaitMs?: number }> = {}): ChecksInTurn {
   const now = input.now ?? Date.now;
@@ -628,6 +637,31 @@ export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ no
     failures += 1;
     failed.set(key, Object.freeze({ turn: failures, wait, until: now() + wait }));
   };
+  /** One check of an item, if its turn has come (null: not asked). `judge`: the publication check, whose answer ends the item's wait. */
+  const inTurn = async <T>(rawKey: string, ask: () => Promise<T>, failedAnswer: (answer: T) => boolean, judge: boolean): Promise<T | null> => {
+    const key = rawKey.toLowerCase();
+    asked.add(key);
+    const record = failed.get(key);
+    if (record !== undefined && now() < record.until) return null;
+    const turn = record?.turn ?? 0;
+    if (shared.resting() || (!answered && turn > owedBefore)) {
+      owed = Math.min(owed, turn);
+      return null;
+    }
+    let answer: T;
+    try {
+      answer = await ask();
+    } catch (error) {
+      fail(key);
+      throw error;
+    }
+    if (failedAnswer(answer)) fail(key);
+    else if (judge) {
+      failed.delete(key);
+      answered = true;
+    }
+    return answer;
+  };
   return Object.freeze({
     pass: async <T>(sweeps: () => Promise<T>): Promise<T> => {
       owed = Number.POSITIVE_INFINITY;
@@ -640,36 +674,19 @@ export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ no
         for (const key of [...failed.keys()]) if (!asked.has(key)) failed.delete(key);
       }
     },
-    check: Object.freeze({ check: async (request: Parameters<PublicationContentCheck["check"]>[0]): Promise<PublicationCheckResult> => {
-      const key = (request.turnKey ?? request.runId).toLowerCase();
-      asked.add(key);
-      const record = failed.get(key);
-      if (record !== undefined && now() < record.until) return { outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" };
-      const turn = record?.turn ?? 0;
-      if (shared.resting() || (!answered && turn > owedBefore)) {
-        owed = Math.min(owed, turn);
-        return { outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" };
-      }
-      let result: PublicationCheckResult;
-      try {
-        result = await shared.check(request);
-      } catch (error) {
-        fail(key);
-        throw error;
-      }
-      if (result.outcome === "UNAVAILABLE") fail(key);
-      else {
-        failed.delete(key);
-        answered = true;
-      }
-      return result;
-    } })
+    check: Object.freeze({ check: async (request: Parameters<PublicationContentCheck["check"]>[0]): Promise<PublicationCheckResult> =>
+      await inTurn(request.turnKey ?? request.runId, () => shared.check(request), (result) => result.outcome === "UNAVAILABLE", true)
+        ?? { outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" } }),
+    checkBefore: <T>(key: string, check: () => Promise<T>, failedAnswer: (answer: T) => boolean): Promise<T | null> =>
+      inTurn(key, check, failedAnswer, false)
   });
 }
 
 /**
- * THE FREE DEBATES' SWEEP (decision 13): each finished Free debate whose ask carried the notice goes public after the publication check, or stays private for good on a refusal. An unavailable
- * check records nothing: the next pass tries again, so a crash anywhere loses nothing. It waits for the story for a while: a debate published a minute earlier would go out without its short answer.
+ * THE FREE DEBATES' SWEEP (decision 13): each finished Free debate whose ask carried the notice goes public after the end-of-debate check allows it, through the gate an owner's Publish passes,
+ * and the publication check allows it, or stays private for good on the publication check's refusal (publishFreeDebate). While the end-of-debate check may still answer, cannot answer, or
+ * flagged it with no staff approval, it keeps waiting; one it asks to delete is never published. An unavailable check records nothing: the next pass tries again, so a crash anywhere loses
+ * nothing. It waits for the story for a while: a debate published a minute earlier would go out without its short answer.
  */
 export type FreeSweepDeps = Readonly<{
   contributions: Pick<PostgresPublicDebateRunnerRepository, "readFreeToPublish" | "refuseFree">;

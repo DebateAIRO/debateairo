@@ -529,6 +529,34 @@ describe("the synthesis check through the Anthropic gate", () => {
     expect(gate.state.envelopes).toHaveLength(1);
   });
 
+  it("the Free sweep's gate never waits for a check running elsewhere and never runs one beside it: that debate is decided on a later pass", async () => {
+    let now = 50_000;
+    let slept = 0;
+    let ownAttempts = 0;
+    let portReads = 0;
+    // Another attempt (an owner's Publish, or one a restart left without an answer) started half a second ago.
+    const running = { attemptId: "22222222-2222-4222-8222-222222222222", answerVersion: 1, startedAt: new Date(now - 500) };
+    const repository = {
+      ownerRefOfRun: async () => "owner", readRecords: async () => [],
+      readInFlightAttempts: async () => [running],
+      startPublishAttempt: async () => { ownAttempts += 1; return { attemptId: "33333333-3333-4333-8333-333333333333", startedAt: new Date(now) }; },
+      insertResult: async () => "INSERTED" as const
+    };
+    const check: SynthesisCheckDeps = { port: () => { portReads += 1; return null; }, deadlineMs: 120_000, recordSpend: async () => undefined,
+      priceOf: () => null, clock: () => new Date(now), log: () => undefined };
+    const gateWith = (wait: Readonly<{ inFlightWaitMs?: number }>) => createSynthesisPublishGate({
+      repository: repository as never, readAnswerVersions: async () => new Map([[1, "The town should build the pier."]]),
+      check, deadlineMs: 120_000, inFlightWindowMs: 120_000, ...wait,
+      clock: () => new Date(now), sleep: async (ms) => { slept += ms; now += ms; } });
+    const decide = (gate: ReturnType<typeof gateWith>) => gate.decide({ runId: RUN, answer: { answer_id: RUN, answer_version: 1 } as never,
+      contentLease: { run: (use) => use(), readAnswer: async () => null }, startedAt: new Date(now) });
+    expect(await decide(gateWith({ inFlightWaitMs: 0 }))).toBe("UNAVAILABLE");
+    expect({ slept, ownAttempts, portReads }).toEqual({ slept: 0, ownAttempts: 0, portReads: 0 });
+    // Without it, as an owner's Publish, the gate waits for that check up to its own time, and still runs none beside it.
+    expect(await decide(gateWith({}))).toBe("UNAVAILABLE");
+    expect({ slept, ownAttempts, portReads }).toEqual({ slept: 120_000, ownAttempts: 0, portReads: 0 });
+  });
+
   it("a call the gate holds past the check's time is a DEADLINE, cancelled before the gate sends it", async () => {
     const gate = await standInGate({ queueMs: 600, vendor: clear });
     const { run } = synthesis(gate.fetch, 150);

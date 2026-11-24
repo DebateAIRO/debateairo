@@ -35,6 +35,12 @@ export function createSynthesisPublishGate(input: Readonly<{
    * calling the model a second time beside it. Without it, D.
    */
   inFlightWindowMs?: number;
+  /**
+   * How long this caller waits for another attempt's check that is still running; without it, up to its own D. Zero: it
+   * does not wait, and such a check makes the decision UNAVAILABLE at once (the Free debates' sweep, which asks again on a
+   * later pass rather than hold its pass). Either way the gate never runs a check of its own beside one that is running.
+   */
+  inFlightWaitMs?: number;
   clock(): Date;
   sleep(ms: number): Promise<void>;
 }>): SynthesisPublishGate {
@@ -64,6 +70,7 @@ export function createSynthesisPublishGate(input: Readonly<{
         const prior = await readDecision();
         if (prior !== null) return prior;
         const deadlineAt = new Date(target.startedAt.getTime() + input.deadlineMs);
+        const waitUntil = Math.min(deadlineAt.getTime(), target.startedAt.getTime() + (input.inFlightWaitMs ?? input.deadlineMs));
         let waitedForCheck = false;
         while (input.clock().getTime() < deadlineAt.getTime()) {
           const inFlight = await input.repository.readInFlightAttempts({
@@ -72,7 +79,8 @@ export function createSynthesisPublishGate(input: Readonly<{
           });
           if (!inFlight.some((attempt) => originVersionOf(texts, attempt.answerVersion) === synthesisOriginVersion)) break;
           waitedForCheck = true;
-          await input.sleep(Math.min(SYNTHESIS_PUBLISH_POLL_MS, deadlineAt.getTime() - input.clock().getTime()));
+          if (input.clock().getTime() >= waitUntil) break;
+          await input.sleep(Math.min(SYNTHESIS_PUBLISH_POLL_MS, waitUntil - input.clock().getTime()));
           const observed = await readDecision();
           if (observed !== null) return observed;
         }

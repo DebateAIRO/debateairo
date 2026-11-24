@@ -196,7 +196,7 @@ import { SessionService } from "./sessions.js";
 import { StaffWebAuthnService } from "./staff/webauthn.js";
 import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
-import { PostgresPublicationApplication, buildPublicDebateBody } from "./publications.js";
+import { PostgresPublicationApplication, buildPublicDebateBody, type FreeEndCheck } from "./publications.js";
 import { PUBLIC_REVIEW_PURGE_EVERY_MS, sweepPublicReviewPurge } from "./public-flag.js";
 import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, checksInTurn, publicReportCarrierMaker, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
 import { createPublicationReviewStaffService } from "./publication-review/staff.js";
@@ -1803,16 +1803,28 @@ const synthesisCheckDeps: SynthesisCheckDeps = {
 const readSynthesisAnswer = (runId: string, answerId: string, version: number, ownerRef: string) =>
   application.readAnswer(answerId, ownerSession(ownerRef, "00000000-0000-0000-0000-000000000000"),
     version, { ownerRef, legacyAskerId: null });
+const readSynthesisAnswerVersions = async (runId: string, answerId: string, maxVersion: number, ownerRef: string) => {
+  const texts = await readSynthesisTexts(maxVersion,
+    (version) => readSynthesisAnswer(runId, answerId, version, ownerRef));
+  if (texts === null) throw new Error("SYNTHESIS_ANSWER_UNREADABLE");
+  return texts;
+};
 const synthesisPublishGate = createSynthesisPublishGate({
   repository: synthesisCheckRepository,
   approvalCovers: input => publicationReviewRepository.approvalCovers(input),
-  readAnswerVersions: async (runId, answerId, maxVersion, ownerRef) => {
-    const texts = await readSynthesisTexts(maxVersion,
-      (version) => readSynthesisAnswer(runId, answerId, version, ownerRef));
-    if (texts === null) throw new Error("SYNTHESIS_ANSWER_UNREADABLE");
-    return texts;
-  },
+  readAnswerVersions: readSynthesisAnswerVersions,
   check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs, inFlightWindowMs: synthesisCheckWindow,
+  clock: () => new Date(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+});
+// The same gate for a finished Free debate, asked by the sweep before it publishes. It runs in the background, so its own
+// check takes the background time; it never waits for a check running elsewhere (an owner's Publish, or an attempt a
+// restart left without an answer), so one debate never holds the sweep's pass: that debate is asked again on a later pass.
+const sweepSynthesisPublishGate = createSynthesisPublishGate({
+  repository: synthesisCheckRepository,
+  approvalCovers: input => publicationReviewRepository.approvalCovers(input),
+  readAnswerVersions: readSynthesisAnswerVersions,
+  check: { ...synthesisCheckDeps, deadlineMs: backgroundCheckDeadlineMs }, deadlineMs: backgroundCheckDeadlineMs,
+  inFlightWindowMs: backgroundCheckDeadlineMs, inFlightWaitMs: 0,
   clock: () => new Date(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 });
 // The worker checks each finished debate in the background: on the gate it may also wait out the gate's slot queue, and it
@@ -2496,6 +2508,13 @@ if (publications !== undefined) {
   const inTurn = checksInTurn(judgeGate);
   const sweepContentCheck = inTurn.check;
   const sweepReportCheck = { check: (request: Parameters<typeof judgeGate.check>[0]) => inTurn.check.check({ runId: `${REPORT_CHECK_PREFIX}${request.runId}`, snapshot: request.snapshot }) };
+  // A finished Free debate goes public only when the end-of-debate check allows it, as an owner's Publish does: the
+  // answer's hold first, then the gate, asked in the debate's own turn, so one that cannot be checked waits its own time.
+  const freeEndCheck: FreeEndCheck = {
+    stateOf: (target) => synthesisAnswerAccess.stateOf(target),
+    decide: async (target) => await inTurn.checkBefore(target.runId, () => sweepSynthesisPublishGate.decide(target),
+      (decision) => decision === "UNAVAILABLE") ?? "UNAVAILABLE"
+  };
   const triggerPublicPage = createSingleFlightErasureReconciler(() => inTurn.pass(async () => {
     await sweepPublicPage({ pool, page: publicPage, contributions: publicContributions, tree: publicTreeRepository, contentCheck: sweepContentCheck, reportContentCheck: sweepReportCheck,
       withPublicationKey: (publicationRef, use) => publications.withPublicationKey(publicationRef, use) });
@@ -2513,7 +2532,7 @@ if (publications !== undefined) {
       if (story === null && Date.now() - Date.parse(waiting.notice_at) < FREE_PUBLICATION_STORY_WAIT_MS) return "WAITING_FOR_STORY";
       const lines = await readPurposeLinesOf(pool, owner.owner_ref, waiting.run_id);
       return publications.publishFreeDebate({ runId: waiting.run_id, answer, owner: { userId: owner.user_id, ownerRef: owner.owner_ref }, purposeLines: lines, contentCheck: sweepContentCheck,
-        source: { ip: "", userAgent: "", requestId: "free-publication-sweep" }, lease,
+        endCheck: freeEndCheck, source: { ip: "", userAgent: "", requestId: "free-publication-sweep" }, lease,
         store: { prepare: (runId, ref) => publicContributions.prepareFreePublication(runId, ref),
           publish: (input) => publicContributions.publishFree({ runId: input.runId, publicationRef: input.publicationRef, grantTokenHash: input.grantTokenHash, content: input.content, presentedAt: input.presentedAt }),
           refuse: (runId) => publicContributions.refuseFree(runId) } });
