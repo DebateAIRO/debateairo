@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Privat debatt",
   "debateChrome.privateDebateDeleted": "Den privata debatten har raderats",
   "debateChrome.privateDebateDeletionProcessing": "Raderingen av den privata debatten pågår",
-  "debateChrome.privateDebateDeletedDetail": "Den här debatten är en gravpost. Dess krypterade privata innehåll är permanent oläsbart.",
+  "debateChrome.privateDebateDeletedDetail": "Den här debatten är en gravpost. Dess krypterade privata innehåll kan inte längre läsas här. Våra säkerhetskopior kan fortfarande innehålla det (integritetspolicyn, avsnitt 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Det privata innehållet är inte längre tillgängligt medan den beständiga nyckelrensningen slutförs.",
   "debateChrome.tree.building": "Bygger argumentträdet…",
   "debateChrome.tree.notProduced": "Inget argumentträd skapades för den här debatten.",

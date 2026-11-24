@@ -413,7 +413,8 @@ const RETIRED_PLAN_LINES = {
 
 // V4 asks send no model strength, so English and Romanian no longer offer a pick of Best, Balanced or Economy: the paid
 // line names the choice V4 does give (Quick look or Thorough, the words of v4.digMode.*), and the Free line says Free
-// questions are public. The other languages keep their earlier lines until they are translated again.
+// questions are public. The other languages were translated again on 24 November 2026: their paid line names the same
+// choice in the words of their own v4.digMode.*, and offers no model strength either.
 const V4_PLAN_LINES = {
   en: ["2 debaters, carefully chosen low-cost models, fixed settings. Free questions and their debates are public.",
     "3 debaters, all settings, and a choice of Quick look or Thorough for each question", ["Quick look", "Thorough"]],
@@ -449,10 +450,15 @@ test("/pricing's plan lines say what is true: Free's low-cost models, and the ch
       }
       continue;
     }
-    // The paid line names the strengths with the very labels of /new's Model strength chooser.
+    // The paid line names the choice V4 gives with the very labels of this language's Quick look / Thorough switch.
+    const v4 = JSON.parse(source(`messages/${code}/v4.json`));
+    for (const mode of ["quick", "thorough"]) {
+      const label = v4[`v4.digMode.${mode}`];
+      assert.ok(billing["billing.pricing.paidFeatures"].includes(label), `${code}: the paid line names ${mode} as the switch does (${label})`);
+    }
     for (const strength of ["Best", "Balanced", "Economy"]) {
       const label = newDebate[`newDebate.modelStrength${strength}`];
-      assert.ok(billing["billing.pricing.paidFeatures"].includes(label), `${code}: the paid line names ${strength} as /new does (${label})`);
+      assert.ok(!billing["billing.pricing.paidFeatures"].includes(label), `${code}: the paid line offers no model strength (${label})`);
     }
   }
 });

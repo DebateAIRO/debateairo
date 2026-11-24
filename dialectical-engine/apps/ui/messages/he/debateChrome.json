@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "דיון פרטי",
   "debateChrome.privateDebateDeleted": "הדיון הפרטי נמחק",
   "debateChrome.privateDebateDeletionProcessing": "מחיקת הדיון הפרטי מתבצעת",
-  "debateChrome.privateDebateDeletedDetail": "דיון זה הוא רשומת מחיקה. תוכנו הפרטי והמוצפן בלתי קריא לצמיתות.",
+  "debateChrome.privateDebateDeletedDetail": "דיון זה הוא רשומת מחיקה. אי אפשר עוד לקרוא כאן את תוכנו הפרטי והמוצפן. ייתכן שהוא עדיין שמור בגיבויים שלנו (מדיניות הפרטיות, סעיף 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "התוכן הפרטי אינו זמין עוד בזמן שהניקוי הסופי של המפתחות מסתיים.",
   "debateChrome.tree.building": "מתבצעת בניית עץ הטיעונים…",
   "debateChrome.tree.notProduced": "לא הופק עץ טיעונים לדיון זה.",

@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Yksityinen väittely",
   "debateChrome.privateDebateDeleted": "Yksityinen väittely poistettu",
   "debateChrome.privateDebateDeletionProcessing": "Yksityisen väittelyn poisto on käynnissä",
-  "debateChrome.privateDebateDeletedDetail": "Tästä väittelystä on jäljellä vain poistomerkintä. Sen salattu yksityinen sisältö on pysyvästi lukukelvoton.",
+  "debateChrome.privateDebateDeletedDetail": "Tästä väittelystä on jäljellä vain poistomerkintä. Sen salattua yksityistä sisältöä ei voi enää lukea täällä. Varmuuskopiomme voivat yhä sisältää sen (tietosuojakäytännön kohta 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Yksityinen sisältö ei ole enää saatavilla, kunnes avainten pysyvä siivous valmistuu.",
   "debateChrome.tree.building": "Argumenttipuuta rakennetaan…",
   "debateChrome.tree.notProduced": "Tälle väittelylle ei muodostettu argumenttipuuta.",

@@ -303,7 +303,7 @@ describe("publication reviews staff surface", () => {
     expect(row?.querySelector(".staffDelivery")).toBeNull();
   });
 
-  it("the page module picks ro catalogues for the ro cookie and en otherwise, and renders no main element", async () => {
+  it("the page module picks ro catalogues for the ro cookie and en otherwise (team pages know only en and ro), and renders no main element", async () => {
     const pagePath = "../../apps/ui/app/admin/reviews/page.js";
     const { default: Page } = await import(/* @vite-ignore */ pagePath);
     cookieLocale = "ro";
@@ -317,8 +317,16 @@ describe("publication reviews staff surface", () => {
     const english = renderToStaticMarkup(englishPage);
     expect(english).toContain(enStaff["staff.reviews.heading"]);
     expect((englishPage as any).props.children.props.children.props.publicCatalog).toBe(enPublic);
-    // French is a catalogue language the site does not offer, so the page reads its cookie as English.
-    expect((englishPage as any).props.children.props.children.props.locale).toBe("en");
+    // French is offered (all 35 languages since 24 November 2026), so the page keeps the reader's locale; the team-only
+    // pages still know only English and Romanian catalogues (owner's decision), so its words stay English.
+    expect((englishPage as any).props.children.props.children.props.locale).toBe("fr");
+    expect((englishPage as any).props.children.props.children.props.catalog).toBe(enStaff);
+    // A cookie naming no offered language is read as English.
+    cookieLocale = "xx";
+    const unknownPage = await Page();
+    expect(renderToStaticMarkup(unknownPage)).toContain(enStaff["staff.reviews.heading"]);
+    expect((unknownPage as any).props.children.props.children.props.locale).toBe("en");
+    expect((unknownPage as any).props.children.props.children.props.publicCatalog).toBe(enPublic);
   });
 
   it("staff.json en and ro hold the same keys", () => {

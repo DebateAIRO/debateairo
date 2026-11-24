@@ -174,17 +174,43 @@ describe("P19 /checkout and /checkout/return", () => {
     expect(mocks.flowProps[0]).toMatchObject({ locale: "ro", consents: null });
   });
 
-  it("reads a cookie naming a language the site does not offer as English, consent pairs included", async () => {
+  it("hands a German reader the German page and the German consent pairs (the site offers all 35 languages)", async () => {
     mocks.session = "t".repeat(43);
     mocks.locale = "de";
     renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    expect(mocks.flowProps).toHaveLength(1);
     expect(mocks.flowProps[0]).toMatchObject({
-      locale: "en",
+      planId: "PLUS",
+      locale: "de",
       consents: {
-        renewal: { version: "CONSENT_RENEWAL@en", sha256: "c".repeat(64) },
-        immediateStart: { version: "CONSENT_IMMEDIATE_START@en", sha256: "c".repeat(64) }
+        renewal: { version: "CONSENT_RENEWAL@de", sha256: "c".repeat(64) },
+        immediateStart: { version: "CONSENT_IMMEDIATE_START@de", sha256: "c".repeat(64) }
       }
     });
+  });
+
+  it("never sends another locale's consent pair to a German reader either: without the German pair the flow gets none", async () => {
+    mocks.session = "t".repeat(43);
+    mocks.locale = "de";
+    mocks.consentMissingFor = "de";
+    renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    expect(mocks.flowProps[0]).toMatchObject({ locale: "de", consents: null });
+  });
+
+  it("reads a cookie naming a language the site does not offer as English, consent pairs included", async () => {
+    for (const cookie of ["xx", "en-AU"]) {
+      mocks.flowProps = [];
+      mocks.session = "t".repeat(43);
+      mocks.locale = cookie;
+      renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+      expect(mocks.flowProps[0], cookie).toMatchObject({
+        locale: "en",
+        consents: {
+          renewal: { version: "CONSENT_RENEWAL@en", sha256: "c".repeat(64) },
+          immediateStart: { version: "CONSENT_IMMEDIATE_START@en", sha256: "c".repeat(64) }
+        }
+      });
+    }
   });
 
   it("sends an expired or revoked session to sign in, from the checkout and its return page alike (spec §2.10)", async () => {

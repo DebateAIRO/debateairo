@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Privaatne väitlus",
   "debateChrome.privateDebateDeleted": "Privaatne väitlus on kustutatud",
   "debateChrome.privateDebateDeletionProcessing": "Privaatse väitluse kustutamine on pooleli",
-  "debateChrome.privateDebateDeletedDetail": "Sellest väitlusest on järel ainult kustutamismärge. Selle krüpteeritud privaatset sisu ei saa enam kunagi lugeda.",
+  "debateChrome.privateDebateDeletedDetail": "Sellest väitlusest on järel ainult kustutamismärge. Selle krüpteeritud privaatset sisu ei saa siin enam lugeda. Meie varukoopiates võib see veel alles olla (privaatsuspoliitika, jaotis 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Privaatne sisu pole enam saadaval, kuni võtmete püsiv kõrvaldamine lõpule jõuab.",
   "debateChrome.tree.building": "Argumendipuu koostamine…",
   "debateChrome.tree.notProduced": "Selle väitluse jaoks ei loodud argumendipuud.",

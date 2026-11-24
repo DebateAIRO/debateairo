@@ -12,6 +12,9 @@ import english from "@/messages/en/mfa-recovery.json";
  * the reader's locale with no client chunk (owner, 2026-10-09: "clear plain screens
  * in all 35 locales"). A component rendered without a served catalogue reads English.
  */
+/** Where the layout of /recover puts the name of the password-reset link, taken from the reader's password-reset catalogue. */
+export const PASSWORD_RESET_LINK_KEY = "password-reset.request.title";
+
 const MfaRecoveryCatalogContext = createContext<MessageCatalog | null>(null);
 
 export function MfaRecoveryCatalogProvider({ catalog, children }: { catalog: MessageCatalog; children: ReactNode }) {

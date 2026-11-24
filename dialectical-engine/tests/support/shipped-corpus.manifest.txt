@@ -940,6 +940,7 @@ apps/ui/lib/legal/vi/termsOfService.ts
 apps/ui/lib/legal/zh/privacyPolicy.ts
 apps/ui/lib/legal/zh/termsOfService.ts
 apps/ui/lib/legalDocument.ts
+apps/ui/lib/lockoutRisk.ts
 apps/ui/lib/makerIdentity.ts
 apps/ui/lib/mfaEnrollment.ts
 apps/ui/lib/modelStrength.test.mjs
@@ -948,6 +949,7 @@ apps/ui/lib/models.ts
 apps/ui/lib/observability/index.ts
 apps/ui/lib/observability/logger.ts
 apps/ui/lib/observability/suspiciousScoring.ts
+apps/ui/lib/passkeyNames.ts
 apps/ui/lib/phoneCompletionDraft.ts
 apps/ui/lib/previewAskProxyCeiling.ts
 apps/ui/lib/previewBuyersApi.ts
@@ -1340,6 +1342,7 @@ packages/db/src/migration-forward0183.ts
 packages/db/src/migration-forward0184.ts
 packages/db/src/migration-forward0185.ts
 packages/db/src/migration-forward0186.ts
+packages/db/src/migration-forward0187.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts

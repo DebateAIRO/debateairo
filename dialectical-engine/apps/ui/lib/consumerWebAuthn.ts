@@ -1,3 +1,4 @@
+import { passkeyLabel } from './passkeyNames.js';
 import { ConsumerAuthenticationCredentialSchema, ConsumerRegistrationCredentialSchema, ConsumerAuthenticationOptionsSchema, ConsumerRegistrationOptionsSchema, type ConsumerAuthenticationCredential, type ConsumerRegistrationCredential, type ConsumerAuthenticationOptions, type ConsumerRegistrationOptions } from '@debateai/contract';
 const decode = (value: string) => Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 function encode(value: ArrayBuffer): string {
@@ -10,7 +11,8 @@ function encode(value: ArrayBuffer): string {
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 export interface ConsumerWebAuthnBrowser {
-    register(options: ConsumerRegistrationOptions, signal?: AbortSignal): Promise<ConsumerRegistrationCredential>;
+    /** `accountLabel` (the account's email) is the name the browser and password manager show for the new passkey. */
+    register(options: ConsumerRegistrationOptions, signal?: AbortSignal, accountLabel?: string): Promise<ConsumerRegistrationCredential>;
     authenticate(options: ConsumerAuthenticationOptions, request?: {
         mediation?: 'conditional' | 'optional' | 'required';
         signal?: AbortSignal;
@@ -55,9 +57,14 @@ export function createConsumerWebAuthnBrowser(): ConsumerWebAuthnBrowser {
             const response = credential.response as AuthenticatorAssertionResponse;
             return ConsumerAuthenticationCredentialSchema.parse({ id: credential.id, rawId: encode(credential.rawId), type: 'public-key', response: { clientDataJSON: encode(response.clientDataJSON), authenticatorData: encode(response.authenticatorData), signature: encode(response.signature), ...(response.userHandle ? { userHandle: encode(response.userHandle) } : {}) }, clientExtensionResults: credential.getClientExtensionResults(), ...(credential.authenticatorAttachment ? { authenticatorAttachment: credential.authenticatorAttachment } : {}) });
         },
-        async register(input, external) {
+        async register(input, external, accountLabel) {
             const options = ConsumerRegistrationOptionsSchema.parse(input);
-            const credential = await navigator.credentials.create({ signal: signal(external), publicKey: { ...options, challenge: decode(options.challenge), user: { ...options.user, id: decode(options.user.id) }, ...(options.excludeCredentials ? { excludeCredentials: options.excludeCredentials.map(c => ({ ...c, id: decode(c.id) })) } : {}) } as PublicKeyCredentialCreationOptions }) as PublicKeyCredential | null;
+            // The server sends a placeholder name; the browser keeps whatever name is given here and shows it in its
+            // password manager, so the account's email lets the person tell their passkeys apart. The id stays the
+            // server's handle: it is what links the passkey to the account.
+            const label = passkeyLabel(accountLabel);
+            const user = { ...options.user, ...(label ? { name: label, displayName: label } : {}), id: decode(options.user.id) };
+            const credential = await navigator.credentials.create({ signal: signal(external), publicKey: { ...options, challenge: decode(options.challenge), user, ...(options.excludeCredentials ? { excludeCredentials: options.excludeCredentials.map(c => ({ ...c, id: decode(c.id) })) } : {}) } as PublicKeyCredentialCreationOptions }) as PublicKeyCredential | null;
             if (!credential)
                 throw new DOMException('PASSKEY_CANCELLED', 'NotAllowedError');
             const response = credential.response as AuthenticatorAttestationResponse;
@@ -67,4 +74,4 @@ export function createConsumerWebAuthnBrowser(): ConsumerWebAuthnBrowser {
 }
 // Kept for the shipped social consumers; all serialization and UV checks have one owner.
 export const authenticateConsumerPasskey = (options: ConsumerAuthenticationOptions) => createConsumerWebAuthnBrowser().authenticate(options);
-export const registerConsumerPasskey = (options: ConsumerRegistrationOptions) => createConsumerWebAuthnBrowser().register(options);
+export const registerConsumerPasskey = (options: ConsumerRegistrationOptions, accountLabel?: string) => createConsumerWebAuthnBrowser().register(options, undefined, accountLabel);

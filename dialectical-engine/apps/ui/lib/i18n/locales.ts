@@ -85,10 +85,11 @@ export function isCatalogLocale(value: unknown): value is LocaleCode {
 }
 
 /**
- * The interface languages the site offers. The other catalogues stay in the repository but are not offered: the
- * language list does not show them, and a locale cookie naming one is read as English.
+ * The interface languages the site offers: all 35 catalogue languages since 24 November 2026 (owner's decision; from
+ * 19 November it was English and Romanian only). A language left out of this list stays in the repository but is not
+ * offered: the language list does not show it, and a locale cookie naming it is read as English.
  */
-export const OFFERED_LOCALE_CODES: readonly CatalogLocaleCode[] = Object.freeze(["en", "ro"]);
+export const OFFERED_LOCALE_CODES: readonly CatalogLocaleCode[] = Object.freeze(LOCALES.map(({ code }) => code));
 
 /** Whether a value names an offered interface language: the test every page applies to the locale cookie. */
 export function isLocale(value: unknown): value is LocaleCode {

@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Prywatna debata",
   "debateChrome.privateDebateDeleted": "Prywatna debata usunięta",
   "debateChrome.privateDebateDeletionProcessing": "Trwa usuwanie prywatnej debaty",
-  "debateChrome.privateDebateDeletedDetail": "Ta debata jest nagrobkiem. Jej zaszyfrowana prywatna treść jest trwale nieczytelna.",
+  "debateChrome.privateDebateDeletedDetail": "Ta debata jest nagrobkiem. Jej zaszyfrowana prywatna treść nie może już być tutaj odczytana. Nasze kopie zapasowe mogą ją jeszcze zawierać (Polityka prywatności, punkt 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Prywatna treść nie jest już dostępna; trwa końcowe, trwałe usuwanie kluczy.",
   "debateChrome.tree.building": "Budowanie drzewa argumentów…",
   "debateChrome.tree.notProduced": "Dla tej debaty nie utworzono drzewa argumentów.",

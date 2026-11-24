@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "مناظرة خاصة",
   "debateChrome.privateDebateDeleted": "حُذفت المناظرة الخاصة",
   "debateChrome.privateDebateDeletionProcessing": "جارٍ حذف المناظرة الخاصة",
-  "debateChrome.privateDebateDeletedDetail": "هذه المناظرة سجل حذف. وقد أصبح محتواها الخاص المشفّر غير قابل للقراءة نهائيًا.",
+  "debateChrome.privateDebateDeletedDetail": "هذه المناظرة سجل حذف. لم يعد بالإمكان قراءة محتواها الخاص المشفّر هنا. وقد تظل نسخنا الاحتياطية تحتفظ به (سياسة الخصوصية، القسم 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "لم يعد المحتوى الخاص متاحًا ريثما يكتمل التنظيف الدائم للمفاتيح.",
   "debateChrome.tree.building": "جارٍ بناء شجرة الحجج…",
   "debateChrome.tree.notProduced": "لم تُنشأ شجرة حجج لهذه المناظرة.",

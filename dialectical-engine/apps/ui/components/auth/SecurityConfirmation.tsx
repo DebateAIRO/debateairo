@@ -3,13 +3,14 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { ContractHttpError, type AuthMethodsResponse, type ContractClient, type StepUpAuthorizationRequest, type StepUpResponse } from '@debateai/contract';
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
+import { namePasskeysForAccount } from '@/lib/passkeyNames';
 import { matchingSecurityGrant, type ConfirmedSecurityAction } from '@/lib/securityConfirmation';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
 import { readSixDigitCode } from '@/lib/sixDigitCode';
 import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import { safeReturnPath } from '@/lib/returnPath';
-export type SecurityConfirmationClient = Partial<Pick<ContractClient, 'authMethods' | 'beginPasskeyStepUp' | 'completePasskeyStepUp' | 'stepUp' | 'beginSocialStepUp'>>;
+export type SecurityConfirmationClient = Partial<Pick<ContractClient, 'authMethods' | 'beginPasskeyStepUp' | 'completePasskeyStepUp' | 'stepUp' | 'beginSocialStepUp' | 'readAccountEmail'>>;
 export interface SecurityConfirmationProps {
     authorization: StepUpAuthorizationRequest;
     catalog: MessageCatalog;
@@ -100,6 +101,9 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
             if (owner !== sequence.current)
                 return;
             const result = await (client.completePasskeyStepUp ?? contractClient.completePasskeyStepUp)({ challenge_handle: options.challenge_handle, credential });
+            // The browser is given the account's email as this passkey's name (older passkeys carry a placeholder).
+            // The action goes on at once; the rename is only a label.
+            void namePasskeysForAccount({ readAccountEmail: client.readAccountEmail ?? contractClient.readAccountEmail }, credential.response?.userHandle);
             if (owner === sequence.current)
                 await finish(result);
         }

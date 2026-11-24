@@ -33,7 +33,8 @@ export const ACCOUNT_CREDENTIAL_SETTING = "debateai.session_credential";
  * makes) and X39 (the Owner's list of the preview's approved buyers: an account found by its address's blind index, and each
  * listed account's address opened to be shown shortened), in apps/api/src/main.ts, X29 (a report press's seal under the public debate's own run, upload check Task 9) in
  * apps/api/src/public-tree.ts, and X36 (the sign-in and recovery steps that hand out a stored secret or open a session on the API's
- * word: a passkey's credential and its sign-in, a recovery's proof and its proof, a saved code's use) inside their repository methods in
+ * word: a passkey's credential and its sign-in, the list of the bound account's own passkeys a sign-in after the first step names to the
+ * browser, a recovery's proof and its proof, a saved code's use) inside their repository methods in
  * packages/db; since the merge with the security fixes of audit run 3, X10 also in apps/api/src/publications.ts (the public read's
  * run release key). Background readers (X8, X12, X13) run outside every request scope and need no id; X19 and X25 connect as
  * api-system directly.
