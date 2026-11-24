@@ -24,7 +24,12 @@ describe("synthesis check production composition", () => {
   });
 
   it("wires answer access into API and exports and reconciles synthesis erasure first", () => {
-    expect(source).toContain("createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: publicationCheckPolicy.deadlineMs })");
+    // The answer is held as long as the worker's check may run, counted from the debate's finish: the check's window and the
+    // seal margin, which together are the background time, D plus the gate's slot wait on the preview gate
+    // (tests/unit/content-checks-composition.test.ts).
+    expect(source).toContain("createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: synthesisCheckWindow })");
+    expect(source).toContain("const synthesisCheckWindow = synthesisCheckWindowMs(backgroundCheckDeadlineMs);");
+    expect(source).toContain("const backgroundCheckDeadlineMs = contentCheckBackgroundDeadlineMs(contentCheckRoute, publicationCheckPolicy.deadlineMs);");
     expect(source).toMatch(/const ownerDeps = \{[^}]*synthesisAnswerAccess[^}]*\}/);
     expect(source).toContain("synthesisAnswerAccess,");
     expect(source).toMatch(/try \{ await synthesisCheckErasure\.reconcile\(100\); \} catch \{[^}]*\}\s*await privateErasure\.reconcile/);

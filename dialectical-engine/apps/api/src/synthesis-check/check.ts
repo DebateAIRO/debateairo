@@ -6,6 +6,11 @@ import { synthesisCheckContract } from "./policy.js";
 import { type SynthesisCheckPort, SynthesisCheckFailure } from "./transport.js";
 import { parseSynthesisCheckAnswer } from "./verdict.js";
 
+/**
+ * The output size the site's own record gives a check call: always for a readable answer, whatever the vendor reports, and at
+ * least this for one that was not readable or did not come back. It is not the vendor's count, which on the gate also counts
+ * the model's thinking.
+ */
 const SYNTHESIS_CHECK_RECORDED_OUTPUT_TOKENS = 192;
 
 type SpendEntry = Readonly<{

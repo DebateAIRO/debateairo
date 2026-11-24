@@ -35,7 +35,11 @@ export interface PublicationCheckRecord {
 }
 export interface PublicationCheckRecorder { record(row: PublicationCheckRecord): Promise<void> }
 export interface PublicationContentCheck {
-  check(input: { runId: string; snapshot: PublicDebate }): Promise<PublicationCheckResult>;
+  /**
+   * `turnKey` names the row being checked when the run id does not: every page update of one dig names the dig's run. Only
+   * the sweeps' turns read it (public-tree.ts, checksInTurn); the check and its record name `runId` alone.
+   */
+  check(input: { runId: string; snapshot: PublicDebate; turnKey?: string }): Promise<PublicationCheckResult>;
 }
 /**
  * `deadlineMs` is D, the deadline of one publish check: every judge call of the attempt shares ONE

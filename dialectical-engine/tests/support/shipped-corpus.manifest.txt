@@ -162,6 +162,7 @@ apps/api/src/provider-discovery.ts
 apps/api/src/public-flag.ts
 apps/api/src/public-tree.ts
 apps/api/src/publication-check/check.ts
+apps/api/src/publication-check/gate-transport.ts
 apps/api/src/publication-check/judge-transport.ts
 apps/api/src/publication-check/material.ts
 apps/api/src/publication-check/policy.ts
