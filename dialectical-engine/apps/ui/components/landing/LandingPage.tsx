@@ -21,7 +21,7 @@ export function LandingPage({
 }): JSX.Element {
   return (
     <div className="lpRoot">
-      <LandingChrome catalog={catalog} />
+      <LandingChrome catalog={catalog} billingOn={footerBilling.billingOn} />
       <LandingHero catalog={catalog} />
       {/* The sample exchange (LandingSample) showed an older debate with scores and model codes, so it is not shown. */}
       <LandingMethod catalog={catalog} />

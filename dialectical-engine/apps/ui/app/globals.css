@@ -6423,8 +6423,9 @@ a:focus-visible {
 }
 .lpCtaGhost:hover { transform: none; }
 
-/* Floating glass nav */
+/* Floating glass nav. Its header is pinned to the viewport and lets clicks through; the bar itself takes them. */
 .lpNav {
+  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 34px;
@@ -6435,6 +6436,15 @@ a:focus-visible {
   box-shadow: var(--lp-nav-shadow);
   backdrop-filter: blur(18px) saturate(150%);
   -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+/* The landing scrolls under the pinned bar, so an in-page link and a control that takes focus stop below it:
+   the bar ends 96px down (34 + 62), 129px where it wraps to two rows, plus 8px for the focus ring. */
+html:has(.lpRoot) { scroll-padding-top: 104px; }
+/* The bar's "Method" link: the section's own top padding already clears the bar, so it starts at the very top. */
+.lpMethod { scroll-margin-top: -104px; }
+@media (max-width: 860px) {
+  html:has(.lpRoot) { scroll-padding-top: 137px; }
+  .lpMethod { scroll-margin-top: 0; }
 }
 .lpNavSignIn {
   font-size: 13.5px;

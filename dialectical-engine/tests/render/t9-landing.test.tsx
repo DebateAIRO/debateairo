@@ -237,6 +237,21 @@ describe("T9-C2 chrome labels & CTAs", () => {
     expect(wordmark?.querySelector(".lpWordmarkAccent")?.textContent).toBe("Engine");
   });
 
+  it("with billing on, the chrome's Pricing link leads to the pricing page, not to the landing's own pricing line", async () => {
+    // PROPERTY: /pricing is "not found" while billing is off (the test above keeps the in-page anchor there), so the
+    // link leads to it exactly while billing is on; the header stays pinned to the viewport either way.
+    routeMocks.getBillingPlans.mockResolvedValueOnce({
+      currency: "USD",
+      plans: [{ plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" }]
+    });
+    const chrome = (await renderRoute(null)).querySelector<HTMLElement>('[data-landing-section="chrome"]');
+    const pricing = [...chrome!.querySelectorAll("a")].find((candidate) => candidate.textContent?.trim() === "Pricing");
+
+    expect(pricing?.getAttribute("href")).toBe("/pricing");
+    expect(chrome!.querySelector('a[href="#pricing"]')).toBeNull();
+    expect(chrome!.style.position).toBe("fixed");
+  });
+
   it("renders the chrome primary CTA with the exact safe return target", async () => {
     // PROPERTY: the AM8-narrowed C2 CTA is asserted inside chrome only; hero
     // CTAs remain T9-C4's contract.
