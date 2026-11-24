@@ -4,7 +4,7 @@ import { finalizeWithPageMemory } from "./erasure-page-memory.js";
 import { withPublicationContentLease } from "./publication-lease.js";
 
 const SYNTHESIS_CHECK_ERASURE_WAITING_OUTCOMES = Object.freeze([
-  "PUBLISHED", "NOT_SHOWN", "NO_SESSION", "LEGACY_PLAINTEXT_RETAINED", "OWNERSHIP_MOVED"
+  "PUBLISHED", "LEGACY_PLAINTEXT_RETAINED", "OWNERSHIP_MOVED"
 ] as const);
 
 export type SynthesisCheckErasureOutcome =
@@ -13,15 +13,18 @@ export type SynthesisCheckErasureOutcome =
   | "NOT_FOUND" | "INVALID_EVIDENCE" | CheckDeletedPublicDebateOutcome;
 
 /**
- * 0190's takedown of a public debate the end-of-debate check deletes. TAKEN_DOWN: its page went private and its publication's key
- * is queued for the API's key cleanup; 0126's prepare erases it once that key is gone. NOT_SHOWN: the verdict is for an older
- * answer version the page does not show, so the page stays and the deletion waits. NO_SESSION: no session row to bind the event
- * to. CONTENDED: busy now; the next pass tries again.
+ * 0190's takedown of a public debate the end-of-debate check deletes, on the requests it can act on now. TAKEN_DOWN: its page
+ * went private, every page it had is closed, and its publication's key is queued for the API's key cleanup; 0126's prepare
+ * erases it once that key is gone. CONTENDED: busy now; the next pass tries again. FAILED: something else went wrong for that
+ * debate alone (`failureCode`, its SQLSTATE); nothing of it was written, and the next pass tries again.
  */
-export type CheckDeletedPublicDebateOutcome = "TAKEN_DOWN" | "NOT_SHOWN" | "NO_SESSION" | "CONTENDED";
+export type CheckDeletedPublicDebateOutcome = "TAKEN_DOWN" | "CONTENDED" | "FAILED";
+export type CheckDeletedPublicDebate = Readonly<{ outcome: CheckDeletedPublicDebateOutcome; runId: string; failureCode: string | null }>;
 export type CheckDeletedPublicPages = Readonly<{
-  takeDown(limit?: number): Promise<readonly Readonly<{ outcome: CheckDeletedPublicDebateOutcome; runId: string }>[]>;
+  takeDown(limit?: number): Promise<readonly CheckDeletedPublicDebate[]>;
 }>;
+/** A SQLSTATE is five digits or capitals; anything else is logged as unknown, so a log line never carries more. */
+const sqlStateOf = (code: string | null): string => code !== null && /^[0-9A-Z]{5}$/u.test(code) ? code : "UNKNOWN";
 
 type PrepareOutcome = Readonly<{ outcome: SynthesisCheckErasureOutcome; erasureId: string | null; runId: string }>;
 type CleanupManifest = Readonly<{
@@ -43,10 +46,10 @@ async function recordedOwnerRef(runs: RunContentKeyStore, runId: string): Promis
 export class PostgresCheckDeletedPublicPageRepository implements CheckDeletedPublicPages {
   constructor(private readonly pool: Pool) {}
 
-  async takeDown(limit = 100): Promise<readonly Readonly<{ outcome: CheckDeletedPublicDebateOutcome; runId: string }>[]> {
-    const result = await this.pool.query<{ outcome: CheckDeletedPublicDebateOutcome; run_id: string }>(
-      "SELECT outcome,run_id FROM core.take_down_check_deleted_debates($1)", [limit]);
-    return Object.freeze(result.rows.map((row) => Object.freeze({ outcome: row.outcome, runId: row.run_id })));
+  async takeDown(limit = 100): Promise<readonly CheckDeletedPublicDebate[]> {
+    const result = await this.pool.query<{ outcome: CheckDeletedPublicDebateOutcome; run_id: string; failure_code: string | null }>(
+      "SELECT outcome,run_id,failure_code FROM core.take_down_check_deleted_debates($1)", [limit]);
+    return Object.freeze(result.rows.map((row) => Object.freeze({ outcome: row.outcome, runId: row.run_id, failureCode: row.failure_code })));
   }
 }
 
@@ -152,9 +155,10 @@ export class SynthesisCheckErasureCoordinator {
       }
     };
     // The public ones first: 0126's prepare reads them as PUBLISHED, or as CONTENDED until their publication's key is gone,
-    // so each is reported once, by what the takedown said.
-    // A takedown that fails holds back none of the private debates' erasures: it is tried again on the next pass.
-    let pages: Awaited<ReturnType<CheckDeletedPublicPages["takeDown"]>> = [];
+    // so each is reported once, by what the takedown said. A public one the takedown cannot act on is not on its list, and
+    // prepare reports it as before (PUBLISHED for an account with no session row).
+    // A takedown that fails as a whole holds back none of the private debates' erasures: it is tried again on the next pass.
+    let pages: readonly CheckDeletedPublicDebate[] = [];
     try {
       if (this.publicPages !== undefined) pages = await this.publicPages.takeDown(limit);
     } catch {
@@ -164,7 +168,7 @@ export class SynthesisCheckErasureCoordinator {
     for (const page of pages) {
       takenDown.add(page.runId);
       if (page.outcome === "TAKEN_DOWN") this.log("[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEN_DOWN]");
-      waiting(page.outcome);
+      if (page.outcome === "FAILED") this.log("[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_FAILED] " + sqlStateOf(page.failureCode));
       outcomes.push({ runId: page.runId, outcome: page.outcome });
     }
     for (const prepared of await this.repository.prepareRequested(limit)) {

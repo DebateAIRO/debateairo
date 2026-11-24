@@ -113,10 +113,9 @@ function node(id: string, claim: string) {
 }
 
 /**
- * A debate, published as the transition publishes it: its snapshot under its own publication key, and its visibility event. `ownQuestion`: the question line its author's own
- * run keeps, when a test needs it to differ from the page's.
+ * A second version of a debate's answer with a composed text of its own, so a conclusion of its own. The product's answer writer never stores one (a later version keeps the
+ * first one's composed text, packages/serve); the tests write one to show what does not depend on it.
  */
-/** A second version of a debate's answer with a composed text of its own, so a conclusion of its own, as a later write of the answer stores it. */
 async function writeSecondAnswerVersion(run: string, answerId: string, text: string): Promise<void> {
   const [composedId, rawId] = [randomUUID(), randomUUID()];
   const composed = await encryptAttestedContentForRun(database.pool, run, "serve.composed_text", composedId,
@@ -138,6 +137,10 @@ async function writeSecondAnswerVersion(run: string, answerId: string, text: str
     FROM serve.answer WHERE answer_id=$1 AND answer_version=1`, [answerId, composedId, JSON.stringify(sealed!.envelope), sealed!.attestation]);
 }
 
+/**
+ * A debate, published as the transition publishes it: its snapshot under its own publication key, and its visibility event. `ownQuestion`: the question line its author's own
+ * run keeps, when a test needs it to differ from the page's.
+ */
 async function publishedDebate(author: StoryEncryptedOwner, shape: Readonly<{ story?: boolean; ownQuestion?: string; beforePublish?: (root: string, answerId: string) => Promise<void> }> = {}): Promise<Readonly<{ root: string; ref: string; position: string; snapshot: PublicDebate }>> {
   const root = await createEncryptedStoryRun(database.pool, author, shape.ownQuestion ?? QUESTION);
   const { answerId } = await persistTerminalRun({ pool: database.pool, runId: root, fixtureKey: randomUUID(), factBundle: FACTS });
@@ -1454,7 +1457,7 @@ describe("a Free debate goes public only when the end-of-debate check allows it"
       outcome: categories.length === 0 ? { verdict: "CLEAR", categories: [] } : { verdict: "FLAGGED", categories: [...categories] },
       modelProviderRef: "anthropic", modelId: "claude-haiku-5-5", policyVersion: POLICY, callCount: 1, deadlineMs: 60_000 })).toBe("INSERTED");
   }
-  /** A newer version of the debate's answer with a composed text of its own, so a synthesis of its own, as a later write of the answer stores it. */
+  /** A newer version of the debate's answer with a composed text of its own, so a synthesis of its own (writeSecondAnswerVersion: the product never stores one). */
   async function newerVersion(debate: FreeDebate): Promise<void> {
     const text = "A newer synthesis that urges harm.";
     await writeSecondAnswerVersion(debate.run, debate.answerId, text);
@@ -1816,19 +1819,16 @@ describe("a debate already public when the end-of-debate check asks for its dele
     }
   });
 
-  it("a verdict for an older answer version the page does not show leaves the page up, and the deletion waits with a line that says so", async () => {
+  it("a deletion verdict on any version of the debate's answer takes its page down, as 0126 erases a private debate on it", async () => {
     const author = await account();
-    // The debate's answer moved on to a second version, with another conclusion, before it went public: the page shows the second.
+    const lines: string[] = [];
+    // A second version with a conclusion of its own, which the product's writer never stores: a verdict on the first still takes the page down.
     const { root, ref } = await publishedDebate(author, { beforePublish: (run, answerId) => writeSecondAnswerVersion(run, answerId, "A second conclusion, checked clear.") });
     expect(await verdict(root, 1, DELETE)).toBe("INSERTED");
-    const lines: string[] = [];
-    for (let pass = 0; pass < 2; pass += 1) expect(await outcomesFor(lines, root)).toEqual([{ runId: root, outcome: "NOT_SHOWN" }]);
-    expect(lines.filter((line) => line === "[SYNTHESIS_CHECK_ERASURE_WAITING] NOT_SHOWN").length).toBeGreaterThanOrEqual(2);
-    expect(lines).not.toContain("[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED");
-    expect((await page(ref)).question).toBe(QUESTION);
-    expect(await latestState(root)).toBe("PUBLISHED");
-    expect(await runKeys.exists(root)).toBe(true);
-    // A verdict for the version the page shows takes it down: here, a debate whose second version kept the first one's conclusion.
+    expect(await outcomesFor(lines, root)).toEqual([{ runId: root, outcome: "TAKEN_DOWN" }]);
+    expect(await application().readPublicDebate(ref)).toBeNull();
+    expect(await latestState(root)).toBe("PRIVATE");
+    // A second version as the product writes it, keeping the first one's conclusion: a verdict on the first takes the page down.
     const same = await publishedDebate(author, { beforePublish: async (run, answerId) => {
       await database.pool.query(`INSERT INTO serve.answer (answer_id,answer_version,run_id,work_item_id,terminal,serve_state,verdict_state,answer_form,condition_marks,fact_bundle_id,
           composed_text_id,conformance_record_id,sealed_at_seq,confidence_band,band_ceiling,reversal_point,builds_on_previous,badges,verdict_unavailable,memory_disclosure,
@@ -1867,6 +1867,8 @@ describe("a debate already public when the end-of-debate check asks for its dele
     expect(contributions.find((row) => row.dig_run_id === running)).toMatchObject({ outcome: "UNAVAILABLE" });
     expect((await database.pool.query("SELECT outcome FROM identity.public_contribution WHERE dig_run_id=$1", [allowed])).rows).toEqual([{ outcome: "ALLOWED" }]);
     expect((await database.pool.query("SELECT 1 FROM identity.public_climb_done WHERE dig_run_id=$1", [allowed])).rowCount).toBe(1);
+    // What its digger reads has no state for a deleted page: they are still told their dig changed the public page.
+    expect(contributionStateOf((await new PostgresPublicDebateRepository(api).readOwn(dan.ownerRef, allowed)).find((row) => row.dig_run_id === allowed)!)).toBe("ON_THE_PAGE");
     expect((await database.pool.query("SELECT outcome,failure_code FROM identity.public_report WHERE publication_ref=$1", [debate.ref])).rows)
       .toEqual([{ outcome: "FAILED", failure_code: "PUBLIC_PAGE_DELETED" }]);
     // The copies of the page sealed for their digs and reports held the deleted text: they go.
@@ -1884,6 +1886,102 @@ describe("a debate already public when the end-of-debate check asks for its dele
     await database.pool.query("SELECT identity.queue_moderation_statements()");
     expect((await database.pool.query("SELECT kind,owner_ref FROM identity.moderation_statement WHERE publication_ref=$1", [debate.ref])).rows).toEqual([]);
     expect(await checks().removalNoticeExists(ana.ownerRef)).toBe(true);
+  }, 180_000);
+
+  it("the copies sealed for digs on a page its owner unpublished before go too, with those of the page public now", async () => {
+    const [ana, dan] = [await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const world = vendors();
+    await dig(dan, debate, world);
+    await settleAll(world);
+    const copiesOf = async (ref: string) => Number((await database.pool.query<{ n: string }>("SELECT count(*)::text AS n FROM identity.public_material WHERE publication_ref=$1", [ref])).rows[0]!.n);
+    expect(await copiesOf(debate.ref)).toBeGreaterThan(0);
+    // Its owner unpublished it and published it again under a new reference, with the rows their own unpublish and publish write.
+    const [again, at] = [randomUUID(), new Date()];
+    const prepared = await publicationCipher.create(again, debate.root);
+    const content = prepared.encrypt({ ...debate.snapshot, public_ref: again, published_at: at.toISOString() });
+    prepared.close();
+    const event = `INSERT INTO core.run_visibility_event (run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,actor_ref_version,warning_version,occurred_at,at_seq)
+      VALUES ($1,$2,$3,$4,$5,2,$6,now(),ledger.allocate_sequence())`;
+    await seeded([
+      ["INSERT INTO serve.publication_key_cleanup_intent (publication_ref,requested_at,completed_at,cleanup_state) VALUES ($1,now(),NULL,'PENDING')", [debate.ref]],
+      [event, [randomUUID(), debate.root, debate.ref, "PRIVATE", randomUUID(), "COPIES_MAY_PERSIST_V1"]],
+      ["INSERT INTO core.publication_ref_tombstone (ref,ref_kind,created_at) VALUES ($1,'publication_ref',now())", [again]],
+      ["INSERT INTO serve.publication_snapshot (publication_ref,run_id,format_version,content_ciphertext,created_at) VALUES ($1,$2,1,$3::jsonb,$4)", [again, debate.root, JSON.stringify(content), at]],
+      [event, [randomUUID(), debate.root, again, "PUBLISHED", randomUUID(), "PUBLIC_INDEXED_V1"]]
+    ]);
+    expect((await page(again)).question).toBe(QUESTION);
+    expect(await verdict(debate.root, 1, DELETE)).toBe("INSERTED");
+    const lines: string[] = [];
+    expect(await outcomesFor(lines, debate.root)).toEqual([{ runId: debate.root, outcome: "TAKEN_DOWN" }]);
+    expect(await application().readPublicDebate(again)).toBeNull();
+    // The earlier page's copies held the same deleted text: they go with the newer page's.
+    expect(await copiesOf(debate.ref)).toBe(0);
+    expect(await copiesOf(again)).toBe(0);
+    // Both pages' keys go, then the debate.
+    expect(await keyCleanup()).toBeGreaterThanOrEqual(2);
+    expect(await outcomesFor(lines, debate.root)).toEqual([{ runId: debate.root, outcome: "CLEANED" }]);
+    expect(await copiesOf(debate.ref)).toBe(0);
+  }, 180_000);
+
+  it("its list holds only the deletions it can act on, so no number of others keeps a newer one from it; the others are 0126's prepare's, as before", async () => {
+    const pages = new PostgresCheckDeletedPublicPageRepository(api);
+    // Three older deletions it cannot act on: an account with no session row, one whose closing has prepared, and one frozen by
+    // the age check with every session revoked (neither of the last two is active, and 0040's binding refuses both).
+    const [sessionless, closing, frozen] = [await account(), await account(), await account()];
+    const stuck = [await publishedDebate(sessionless), await publishedDebate(closing), await publishedDebate(frozen)];
+    for (const debate of stuck) expect(await verdict(debate.root, 1, DELETE)).toBe("INSERTED");
+    await database.pool.query("DELETE FROM identity.session WHERE user_id=$1", [sessionless.userId]);
+    await seeded([[`UPDATE identity."user" SET state='suspended' WHERE user_id=$1`, [closing.userId]],
+      ["UPDATE identity.session SET revoked_at=now() WHERE user_id=$1", [frozen.userId]], [`UPDATE identity."user" SET state='age_frozen' WHERE user_id=$1`, [frozen.userId]]]);
+    const newer = await publishedDebate(await account());
+    expect(await verdict(newer.root, 1, DELETE)).toBe("INSERTED");
+    // A list of one reaches the newer one at once: the older ones are never on it.
+    expect(await pages.takeDown(1)).toEqual([{ outcome: "TAKEN_DOWN", runId: newer.root, failureCode: null }]);
+    expect(await pages.takeDown(100)).toEqual([]);
+    for (const debate of stuck) expect(await latestState(debate.root)).toBe("PUBLISHED");
+    // 0126's prepare drops the deletion of a debate whose owner is not active, and the page stays (the runbook says so); the one
+    // with no session row waits, with the line that says so.
+    const lines: string[] = [];
+    const outcomes = await coordinator(lines).reconcile(100);
+    for (const debate of stuck.slice(1)) {
+      expect(outcomes.filter((outcome) => outcome.runId === debate.root)).toEqual([{ runId: debate.root, outcome: "ACCOUNT_CLOSED" }]);
+      expect(await latestState(debate.root)).toBe("PUBLISHED");
+    }
+    expect(outcomes.filter((outcome) => outcome.runId === stuck[0]!.root)).toEqual([{ runId: stuck[0]!.root, outcome: "PUBLISHED" }]);
+    expect(lines).toContain("[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED");
+    // Given a session row, the waiting one is on the list again and comes down.
+    await seeded([[`INSERT INTO identity.session(session_id,user_id,token_hash,csrf_token_hash,binding_context,created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at)
+      VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',now()+interval '2 hours',now())`,
+      [randomUUID(), sessionless.userId, `sha256:${randomBytes(32).toString("hex")}`, `sha256:${randomBytes(32).toString("hex")}`]]]);
+    expect(await pages.takeDown(100)).toEqual([{ outcome: "TAKEN_DOWN", runId: stuck[0]!.root, failureCode: null }]);
+  }, 180_000);
+
+  it("one deletion that fails for any other reason writes nothing, is logged with its SQLSTATE alone, and holds back none after it", async () => {
+    const [failing, after] = [await publishedDebate(await account()), await publishedDebate(await account())];
+    for (const debate of [failing, after]) expect(await verdict(debate.root, 1, DELETE)).toBe("INSERTED");
+    // A trigger refuses the failing one's PRIVATE event, as any error inside its takedown would.
+    await database.pool.query(`CREATE FUNCTION public.refuse_one_takedown() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN IF NEW.run_id = '${failing.root}'::uuid AND NEW.state = 'PRIVATE' THEN RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'REFUSED_IN_TEST'; END IF; RETURN NEW; END $$`);
+    await database.pool.query("CREATE TRIGGER refuse_one_takedown BEFORE INSERT ON core.run_visibility_event FOR EACH ROW EXECUTE FUNCTION public.refuse_one_takedown()");
+    const lines: string[] = [];
+    let outcomes: Awaited<ReturnType<SynthesisCheckErasureCoordinator["reconcile"]>>;
+    try {
+      outcomes = await coordinator(lines).reconcile(100);
+    } finally {
+      await database.pool.query("DROP TRIGGER refuse_one_takedown ON core.run_visibility_event");
+      await database.pool.query("DROP FUNCTION public.refuse_one_takedown()");
+    }
+    expect(outcomes.filter((outcome) => outcome.runId === failing.root)).toEqual([{ runId: failing.root, outcome: "FAILED" }]);
+    expect(outcomes.filter((outcome) => outcome.runId === after.root)).toEqual([{ runId: after.root, outcome: "TAKEN_DOWN" }]);
+    expect(lines).toContain("[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_FAILED] P0001");
+    expect(lines.join("\n")).not.toContain(failing.root);
+    // None of its rows were written: its page reads, with no key cleanup and no binding.
+    expect((await page(failing.ref)).question).toBe(QUESTION);
+    expect((await database.pool.query("SELECT 1 FROM serve.publication_key_cleanup_intent WHERE publication_ref=$1", [failing.ref])).rowCount).toBe(0);
+    expect((await database.pool.query("SELECT 1 FROM identity.publication_event_binding WHERE run_id=$1", [failing.root])).rowCount).toBe(0);
+    // The next pass takes it down.
+    expect(await outcomesFor(lines, failing.root)).toEqual([{ runId: failing.root, outcome: "TAKEN_DOWN" }]);
   }, 180_000);
 });
 

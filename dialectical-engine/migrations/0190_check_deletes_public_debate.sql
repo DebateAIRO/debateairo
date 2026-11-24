@@ -13,20 +13,30 @@
 -- at start that its erasure login can run exactly the functions it knows, so one more there would stop the release before.
 --   - Only a final deletion verdict does this. 0126 writes a deletion request only for a final result that asks for it: a
 --     flag that needs a staff approval, an unavailable answer and an answer that came too late (the API stores it as
---     unavailable) never write one. And the verdict must be about what the page shows: a verdict for an older answer version
---     whose conclusion differs from the version that was newest when the debate went public leaves the page as it is (the
---     outcome is NOT_SHOWN, and the API logs that it waits). A verdict for that version, or a newer one, takes it down.
+--     unavailable) never write one. Any such verdict on the debate takes its page down, whichever version of its answer it
+--     was about, as 0126 erases a private debate on the same request: a later version of an answer keeps the first one's
+--     conclusion (packages/serve's answer writer copies its composed text), so a verdict is always about what the page shows.
+--   - The list holds only the requests this step can act on now, so no number of others keeps a newer one from it. The others
+--     stay with 0126's prepare, which reports each as before: another owner now, a debate stored in clear, an erasure under
+--     way, or an account with no session row to bind the event to (prepare says PUBLISHED).
+--   - An owner that is not active cannot be given 0040's one-shot binding (enforce_active_user_child refuses it), so this step
+--     never acts for one, and 0126's prepare drops the request (ACCOUNT_CLOSED): the page stays. Two such owners can have a
+--     public page: one whose closing has prepared (its erasure, 0110, keeps or deletes the account's pages as they chose) and
+--     one frozen by the age check, which nothing ends.
 --   - A publish racing the verdict. The publish holds the debate's row while it writes its event, and so does this step, so
 --     one goes first. A publish still in flight (its key's intent recorded) makes this step wait (CONTENDED); a publish that
 --     went through after the verdict is taken down on the next pass.
---   - What other people put on the page goes with it, as when a debate is hidden: a dig whose check has not settled is
---     settled UNAVAILABLE (its person sees it kept private, and the dig goes on as theirs), the climb of an allowed dig
---     ends, and a report being written ends FAILED with PUBLIC_PAGE_DELETED. Their texts on the page (its updates, its
---     report copies and any correction) are sealed under the publication's key and die with it. The copies of the page sealed
+--   - What other people put on any page the debate had goes with it, as when a debate is hidden: a dig whose check has not
+--     settled is settled UNAVAILABLE (its person sees it kept private, and the dig goes on as theirs), the climb of an allowed
+--     dig ends, and a report being written ends FAILED with PUBLIC_PAGE_DELETED. Their texts on the page (its updates, its
+--     report copies and any correction) are sealed under the publication's key and die with it. The copies of each page sealed
 --     for digs and reports (0147's identity.public_material, under each digger's or writer's own key) are deleted, as 0151's
---     purge deletes them when an original goes. Each digger's own dig and each writer's own report stay theirs.
+--     purge deletes them when an original goes, for a page the owner had unpublished before as for the one public now. Each
+--     digger's own dig and each writer's own report stay theirs. A digger whose dig was on the page still reads that it
+--     changed the public page: no state of theirs says the page was deleted.
 --   - No statement of reasons is queued for them: 0157's statements come from a review log row or a decision, and this
 --     deletion is neither. The owner gets 0126's removal notice, as for a private debate.
+--   - One request that fails for any other reason is reported FAILED with its SQLSTATE, and the others in the pass still go.
 --
 -- Plain words, the second part. A finished Free debate goes public after two checks (0137, 0189). The sweep read the
 -- oldest waiting debates, at most 100, with no way to read past them. A debate the end-of-debate check flagged waits for a
@@ -50,8 +60,9 @@
 -- Replay-safe in the repository's form: CREATE OR REPLACE of names no earlier migration defines.
 
 -- 1. What was running on a page the check deleted -----------------------------------------------------------------------------
--- The same rules as 0150's hide for what is running, under the caller's lock of the public tree, and then the copies of the
--- page sealed for digs and reports go, as 0151's purge deletes them. Returns how many rows changed.
+-- One page of the debate, the takedown calls it for each. The same rules as 0150's hide for what is running, under the caller's
+-- lock of the page's tree, and then the copies of the page sealed for digs and reports go, as 0151's purge deletes them.
+-- Returns how many rows changed.
 CREATE OR REPLACE FUNCTION identity.close_public_page_of_deleted_debate(p_publication_ref uuid) RETURNS integer
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE
@@ -88,14 +99,16 @@ END
 $$;
 
 -- 2. The check's deletion of a public debate: its page comes down first ------------------------------------------------------
--- Each deletion request whose debate is public now, oldest first, at most p_limit (0..100). TAKEN_DOWN: 0085's unpublish rows are
--- written, and 0126's prepare erases the debate once the API's key cleanup has destroyed the publication's key. NOT_SHOWN: the
--- verdict is for an older answer version with another conclusion than the page shows, so the page stays and the request waits.
--- NO_SESSION: the account keeps no session row to bind the event to (session rows go only with their account). CONTENDED: the
--- debate, its tree or a publish in flight is busy; the next pass tries again. A request 0126's prepare would not erase (another
--- owner now, an account not active, an erasure under way, a debate stored in clear) is left to it.
+-- The deletion requests whose debate is public now and that this step can act on, oldest first, at most p_limit (0..100): the
+-- debate is stored encrypted, its first owner is its owner now, that account is active and keeps a session row, and no erasure
+-- of it is under way. Every other request is 0126's prepare's alone, and is never on this list.
+-- TAKEN_DOWN: 0085's unpublish rows are written, every page the debate had is closed, and 0126's prepare erases the debate once
+-- the API's key cleanup has destroyed the publication's key. CONTENDED: the debate, one of its pages' trees or a publish in
+-- flight is busy; the next pass tries again. FAILED: anything else went wrong for this request (failure_code: its SQLSTATE);
+-- none of its rows were written, and the next pass tries again. What the list read is read again under the locks: a request
+-- that no longer qualifies is left, for a later pass or for 0126's prepare.
 CREATE OR REPLACE FUNCTION core.take_down_check_deleted_debates(p_limit integer)
-RETURNS TABLE(outcome text,run_id uuid)
+RETURNS TABLE(outcome text,run_id uuid,failure_code text)
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $$
 DECLARE
   v_request record;
@@ -106,10 +119,9 @@ DECLARE
   v_user_id uuid;
   v_latest_visibility text;
   v_latest_publication_ref uuid;
-  v_latest_at_seq bigint;
-  v_judged_answer_id uuid;
-  v_judged_version integer;
-  v_shown_version integer;
+  v_pages uuid[];
+  v_page uuid;
+  v_busy boolean;
   v_session_id uuid;
   v_reservation_id uuid;
   v_event_id uuid;
@@ -122,10 +134,22 @@ DECLARE
   v_denied_audit_target_ref uuid;
 BEGIN
   FOR v_request IN
-    SELECT removal.request_id,removal.run_id,removal.result_id
+    SELECT removal.request_id,removal.run_id
     FROM serve.synthesis_check_removal_request AS removal
-    WHERE (SELECT event.state FROM core.run_visibility_event AS event
-      WHERE event.run_id=removal.run_id ORDER BY event.at_seq DESC LIMIT 1)='PUBLISHED'
+    JOIN core.run AS run ON run.run_id=removal.run_id
+    WHERE run.content_encryption_version=1
+      AND (SELECT event.state FROM core.run_visibility_event AS event
+        WHERE event.run_id=removal.run_id ORDER BY event.at_seq DESC LIMIT 1)='PUBLISHED'
+      AND NOT EXISTS (SELECT 1 FROM serve.private_run_key_cleanup_intent AS intent WHERE intent.run_id=removal.run_id)
+      AND NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone AS tombstone WHERE tombstone.run_id=removal.run_id)
+      AND EXISTS (
+        SELECT 1 FROM identity."user" AS account
+        WHERE account.owner_ref=(SELECT event.owner_ref FROM core.run_ownership_event AS event
+            WHERE event.run_id=removal.run_id ORDER BY event.at_seq ASC LIMIT 1)
+          AND account.owner_ref=(SELECT event.owner_ref FROM core.run_ownership_event AS event
+            WHERE event.run_id=removal.run_id ORDER BY event.at_seq DESC LIMIT 1)
+          AND account.state='active'
+          AND EXISTS (SELECT 1 FROM identity.session AS session WHERE session.user_id=account.user_id))
     ORDER BY removal.requested_at,removal.request_id
     LIMIT LEAST(GREATEST(COALESCE(p_limit,0),0),100)
     FOR UPDATE OF removal SKIP LOCKED
@@ -147,46 +171,35 @@ BEGIN
       CONTINUE WHEN v_user_id IS NULL
         OR EXISTS (SELECT 1 FROM serve.private_run_key_cleanup_intent AS intent WHERE intent.run_id=v_request.run_id)
         OR EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone AS tombstone WHERE tombstone.run_id=v_request.run_id);
-      SELECT event.state,event.publication_ref,event.at_seq
-      INTO v_latest_visibility,v_latest_publication_ref,v_latest_at_seq
+      SELECT event.state,event.publication_ref
+      INTO v_latest_visibility,v_latest_publication_ref
       FROM core.run_visibility_event AS event
       WHERE event.run_id=v_request.run_id ORDER BY event.at_seq DESC LIMIT 1;
       CONTINUE WHEN v_latest_visibility IS DISTINCT FROM 'PUBLISHED';
-      -- Only a verdict about what the page shows: the version of its answer that was newest when the debate went public, or
-      -- a later one. An older version with another conclusion is not on the page. (0126 writes a request only for a final
-      -- result that asks for the deletion: never for a flag, an unavailable answer or one stored too late.)
-      v_judged_answer_id := NULL;
-      SELECT result.answer_id,result.answer_version INTO v_judged_answer_id,v_judged_version
-      FROM serve.synthesis_check_result AS result WHERE result.result_id=v_request.result_id AND result.final;
-      SELECT max(answer.answer_version) INTO v_shown_version FROM serve.answer AS answer
-      WHERE answer.answer_id=v_judged_answer_id AND answer.sealed_at_seq<v_latest_at_seq;
-      IF v_judged_answer_id IS NULL OR (v_judged_version<v_shown_version AND (
-          SELECT judged.composed_text_id FROM serve.answer AS judged
-          WHERE judged.answer_id=v_judged_answer_id AND judged.answer_version=v_judged_version
-        ) IS DISTINCT FROM (
-          SELECT shown.composed_text_id FROM serve.answer AS shown
-          WHERE shown.answer_id=v_judged_answer_id AND shown.answer_version=v_shown_version
-        )) THEN
-        RETURN QUERY SELECT 'NOT_SHOWN'::text,v_request.run_id;
-        CONTINUE;
-      END IF;
-      -- Another publish of it in flight: its key's intent is recorded until it ends.
-      IF EXISTS (SELECT 1 FROM serve.publication_key_provision_intent AS provision WHERE provision.run_id=v_request.run_id) THEN
-        RETURN QUERY SELECT 'CONTENDED'::text,v_request.run_id;
-        CONTINUE;
-      END IF;
-      -- The page's digs, reports and flags take this lock first; never wait for it while holding the debate's row.
-      IF NOT pg_try_advisory_xact_lock(hashtextextended('identity:public-tree:'||v_latest_publication_ref::text,0)) THEN
-        RETURN QUERY SELECT 'CONTENDED'::text,v_request.run_id;
-        CONTINUE;
-      END IF;
       -- 0040's binding names a session row of the account, as 0137's Free publish does: its newest, whatever its state.
       -- Nothing authenticates by it.
       v_session_id := NULL;
       SELECT session.session_id INTO v_session_id FROM identity.session AS session
       WHERE session.user_id=v_user_id ORDER BY session.created_at DESC,session.session_id LIMIT 1;
-      IF v_session_id IS NULL THEN
-        RETURN QUERY SELECT 'NO_SESSION'::text,v_request.run_id;
+      CONTINUE WHEN v_session_id IS NULL;
+      -- Another publish of it in flight: its key's intent is recorded until it ends.
+      IF EXISTS (SELECT 1 FROM serve.publication_key_provision_intent AS provision WHERE provision.run_id=v_request.run_id) THEN
+        RETURN QUERY SELECT 'CONTENDED'::text,v_request.run_id,NULL::text;
+        CONTINUE;
+      END IF;
+      -- Every page the debate had: the one public now, and any its owner unpublished before. Each page's digs, reports and
+      -- flags take its lock first; never wait for one while holding the debate's row.
+      v_pages := ARRAY(SELECT snapshot.publication_ref FROM serve.publication_snapshot AS snapshot
+        WHERE snapshot.run_id=v_request.run_id ORDER BY snapshot.publication_ref);
+      v_busy := false;
+      FOREACH v_page IN ARRAY v_pages LOOP
+        IF NOT pg_try_advisory_xact_lock(hashtextextended('identity:public-tree:'||v_page::text,0)) THEN
+          v_busy := true;
+          EXIT;
+        END IF;
+      END LOOP;
+      IF v_busy THEN
+        RETURN QUERY SELECT 'CONTENDED'::text,v_request.run_id,NULL::text;
         CONTINUE;
       END IF;
       BEGIN
@@ -239,13 +252,19 @@ BEGIN
         );
         UPDATE identity.publication_event_binding SET consumed_at=v_now
         WHERE reservation_id=v_reservation_id AND consumed_at IS NULL;
-        PERFORM identity.close_public_page_of_deleted_debate(v_latest_publication_ref);
-        RETURN QUERY SELECT 'TAKEN_DOWN'::text,v_request.run_id;
+        FOREACH v_page IN ARRAY v_pages LOOP
+          PERFORM identity.close_public_page_of_deleted_debate(v_page);
+        END LOOP;
+        RETURN QUERY SELECT 'TAKEN_DOWN'::text,v_request.run_id,NULL::text;
       EXCEPTION WHEN unique_violation THEN
-        RETURN QUERY SELECT 'CONTENDED'::text,v_request.run_id;
+        RETURN QUERY SELECT 'CONTENDED'::text,v_request.run_id,NULL::text;
       END;
-    EXCEPTION WHEN lock_not_available THEN
-      RETURN QUERY SELECT 'CONTENDED'::text,v_request.run_id;
+    EXCEPTION
+      WHEN lock_not_available OR deadlock_detected THEN
+        RETURN QUERY SELECT 'CONTENDED'::text,v_request.run_id,NULL::text;
+      -- Anything else is this request's alone: its rows roll back with the block, and the next request still goes.
+      WHEN OTHERS THEN
+        RETURN QUERY SELECT 'FAILED'::text,v_request.run_id,SQLSTATE::text;
     END;
   END LOOP;
 END;
@@ -316,9 +335,8 @@ BEGIN
     OR NOT pg_catalog.has_table_privilege(v_core, 'identity.session', 'SELECT')
     OR NOT pg_catalog.has_table_privilege(v_core, 'serve.publication_key_cleanup_intent', 'INSERT')
     OR NOT pg_catalog.has_table_privilege(v_core, 'serve.publication_key_cleanup_intent', 'UPDATE')
-    OR NOT pg_catalog.has_table_privilege(v_core, 'serve.answer', 'SELECT')
+    OR NOT pg_catalog.has_table_privilege(v_core, 'serve.publication_snapshot', 'SELECT')
     OR NOT pg_catalog.has_table_privilege(v_core, 'serve.synthesis_check_removal_request', 'UPDATE')
-    OR NOT pg_catalog.has_table_privilege(v_core, 'serve.synthesis_check_result', 'SELECT')
     OR NOT pg_catalog.has_function_privilege(v_list, 'identity.web_evidence_run_owner(uuid)', 'EXECUTE')
     OR NOT pg_catalog.has_function_privilege(v_list, 'identity.run_is_dig(uuid)', 'EXECUTE')
     OR NOT pg_catalog.has_table_privilege(v_list, 'identity.free_public_ask', 'SELECT')

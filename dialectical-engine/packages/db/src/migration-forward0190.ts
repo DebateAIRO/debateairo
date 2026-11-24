@@ -6,9 +6,9 @@ import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-cha
 /**
  * 0190, the check deletes a public debate and the Free sweep reads past waiting debates (expand; migrations/lineage/README.md
  * "The check deletes a public debate, and the Free sweep reads past waiting debates (0190)"): three definers.
- * core.take_down_check_deleted_debates takes the page of a public debate down when the end-of-debate check's deletion verdict
- * is about what the page shows, so that 0126's unchanged prepare then erases it; identity.close_public_page_of_deleted_debate
- * ends what was running on that page and deletes the page's sealed copies (the takedown's owner's alone);
+ * core.take_down_check_deleted_debates takes the page of a public debate down on the end-of-debate check's final deletion
+ * verdict, so that 0126's unchanged prepare then erases it; identity.close_public_page_of_deleted_debate ends what was running
+ * on one page of it and deletes that page's sealed copies, for every page it had (the takedown's owner's alone);
  * identity.read_free_debates_to_publish_after is 0137's list of waiting Free debates read from a place. The two the API calls
  * are the cross-account marker's, never the erasure login's, whose functions the release before counts at its start. No
  * table, column or table right is added, and no earlier function changes. It keeps 0130's verifier and amends no earlier step.

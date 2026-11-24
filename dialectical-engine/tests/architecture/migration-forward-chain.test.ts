@@ -1117,8 +1117,12 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "MIGRATION_FORWARD0190_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "verify-effective-capabilities-130.sql", "replayVerifierSql",
       "previous.manifestSha256", "migration.sha256", "renumber", "core.take_down_check_deleted_debates(integer)", "identity.close_public_page_of_deleted_debate(uuid)",
       "identity.read_free_debates_to_publish_after(integer,timestamptz,uuid)", "core.prepare_synthesis_check_erasures", "assertAccountErasureDatabaseRole",
-      "debateai_rls_all_accounts", "TAKEN_DOWN", "NOT_SHOWN", "[SYNTHESIS_CHECK_ERASURE_WAITING] NOT_SHOWN", "tests/integration/public-tree-flow.test.ts"
+      "debateai_rls_all_accounts", "TAKEN_DOWN", "CONTENDED", "FAILED", "enforce_active_user_child", "age_frozen", "every page the debate had", "[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_FAILED]",
+      "tests/integration/public-tree-flow.test.ts"
     ]) expect(section, needle).toContain(needle);
+    // Any final deletion verdict takes the page down: no outcome waits on which answer version it was about.
+    expect(section).not.toContain("NOT_SHOWN");
+    expect(step.sql).not.toContain("NOT_SHOWN");
     expect(readme.replace(/\s+/gu, " ")).toContain(
       "a Free debate the publication check kept private (0189, below) the seventy-ninth, and the check deleting a public debate with the Free sweep reading past waiting debates (0190, below) the eightieth");
   });

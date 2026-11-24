@@ -1629,25 +1629,42 @@ readable and its keys were kept for as long as it was public.
   and 0085): the publication's key cleanup intent, a `PRIVATE` visibility event through 0040's one-shot binding (on the
   account's newest session row, as 0137's `core.publish_free_debate`; nothing authenticates by it), and the
   `debate.publication.unpublished` audit event. The API's publication key cleanup then destroys the publication's key, and
-  0126's prepare, unchanged, erases the debate on a later pass as a private one. Outcomes: `TAKEN_DOWN`; `NOT_SHOWN` (the
-  verdict is for an older answer version whose conclusion differs from the version that was newest when the debate went
-  public, so the page stays and the request waits); `NO_SESSION` (no session row to bind the event to); `CONTENDED` (the
-  debate, its tree or a publish in flight is busy). A request 0126's prepare would not erase is left to it.
+  0126's prepare, unchanged, erases the debate on a later pass as a private one. Outcomes: `TAKEN_DOWN`; `CONTENDED` (the
+  debate, one of its pages' trees or a publish in flight is busy); `FAILED` with the SQLSTATE in `failure_code` (anything
+  else went wrong for that request: its rows roll back, and the other requests of the pass still go).
+- Its list holds only the requests it can act on now: the debate is stored encrypted, its first owner is its owner now, that
+  account is `active` and keeps a session row, and no erasure of the debate is under way. So no number of other requests
+  keeps a newer one from it. Those others are 0126's prepare's, which reports each as before (`OWNERSHIP_MOVED`,
+  `LEGACY_PLAINTEXT_RETAINED`, `ERASED`, `PUBLISHED` for an account with no session row).
+- An owner that is not active cannot be given 0040's one-shot binding (`identity.enforce_active_user_child` refuses it), so
+  the takedown never acts for one, and 0126's prepare drops the request (`ACCOUNT_CLOSED`): the page stays. Two such owners
+  can have a public page: one whose closing has prepared (`suspended`; that erasure, 0110, keeps or deletes the account's
+  pages as the owner chose) and one frozen by the age check (`age_frozen`), which nothing ends. Taking such a page down needs
+  another way than the owner's unpublish rows, and is not in this step.
 - Only a final deletion verdict does this: 0126 writes a deletion request only for a final result that asks for one, never for
-  a flag, an unavailable answer or an answer stored too late (the API stores it as unavailable).
-- `identity.close_public_page_of_deleted_debate(uuid)` ends what was running on the page with 0150's rules for a hide (a dig not
-  settled is settled `UNAVAILABLE` and goes on as its person's own; an allowed dig's climb ends; a report being written ends
-  `FAILED` with `PUBLIC_PAGE_DELETED`) and deletes the page's copies sealed for digs and reports (0147's
-  `identity.public_material`), as 0151's purge does when an original goes. The page's own rows die with the publication's
-  key. No 0157 statement is queued: those come from a review log row or a decision. EXECUTE is the takedown's owner's alone.
+  a flag, an unavailable answer or an answer stored too late (the API stores it as unavailable). Any such verdict takes the page
+  down, whichever version of the answer it was about, as 0126 erases a private debate on the same request: a later version of
+  an answer keeps the first one's composed text (packages/serve's answer writer), so a verdict is always about what the page
+  shows.
+- `identity.close_public_page_of_deleted_debate(uuid)` closes one page, and the takedown calls it for every page the debate had
+  (`serve.publication_snapshot`), the one public now and any its owner unpublished before. It ends what was running on the page
+  with 0150's rules for a hide (a dig not settled is settled `UNAVAILABLE` and goes on as its person's own; an allowed dig's
+  climb ends; a report being written ends `FAILED` with `PUBLIC_PAGE_DELETED`) and deletes the page's copies sealed for digs
+  and reports (0147's `identity.public_material`), as 0151's purge does when an original goes. The page's own rows die with
+  the publication's key. No 0157 statement is queued: those come from a review log row or a decision. A digger whose dig was
+  on the page still reads `ON_THE_PAGE` ("This changed the public page."): no contribution state says the page was deleted.
+  EXECUTE is the takedown's owner's alone.
+- Not covered: a debate that is private when the verdict comes but was public before is erased by 0126 alone, as before this
+  step, and the copies sealed for digs on its earlier pages stay.
 - Why a function of its own on the cross-account marker (`debateai_rls_all_accounts`, the API's system login outside any
   request, as 0171 gave 0137's Free publish) and not a new prepare on the erasure login: the API attests at start that its
   erasure login can run exactly the functions it knows in identity, core, serve and erasure_reconcile
   (`assertAccountErasureDatabaseRole`), so one more there would stop the release before from starting.
 - The coordinator (`SynthesisCheckErasureCoordinator`, `packages/db/src/synthesis-check-erasure.ts`) calls the takedown first
   through `PostgresCheckDeletedPublicPageRepository`, logs `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEN_DOWN]` once per page it
-  takes down and `[SYNTHESIS_CHECK_ERASURE_WAITING] NOT_SHOWN` while a verdict waits that the page does not show, and reports
-  each such debate once, by what the takedown said.
+  takes down, `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_FAILED] <SQLSTATE>` for a request that failed and
+  `[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_PENDING]` when the whole call failed, and reports each such debate once, by what the
+  takedown said.
 
 The second. A finished Free debate goes public after two checks (0137, 0189). The API's sweep read the 100 oldest waiting
 Free debates with no way to read past them, and a debate the end-of-debate check flagged waits there for a staff approval, as

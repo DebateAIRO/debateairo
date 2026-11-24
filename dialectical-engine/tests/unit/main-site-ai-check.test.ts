@@ -324,11 +324,17 @@ describe('the runbook says what the end-of-debate check does by itself on this s
     // 0126's prepare still waits while a debate is public; the API takes the page down first (0190), on its system login, and logs it once.
     expect(read('migrations/0126_synthesis_check.sql')).toContain("IF v_latest_visibility='PUBLISHED' THEN\n        RETURN QUERY SELECT 'PUBLISHED'::text,NULL::uuid,v_request.run_id;");
     expect(step).toContain("2,'COPIES_MAY_PERSIST_V1',v_now,ledger.allocate_sequence()");
-    expect(step).toContain("RETURN QUERY SELECT 'NOT_SHOWN'::text,v_request.run_id;");
+    // Any final deletion verdict takes the page down, for an active owner only (the binding's guard refuses any other); one failing
+    // debate is logged with its SQLSTATE and holds back no other.
+    expect(step).not.toContain('NOT_SHOWN');
+    expect(step).toContain("WHERE account.owner_ref=v_first_owner AND account.state='active' FOR KEY SHARE NOWAIT;");
+    expect(step).toContain("RETURN QUERY SELECT 'FAILED'::text,v_request.run_id,SQLSTATE::text;");
     const erasure = read('packages/db/src/synthesis-check-erasure.ts');
     expect(erasure).toContain('if (page.outcome === "TAKEN_DOWN") this.log("[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEN_DOWN]");');
+    expect(erasure).toContain('if (page.outcome === "FAILED") this.log("[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_FAILED] " + sqlStateOf(page.failureCode));');
+    expect(erasure).toContain('this.log("[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEDOWN_PENDING]");');
     expect(erasure).toContain('this.log("[SYNTHESIS_CHECK_ERASURE_WAITING] " + outcome);');
-    expect(erasure).toContain('"PUBLISHED", "NOT_SHOWN", "NO_SESSION", "LEGACY_PLAINTEXT_RETAINED", "OWNERSHIP_MOVED"');
+    expect(erasure).toContain('"PUBLISHED", "LEGACY_PLAINTEXT_RETAINED", "OWNERSHIP_MOVED"');
     expect(read('apps/api/src/main.ts')).toContain('(line) => console.error(line), new PostgresCheckDeletedPublicPageRepository(pool)');
     // Only the older page offers the review; the V4 debate page has none.
     expect(read('apps/ui/components/PublicationControl.tsx')).toContain('<PublicationReviewPanel');
