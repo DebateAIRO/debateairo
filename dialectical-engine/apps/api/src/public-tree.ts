@@ -604,10 +604,11 @@ export async function sweepPublicPage(deps: PublicPageSweepDeps): Promise<Readon
  * Kept in memory and keyed by the row each check is for: its `turnKey` when it names one (a page update, whose run id is its
  * dig's, shared by every page update of that dig), else the run id it names (a report's carries its prefix, main.ts). An item
  * a pass did not ask is forgotten (published, refused, given up or erased), and a restart starts again from the lists' own order.
- * A Free debate's end-of-debate check goes before its publication check, in the same turn and under the same key
- * (`checkBefore`): when it cannot answer, the debate waits its own doubling time as when the publication check cannot.
- * Such a check may take the whole background time (two minutes on the gate) before it fails, and the pass holds every
- * other sweep's work while it runs. So once one has failed in a pass, no other `checkBefore` is asked in that pass: those
+ * The end-of-debate check a Free debate's gate runs itself, when no decision of that check is stored, goes before its
+ * publication check, in the same turn and under the same key (`checkBefore`): when it cannot answer, the debate waits its
+ * own doubling time as when the publication check cannot. A decision already stored is read outside the turns. Such a
+ * check may take the whole background time (two minutes on the gate) before it fails, and the pass holds every other
+ * sweep's work while it runs. So once one has failed in a pass, no other `checkBefore` is asked in that pass: those
  * debates are left owed, as during the shared wait, and the next pass asks them. A pass waits for at most one that fails.
  */
 export type ChecksInTurn = Readonly<{
@@ -615,9 +616,9 @@ export type ChecksInTurn = Readonly<{
   pass: <T>(sweeps: () => Promise<T>) => Promise<T>;
   check: PublicationContentCheck;
   /**
-   * Another check that goes before an item's publication check (a Free debate's end-of-debate check), asked in the same
-   * turns under the same key. Null: the item's turn has not come, or another such check already failed in this pass, and
-   * nothing was asked. An answer `failed` calls a failure starts or doubles the item's own wait, as an unavailable
+   * Another check that goes before an item's publication check (the end-of-debate check a Free debate's gate runs itself,
+   * synthesis-check/publish-gate.ts `ownCheckInTurn`), asked in the same turns under the same key. Null: the item's turn
+   * has not come, or another such check already failed in this pass, and nothing was asked. An answer `failed` calls a failure starts or doubles the item's own wait, as an unavailable
    * publication check does. Any other answer changes nothing: only the publication check's own answer ends an item's wait
    * and tells the turns that the judge has answered.
    */
