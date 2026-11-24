@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v1.1 · EFFETTIVI 25 TA’ NOVEMBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v1.1 · EFFETTIVI 24 TA’ NOVEMBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
 endMarker: TMIEM IT-TERMINI · v1.1
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 1.1 · Effective 25 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 1.1 · Effective 24 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Fuq il-pjan bla ħlas, id-dibattiti tiegħek huma pubbliċi meta jintemmu, wara verifika bl-IA; fuq pjan bi ħlas, huma privati sakemm ma tippubblikahomx. Ladarba jkunu pubbliċi, kulħadd jista’ jaqra dibattitu, u jibqa’ pubbliku. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, prinċipalment lil DeepInfra, fl-Istati Uniti. It-termini ta’ DeepInfra, Anthropic u Perplexity ma jippermettulhomx iħarrġu mudelli fuqu; it-taqsima 8 tgħid għal liema kumpanija għadna ma kkonfermajniex dan. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 

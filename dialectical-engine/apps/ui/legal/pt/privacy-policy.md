@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Em resumo
-eyebrow: POLÍTICA DE PRIVACIDADE · v1.1 · EM VIGOR DESDE 25 DE NOVEMBRO DE 2026
+eyebrow: POLÍTICA DE PRIVACIDADE · v1.1 · EM VIGOR DESDE 24 DE NOVEMBRO DE 2026
 title: O que armazenamos e porquê
 lede: Os seus direitos e as nossas obrigações ao abrigo do GDPR (EU) 2016/679, em linguagem clara. Catorze secções e o Anexo B — desloque-se até ao fim.
 endMarker: FIM DA POLÍTICA · GDPR (EU) 2016/679 · v1.1
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 1.1 · Effective 25 de novembro de 2026 · Versões anteriores em dezbatere.ro/privacy/versions · Responsável pelo tratamento: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.1 · Effective 24 de novembro de 2026 · Versões anteriores em dezbatere.ro/privacy/versions · Responsável pelo tratamento: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Recolhemos o que é necessário para uma conta e o que escreve nos seus debates. O que escreve ao assistente de apoio é enviado ao respetivo modelo de IA para que lhe possa responder, e nós não conservamos nada disso. As suas perguntas são enviadas aos fornecedores de IA indicados no nosso Registo, principalmente a DeepInfra, nos Estados Unidos. As condições da DeepInfra, da Anthropic e da Perplexity não lhes permitem treinar modelos com o que escreve; a secção 5 indica para que empresa ainda não o confirmámos. O nosso fornecedor de alojamento armazena a sua conta e os seus debates em Londres, no Reino Unido; a secção 5 indica para onde mais vão os seus dados. No plano gratuito, os debates são públicos quando terminam, após uma verificação por IA; num plano pago, são privados, salvo se os publicar. A eliminação da conta destrói as chaves dos seus dados privados no nosso servidor, mas as cópias cifradas no nosso armazenamento separado de cópias de segurança não são eliminadas automaticamente (secção 7); os debates públicos continuam públicos, e o seu pseudónimo é removido deles. Pode contactar-nos através de privacy@dezbatere.ro, e as pessoas mencionadas num debate podem escrever-nos sem terem uma conta.
 

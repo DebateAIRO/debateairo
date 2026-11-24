@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Stručně
-eyebrow: ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v1.1 · ÚČINNÉ OD 25. LISTOPADU 2026
+eyebrow: ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v1.1 · ÚČINNÉ OD 24. LISTOPADU 2026
 title: Co uchováváme a proč
 lede: Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.
 endMarker: KONEC ZÁSAD · GDPR (EU) 2016/679 · v1.1
@@ -19,7 +19,7 @@ jumps:
 13 SOUBORY COOKIE
 -->
 
-**Version 1.1 · Effective 25. listopadu 2026 · Předchozí verze na dezbatere.ro/privacy/versions · Správce: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.1 · Effective 24. listopadu 2026 · Předchozí verze na dezbatere.ro/privacy/versions · Správce: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Shromažďujeme údaje nezbytné pro účet a to, co zadáte do svých debat. To, co napíšete asistentovi podpory, se předává jeho modelu AI, aby vám mohl odpovědět, a nic z toho neuchováváme. Vaše otázky jsou předávány poskytovatelům AI uvedeným v našem Registru, především poskytovateli DeepInfra, ve Spojených státech. Podmínky DeepInfra, Anthropic a Perplexity jim nedovolují trénovat modely na tom, co napíšete; oddíl 5 uvádí, u které společnosti jsme to dosud nepotvrdili. Náš poskytovatel hostingu uchovává váš účet a vaše debaty v Londýně ve Spojeném království; oddíl 5 uvádí, kam dále vaše údaje putují. V bezplatném tarifu jsou debaty po dokončení veřejné, po kontrole AI; v placeném tarifu jsou soukromé, dokud je nezveřejníte. Výmaz účtu zničí klíče k vašim soukromým údajům na našem serveru, ale šifrované kopie v našem samostatném úložišti záloh se automaticky nemažou (oddíl 7); veřejné debaty zůstanou veřejné a váš pseudonym se z nich odstraní. Můžete nás kontaktovat na privacy@dezbatere.ro a osoby uvedené v debatě se na nás mohou obrátit i bez účtu.
 
