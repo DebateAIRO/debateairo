@@ -156,5 +156,7 @@ a273d069b8eadfecc62bab6caecbb2bca3e64654:dialectical-engine/tests/unit/public-re
 # Lithuanian word for "Map", and the Lithuanian "this page could not be read this time". They are words shown to
 # visitors, not credentials. Classified by reading them, as .gitleaks.toml describes.
 c6c932f6e02dcf6392683c92acb732f776f9303e:dialectical-engine/apps/ui/messages/hr/v4.json:generic-api-key:705
+# The same change: the Lithuanian word for "Map", a page title shown to visitors. Not a credential.
 c6c932f6e02dcf6392683c92acb732f776f9303e:dialectical-engine/apps/ui/messages/lt/v4.json:generic-api-key:229
+# The same change: the Lithuanian sentence "this page could not be read this time". Not a credential.
 c6c932f6e02dcf6392683c92acb732f776f9303e:dialectical-engine/apps/ui/messages/lt/v4.json:generic-api-key:552
