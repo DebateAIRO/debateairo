@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: INFORMATIVA SULLA PRIVACY · v1.1 · IN VIGORE DAL 24 NOVEMBRE 2026
+eyebrow: INFORMATIVA SULLA PRIVACY · v1.2 · IN VIGORE DAL 26 NOVEMBRE 2026
 title: Cosa conserviamo e perché
 lede: I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.
-endMarker: FINE DELL'INFORMATIVA · GDPR (EU) 2016/679 · v1.1
+endMarker: FINE DELL'INFORMATIVA · GDPR (EU) 2016/679 · v1.2
 bodyLabel: Testo dell'Informativa sulla privacy
 annexTitle: Allegato B — Condizioni regionali sulla privacy
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIE
 -->
 
-**Version 1.1 · Effective 24 novembre 2026 · Versioni precedenti su dezbatere.ro/privacy/versions · Titolare del trattamento: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 26 novembre 2026 · Versioni precedenti su dezbatere.ro/privacy/versions · Titolare del trattamento: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Raccogliamo ciò che serve a un account e ciò che digiti nei tuoi dibattiti. Ciò che scrivi all’assistente di supporto viene inviato al suo modello di IA perché possa risponderti, e noi non ne conserviamo nulla. Le tue domande vengono inviate ai fornitori di IA elencati nel nostro Registro, principalmente DeepInfra, negli Stati Uniti. Le condizioni di DeepInfra, Anthropic e Amazon non consentono loro di addestrare modelli su ciò che scrivi. Il fornitore di ricerca sul web riceve solo le brevi frasi di ricerca formulate dai modelli (sezione 5). Il nostro fornitore di hosting conserva il tuo account e i tuoi dibattiti a Londra, nel Regno Unito; la sezione 5 spiega dove altro vanno i tuoi dati. Nel piano Gratuito i dibattiti sono pubblici una volta conclusi, dopo la verifica dell’IA; nei piani a pagamento sono privati, salvo che tu li pubblichi. La cancellazione dell’account distrugge le chiavi dei tuoi dati privati nel servizio attivo, ma non cancella i nostri backup, e alcuni di essi contengono tali chiavi (sezione 7); i dibattiti pubblici restano pubblici e il tuo pseudonimo viene rimosso da essi. Puoi contattarci all'indirizzo privacy@dezbatere.ro e le persone nominate in un dibattito possono scriverci senza avere un account.
 

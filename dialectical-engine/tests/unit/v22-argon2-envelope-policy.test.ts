@@ -325,6 +325,8 @@ describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", 
       // Owner ruling 2026-10-09: finishing an authenticator recovery after its 24-hour wait re-checks the current password.
       "apps/api/src/email-mfa-recovery.ts:verifyPassword",
       "apps/api/src/mfa.ts:verifyRecoveryCode",
+      // The Owner's permit for a locked-out account: one check of the typed password, used at the mailbox link and at the finish link.
+      "apps/api/src/recovery-permit.ts:verifyPassword",
       "apps/api/src/sessions.ts:verifyPassword",
       "apps/api/src/sessions.ts:verifyRecoveryCode",
       "apps/api/src/sessions.ts:verifyPassword",

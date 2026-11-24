@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -24,13 +25,31 @@ export const legalText = (kind: LegalKind, code: string): string =>
 export const legalLines = (kind: LegalKind, code: string): string[] => legalText(kind, code).split("\n");
 
 /**
- * The day the current texts take effect, as the English Privacy Policy's version line gives it (`<day> <Month> <year>`).
- * apps/ui/scripts/legal-redate.mjs sets it in every draft at once, so a test reads it here instead of typing it;
- * tests/unit/legal-reset-10.test.ts holds every draft of both documents to it.
+ * The English text the translations are held to, row for row and place for place. A change to the wording is made in
+ * English first (apps/ui/scripts/generate-legal-data.mjs), so while it waits for its translations, French, and every
+ * other translation with it, still has the rows of the English text French was translated from: that text, read from
+ * the archive, which keeps every released text byte for byte (apps/ui/legal/translated-from.json names it). Once French
+ * follows the current English text, this is the current English text. A check of English's own words reads
+ * legalText(kind, "en").
  */
-export const legalEffectiveDay = (): string => {
-  const day = /^\*\*Version \d+\.\d+ · Effective (\d{1,2} [A-Z][a-z]+ \d{4}) · /mu.exec(legalText("PRIVACY", "en"))?.[1];
-  if (day === undefined) throw new Error("the English Privacy Policy's version line gives no day");
+export const legalEnglishTranslatedFrom = (kind: LegalKind): string => {
+  const english = legalText(kind, "en");
+  const record = JSON.parse(readFileSync(resolve(process.cwd(), "apps/ui/legal/translated-from.json"), "utf8")) as
+    Record<LegalKind, Record<string, { version: string; sha256: string }>>;
+  const followed = record[kind].fr!.sha256;
+  if (createHash("sha256").update(english, "utf8").digest("hex") === followed) return english;
+  return readFileSync(resolve(process.cwd(), "apps/ui/legal/archive/en", `${followed}.md`), "utf8");
+};
+
+/**
+ * The day a document's current text takes effect, as its English version line gives it (`<day> <Month> <year>`).
+ * apps/ui/scripts/legal-redate.mjs sets it in every draft of that document at once, so a test reads it here instead of
+ * typing it; tests/unit/legal-reset-10.test.ts holds every draft of each document to its day. The two documents can
+ * carry different days, since a released version keeps its own.
+ */
+export const legalEffectiveDay = (kind: LegalKind): string => {
+  const day = /^\*\*Version \d+\.\d+ · Effective (\d{1,2} [A-Z][a-z]+ \d{4}) · /mu.exec(legalText(kind, "en"))?.[1];
+  if (day === undefined) throw new Error(`the English ${kind} version line gives no day`);
   return day;
 };
 

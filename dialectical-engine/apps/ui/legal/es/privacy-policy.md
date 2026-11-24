@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En resumen
-eyebrow: POLÍTICA DE PRIVACIDAD · v1.1 · EN VIGOR DESDE 24 DE NOVIEMBRE DE 2026
+eyebrow: POLÍTICA DE PRIVACIDAD · v1.2 · EN VIGOR DESDE 26 DE NOVIEMBRE DE 2026
 title: Qué almacenamos y por qué
 lede: Sus derechos y nuestras obligaciones conforme al RGPD – GDPR (EU) 2016/679, en lenguaje claro. Catorce secciones y el anexo B — desplácese hasta el final.
-endMarker: FIN DE LA POLÍTICA · RGPD – GDPR (EU) 2016/679 · v1.1
+endMarker: FIN DE LA POLÍTICA · RGPD – GDPR (EU) 2016/679 · v1.2
 bodyLabel: Texto de la Política de privacidad
 annexTitle: Anexo B — Condiciones regionales de privacidad
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 1.1 · Effective 24 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/privacy/versions · Responsable: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 26 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/privacy/versions · Responsable: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Recopilamos lo que una cuenta necesita y lo que usted escribe en sus debates. Lo que usted escribe al asistente de soporte se envía a su modelo de IA para que pueda responderle, y no conservamos nada de ello. Sus preguntas se envían a los proveedores de IA que figuran en nuestro Registro, principalmente DeepInfra, en Estados Unidos. Las condiciones de DeepInfra, Anthropic y Amazon no les permiten entrenar modelos con lo que usted escribe. El proveedor de búsqueda web recibe únicamente las breves frases de búsqueda que redactan los modelos (sección 5). Nuestro proveedor de alojamiento almacena su cuenta y sus debates en Londres, en el Reino Unido; la sección 5 indica adónde más van sus datos. En el plan Gratuito, los debates son públicos cuando terminan, tras una comprobación de IA; en un plan de pago son privados salvo que usted los publique. La eliminación de su cuenta destruye las claves de sus datos privados en el servicio activo, pero no elimina nuestras copias de seguridad, y algunas de ellas contienen esas claves (sección 7); los debates públicos siguen siendo públicos, y su seudónimo se elimina de ellos. Puede escribirnos a privacy@dezbatere.ro, y las personas mencionadas en un debate pueden hacerlo sin disponer de una cuenta.
 

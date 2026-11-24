@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: PRIVAATSUSPOLIITIKA · v1.1 · KEHTIB ALATES 24. NOVEMBRIST 2026
+eyebrow: PRIVAATSUSPOLIITIKA · v1.2 · KEHTIB ALATES 26. NOVEMBRIST 2026
 title: Mida ja miks me talletame
 lede: Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.
-endMarker: POLIITIKA LÕPP · GDPR (EU) 2016/679 · v1.1
+endMarker: POLIITIKA LÕPP · GDPR (EU) 2016/679 · v1.2
 bodyLabel: Privaatsuspoliitika tekst
 annexTitle: Lisa B — Piirkondlikud privaatsustingimused
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 KÜPSISED
 -->
 
-**Version 1.1 · Effective 24. november 2026 · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 26. november 2026 · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Kogume seda, mida konto vajab, ja seda, mida sisestate oma väitlustesse. Seda, mida kirjutate kasutajatoe assistendile, saadetakse selle tehisintellekti mudelile, et see saaks teile vastata, ning me ei säilita sellest midagi. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele, peamiselt pakkujale DeepInfra Ameerika Ühendriikides. Pakkujate DeepInfra, Anthropic ja Amazon tingimused ei luba neil mudeleid teie kirjutatu põhjal treenida. Veebiotsingu pakkuja saab ainult lühikesed otsingufraasid, mille mudelid kirjutavad (jaotis 5). Meie majutusteenuse pakkuja säilitab teie konto ja väitlused Londonis Ühendkuningriigis; jaotises 5 on öeldud, kuhu mujale teie andmed jõuavad. Tasuta paketi korral on väitlused pärast lõpetamist avalikud, pärast tehisintellekti kontrolli; tasulise paketi korral on need privaatsed, kui te neid ei avalda. Konto kustutamine hävitab teie privaatsete andmete võtmed töötavas teenuses, kuid see ei kustuta meie varukoopiaid ja mõned neist sisaldavad neid võtmeid (jaotis 7); avalikud väitlused jäävad avalikuks ning teie pseudonüüm eemaldatakse neist. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad meiega ühendust võtta ilma kontota.
 

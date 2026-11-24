@@ -189,6 +189,8 @@ apps/api/src/question-language/reference.ts
 apps/api/src/question-language/transport.ts
 apps/api/src/readmission.ts
 apps/api/src/recovery-email.ts
+apps/api/src/recovery-permit-routes.ts
+apps/api/src/recovery-permit.ts
 apps/api/src/recovery.ts
 apps/api/src/registration.ts
 apps/api/src/release-loops.ts
@@ -217,6 +219,7 @@ apps/api/src/staff/alerts.ts
 apps/api/src/staff/internal-allowances.ts
 apps/api/src/staff/preview-buyers.ts
 apps/api/src/staff/public-review.ts
+apps/api/src/staff/recovery-permits.ts
 apps/api/src/staff/routes.ts
 apps/api/src/staff/runtime.ts
 apps/api/src/staff/team-allowances.ts
@@ -549,6 +552,7 @@ apps/ui/app/public/debate/[id]/PublicPageNote.tsx
 apps/ui/app/public/debate/[id]/loading.tsx
 apps/ui/app/public/debate/[id]/page.tsx
 apps/ui/app/recover-authenticator/page.tsx
+apps/ui/app/recover/help/page.tsx
 apps/ui/app/recover/layout.tsx
 apps/ui/app/recover/page.tsx
 apps/ui/app/reset-password/page.tsx
@@ -634,6 +638,7 @@ apps/ui/components/QuestionLanguageChoice.tsx
 apps/ui/components/QuestionLanguageOffer.tsx
 apps/ui/components/QuestionRefusal.tsx
 apps/ui/components/RecommendedInvestigations.tsx
+apps/ui/components/RecoveryPermitsPanel.tsx
 apps/ui/components/ReferenceNodeMeta.tsx
 apps/ui/components/RegionField.tsx
 apps/ui/components/ScoringErrorBoundary.tsx
@@ -664,6 +669,7 @@ apps/ui/components/auth/LockoutPrompt.tsx
 apps/ui/components/auth/OnboardingEvidence.tsx
 apps/ui/components/auth/PhoneField.tsx
 apps/ui/components/auth/RecoveryFlow.tsx
+apps/ui/components/auth/RecoveryHelpFlow.tsx
 apps/ui/components/auth/SecurityActionResume.tsx
 apps/ui/components/auth/SecurityConfirmation.tsx
 apps/ui/components/auth/SecurityEnrollment.tsx
@@ -961,6 +967,7 @@ apps/ui/lib/publicDebatePresentation.ts
 apps/ui/lib/publicReviewApi.ts
 apps/ui/lib/recommendation.test.mjs
 apps/ui/lib/recommendation.ts
+apps/ui/lib/recoveryPermitsApi.ts
 apps/ui/lib/report/InvestigationReportDocument.tsx
 apps/ui/lib/report/ReportChart.tsx
 apps/ui/lib/report/ReportDocument.tsx
@@ -1343,6 +1350,8 @@ packages/db/src/migration-forward0184.ts
 packages/db/src/migration-forward0185.ts
 packages/db/src/migration-forward0186.ts
 packages/db/src/migration-forward0187.ts
+packages/db/src/migration-forward0188.ts
+packages/db/src/migration-forward0189.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -1372,6 +1381,7 @@ packages/db/src/publication-lease.ts
 packages/db/src/publication.ts
 packages/db/src/recovery-candidate.ts
 packages/db/src/recovery-email.ts
+packages/db/src/recovery-permits.ts
 packages/db/src/recovery.ts
 packages/db/src/release-state.ts
 packages/db/src/restore-fence.ts

@@ -11,6 +11,7 @@ import { activeVersionAlarm, checkActiveSettingsVersionAtBoot } from "./admissio
 import { PasswordResetService } from "./password-reset.js";
 import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
 import { BackupEmailService, MfaRecoveryService } from "./email-mfa-recovery.js";
+import { RecoveryPermitService } from "./recovery-permit.js";
 import { EmailRecoveryNotificationWorker, SendmailEmailRecoverySender, reconcileEachIndependently } from "./email-mfa-mail.js";
 import { PostgresPasswordResetRepository } from "../../../packages/db/src/password-reset.js";
 import { PostgresBackupEmailRepository, PostgresMfaRecoveryRepository } from "../../../packages/db/src/email-mfa-recovery.js";
@@ -92,7 +93,7 @@ import {
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import type { PreparedPublicationCipher } from "@debateai/crypto";
-import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, PostgresPreviewBuyerRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportShredRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
+import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, PostgresPreviewBuyerRepository, PostgresRecoveryPermitRepository, PostgresRecoveryPermitStaffRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportShredRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
 import { recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
 // FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
@@ -1201,8 +1202,13 @@ if(backupEmailRepository)await boot.run("backup-email-role",()=>attestEveryRoute
 if(mfaRecoveryRepository)await boot.run("mfa-recovery-role",()=>attestEveryRoute(()=>mfaRecoveryRepository.assertRole()));
 const backupEmail=backupEmailRepository&&backupEmailPolicy?new BackupEmailService({repository:backupEmailRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:backupEmailPolicy}):undefined;
 const mfaRecovery=mfaRecoveryRepository&&mfaRecoveryPolicy?new MfaRecoveryService({repository:mfaRecoveryRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:mfaRecoveryPolicy,blindIndexKey}):undefined;
+// 0188: the person's side of the Owner's permit for a locked-out account. It runs on the login the email route for a lost
+// authenticator app runs on (0188 grants its steps to that route's role) and shares that route's per-source window, so
+// it is built only where that route is.
+const recoveryPermitRepository=mfaRecoveryRepository?new PostgresRecoveryPermitRepository(pool):undefined;
+const recoveryPermit=recoveryPermitRepository&&mfaRecoveryRepository?new RecoveryPermitService({repository:recoveryPermitRepository,sources:mfaRecoveryRepository,users:dekStore,argon2:argon2Pool,authPolicy,blindIndexKey}):undefined;
 const emailRecoverySender=new SendmailEmailRecoverySender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs,gate:outboundMailGate});
-const emailRecoveryWorkers=[...(backupEmailRepository?[new EmailRecoveryNotificationWorker({flow:"backup_email",repository:backupEmailRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchNoticeMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[]),...(mfaRecoveryRepository?[new EmailRecoveryNotificationWorker({flow:"mfa_recovery",repository:mfaRecoveryRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchNoticeMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[])];
+const emailRecoveryWorkers=[...(backupEmailRepository?[new EmailRecoveryNotificationWorker({flow:"backup_email",repository:backupEmailRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchNoticeMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[]),...(mfaRecoveryRepository?[new EmailRecoveryNotificationWorker({flow:"mfa_recovery",repository:mfaRecoveryRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchNoticeMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[]),...(recoveryPermitRepository?[new EmailRecoveryNotificationWorker({flow:"recovery_permit",repository:recoveryPermitRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchNoticeMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[])];
 const triggerEmailRecoveryReconciliation=emailRecoveryWorkers.length?createSingleFlightErasureReconciler(()=>reconcileEachIndependently(emailRecoveryWorkers,100),()=>console.error("[EMAIL_RECOVERY_RECONCILIATION_PENDING]")):undefined;
 let emailRecoveryTimer:ReturnType<typeof setInterval>|undefined;
 
@@ -1245,6 +1251,14 @@ const previewBuyerStaff = previewBuyerRepository === undefined || billingConnect
   blindIndex: (address: string) => createEmailBlindIndex(blindIndexKey, address),
   teamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [], applies: environment.PREVIEW_ASKS_OPEN === "everyone-with-listed-buyers"
 };
+// 0188: the Owner's list of asks to get back into an account, and the door that approves or refuses one, run on the
+// request login, whose billing role holds 0188's grants. The shortened address of each asking account and whether it
+// ever paid are other accounts' rows, so they are read on the system login (X40), only after the Owner's authority is
+// checked. Without the person's side there is nothing to decide, and the routes answer 404.
+const recoveryPermitAccounts = crossAccountPool(pool, "X40");
+const recoveryPermitStaff = recoveryPermit === undefined ? undefined : {
+  repository: new PostgresRecoveryPermitStaffRepository(pool, recoveryPermitAccounts), readEmail: accountEmailReader(recoveryPermitAccounts, dekStore)
+};
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(crossAccountPool(pool, "X14")),
   webauthn: new StaffWebAuthnService(new PostgresStaffRepository(crossAccountPool(pool, "X14")), {publicAppUrl: environment.PUBLIC_APP_URL}),
@@ -1260,7 +1274,8 @@ const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undef
     return publications.withReviewKey(publicationRef, runId, use);
   } },
   ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding }),
-  ...(previewBuyerStaff === undefined ? {} : { previewBuyers: previewBuyerStaff })
+  ...(previewBuyerStaff === undefined ? {} : { previewBuyers: previewBuyerStaff }),
+  ...(recoveryPermitStaff === undefined ? {} : { recoveryPermits: recoveryPermitStaff })
 };
 // Self-service profile/recovery capabilities use the existing authorization
 // role and account DEK custody, beside purpose-bound TOTP grant rotation.
@@ -2275,6 +2290,7 @@ const api = buildApi({
   ...(passwordReset?{passwordReset}:{}),
   ...(backupEmail?{backupEmail}:{}),
   ...(mfaRecovery?{mfaRecovery}:{}),
+  ...(recoveryPermit?{recoveryPermit}:{}),
   consumerRecovery,
   onboardingEvidence,
   mfa,

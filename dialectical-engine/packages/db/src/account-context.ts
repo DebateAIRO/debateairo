@@ -31,7 +31,8 @@ export const ACCOUNT_CREDENTIAL_SETTING = "debateai.session_credential";
  * Report button's settlement, after its judge), X30 to X33 (the writers of the site's day a request pays for: the language check,
  * the question check, the clarify charge and the synthesis check) and X37 (the ask-time discovery's record of each provider probe it
  * makes) and X39 (the Owner's list of the preview's approved buyers: an account found by its address's blind index, and each
- * listed account's address opened to be shown shortened), in apps/api/src/main.ts, X29 (a report press's seal under the public debate's own run, upload check Task 9) in
+ * listed account's address opened to be shown shortened) and X40 (the Owner's list of asks to get back into an account, 0188: each asking
+ * account's address opened to be shown shortened, and whether it ever paid), in apps/api/src/main.ts, X29 (a report press's seal under the public debate's own run, upload check Task 9) in
  * apps/api/src/public-tree.ts, and X36 (the sign-in and recovery steps that hand out a stored secret or open a session on the API's
  * word: a passkey's credential and its sign-in, the list of the bound account's own passkeys a sign-in after the first step names to the
  * browser, a recovery's proof and its proof, a saved code's use) inside their repository methods in
@@ -40,7 +41,7 @@ export const ACCOUNT_CREDENTIAL_SETTING = "debateai.session_credential";
  * api-system directly.
  */
 export type CrossAccountReader = "X10" | "X11" | "X14" | "X18a" | "X18b" | "X18c" | "X18d" | "X18e" | "X18f" | "X18g"
-  | "X18h" | "X18j" | "X20" | "X21" | "X22" | "X23" | "X24" | "X27" | "X28" | "X29" | "X30" | "X31" | "X32" | "X33" | "X36" | "X37" | "X38" | "X39";
+  | "X18h" | "X18j" | "X20" | "X21" | "X22" | "X23" | "X24" | "X27" | "X28" | "X29" | "X30" | "X31" | "X32" | "X33" | "X36" | "X37" | "X38" | "X39" | "X40";
 
 type RequestScope = { credential: string | null };
 

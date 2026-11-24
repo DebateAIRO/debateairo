@@ -3663,6 +3663,21 @@
       "grants": [
         "EXECUTE ON FUNCTION identity.read_consumer_passkey_allow_credentials(text,text)"
       ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0188_recovery_permit.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION staff.read_recovery_permits(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.recovery_permit_act(jsonb,uuid,jsonb,jsonb,jsonb)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0189_free_debate_refused_by_check.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_free_debate_refused_by_check(uuid,uuid)"
+      ]
     }
   ],
   "privilegeRevocations": [

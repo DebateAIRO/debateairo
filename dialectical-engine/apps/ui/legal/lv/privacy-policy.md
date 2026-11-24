@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PRIVĀTUMA POLITIKA · v1.1 · SPĒKĀ NO 2026. GADA 24. NOVEMBRA
+eyebrow: PRIVĀTUMA POLITIKA · v1.2 · SPĒKĀ NO 2026. GADA 26. NOVEMBRA
 title: Ko mēs glabājam un kāpēc
 lede: Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.
-endMarker: POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v1.1
+endMarker: POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v1.2
 bodyLabel: Privātuma politikas teksts
 annexTitle: B pielikums — Reģionālie privātuma noteikumi
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SĪKDATNES
 -->
 
-**Version 1.1 · Effective 2026. gada 24. novembris · Iepriekšējās versijas: dezbatere.ro/privacy/versions · Pārzinis: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 2026. gada 26. novembris · Iepriekšējās versijas: dezbatere.ro/privacy/versions · Pārzinis: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Mēs vācam to, kas nepieciešams kontam, un to, ko ievadāt savās debatēs. Tas, ko rakstāt atbalsta asistentam, tiek nosūtīts tā MI modelim, lai tas varētu jums atbildēt, un mēs neko no tā neglabājam. Jūsu jautājumi tiek nosūtīti mūsu Reģistrā norādītajiem MI pakalpojumu sniedzējiem, galvenokārt DeepInfra, Amerikas Savienotajās Valstīs. DeepInfra, Anthropic un Amazon noteikumi neļauj tiem apmācīt modeļus ar to, ko rakstāt. Tīmekļa meklēšanas pakalpojumu sniedzējs saņem tikai īsās meklēšanas frāzes, ko uzraksta modeļi (5. sadaļa). Mūsu mitināšanas pakalpojumu sniedzējs glabā jūsu kontu un debates Londonā, Apvienotajā Karalistē; 5. sadaļā norādīts, uz kurieni jūsu dati tiek nosūtīti vēl. Bezmaksas plānā debates kļūst publiskas, kad tās ir pabeigtas, pēc MI pārbaudes; maksas plānā tās ir privātas, ja vien jūs tās nepublicējat. Dzēšot kontu, tiek iznīcinātas jūsu privāto datu atslēgas darbībā esošajā pakalpojumā, taču tas neizdzēš mūsu dublējumkopijas, un dažās no tām šīs atslēgas ir saglabātas (7. sadaļa); publiskas debates paliek publiskas, un no tām tiek noņemts jūsu pseidonīms. Varat ar mums sazināties, rakstot uz privacy@dezbatere.ro, un debatēs minētās personas var mums rakstīt arī bez konta.
 

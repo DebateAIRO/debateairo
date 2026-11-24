@@ -7,6 +7,7 @@ import {
 } from "../../apps/api/src/account-mail-template.mjs";
 import { renderEmailRecoveryMail, type EmailRecoveryMail } from "../../apps/api/src/email-mfa-mail.js";
 import { renderPasswordResetMail, type PasswordResetMail } from "../../apps/api/src/password-reset-mail.js";
+import { awaitsTranslation } from "../support/mailKeysAwaitingTranslation.js";
 
 /**
  * S01 render level (SPEC-v4 R-28 and B8, D-79; Appendix B A-2). Every R-25 mail is rendered by its own renderer
@@ -26,7 +27,8 @@ const CODES = readdirSync(MESSAGES, { withFileTypes: true })
   .map((entry) => entry.name)
   .sort();
 const EN = JSON.parse(readFileSync(join(MESSAGES, "en", "mail.json"), "utf8")) as Record<string, string>;
-const AUTH_KEYS = Object.keys(EN).filter((key) => key.startsWith("auth.")).sort();
+// Keys written in English first (tests/support/mailKeysAwaitingTranslation.ts) are walked by mail-locale-copy-parity.test.ts until they are translated.
+const AUTH_KEYS = Object.keys(EN).filter((key) => key.startsWith("auth.") && !awaitsTranslation(key)).sort();
 const englishOf = (key: string): string => String(EN[key]);
 
 const R29 = ["Dialectical Engine", "DebateAI", "dezbatere.ro", "PLUS", "PRO", "MAX"] as const;

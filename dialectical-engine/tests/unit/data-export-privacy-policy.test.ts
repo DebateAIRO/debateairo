@@ -121,11 +121,12 @@ describe("data export privacy policy", () => {
   // V-24/V-70), so the reacceptance floor stays "3.2".
   // Privacy 3.13 and 3.14 (both effective 19 November 2026) 3.15 and 3.16 kept the floor too. Launch renumbered the
   // text 1.0 and set the floor at 1.0, which every pre-launch acceptance clears (owner's decision of 20 November 2026).
-  it("pins the current Privacy version (1.1) and the reacceptance floor (1.0)", () => {
+  // Privacy 1.1 and 1.2 kept the floor at 1.0.
+  it("pins the current Privacy version (1.2) and the reacceptance floor (1.0)", () => {
     const manifest = JSON.parse(
       readFileSync(join(root, "packages/legal-manifest/src/manifest.json"), "utf8"),
     ) as { reacceptance: { PRIVACY: string } };
-    expect(PRIVACY_POLICY.version).toBe("1.1");
+    expect(PRIVACY_POLICY.version).toBe("1.2");
     expect(manifest.reacceptance.PRIVACY).toBe("1.0");
   });
 });
