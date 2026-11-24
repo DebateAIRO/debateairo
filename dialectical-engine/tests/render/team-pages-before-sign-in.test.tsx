@@ -4,10 +4,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TeamLimitPanel } from "../../apps/ui/components/TeamLimitPanel.js";
 import { TeamAllowancePanel } from "../../apps/ui/components/TeamAllowancePanel.js";
+import { PreviewBuyersPanel } from "../../apps/ui/components/PreviewBuyersPanel.js";
 import { PublicReviewPanel } from "../../apps/ui/components/PublicReviewPanel.js";
 import { PublicationReviewsPanel } from "../../apps/ui/components/PublicationReviewsPanel.js";
 import { createTeamLimitClient } from "../../apps/ui/lib/teamLimitApi.js";
 import { createTeamAllowanceClient } from "../../apps/ui/lib/teamAllowanceApi.js";
+import { createPreviewBuyersClient } from "../../apps/ui/lib/previewBuyersApi.js";
 import { createPublicReviewClient } from "../../apps/ui/lib/publicReviewApi.js";
 import { createStaffApiClient } from "../../apps/ui/lib/staffApi.js";
 import staff from "../../apps/ui/messages/en/staff.json";
@@ -57,16 +59,17 @@ async function teamSignIn(): Promise<void> {
 }
 
 describe("/admin/team before the team sign-in", () => {
-  it("the team limit and the allowance panels send nothing, then read once the team sign-in is done", async () => {
+  it("the team limit, the allowance and the buyers panels send nothing, then read once the team sign-in is done", async () => {
     holdReadableCookies(CSRF_COOKIE);
     const api = server();
     await render(<>
       <TeamLimitPanel client={createTeamLimitClient({ fetchImplementation: api.fetchImplementation, browser })} catalog={staff} />
       <TeamAllowancePanel client={createTeamAllowanceClient({ fetchImplementation: api.fetchImplementation, browser })} catalog={staff} />
+      <PreviewBuyersPanel client={createPreviewBuyersClient({ fetchImplementation: api.fetchImplementation, browser })} catalog={staff} />
     </>);
     expect(api.calls, "no team read before the team sign-in").toEqual([]);
     await teamSignIn();
-    expect(api.calls).toEqual(["/v1/admin/team-limit", "/v1/admin/team-allowances"]);
+    expect(api.calls).toEqual(["/v1/admin/team-limit", "/v1/admin/team-allowances", "/v1/admin/preview-buyers"]);
   });
 
   it("the public review panel sends nothing and stays away, as it did after the refusal", async () => {
@@ -84,8 +87,9 @@ describe("/admin/team before the team sign-in", () => {
       <TeamLimitPanel client={createTeamLimitClient({ fetchImplementation: api.fetchImplementation, browser })} catalog={staff} />
       <TeamAllowancePanel client={createTeamAllowanceClient({ fetchImplementation: api.fetchImplementation, browser })} catalog={staff} />
       <PublicReviewPanel client={createPublicReviewClient({ fetchImplementation: api.fetchImplementation, browser })} catalog={staff} />
+      <PreviewBuyersPanel client={createPreviewBuyersClient({ fetchImplementation: api.fetchImplementation, browser })} catalog={staff} />
     </>);
-    expect(api.calls).toEqual(["/v1/admin/team-limit", "/v1/admin/team-allowances", "/v1/admin/public-review"]);
+    expect(api.calls).toEqual(["/v1/admin/team-limit", "/v1/admin/team-allowances", "/v1/admin/public-review", "/v1/admin/preview-buyers"]);
   });
 });
 

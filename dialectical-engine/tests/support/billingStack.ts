@@ -19,7 +19,7 @@ import {
 } from "@debateai/crypto";
 import {
   AcceptanceRepository, BillingJobQueries, BillingRepository, crossAccountPool, EntitlementRepository,
-  PostgresAccountErasureRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, RunRepository, migrate,
+  PostgresAccountErasureRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresPreviewBuyerRepository, RunRepository, migrate,
   type PrivateRunErasureCoordinator
 } from "@debateai/db";
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
@@ -272,10 +272,11 @@ async function createActiveAccount(
  * The hosted preview's members of buildApi's options, as main.ts hands them, for a stack that tests the preview's buyer
  * rule: the preview configuration, the team line and PREVIEW_ASKS_OPEN_TO's value. `teamUserIds` is read when a request
  * arrives, so a test signs its people up first and then fills the list, as the owner lists existing accounts before the
- * API's start. Without it the stack is off the preview, as before.
+ * API's start. Without it the stack is off the preview, as before. `approvedBuyers`: the Owner's list of approved buyers
+ * (0186) as main.ts hands it, PostgresPreviewBuyerRepository on the request pool; without it no list is handed.
  */
 export type BillingStackPreview = Readonly<{
-  config: PreviewProviderTestConfig; teamUserIds: readonly string[]; asksOpenTo?: PreviewAsksOpenTo;
+  config: PreviewProviderTestConfig; teamUserIds: readonly string[]; asksOpenTo?: PreviewAsksOpenTo; approvedBuyers?: true;
 }>;
 
 export async function startBillingStack(options: Readonly<{ preview?: BillingStackPreview }> = {}): Promise<BillingStack> {
@@ -457,6 +458,7 @@ export async function startBillingStack(options: Readonly<{ preview?: BillingSta
     billing: { ...runtime.routes, usage },
     ...(preview === undefined ? {} : { previewProviderTestConfig: preview.config, previewTeamUserIds: preview.teamUserIds }),
     ...(preview?.asksOpenTo === undefined ? {} : { previewAsksOpen: true as const, previewAsksOpenTo: preview.asksOpenTo }),
+    ...(preview?.approvedBuyers !== true ? {} : { previewApprovedBuyers: new PostgresPreviewBuyerRepository(pools.runtime, crossAccountPool(pools.runtime, "X39")) }),
     // As main.ts passes them: the deletion routes, and billing's renewal stop on a scheduled deletion (P15, W7).
     accountErasure, billingErasure: runtime.erasure
   });

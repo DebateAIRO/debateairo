@@ -145,6 +145,14 @@ const PublicReviewStepShape = { ...PublicReviewHideShape, step: PublicReviewStep
 /** 0157 (D4): a close of a report: NO_BREACH (nothing to act on) or ACTED (a person acted on it). The reporter is told which. */
 export const PublicFlagOutcomeSchema = z.enum(["NO_BREACH", "ACTED"]);
 export type PublicFlagOutcome = z.infer<typeof PublicFlagOutcomeSchema>;
+/**
+ * The preview's approved buyers (migration 0186): the Owner allows an account to buy while the site is open with test
+ * payments, or stops it. The address is typed on the Owner's page and travels only in a POST body; the server turns it
+ * into the account and binds the proof to the account, never to the address. A removal names the row by its ref.
+ */
+const PreviewBuyerAddressSchema = z.string().trim().min(3).max(320).regex(/^[^@\s]+@[^@\s]+$/u);
+const PreviewBuyerAddShape = { address: PreviewBuyerAddressSchema, expected_revision: RevisionSchema, operation_id: z.uuid() };
+const PreviewBuyerRemoveShape = { buyer_ref: z.uuid(), expected_revision: RevisionSchema, operation_id: z.uuid() };
 export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("TEAM_INVITE"), target_user_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
     z.object({ action: z.literal("TEAM_GRANT"), target_staff_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
@@ -160,7 +168,10 @@ export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("PUBLIC_REVIEW_HIDE"), ...PublicReviewHideShape }).strict(),
     z.object({ action: z.literal("PUBLIC_REVIEW_STEP"), ...PublicReviewStepShape }).strict(),
     // 0157 (D4): the close says what the person found; it is bound into the passkey's body.
-    z.object({ action: z.literal("PUBLIC_REPORT_DISMISS"), flag_id: z.uuid(), outcome: PublicFlagOutcomeSchema, operation_id: z.uuid() }).strict()
+    z.object({ action: z.literal("PUBLIC_REPORT_DISMISS"), flag_id: z.uuid(), outcome: PublicFlagOutcomeSchema, operation_id: z.uuid() }).strict(),
+    // 0186: both bound under the existing action TEAM_GRANT, which only the Owner holds; the change is in the proof's body.
+    z.object({ action: z.literal("PREVIEW_BUYER_ADD"), ...PreviewBuyerAddShape }).strict(),
+    z.object({ action: z.literal("PREVIEW_BUYER_REMOVE"), ...PreviewBuyerRemoveShape }).strict()
 ]);
 export const StaffActionOptionsRequestSchema = z.object({ intent: StaffActionIntentSchema }).strict();
 export const StaffActionVerifyRequestSchema = z.object({ intent: StaffActionIntentSchema,
@@ -219,6 +230,24 @@ export const PublicFlagQueueSchema = z.object({ reports: z.array(z.object({
     closed_by_step: z.boolean() }).strict()).max(200) }).strict();
 export type PublicFlagQueue = z.infer<typeof PublicFlagQueueSchema>;
 export const PublicFlagDismissRequestSchema = z.object({ operation_id: z.uuid(), outcome: PublicFlagOutcomeSchema, proof_handle: OpaqueHandleSchema }).strict();
+/** 0186: the Owner's look-up before the key is touched. The answer is the shortened address the page shows, or a refusal by name. */
+export const PreviewBuyerFindRequestSchema = z.object({ address: PreviewBuyerAddressSchema }).strict();
+const PreviewBuyerMaskedAddressSchema = z.string().min(4).max(400).regex(/^[^@\s]+@[^@\s]+$/u);
+export const PreviewBuyerFindResponseSchema = z.object({ masked_address: PreviewBuyerMaskedAddressSchema }).strict();
+export const PreviewBuyerAddRequestSchema = z.object({ ...PreviewBuyerAddShape, proof_handle: OpaqueHandleSchema }).strict();
+export const PreviewBuyerRemoveRequestSchema = z.object({ expected_revision: RevisionSchema, operation_id: z.uuid(), proof_handle: OpaqueHandleSchema }).strict();
+export const PreviewBuyerRefParamsSchema = z.object({ ref: z.uuid() }).strict();
+/**
+ * 0186: the Owner's list. `applies`: this API runs the site open to everyone with buying kept to listed accounts on the
+ * test payments, so the list counts now. `team_count` and `cap`: the team line's accounts and the most that may buy at
+ * once, the team included. Each row: the ref of its latest addition, the shortened address (null when it cannot be read
+ * now) and since when. The full address and the account id never leave the server.
+ */
+export const PreviewBuyersPageSchema = z.object({
+    applies: z.boolean(), team_count: z.number().int().min(0).max(1000), cap: z.number().int().positive().max(1000), revision: RevisionSchema,
+    buyers: z.array(z.object({ ref: z.uuid(), masked_address: PreviewBuyerMaskedAddressSchema.nullable(), since: z.iso.datetime({ offset: true }) }).strict()).max(1000)
+}).strict();
+export type PreviewBuyersPage = z.infer<typeof PreviewBuyersPageSchema>;
 export const StaffActionProofResponseSchema = z.object({ proof_handle: OpaqueHandleSchema, expires_at: z.iso.datetime() }).strict();
 const CredentialDescriptorSchema = z.object({ id: CredentialIdSchema, type: z.literal("public-key"), transports: TransportsSchema.optional() }).strict();
 export const StaffRegistrationOptionsResponseSchema = z.object({
@@ -320,7 +349,8 @@ export const staffContractInventory = Object.freeze({
         "GET /v1/admin/team-limit", "POST /v1/admin/team-limit", "POST /v1/admin/team-limit/partner/{staffId}",
         "DELETE /v1/admin/team-limit/partner/{staffId}", "POST /v1/admin/team-limit/practice",
         "GET /v1/admin/public-review", "GET /v1/admin/public-review/{id}", "POST /v1/admin/public-review/{id}/hide", "POST /v1/admin/public-review/{id}/step",
-        "GET /v1/admin/public-reports", "POST /v1/admin/public-reports/{id}/dismiss"
+        "GET /v1/admin/public-reports", "POST /v1/admin/public-reports/{id}/dismiss",
+        "GET /v1/admin/preview-buyers", "POST /v1/admin/preview-buyers/find", "POST /v1/admin/preview-buyers", "DELETE /v1/admin/preview-buyers/{ref}"
     ]),
     resources: Object.freeze({
         StaffCapabilitySchema, DelegatedStaffCapabilitiesSchema, ActiveStaffCapabilitiesSchema, StaffActionSchema,
@@ -335,7 +365,9 @@ export const staffContractInventory = Object.freeze({
         StaffPageQuerySchema, StaffTeamQuerySchema, StaffAuditQuerySchema, StaffTeamMemberSchema, StaffTeamPageSchema, StaffAuditEventSchema, ThreatReportAuditEventSchema, StaffAuditPageSchema,
         TeamLimitSetRequestSchema, TeamLimitPartnerRequestSchema, TeamPracticeRequestSchema, TeamLimitPageSchema,
         PublicReviewHideRequestSchema, PublicReviewStepRequestSchema, PublicReviewPageSchema, PublicReviewListSchema,
-        PublicFlagQueueSchema, PublicFlagDismissRequestSchema
+        PublicFlagQueueSchema, PublicFlagDismissRequestSchema,
+        PreviewBuyerFindRequestSchema, PreviewBuyerFindResponseSchema, PreviewBuyerAddRequestSchema, PreviewBuyerRemoveRequestSchema,
+        PreviewBuyerRefParamsSchema, PreviewBuyersPageSchema
     })
 });
 

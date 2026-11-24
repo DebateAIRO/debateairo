@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import staff from "../../apps/ui/messages/en/staff.json";
 import { TeamLimitPanel } from "../../apps/ui/components/TeamLimitPanel.js";
 import { TeamAllowancePanel } from "../../apps/ui/components/TeamAllowancePanel.js";
+import { PreviewBuyersPanel } from "../../apps/ui/components/PreviewBuyersPanel.js";
 import { button, expectFocusOn, guardWait, mountPage, press, typeInto, unmountPage } from "./kbd-r2-set-harness.js";
 import { submitByKeyboard } from "./kbd-guard-harness.js";
 import { CSRF_COOKIE, holdReadableCookies, STAFF_CSRF_COOKIE } from "../support/sessionCookie.js";
@@ -134,5 +135,45 @@ describe("the team allowance panel: Cancel goes back to where the person asked f
     expectFocusOn(button(S["staff.teamAllowance.confirm"]!));
     await press(button(S["staff.teamAllowance.cancel"]!));
     expectFocusOn(button(S["staff.teamAllowance.takeBack"]!, row));
+  });
+});
+
+const BUYER = "66666666-6666-4666-8666-666666666666";
+const buyersPage = { applies: true, team_count: 2, cap: 20, revision: 3, buyers: [{ ref: BUYER, masked_address: "a•••@example.com", since: "2031-03-01T00:00:00.000Z" }] };
+const buyersClient = () => ({ read: vi.fn(async () => buyersPage), find: vi.fn(async () => ({ masked_address: "ste•••n.n•••our@example.com" })),
+  add: vi.fn(async () => undefined), remove: vi.fn(async () => undefined), cancel: vi.fn() });
+
+// The Owner's box for who may buy while payments are in test mode follows the same rule. Its addition looks the address up
+// before the confirm opens, so the place is read as the person asks, before the look-up switches the form off.
+describe("the box of who may buy: Cancel goes back to where the person asked from", () => {
+  const address = () => document.querySelector<HTMLInputElement>("#preview-buyer-address")!;
+
+  it("asked with Enter in the address box: focus goes to Confirm, and Cancel puts it back in the box", async () => {
+    await mountPage(<PreviewBuyersPanel client={buyersClient() as never} />);
+    await typeInto(address(), "stefan.nour@example.com");
+    submitByKeyboard(address());
+    await guardWait();
+    expectFocusOn(button(S["staff.previewBuyers.confirm"]!));
+    await press(button(S["staff.previewBuyers.cancel"]!));
+    expect(document.querySelector("[data-preview-buyers-confirm]")).toBeNull();
+    expectFocusOn(address());
+  });
+
+  it("asked with Allow to buy: Cancel puts focus back on that button", async () => {
+    await mountPage(<PreviewBuyersPanel client={buyersClient() as never} />);
+    await typeInto(address(), "stefan.nour@example.com");
+    await press(button(S["staff.previewBuyers.add"]!));
+    expectFocusOn(button(S["staff.previewBuyers.confirm"]!));
+    await press(button(S["staff.previewBuyers.cancel"]!));
+    expectFocusOn(button(S["staff.previewBuyers.add"]!));
+  });
+
+  it("a row's Remove: Cancel puts focus back on that row's Remove", async () => {
+    await mountPage(<PreviewBuyersPanel client={buyersClient() as never} />);
+    const row = document.querySelector(`[data-preview-buyer="${BUYER}"]`)!;
+    await press(button(S["staff.previewBuyers.remove"]!, row));
+    expectFocusOn(button(S["staff.previewBuyers.confirm"]!));
+    await press(button(S["staff.previewBuyers.cancel"]!));
+    expectFocusOn(button(S["staff.previewBuyers.remove"]!, row));
   });
 });

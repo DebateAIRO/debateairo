@@ -30,7 +30,8 @@ export const ACCOUNT_CREDENTIAL_SETTING = "debateai.session_credential";
  * (the staff notice loops' account address reader, once the staff threat report's) and X28 (the staff publication review), and since the security review X38 (the
  * Report button's settlement, after its judge), X30 to X33 (the writers of the site's day a request pays for: the language check,
  * the question check, the clarify charge and the synthesis check) and X37 (the ask-time discovery's record of each provider probe it
- * makes), in apps/api/src/main.ts, X29 (a report press's seal under the public debate's own run, upload check Task 9) in
+ * makes) and X39 (the Owner's list of the preview's approved buyers: an account found by its address's blind index, and each
+ * listed account's address opened to be shown shortened), in apps/api/src/main.ts, X29 (a report press's seal under the public debate's own run, upload check Task 9) in
  * apps/api/src/public-tree.ts, and X36 (the sign-in and recovery steps that hand out a stored secret or open a session on the API's
  * word: a passkey's credential and its sign-in, a recovery's proof and its proof, a saved code's use) inside their repository methods in
  * packages/db; since the merge with the security fixes of audit run 3, X10 also in apps/api/src/publications.ts (the public read's
@@ -38,7 +39,7 @@ export const ACCOUNT_CREDENTIAL_SETTING = "debateai.session_credential";
  * api-system directly.
  */
 export type CrossAccountReader = "X10" | "X11" | "X14" | "X18a" | "X18b" | "X18c" | "X18d" | "X18e" | "X18f" | "X18g"
-  | "X18h" | "X18j" | "X20" | "X21" | "X22" | "X23" | "X24" | "X27" | "X28" | "X29" | "X30" | "X31" | "X32" | "X33" | "X36" | "X37" | "X38";
+  | "X18h" | "X18j" | "X20" | "X21" | "X22" | "X23" | "X24" | "X27" | "X28" | "X29" | "X30" | "X31" | "X32" | "X33" | "X36" | "X37" | "X38" | "X39";
 
 type RequestScope = { credential: string | null };
 
