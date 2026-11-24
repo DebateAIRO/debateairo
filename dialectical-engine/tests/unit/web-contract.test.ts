@@ -348,7 +348,8 @@ describe("W1-6 inventory and the no-grade rule over every new shape", () => {
     // 0157: the statements of reasons (GET /v1/account/moderation-statements).
     // The verify that also sets the password (POST /v1/auth/verify-email/password).
     // The threat reports' four staff routes were removed (2026-11-19).
-    expect(contractInventory.routes).toHaveLength(208);
+    // 0186: the four staff routes of the preview's approved buyers (GET, POST and POST …/find on /v1/admin/preview-buyers, DELETE …/{ref}).
+    expect(contractInventory.routes).toHaveLength(212);
   });
 });
 
