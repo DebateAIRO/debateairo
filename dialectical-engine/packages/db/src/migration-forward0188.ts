@@ -17,7 +17,7 @@ const NAME = "0188_recovery_permit.sql";
 const VERSION = "recovery-permit-forward0188-v1";
 const MANIFEST_PATH = "lineage/recovery-permit-forward0188.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
-const PREVIOUS = "0186_preview_buyers.sql";
+const PREVIOUS = "0187_passkey_allow_credentials.sql";
 /** The twenty-seven functions the step creates, each digested whole (owner, definer, settings, volatility, body and ACL). */
 const FUNCTIONS: readonly string[] = [
   "identity.recovery_permit_facts_internal(uuid)",

@@ -196,7 +196,8 @@ describe("Privacy Policy: what happens when you press Next, and the questions no
 
   it("leaves out of the first-translation checks only the translations brought up to date from an English text released since launch", () => {
     const left = LOCALES.map(({ code }) => code).filter((code) => !FIRST_TRANSLATION.includes(code));
-    expect([...left].sort()).toEqual(["fr", "ja", "ko", "ro"]);
+    // 24 November 2026: every translation was brought up to the English 1.1 text, so only English is left pinned.
+    expect([...left].sort()).toEqual(LOCALES.map(({ code }) => code).filter((code) => code !== "en").sort());
     for (const code of left) expect(fromEnglishSinceLaunch(code), code).toBe(true);
   });
 

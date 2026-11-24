@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Приватні дебати",
   "debateChrome.privateDebateDeleted": "Приватні дебати видалено",
   "debateChrome.privateDebateDeletionProcessing": "Триває видалення приватних дебатів",
-  "debateChrome.privateDebateDeletedDetail": "Від цих дебатів залишився лише запис про видалення. Їхній зашифрований приватний вміст назавжди непридатний для читання.",
+  "debateChrome.privateDebateDeletedDetail": "Від цих дебатів залишився лише запис про видалення. Їхній зашифрований приватний вміст тут більше не можна прочитати. Наші резервні копії його ще можуть зберігати (Політика конфіденційності, розділ 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Приватний вміст уже недоступний; завершується остаточне видалення ключів.",
   "debateChrome.tree.building": "Побудова дерева аргументів…",
   "debateChrome.tree.notProduced": "Для цих дебатів не створено дерева аргументів.",

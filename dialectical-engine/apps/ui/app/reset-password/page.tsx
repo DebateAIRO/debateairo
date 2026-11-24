@@ -1,10 +1,12 @@
 import { cookies } from "next/headers";
 import { PasswordResetFlow } from "@/components/PasswordResetFlow";
-import { LOCALE_COOKIE } from "@/lib/i18n/locales";
-import en from "@/messages/en/password-reset.json";
-import ro from "@/messages/ro/password-reset.json";
+import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
+import { loadNamespace } from "@/lib/i18n/server";
 
 export default async function ResetPasswordPage() {
-  const locale = (await cookies()).get(LOCALE_COOKIE)?.value === "ro" ? "ro" : "en";
-  return <PasswordResetFlow locale={locale} catalog={locale === "ro" ? ro : en} />;
+  const requested = (await cookies()).get(LOCALE_COOKIE)?.value;
+  const locale = isLocale(requested) ? requested : "en";
+  // Every language has its own password-reset texts; the sign-in method names come from the mfa-recovery texts.
+  const [catalog, mfaCatalog] = await Promise.all([loadNamespace(locale, "password-reset"), loadNamespace(locale, "mfa-recovery")]);
+  return <PasswordResetFlow locale={locale} catalog={catalog} mfaCatalog={mfaCatalog} />;
 }

@@ -32,6 +32,12 @@ function rankedRanges(header: string): readonly RankedRange[] {
   return ranked;
 }
 
+/** The site's own order of its offered languages: English first, then the catalogue's order. */
+const SITE_ORDER: readonly CatalogLocaleCode[] = Object.freeze([
+  ...OFFERED_LOCALE_CODES.filter((code) => code === DEFAULT_LOCALE),
+  ...OFFERED_LOCALE_CODES.filter((code) => code !== DEFAULT_LOCALE)
+]);
+
 /**
  * The offered interface language a browser's Accept-Language ranks highest, or null when it accepts none of them.
  * The weights decide; on a tie the earlier entry wins. `ro-RO` and `ro-MD` count as `ro`, `en-US` as `en`. A weight of 0
@@ -44,7 +50,7 @@ export function preferredOfferedLocale(header: string | null | undefined): Catal
   const named = new Set(ranked.map(({ language }) => language));
   let best: Readonly<{ code: CatalogLocaleCode; q: number }> | null = null;
   for (const { language, q } of ranked) {
-    for (const code of OFFERED_LOCALE_CODES) {
+    for (const code of SITE_ORDER) {
       const covers = language === "*" ? !named.has(code) : language === code;
       if (covers && q > 0 && (best === null || q > best.q)) best = { code, q };
     }

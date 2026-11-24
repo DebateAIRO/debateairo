@@ -221,7 +221,7 @@ describe("FIX-DEBATE-CATALOGS: the debate page renders its drawers in the interf
     mocks.getDebateServer.mockResolvedValue({ ok: false, kind: "loading", run: queuedRun });
   });
 
-  // The interface offers English and Romanian only, so the non-English page under test is the Romanian one.
+  // The interface offers all 35 catalogue languages (owner, 24 November 2026); Romanian and Hebrew are tested here.
   it("renders the Synthesis title, subtitle and pending note from the Romanian catalogue", async () => {
     const romanian = synthesisStrings("ro");
     const english = synthesisStrings("en");
@@ -231,10 +231,20 @@ describe("FIX-DEBATE-CATALOGS: the debate page renders its drawers in the interf
     for (const value of english) expect(panel).not.toContain(escapeHtml(value));
   });
 
-  it("renders the English page for a cookie naming a language the site does not offer", async () => {
+  it("renders the Synthesis title, subtitle and pending note from the Hebrew catalogue for a Hebrew cookie", async () => {
+    const hebrew = synthesisStrings("he");
+    const english = synthesisStrings("en");
     const panel = synthesisPanel(await renderPage("he"));
-    for (const value of synthesisStrings("en")) expect(panel).toContain(escapeHtml(value));
-    for (const value of synthesisStrings("he")) expect(panel).not.toContain(escapeHtml(value));
+    for (const value of hebrew) expect(panel).toContain(escapeHtml(value));
+    for (const value of english) expect(panel).not.toContain(escapeHtml(value));
+  });
+
+  it("renders the English page for a cookie naming a language the site does not offer", async () => {
+    for (const cookie of ["xx", "en-AU"]) {
+      const panel = synthesisPanel(await renderPage(cookie));
+      for (const value of synthesisStrings("en")) expect(panel, cookie).toContain(escapeHtml(value));
+      for (const value of synthesisStrings("he")) expect(panel, cookie).not.toContain(escapeHtml(value));
+    }
   });
 
   it("leaves the English page byte-identical except for S02's pending publication action", async () => {

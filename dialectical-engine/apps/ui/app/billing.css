@@ -29,20 +29,27 @@
 .billingInner a:not(.btn):not(.setBtn) { color: var(--link); font-weight: 600; text-decoration: underline; }
 
 /* Buttons. Outlined is the plain one; .btnDark is the blue fill with the page colour on it; .billingCta is the orange
-   call to action of a paying step (52px, a 2px edge and a hard 4px shadow it presses into). */
+   call to action of a paying step (52px, a 2px edge and a hard 4px shadow it presses into). .lpPlans is the landing's
+   copy of the plan cards and their place form (LandingPricing), which wear the pricing page's buttons. */
 .pricingInner .btn,
+.lpPlans .btn,
 .billingInner .btn,
 .billingInner .setBtn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 6px 18px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--core); color: var(--ink); font-family: var(--font-sans); font-size: 13px; font-weight: 700; line-height: 1.2; text-align: center; text-decoration: none; white-space: normal; cursor: pointer; }
 .pricingInner .btn:hover,
+.lpPlans .btn:hover,
 .billingInner .btn:hover,
 .billingInner .setBtn:hover { background: var(--surface-2); }
 .pricingInner .btnDark,
+.lpPlans .btnDark,
 .billingInner .btnDark,
 .billingInner .setBtn[aria-pressed="true"] { background: var(--pro); border-color: var(--pro); color: var(--bg); }
 .pricingInner .btnDark:hover,
+.lpPlans .btnDark:hover,
 .billingInner .btnDark:hover { background: color-mix(in srgb, var(--pro) 88%, var(--ink)); }
 .pricingInner .btn:disabled,
 .pricingInner .btn[aria-disabled="true"],
+.lpPlans .btn:disabled,
+.lpPlans .btn[aria-disabled="true"],
 .billingInner .btn:disabled,
 .billingInner .btn[aria-disabled="true"],
 .billingInner .setBtn:disabled { opacity: .55; cursor: not-allowed; }
@@ -63,7 +70,8 @@
 /* 19a: the plan cards. */
 .pricingGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 28px; }
 .pricingCard { display: flex; flex-direction: column; gap: 10px; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--core); }
-.pricingCard h2 { margin: 0; font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; font-size: 24px; line-height: normal; }
+.pricingCard h2,
+.pricingCard h3 { margin: 0; font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; font-size: 24px; line-height: normal; }
 .pricingCard > p { margin: 0; font-size: 14px; }
 .pricingCard .pricingPrice { font-size: 20px; font-weight: 600; }
 /* Terms §12: a card that cannot be priced yet says what it needs, in place of a price. */

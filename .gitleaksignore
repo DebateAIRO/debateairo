@@ -151,3 +151,12 @@ a273d069b8eadfecc62bab6caecbb2bca3e64654:dialectical-engine/tests/unit/public-re
 # hex digits 0 to 9, a, b in order) that a test hands to guide block A6 as its names-file value KEY. A release key is a
 # public label, not a credential, and this one names no release. Classified by reading it, as .gitleaks.toml describes.
 57014d6c0300887027bf4affc4e34b6ddd3b32de:dialectical-engine/tests/unit/preview-release-guide.test.ts:generic-api-key:2593
+# 2026-11-24 — every language follows the English texts (PR #358): generic-api-key matched three ordinary translated
+# sentences in the site's text files: the Croatian "this report could not be written, you can write it again", the
+# Lithuanian word for "Map", and the Lithuanian "this page could not be read this time". They are words shown to
+# visitors, not credentials. Classified by reading them, as .gitleaks.toml describes.
+c6c932f6e02dcf6392683c92acb732f776f9303e:dialectical-engine/apps/ui/messages/hr/v4.json:generic-api-key:705
+# The same change: the Lithuanian word for "Map", a page title shown to visitors. Not a credential.
+c6c932f6e02dcf6392683c92acb732f776f9303e:dialectical-engine/apps/ui/messages/lt/v4.json:generic-api-key:229
+# The same change: the Lithuanian sentence "this page could not be read this time". Not a credential.
+c6c932f6e02dcf6392683c92acb732f776f9303e:dialectical-engine/apps/ui/messages/lt/v4.json:generic-api-key:552

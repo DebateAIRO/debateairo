@@ -3658,6 +3658,13 @@
       ]
     },
     {
+      "roleName": "debateai_rls_all_accounts",
+      "source": "migrations/0187_passkey_allow_credentials.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_consumer_passkey_allow_credentials(text,text)"
+      ]
+    },
+    {
       "roleName": "debateai_billing_runtime",
       "source": "migrations/0188_recovery_permit.sql",
       "grants": [

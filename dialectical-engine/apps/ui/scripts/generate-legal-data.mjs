@@ -59,14 +59,18 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 /**
  * The languages whose Terms of Service and Privacy Policy this release offers: the release check holds only these to
- * the current English text, and the archive step copies only their current texts. English and Romanian are the
- * interface languages offered. French is here too because sign-up shows a person who picks Canada the French Terms and
- * Privacy Policy first and records their acceptance in French (apps/ui/components/consent/canadaLegalLanguage.ts).
- * The other languages' drafts stay in the repository and carry the same version number, but they are neither checked
- * nor archived until a release offers them again. The site keeps the same list as LEGAL_TEXT_LOCALE_CODES
+ * the current English text, and the archive step copies only their current texts. Since 24 November 2026 the site
+ * offers all 35 catalogue languages as interface languages (owner's decision), so all 35 are here; French was here
+ * before that too, because sign-up shows a person who picks Canada the French Terms and Privacy Policy first and records
+ * their acceptance in French (apps/ui/components/consent/canadaLegalLanguage.ts). A language taken out of this list
+ * keeps its draft in the repository under the same version number, but it is neither checked nor archived until a
+ * release offers it again. The site keeps the same list as LEGAL_TEXT_LOCALE_CODES
  * (apps/ui/lib/legal/legalTextLocales.ts) and shows legal texts only in those languages; a unit test holds the two equal.
  */
-export const RELEASE_LEGAL_LOCALES = Object.freeze(["en", "fr", "ro"]);
+export const RELEASE_LEGAL_LOCALES = Object.freeze([
+  "ar", "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "ga", "he", "hi", "hr", "hu", "id", "it", "ja", "ko",
+  "lt", "lv", "mt", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "tr", "uk", "vi", "zh"
+]);
 
 /** The section accents, cycled in this order — the six tokens the design's policy modal uses. */
 const ACCENT_CYCLE = ["--ok-dot", "--gold", "--reasoning", "--con", "--ink", "--muted"];

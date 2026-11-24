@@ -1784,6 +1784,13 @@ describe("P3-01 production database-principal manifest", () => {
   "source": "migrations/0186_preview_buyers.sql",
   "grants": ["EXECUTE ON FUNCTION staff.read_audit_page_v2(jsonb,text,integer,timestamptz,uuid)"]
 },
+// 0187: the ids and transports of the own passkeys of the account a sign-in after the first step is bound to. The cross-account
+// marker's alone, as 0098's stored-credential read: the API calls it on its authorization system login (X36).
+{
+  "roleName": "debateai_rls_all_accounts",
+  "source": "migrations/0187_passkey_allow_credentials.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_consumer_passkey_allow_credentials(text,text)"]
+},
 // 0188: the Owner's permit for a locked-out account. The Owner's list and the one door are the API's billing role's alone, which the
 // runner's login does not hold; the audit page beside 0186's goes where 0142's went. The person's steps go to the email route's role,
 // which this manifest does not list.
@@ -2335,6 +2342,23 @@ it("discloses exactly 0186's grants: the preview buyers' three to the API's bill
   // Four functions, no table grant: the table is no login's.
   expect(declared).toHaveLength(4);
   expect(declared.some(grant => /\bON staff\.preview_buyer_event\b/u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0187's grant: the passkey sign-in's list of the bound account's own passkeys, to the cross-account marker alone", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0187_passkey_allow_credentials.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_authorization_runtime|debateai_rls_all_accounts";
+  // As for 0186: every GRANT line naming one of the disclosed roles names it alone.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0187_passkey_allow_credentials.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // One function, the marker's alone: no request role, no table grant.
+  expect(declared).toEqual(["GRANT EXECUTE ON FUNCTION identity.read_consumer_passkey_allow_credentials(text,text) TO debateai_rls_all_accounts;"]);
 });
 
 it("discloses exactly 0125's grants to the API's billing role and the export worker (italy-clause-approval S01)", async () => {

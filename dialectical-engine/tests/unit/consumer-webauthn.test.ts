@@ -64,3 +64,65 @@ it('consumer material retains selected earlier expiry while imposing fourteen/th
         expect(material.sessionBindingContext.user_agent_hash).toBe(material.bindingHash);
     }
 });
+import { ConsumerWebAuthnService } from '../../apps/api/src/consumer-webauthn.js';
+import { hashToken } from '@debateai/crypto';
+import type { ConsumerAllowCredential } from '@debateai/db';
+describe('a passkey sign-in after the first step names only the bound account\'s own passkeys', () => {
+    const source = { ip: '192.0.2.9', userAgent: 'unit', requestId: 'unit' }, continuation = 'c'.repeat(43), binding = 'sha256:' + 'b'.repeat(64);
+    const handleHashOf = (handle: string) => 'sha256:' + createHash('sha256').update('consumer-passkey:LOGIN\0' + handle).digest('hex');
+    /** The service on a stand-in repository: beginLogin writes nothing, and the list is whatever the database would answer. */
+    function harness(list: readonly ConsumerAllowCredential[], refused = false) {
+        const begun: Array<Record<string, unknown>> = [], read: Array<[string, string]> = [];
+        const unused = async () => { throw new Error('UNUSED'); };
+        const repository = {
+            beginLogin: async (input: Record<string, unknown>) => {
+                begun.push(input);
+                if (refused) throw new Error('CONSUMER_AUTH_INVALID');
+                return { expiresAt: new Date(Date.now() + 300000).toISOString() };
+            },
+            readAllowCredentials: async (handleHash: string, bindingHash: string) => { read.push([handleHash, bindingHash]); return list; },
+            readChallenge: unused, readCredential: unused, beginEnrollment: unused, completeEnrollment: unused, completeLogin: unused
+        };
+        const sessions = { admit: async () => ({ retentionKey: 'sha256:' + 'a'.repeat(64), challengeCapacity: 1000, challengesPerScope: 10 }), bindingHash: () => binding, prepare: () => { throw new Error('UNUSED'); }, committed: unused };
+        return { service: new ConsumerWebAuthnService(repository as never, sessions as never, { publicAppUrl: origin }), begun, read };
+    }
+    it('with a continuation, the options carry exactly the ids the database answers for the challenge just written, with their transports', async () => {
+        const { service, begun, read } = harness([{ id: 'AQID', transports: ['internal', 'hybrid'] }, { id: 'BAUG', transports: [] }]);
+        const response = await service.beginPasskeyLogin({ continuation_token: continuation }, source);
+        expect(begun).toHaveLength(1);
+        expect(begun[0]!.continuationHash).toBe(hashToken('login-challenge', continuation));
+        // Read for the challenge this call wrote, from the same browser, after it was written.
+        expect(read).toEqual([[handleHashOf(response.challenge_handle), binding]]);
+        expect(begun[0]!.handleHash).toBe(handleHashOf(response.challenge_handle));
+        expect(response.options.allowCredentials).toEqual([{ id: 'AQID', type: 'public-key', transports: ['internal', 'hybrid'] }, { id: 'BAUG', type: 'public-key' }]);
+        expect(response.options).toMatchObject({ rpId, userVerification: 'required', timeout: 300000 });
+    });
+    it('without a continuation (the "sign in with a passkey" button), no list is read and none is sent', async () => {
+        const { service, read } = harness([{ id: 'AQID', transports: ['internal'] }]);
+        for (const input of [{}, undefined]) {
+            const response = await service.beginPasskeyLogin(input, source);
+            expect(response.options.allowCredentials).toBeUndefined();
+            expect(JSON.stringify(response)).not.toContain('allowCredentials');
+        }
+        expect(read).toEqual([]);
+    });
+    it('an account with no passkey that could pass gets no list, as before, and the sign-in does not fail', async () => {
+        const { service, read } = harness([]);
+        const response = await service.beginPasskeyLogin({ continuation_token: continuation }, source);
+        expect(read).toHaveLength(1);
+        expect(response.options.allowCredentials).toBeUndefined();
+        expect(JSON.stringify(response)).not.toContain('allowCredentials');
+    });
+    it('a list beyond the contract\'s bounds is left out rather than failing the sign-in', async () => {
+        const { service } = harness(Array.from({ length: 101 }, (_, index) => ({ id: b64(Buffer.from([index, 1, 2])), transports: ['usb'] })));
+        const response = await service.beginPasskeyLogin({ continuation_token: continuation }, source);
+        expect(response.options.allowCredentials).toBeUndefined();
+        expect(response.challenge_handle).toMatch(/^[A-Za-z0-9_-]{43}$/u);
+    });
+    it('a refused first step reads no list: the begin fails before it', async () => {
+        const { service, begun, read } = harness([{ id: 'AQID', transports: [] }], true);
+        await expect(service.beginPasskeyLogin({ continuation_token: continuation }, source)).rejects.toMatchObject({ code: 'AUTH_CREDENTIALS_INVALID' });
+        expect(begun).toHaveLength(1);
+        expect(read).toEqual([]);
+    });
+});

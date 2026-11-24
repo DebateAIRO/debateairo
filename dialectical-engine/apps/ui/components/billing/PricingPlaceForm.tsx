@@ -12,7 +12,8 @@ const POSTAL_CODE_COUNTRIES: ReadonlySet<string> = new Set(["US", "CA"]);
 /**
  * Terms §12: the place the cards are priced for, as the checkout asks it: the country where the visitor lives (the
  * connection's, until they choose), picked with sign-up's own region picker among the countries we serve, and in the
- * US and Canada the postal code. A GET form back to /pricing; the place is used for this page only and stored nowhere.
+ * US and Canada the postal code. A GET form back to /pricing (or, by `action`, to the landing's own plan cards); the
+ * place is used for that page only and stored nowhere.
  * The postal code is asked only while the picked country needs it, and is not `required`: one sent empty is asked for
  * again by the cards. The picker needs scripts, so without them (a Tor exit, whose country is never known, often has
  * none) a plain select of the same countries sends the country instead; the picker's hidden field and the disabled
@@ -23,7 +24,8 @@ export function PricingPlaceForm({
   regionCatalog,
   locale,
   place,
-  typedPostalCode
+  typedPostalCode,
+  action = "/pricing"
 }: Readonly<{
   catalog: MessageCatalog;
   /** Sign-up's catalogue, for the picker's continents and its back button. */
@@ -31,7 +33,9 @@ export function PricingPlaceForm({
   locale: string;
   place: BillingPlansPlace;
   /** The postal code as the visitor typed it, given back when it did not fit so they can correct it. */
-  typedPostalCode?: string;
+  typedPostalCode?: string | undefined;
+  /** Where the form sends the place: the pricing page, or the landing's plan cards ("/#plans"). */
+  action?: string;
 }>): JSX.Element {
   // The picker starts from the priced place, even one outside its list (a connection's country): it shows the country
   // the cards are priced for, and sends it again.
@@ -48,7 +52,7 @@ export function PricingPlaceForm({
   const postalInvalid = samePlace && place.status === "POSTAL_CODE_INVALID";
   const postalDefault = !samePlace ? "" : place.postal_code ?? (postalInvalid ? typedPostalCode ?? "" : "");
   return (
-    <form className="pricingPlace" method="get" action="/pricing" data-pricing-place>
+    <form className="pricingPlace" method="get" action={action} data-pricing-place>
       <RegionField
         catalog={regionCatalog} locale={locale} value={pick} onChange={setPick} disabled={false}
         idPrefix="pricing-region" label={t(catalog, "billing.checkout.country")}

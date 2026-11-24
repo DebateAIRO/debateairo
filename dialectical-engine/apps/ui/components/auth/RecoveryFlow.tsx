@@ -9,13 +9,18 @@ import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import type { LocaleCode } from '@/lib/i18n/locales';
 import { KnownPasswordRecoveryLink } from '../KnownPasswordRecoveryLink';
 import resetEn from '@/messages/en/password-reset.json';
-import resetRo from '@/messages/ro/password-reset.json';
+import { PASSWORD_RESET_LINK_KEY, useMfaRecoveryCatalog } from '@/components/MfaRecoveryCatalog';
 import { AuthShell } from '../AuthShell';
 import { OnboardingEvidence } from './OnboardingEvidence';
 import { SecurityEnrollment } from './SecurityEnrollment';
 import { clearStoredSupportConversation } from '../support/conversation';
 import { useFormAnnouncer } from './InlineFieldMessage';
 import { useDeadlineWarning, useStepFocus } from './timedStep';
+/** The password-reset link's name in the reader's language, served by the layout of /recover; English when none was served. */
+function PasswordResetLinkText() {
+    const served = useMfaRecoveryCatalog()[PASSWORD_RESET_LINK_KEY];
+    return <>{served ?? t(resetEn, "request.title")}</>;
+}
 export function RecoveryFlow({ catalog, locale, client = contractClient, onAuthenticated = () => window.location.assign(safeReturnPath(new URLSearchParams(window.location.search).get('next'))) }: {
     catalog: MessageCatalog;
     locale: LocaleCode;
@@ -135,7 +140,7 @@ export function RecoveryFlow({ catalog, locale, client = contractClient, onAuthe
         }
     }
     const invalid = (field: 'email' | 'code') => error !== null && errorField === field;
-    return <AuthShell eyebrow={t(catalog, "auth.login.recoveryAccess")} title={t(catalog, "auth.recovery.title")} description={t(catalog, "auth.recovery.description")} focusTitle={moved} footer={!proof&&!token?<p><a href="/reset-password">{t(locale==='ro'?resetRo:resetEn,"request.title")}</a> · <KnownPasswordRecoveryLink/></p>:null}>
+    return <AuthShell eyebrow={t(catalog, "auth.login.recoveryAccess")} title={t(catalog, "auth.recovery.title")} description={t(catalog, "auth.recovery.description")} focusTitle={moved} footer={!proof&&!token?<p><a href="/reset-password"><PasswordResetLinkText/></a> · <KnownPasswordRecoveryLink/></p>:null}>
  {announcer.region}
  {error ? <div className="authAlert" id="recover-error" role="alert">{error}</div> : null}
  {/* Always mounted, so the expiry is announced as a change; focus lands here when the proof runs out. */}

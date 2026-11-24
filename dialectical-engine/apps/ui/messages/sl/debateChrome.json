@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Zasebna razprava",
   "debateChrome.privateDebateDeleted": "Zasebna razprava je izbrisana",
   "debateChrome.privateDebateDeletionProcessing": "Izbris zasebne razprave poteka",
-  "debateChrome.privateDebateDeletedDetail": "Ta razprava je le zapis o izbrisu. Njena šifrirana zasebna vsebina je trajno neberljiva.",
+  "debateChrome.privateDebateDeletedDetail": "Ta razprava je le zapis o izbrisu. Njene šifrirane zasebne vsebine tukaj ni več mogoče prebrati. Naše varnostne kopije jo morda še vedno hranijo (Pravilnik o zasebnosti, razdelek 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Zasebna vsebina ni več na voljo, medtem ko se končuje trajno odstranjevanje ključev.",
   "debateChrome.tree.building": "Gradnja drevesa argumentov …",
   "debateChrome.tree.notProduced": "Za to razpravo ni bilo ustvarjeno nobeno drevo argumentov.",

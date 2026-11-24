@@ -852,6 +852,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
     // One table and five functions, and staff.audit_event's event list widened under one reviewed pair.
+    // Found by name: the passkeys a sign-in after the first step may use (0187) follow it.
     const at = names.indexOf("0186_preview_buyers.sql");
     expect(names.slice(at - 1, at + 1)).toEqual(["0185_release_history.sql", "0186_preview_buyers.sql"]);
     const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
@@ -895,17 +896,70 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "the reader of the release switches (0185, below) the seventy-fifth, and the preview's approved buyers (0186, below) the seventy-sixth");
   });
 
-  it("chains the recovery permit 0188 after 0186 as an expand step that keeps 0130's verifier and amends 0186's event list, and documents it", async () => {
+  it("chains the passkeys a sign-in after the first step may use 0187 after 0186 as an expand step that keeps 0130's verifier, and documents it", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    // One function of the cross-account marker, its owner set by one reviewed DO block. Found by name: the recovery permit (0188) follows it.
+    const at = names.indexOf("0187_passkey_allow_credentials.sql");
+    expect(names.slice(at - 1, at + 1)).toEqual(["0186_preview_buyers.sql", "0187_passkey_allow_credentials.sql"]);
+    const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
+    expect(JSON.parse((await bytesOf("lineage/passkey-allow-credentials-forward0187.json")).toString("utf8"))).toEqual({
+      version: "passkey-allow-credentials-forward0187-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: { name: "0186_preview_buyers.sql", manifestSha256: sha256(await bytesOf("lineage/preview-buyers-forward0186.json")), verifierSha256: previous.verifierSha256 },
+      migration: { name: "0187_passkey_allow_credentials.sql", sha256: sha256(await bytesOf("0187_passkey_allow_credentials.sql")) },
+      verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) },
+      amendsPostconditionsOf: []
+    });
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/passkey-allow-credentials-forward0187.json")));
+    expect(step.previousName).toBe(previous.name);
+    expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+    expect(step.previousVerifierSha256).toBe(previous.verifierSha256);
+    expect(step.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
+    expect(step.replayVerifierSql).toBeUndefined();
+    expect(step.amendsPostconditionsOf ?? []).toEqual([]);
+    // One new function, its owner, its revoke and its one grant; nothing earlier replaced, nothing of billing.
+    const statements = step.sql.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("--")).join("\n");
+    expect(statements.match(/^(?:CREATE|ALTER|REVOKE|GRANT|DROP|INSERT|UPDATE|DELETE|DO)\b.*$/gmu)).toEqual([
+      "CREATE OR REPLACE FUNCTION identity.read_consumer_passkey_allow_credentials(p_handle text,p_binding text) RETURNS jsonb",
+      "DO $passkey_allow_credentials_owner$",
+      "REVOKE ALL ON FUNCTION identity.read_consumer_passkey_allow_credentials(text,text)",
+      "GRANT EXECUTE ON FUNCTION identity.read_consumer_passkey_allow_credentials(text,text) TO debateai_rls_all_accounts;"
+    ]);
+    expect(statements).not.toMatch(/\bbilling\./u);
+    const earlier = (await readdir(MIGRATIONS)).filter((name) => /^\d{4}_.*\.sql$/u.test(name) && name < step.name);
+    for (const name of earlier) expect((await bytesOf(name)).toString("utf8"), name).not.toContain("read_consumer_passkey_allow_credentials");
+    const lines = step.sql.split("\n");
+    const reviewed = lines.findIndex((line) => line.startsWith("-- n1: reviewed "));
+    expect(lines.filter((line) => line.startsWith("-- n1: reviewed "))).toHaveLength(1);
+    expect(lines[reviewed + 1]).toBe("DO $passkey_allow_credentials_owner$");
+    const loader = await readFile(new URL("migration-forward0187.ts", DB_SOURCE), "utf8");
+    expect(loader).toContain('const FUNCTIONS: readonly string[] = ["identity.read_consumer_passkey_allow_credentials(text,text)"];');
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The passkeys a sign-in after the first step may use (0187)"));
+    expect(section.startsWith("## The passkeys a sign-in after the first step may use (0187)")).toBe(true);
+    for (const needle of ["0186", "0187_passkey_allow_credentials.sql", "passkey-allow-credentials-forward0187.json", "packages/db/src/migration-forward0187.ts",
+      "MIGRATION_FORWARD0187_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "verify-effective-capabilities-130.sql", "replayVerifierSql",
+      "previous.manifestSha256", "migration.sha256", "renumber", "identity.read_consumer_passkey_allow_credentials(text,text)",
+      "identity.read_consumer_passkey_credential", "debateai_rls_all_accounts", "X36", "allowCredentials",
+      "tests/integration/consumer-auth-database.test.ts"
+    ]) expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "the preview's approved buyers (0186, below) the seventy-sixth, and the passkeys a sign-in after the first step may use (0187, below) the seventy-seventh");
+  });
+
+  it("chains the recovery permit 0188 after 0187 as an expand step that keeps 0130's verifier and amends 0186's event list, and documents it", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
     // The chain head: four tables and twenty-seven functions, and staff.audit_event's event list widened under one reviewed pair.
-    expect(names.slice(-2)).toEqual(["0186_preview_buyers.sql", "0188_recovery_permit.sql"]);
+    expect(names.slice(-2)).toEqual(["0187_passkey_allow_credentials.sql", "0188_recovery_permit.sql"]);
     const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
     const amends = [{ step: "0186_preview_buyers.sql", relations: ["staff.audit_event"], constraints: ["audit_event_funded_event_type_check"], field: "constraint_definition" }];
     expect(JSON.parse((await bytesOf("lineage/recovery-permit-forward0188.json")).toString("utf8"))).toEqual({
       version: "recovery-permit-forward0188-v1",
       baseRecipeSha256: plan.recipeSha256,
-      previous: { name: "0186_preview_buyers.sql", manifestSha256: sha256(await bytesOf("lineage/preview-buyers-forward0186.json")), verifierSha256: previous.verifierSha256 },
+      previous: { name: "0187_passkey_allow_credentials.sql", manifestSha256: sha256(await bytesOf("lineage/passkey-allow-credentials-forward0187.json")), verifierSha256: previous.verifierSha256 },
       migration: { name: "0188_recovery_permit.sql", sha256: sha256(await bytesOf("0188_recovery_permit.sql")) },
       verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) },
       amendsPostconditionsOf: amends
@@ -933,18 +987,19 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(loader).toContain('[["staff.audit_event", "audit_event_funded_event_type_check"]]');
     // Every earlier event stays allowed: the list is 0186's with this step's two at its end.
     const eventList = (sql: string): string[] => [...sql.slice(sql.lastIndexOf("ADD CONSTRAINT audit_event_funded_event_type_check")).matchAll(/'([A-Z_]+)'/gu)].map((match) => match[1]!);
-    expect(eventList(step.sql)).toEqual([...eventList(previous.sql), "ACCOUNT_RECOVERY_APPROVED", "ACCOUNT_RECOVERY_REFUSED"]);
+    const buyers = plan.forwardChain.find((entry) => entry.name === "0186_preview_buyers.sql")!;
+    expect(eventList(step.sql)).toEqual([...eventList(buyers.sql), "ACCOUNT_RECOVERY_APPROVED", "ACCOUNT_RECOVERY_REFUSED"]);
     const readme = (await bytesOf("lineage/README.md")).toString("utf8");
     const section = readme.slice(readme.indexOf("## The recovery permit (0188)"));
     expect(section.startsWith("## The recovery permit (0188)")).toBe(true);
-    for (const needle of ["0186", "0188_recovery_permit.sql", "recovery-permit-forward0188.json", "packages/db/src/migration-forward0188.ts",
+    for (const needle of ["0186", "0187", "0188_recovery_permit.sql", "recovery-permit-forward0188.json", "packages/db/src/migration-forward0188.ts",
       "MIGRATION_FORWARD0188_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "verify-effective-capabilities-130.sql", "replayVerifierSql",
-      "amendsPostconditionsOf", "previous.manifestSha256", "migration.sha256", "renumber", "0187", "audit_event_funded_event_type_check", "TEAM_GRANT",
+      "amendsPostconditionsOf", "previous.manifestSha256", "migration.sha256", "renumber", "audit_event_funded_event_type_check", "TEAM_GRANT",
       "debateai_billing_runtime", "debateai_mfa_recovery_runtime", "tests/integration/recovery-permit-0188.test.ts",
       ...listed("TABLES"), ...listed("FUNCTIONS")
     ]) expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
-      "the preview's approved buyers (0186, below) the seventy-sixth, and the recovery permit (0188, below) the seventy-seventh");
+      "the passkeys a sign-in after the first step may use (0187, below) the seventy-seventh, and the recovery permit (0188, below) the seventy-eighth");
   });
 
   it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122, 0123, 0124, 0126, 0128 or 0178, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {

@@ -3934,11 +3934,11 @@ true:
 **The Terms archive.** Every published Terms and Privacy version is kept, by its fingerprint, under
 `apps/ui/legal/archive/` (one folder per language). A change to either text is made in English first; before a
 release, every language the release offers (`RELEASE_LEGAL_LOCALES` in `apps/ui/scripts/generate-legal-data.mjs`:
-English, French, which Canada reads at sign-up, and Romanian) is translated from the current English text and recorded
+all 35 languages of the site since 24 November 2026) is translated from the current English text and recorded
 in `apps/ui/legal/translated-from.json`, and `pnpm run generate:legal:archive` adds the file for each current text of
 those languages. `pnpm run legal:release-check`, which step 2 of an upgrade runs before the build, refuses a release
-until both are done and names each of those languages that lags. The other languages' texts stay in the repository
-and are neither checked nor archived.
+until both are done and names each of those languages that lags. A language taken out of that list keeps its text in
+the repository, neither checked nor archived.
 Never delete or edit a file there: each is a version someone accepted, and the confirmation email attaches the
 version the person accepted from there, even after the Terms change. The site lists them at `/terms/versions` and
 `/privacy/versions`, as both documents promise, and shows each one at its own address.

@@ -2,8 +2,8 @@
   "version": "recovery-permit-forward0188-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0186_preview_buyers.sql",
-    "manifestSha256": "d2799bc503055174a18b25f74dbc9039d2e4285ead0e1a2d7cee98b63d125e5c",
+    "name": "0187_passkey_allow_credentials.sql",
+    "manifestSha256": "2368e4218750732cc56a78b7ee4ccd591e166395aa25a11e5e72b3268267197a",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {

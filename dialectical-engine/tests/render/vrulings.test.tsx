@@ -216,7 +216,7 @@ describe("ruling 1: native spellings of the same phrase are accepted (fluency re
 });
 
 describe("ruling 2: the meta description follows the reader's locale", () => {
-  it("returns the catalogue's description for ro, the offered language besides English, and the brand title", async () => {
+  it("returns the catalogue's description for ro, and the brand title", async () => {
     const locale = "ro";
     mocks.locale = locale;
     mocks.overlay = {};
@@ -235,10 +235,24 @@ describe("ruling 2: the meta description follows the reader's locale", () => {
     expect(await generateMetadata()).toEqual({ title: "Dialectical Engine", description: ENGLISH_DESCRIPTION });
   });
 
-  it("gives English metadata for a catalogue language the site does not offer (he, de)", async () => {
+  it("returns the catalogue's description for every other offered language too (he, de), since the site offers all 35", async () => {
     for (const locale of ["he", "de"] as const) {
       mocks.locale = locale;
+      mocks.overlay = {};
+      const description = catalogValue(locale, "chrome", "chrome.metaDescription");
+      // Each language's catalogue carries its own translated sentence, not the English one.
+      expect(description).not.toBe(ENGLISH_DESCRIPTION);
+      expect(await generateMetadata()).toEqual({ title: "Dialectical Engine", description });
+      // A value the layout could not invent proves the description is read from the locale's catalogue.
       mocks.overlay = { [`${locale}/chrome`]: { "chrome.metaDescription": `${locale.toUpperCase()}_META_SENTINEL` } };
+      expect((await generateMetadata()).description).toBe(`${locale.toUpperCase()}_META_SENTINEL`);
+    }
+  });
+
+  it("gives English metadata for a cookie naming no offered language (xx, en-AU)", async () => {
+    for (const locale of ["xx", "en-AU"] as const) {
+      mocks.locale = locale;
+      mocks.overlay = { [`${locale}/chrome`]: { "chrome.metaDescription": "UNOFFERED_META_SENTINEL" } };
       expect(await generateMetadata()).toEqual({ title: "Dialectical Engine", description: ENGLISH_DESCRIPTION });
     }
   });

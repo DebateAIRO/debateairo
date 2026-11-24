@@ -36,21 +36,23 @@ const CODES = LOCALES.map(({ code }) => code).sort();
 const KINDS = ["PRIVACY", "TERMS"] as const;
 const current = englishVersionAndDay(readDraft("en", "PRIVACY"));
 const currentOf = (kind: "PRIVACY" | "TERMS") => englishVersionAndDay(readDraft("en", kind));
-/**
- * The record of translations once French and Romanian follow the current English texts, as they must before an upload
- * re-dates them. The plan reads only the record, not the translations' words.
- */
+/** Every language but English: the translations, all of which the release offers. */
+const TRANSLATED = CODES.filter((code) => code !== "en");
 /** A copy this file may write to: the record's and the manifest's own types are read-only. */
 type Writable<T> = { -readonly [K in keyof T]: Writable<T[K]> };
+/**
+ * The record of translations once every translation follows the current English texts, as it must before an upload
+ * re-dates them. The plan reads only the record, not the translations' words.
+ */
 const caughtUp = (): Writable<LegalTranslations> => {
   const record = structuredClone(translations()) as Writable<LegalTranslations>;
   for (const kind of KINDS) {
-    for (const code of ["fr", "ro"]) record[kind][code] = { version: currentOf(kind).version, sha256: sha(readDraft("en", kind)) };
+    for (const code of TRANSLATED) record[kind][code] = { version: currentOf(kind).version, sha256: sha(readDraft("en", kind)) };
   }
   return record;
 };
-/** Whether French and Romanian follow the current English texts in the repository as it is. */
-const translationsFollow = KINDS.every((kind) => ["fr", "ro"].every((code) => translations()[kind][code]?.sha256 === sha(readDraft("en", kind))));
+/** Whether every translation follows the current English texts in the repository as it is. */
+const translationsFollow = KINDS.every((kind) => TRANSLATED.every((code) => translations()[kind][code]?.sha256 === sha(readDraft("en", kind))));
 const dayAfter = (day: { year: number; month: number; day: number }, days: number) => {
   const date = new Date(Date.UTC(day.year, day.month - 1, day.day + days));
   return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() };
@@ -123,10 +125,9 @@ describe("the plan on the drafts as they are", () => {
       const kind = draft.path.endsWith(DRAFT.PRIVACY) ? "PRIVACY" : "TERMS";
       const before = currentOf(kind);
       expect(draft.lines.map((line) => line.before.slice(0, 9)).slice(0, 2), draft.path).toEqual(["eyebrow: ", "**Version"]);
-      // The Privacy Policy's last-updated sentence changes too where it gives the day: English, and each translation
-      // made from the current English text.
-      const lastUpdated = kind === "PRIVACY" && readDraft(code, kind).includes(`${legalDayText(code, before.day, "line")}.`)
-        && (code === "en" || ["fr", "ro"].includes(code));
+      // The Privacy Policy's last-updated sentence changes too where it gives the day: every translation is recorded as
+      // made from the current English text here, but only a text whose body was translated from it carries its day.
+      const lastUpdated = kind === "PRIVACY" && readDraft(code, kind).includes(`${legalDayText(code, before.day, "line")}.`);
       expect(draft.lines, draft.path).toHaveLength(lastUpdated ? 3 : 2);
       if (lastUpdated) {
         expect(draft.lines[2]!.before).toContain(legalDayText(code, before.day, "line"));
@@ -136,7 +137,7 @@ describe("the plan on the drafts as they are", () => {
       expect(draft.after).toContain(legalDayText(code, next, "eyebrow"));
       expect(draft.after.split("\n").length).toBe(readFileSync(resolve(root, draft.path), "utf8").split("\n").length);
     }
-    for (const kind of KINDS) expect(result.retranslate[kind], kind).toEqual(dated.includes(kind) ? ["fr", "ro"] : []);
+    for (const kind of KINDS) expect(result.retranslate[kind], kind).toEqual(dated.includes(kind) ? TRANSLATED : []);
   });
 
   it("removes the archive copies of the current version only; the copies of older versions are never touched or asked about", () => {
@@ -147,6 +148,12 @@ describe("the plan on the drafts as they are", () => {
       .flatMap(([, entries]) => Object.values(entries).filter((entry) => entry.version === currentOf(kind).version).map((entry) => entry.path)));
     expect(result.archiveRemovals.map((removal) => removal.path).sort()).toEqual([...currentCopies].sort());
     expect(asked.sort()).toEqual([...currentCopies].sort());
+    // The launch texts (1.0) are English, French and Romanian only; the other 32 languages were first released at 1.1.
+    for (const kind of KINDS) {
+      const launch = Object.entries(archive[kind]).filter(([, entries]) => Object.values(entries).some((entry) => entry.version === "1.0"));
+      expect(launch.map(([code]) => code).sort(), kind).toEqual(["en", "fr", "ro"]);
+      for (const [, entries] of launch) for (const entry of Object.values(entries)) if (entry.version === "1.0") expect(asked, entry.path).not.toContain(entry.path);
+    }
   });
 
   it("changes nothing for the day the Privacy Policy already carries while the Terms' current version is released", () => {
@@ -285,8 +292,9 @@ describe("the command on a copy of the legal files", () => {
     for (const kind of KINDS) {
       const { version } = currentOf(kind);
       const english = readFileSync(join(copy, "apps/ui/legal/en", DRAFT[kind]), "utf8");
-      for (const code of ["fr", "ro"]) expect(record[kind][code], `${kind} ${code}`).toEqual({ version, sha256: sha(english) });
-      for (const code of ["en", "fr", "ro"]) {
+      // Every translation is recorded again as following the re-dated English text, and every language's text is archived again.
+      for (const code of TRANSLATED) expect(record[kind][code], `${kind} ${code}`).toEqual({ version, sha256: sha(english) });
+      for (const code of CODES) {
         const text = readFileSync(join(copy, "apps/ui/legal", code, DRAFT[kind]), "utf8");
         expect(after.archive[kind][code]![sha(text)], `${kind} ${code}`).toEqual({ version, path: `apps/ui/legal/archive/${code}/${sha(text)}.md` });
         expect(readFileSync(join(copy, `apps/ui/legal/archive/${code}/${sha(text)}.md`), "utf8")).toBe(text);
