@@ -6669,6 +6669,12 @@ a:focus-visible {
 .lpMotifRule { width: 34px; height: 1px; background: var(--line-strong); }
 .lpClosingLede { margin: 36px auto 0; max-width: 46ch; font-size: 18px; line-height: 1.65; color: var(--muted); }
 .lpPricing { margin: 30px 0 0; font-size: 13px; color: var(--muted); }
+/* The plans between the closing lede and its CTA: the pricing page's own cards and place form (billing.css), set
+   left-aligned in the centred closing, at the pricing page's column width. The place form sends the visitor back
+   here (#plans). */
+.lpPlans { max-width: 1084px; margin: 56px auto 0; text-align: start; line-height: normal; scroll-margin-top: 24px; }
+.lpPlans .pricingPlace { margin-top: 0; }
+.lpPlans .pricingGrid + .pricingNote { text-align: center; }
 
 @media (prefers-reduced-motion: reduce) {
   .lpCta, .lpCtaGhost, .lpCard { transition: none; }

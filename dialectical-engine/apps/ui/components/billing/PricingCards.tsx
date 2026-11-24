@@ -30,12 +30,16 @@ export function PricingCards({
   currency,
   place,
   tax,
-  plans
+  plans,
+  headingLevel = 2
 }: Readonly<{
   catalog?: MessageCatalog; locale: string; currency: BillingCurrency; place: BillingPlansPlace;
   tax: BillingPlansTax | null; plans: readonly PricingPlan[];
+  /** The level of a card's plan name: 2 on the pricing page, 3 on the landing, whose closing title is the level 2. */
+  headingLevel?: 2 | 3;
 }>): JSX.Element {
   const priced = pricedTax({ place, tax });
+  const PlanHeading = headingLevel === 3 ? "h3" : "h2";
   return (
     <div className="pricingGrid" data-pricing-cards>
       {plans.map((plan) => {
@@ -49,7 +53,7 @@ export function PricingCards({
             data-plan={plan.plan_id}
             aria-labelledby={`pricing-plan-${plan.plan_id}`}
           >
-            <h2 id={`pricing-plan-${plan.plan_id}`}>{name}</h2>
+            <PlanHeading id={`pricing-plan-${plan.plan_id}`}>{name}</PlanHeading>
             {free || total !== null ? (
               <p className="pricingPrice">
                 {t(catalog, "billing.pricing.perMonth", {
