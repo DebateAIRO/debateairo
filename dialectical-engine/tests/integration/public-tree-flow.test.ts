@@ -1530,6 +1530,23 @@ describe("a Free debate goes public only when the end-of-debate check allows it"
     expect(sweep.modelCalls).toEqual([]);
   });
 
+  it("twenty older debates waiting for an approval do not hold back a newer one the checks allow: the sweep reads past them", async () => {
+    const owner = await account();
+    const flagged: FreeDebate[] = [];
+    for (let made = 0; made < 20; made += 1) {
+      const debate = await finished(owner);
+      await verdict(debate, 1, ["HATE_SPEECH"]);
+      flagged.push(debate);
+    }
+    const clear = await finished(owner);
+    await verdict(clear, 1, []);
+    const sweep = freeSweep({ flags: null });
+    await sweep.pass(...flagged, clear);
+    expect(flagged.map((debate) => sweep.outcomeOf(debate))).toEqual(flagged.map(() => "WAITING_FOR_APPROVAL"));
+    expect(sweep.outcomeOf(clear)).toBe("PUBLISHED");
+    expect(await isPublic(clear)).toBe(true);
+  }, 60_000);
+
   it("one the check asks to delete is never published, and its deletion goes ahead", async () => {
     const debate = await finished(await account());
     await verdict(debate, 1, ["SUICIDE_OR_HARM_TO_OTHERS"]);
