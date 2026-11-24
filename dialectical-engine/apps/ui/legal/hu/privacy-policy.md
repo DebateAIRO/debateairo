@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: ADATVÉDELMI SZABÁLYZAT · v1.1 · HATÁLYOS 2026. NOVEMBER 24.
+eyebrow: ADATVÉDELMI SZABÁLYZAT · v1.2 · HATÁLYOS 2026. NOVEMBER 26.
 title: Mit tárolunk és miért
 lede: Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.
-endMarker: A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v1.1
+endMarker: A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v1.2
 bodyLabel: Az Adatvédelmi szabályzat szövege
 annexTitle: B. melléklet — Regionális adatvédelmi feltételek
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SÜTIK
 -->
 
-**Version 1.1 · Effective 2026. november 24. · Korábbi változatok: dezbatere.ro/privacy/versions · Adatkezelő: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 2026. november 26. · Korábbi változatok: dezbatere.ro/privacy/versions · Adatkezelő: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Gyűjtjük a fiók működéséhez szükséges adatokat és azt, amit Ön a vitáiba beír. Amit a támogatási asszisztensnek ír, az az MI-modelljéhez jut el, hogy válaszolhasson Önnek, és ebből semmit nem őrzünk meg. Kérdéseit a Nyilvántartásunkban felsorolt MI-szolgáltatókhoz továbbítjuk, főként az Egyesült Államokban működő DeepInfra szolgáltatóhoz. A DeepInfra, az Anthropic és az Amazon feltételei nem engedik meg nekik, hogy az Ön által beírtakon modelleket tanítsanak be. A webes keresési szolgáltató csak a modellek által megfogalmazott rövid keresőkifejezéseket kapja meg (5. szakasz). Tárhelyszolgáltatónk az Ön fiókját és vitáit Londonban, az Egyesült Királyságban tárolja; hogy adatai még hová jutnak, azt az 5. szakasz mondja el. Az ingyenes csomagon a viták befejezésük után, MI-ellenőrzést követően nyilvánosak; fizetős csomagon privátak, amíg Ön közzé nem teszi őket. Fiókja törlése megsemmisíti privát adatainak kulcsait az élő szolgáltatásban, de biztonsági mentéseinket nem törli, és ezek egy része tartalmazza ezeket a kulcsokat (7. szakasz); a nyilvános viták nyilvánosak maradnak, de belőlük eltávolítjuk az Ön álnevét. A privacy@dezbatere.ro címen érhet el bennünket, a vitában megnevezett személyek pedig fiók nélkül is írhatnak nekünk.
 

@@ -89,7 +89,7 @@ describe("legal documents — generated data", () => {
   describe("Terms of Service", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(TERMS_OF_SERVICE.key).toBe("terms");
-      expect(TERMS_OF_SERVICE.eyebrow).toBe(`TERMS OF SERVICE · v1.1 · EFFECTIVE ${legalEffectiveDay().toUpperCase()}`);
+      expect(TERMS_OF_SERVICE.eyebrow).toBe(`TERMS OF SERVICE · v1.1 · EFFECTIVE ${legalEffectiveDay("TERMS").toUpperCase()}`);
       expect(TERMS_OF_SERVICE.title).toBe("What you agree to");
       expect(TERMS_OF_SERVICE.lede).toBe(
         "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end."
@@ -486,12 +486,12 @@ describe("legal documents — generated data", () => {
   describe("Privacy Policy", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(PRIVACY_POLICY.key).toBe("privacy");
-      expect(PRIVACY_POLICY.eyebrow).toBe(`PRIVACY POLICY · v1.1 · EFFECTIVE ${legalEffectiveDay().toUpperCase()}`);
+      expect(PRIVACY_POLICY.eyebrow).toBe(`PRIVACY POLICY · v1.2 · EFFECTIVE ${legalEffectiveDay("PRIVACY").toUpperCase()}`);
       expect(PRIVACY_POLICY.title).toBe("What we store, and why");
       expect(PRIVACY_POLICY.lede).toBe(
         "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end."
       );
-      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v1.1");
+      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v1.2");
       expect(PRIVACY_POLICY.contact).toBe("privacy@dezbatere.ro");
       expect(PRIVACY_POLICY.bodyLabel).toBe("Privacy Policy text");
       expect(PRIVACY_POLICY.sectionIdPrefix).toBe("policy-section-");
@@ -522,18 +522,20 @@ describe("legal documents — generated data", () => {
 
     // V, 2026-10-28: the "Refused questions we keep" row went with the keeping, leaving thirteen; R22 item 15
     // (2026-10-29) adds "Page settings and visits" after "Debate content": fourteen. Privacy 3.12 (plan Task 83c) adds
-    // "Questions not started yet" after "Page settings and visits": sixteen.
-    it("turns the collection table into sixteen rows joined with em dashes", () => {
+    // "Questions not started yet" after "Page settings and visits": sixteen. The moderation notices make seventeen, and
+    // the requests for help getting back into an account, after the security audit trail, eighteen.
+    it("turns the collection table into eighteen rows joined with em dashes", () => {
       const collect = section(PRIVACY_POLICY, "02");
       expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p", "p", "p"]);
       const table = collect.blocks[1]!;
       if (table.kind !== "list") throw new Error("unreachable");
       // 0157: the moderation notices row.
-      expect(table.items).toHaveLength(17);
-      expect(table.items[9]!.startsWith("Questions not started yet — When you press Next, agree that the AIs may read your question")).toBe(true);
+      expect(table.items).toHaveLength(18);
+      expect(table.items[6]!.startsWith("Requests for help getting back into your account — If you lose your passkey or authenticator app")).toBe(true);
+      expect(table.items[10]!.startsWith("Questions not started yet — When you press Next, agree that the AIs may read your question")).toBe(true);
       expect(table.items.some((item) => item.startsWith("Moderation notices — "))).toBe(true);
       expect(table.items.some((item) => /refused questions/i.test(item))).toBe(false);
-      expect(table.items[8]!.startsWith("Page settings and visits — The reading level you choose on the debate pages;")).toBe(true);
+      expect(table.items[9]!.startsWith("Page settings and visits — The reading level you choose on the debate pages;")).toBe(true);
       expect(table.items[0]!.startsWith("Account — Email address and recovery email address")).toBe(true);
       expect(table.items[0]!.endsWith("— You, at registration and in Settings; Google, Apple or X, if you sign in with one of them")).toBe(true);
     });

@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { awaitsTranslation } from "../support/mailKeysAwaitingTranslation.js";
 
 /**
  * S01 C01.8 (SPEC-v3 R-28, Appendix B A-2): the key-level walk over the 115 auth.* copy keys of
@@ -22,7 +23,8 @@ const CODES = readdirSync(MESSAGES, { withFileTypes: true })
   .sort();
 
 const EN = catalogueOf("en");
-const AUTH_KEYS = Object.keys(EN).filter((key) => key.startsWith("auth.")).sort();
+// Keys written in English first (tests/support/mailKeysAwaitingTranslation.ts) are walked by mail-locale-copy-parity.test.ts until they are translated.
+const AUTH_KEYS = Object.keys(EN).filter((key) => key.startsWith("auth.") && !awaitsTranslation(key)).sort();
 const englishOf = (key: string): string => String(EN[key]);
 
 const R29 = ["Dialectical Engine", "DebateAI", "dezbatere.ro", "PLUS", "PRO", "MAX"] as const;

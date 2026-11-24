@@ -70,6 +70,12 @@ tests/integration/staff-rekey-permit.test.ts
 # the grants and the erasure on real Postgres; and the four Owner routes over HTTP on fake data ports.
 tests/integration/preview-buyers-0186.test.ts
 tests/integration/preview-buyers-http.test.ts
+# 0188: the Owner's permit for a locked-out account: the mailbox link and the password before any request, only the Owner with a proof
+# bound to that request, the daily limit, the 72 hours, what ends a permit, the finish link's uses, the grants and the erasure on real
+# Postgres; the person's routes end to end with the real mail worker; and the Owner's three routes over HTTP.
+tests/integration/recovery-permit-0188.test.ts
+tests/integration/recovery-permit-journey.test.ts
+tests/integration/recovery-permits-http.test.ts
 tests/integration/owner-one-key.test.ts
 # Spawns one tsx child under a 5 s commit deadline (kill-ceremony case): the only timing-bounded case on this list.
 tests/integration/owner-bootstrap-recovery.test.ts

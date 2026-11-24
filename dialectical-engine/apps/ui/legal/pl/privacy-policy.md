@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: POLITYKA PRYWATNOŚCI · v1.1 · OBOWIĄZUJE OD 24 LISTOPADA 2026
+eyebrow: POLITYKA PRYWATNOŚCI · v1.2 · OBOWIĄZUJE OD 26 LISTOPADA 2026
 title: Co przechowujemy i dlaczego
 lede: Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.
-endMarker: KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v1.1
+endMarker: KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v1.2
 bodyLabel: Tekst Polityki prywatności
 annexTitle: Załącznik B — Regionalne warunki prywatności
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 PLIKI COOKIE
 -->
 
-**Version 1.1 · Effective 24 listopada 2026 · Poprzednie wersje na dezbatere.ro/privacy/versions · Administrator: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 26 listopada 2026 · Poprzednie wersje na dezbatere.ro/privacy/versions · Administrator: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Gromadzimy dane potrzebne do działania konta oraz treści, które wpisujesz w swoich debatach. To, co piszesz do asystenta wsparcia, trafia do jego modelu AI, aby mógł Ci odpowiedzieć, i niczego z tego nie przechowujemy. Twoje pytania trafiają do dostawców AI wymienionych w naszym Rejestrze, głównie do DeepInfra, w Stanach Zjednoczonych. Warunki DeepInfra, Anthropic i Amazon nie pozwalają im trenować modeli na tym, co piszesz. Dostawca wyszukiwania w internecie otrzymuje wyłącznie krótkie frazy wyszukiwania, które piszą modele (sekcja 5). Nasz dostawca hostingu przechowuje Twoje konto i Twoje debaty w Londynie, w Zjednoczonym Królestwie; sekcja 5 wskazuje, dokąd jeszcze trafiają Twoje dane. W planie bezpłatnym debaty stają się publiczne po zakończeniu, po sprawdzeniu przez AI; w płatnym planie są prywatne, chyba że je opublikujesz. Usunięcie konta niszczy klucze do Twoich prywatnych danych w działającej usłudze, ale nie usuwa naszych kopii zapasowych, a niektóre z nich zawierają te klucze (sekcja 7); publiczne debaty pozostają publiczne, a Twój pseudonim zostaje z nich usunięty. Możesz skontaktować się z nami pod adresem privacy@dezbatere.ro, a osoby wymienione w debacie mogą napisać do nas bez posiadania konta.
 

@@ -43,6 +43,12 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   // Owner ruling 2026-10-09: the emailed finish link after the 24-hour wait.
   { route: "POST /v1/auth/mfa-recovery/finish/status", auth: "public", origin: "trusted", resource: "identity", action: "read-mfa-recovery-finish" },
   { route: "POST /v1/auth/mfa-recovery/finish", auth: "public", origin: "trusted", resource: "identity", action: "finish-mfa-recovery" },
+  // 0188: the person's side of the Owner's permit for a locked-out account; each call carries its own emailed link.
+  { route: "POST /v1/auth/recovery-permit/start", auth: "public", origin: "trusted", resource: "identity", action: "start-recovery-permit" },
+  { route: "POST /v1/auth/recovery-permit/request", auth: "public", origin: "trusted", resource: "identity", action: "request-recovery-permit" },
+  { route: "POST /v1/auth/recovery-permit/cancel", auth: "public", origin: "trusted", resource: "identity", action: "cancel-recovery-permit" },
+  { route: "POST /v1/auth/recovery-permit/finish/status", auth: "public", origin: "trusted", resource: "identity", action: "read-recovery-permit-finish" },
+  { route: "POST /v1/auth/recovery-permit/finish", auth: "public", origin: "trusted", resource: "identity", action: "finish-recovery-permit" },
 
   // Approved account-flow capabilities: exact authority and Origin classes, independent of declaration order.
   ...['begin','status','passkey-options','complete'].map((step,index)=>({route:index===0?'POST /v1/account/social/{provider}/step-up/begin':`POST /v1/account/social/step-up/${step}`,auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'})),
@@ -227,6 +233,10 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/admin/preview-buyers/find", auth: "staff", resource: "staff-team", action: "preview-buyers-find" },
   { route: "POST /v1/admin/preview-buyers", auth: "staff", resource: "staff-team", action: "preview-buyers-add" },
   { route: "DELETE /v1/admin/preview-buyers/{ref}", auth: "staff", resource: "staff-team", action: "preview-buyers-remove" },
+  // 0188: the Owner's permit for a locked-out account, the Owner's alone; each handler asks TEAM_GRANT and the owner designation itself.
+  { route: "GET /v1/admin/recovery-permits", auth: "staff", resource: "staff-team", action: "recovery-permits-read" },
+  { route: "POST /v1/admin/recovery-permits/{ref}/approve", auth: "staff", resource: "staff-team", action: "recovery-permits-approve" },
+  { route: "POST /v1/admin/recovery-permits/{ref}/refuse", auth: "staff", resource: "staff-team", action: "recovery-permits-refuse" },
   // R22 decision 32 (0146): the Owner's allowance for a member.
   { route: "GET /v1/admin/team-allowances", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-team", action: "allowance-read" },
   { route: "POST /v1/admin/team-allowances/{staffId}", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-team", action: "allowance-give" },
@@ -368,7 +378,7 @@ describe("S7 deny-by-default authorization", () => {
     expect(new Set(contractInventory.routes).size).toBe(contractInventory.routes.length);
     expect(new Set(governed).size).toBe(governed.length);
     expect(new Set(governed)).toEqual(new Set(contractInventory.routes));
-    const api = buildApi({application: fixtureApplication(), sessions: testSessionApplication([USER_IDENTITY]), allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2, passwordReset:{} as never,backupEmail:{} as never,mfaRecovery:{} as never,consumerRecovery:{} as never,onboardingEvidence:{} as never,consumerSecurity:{} as never,consumerWebAuthn:{} as never, registration: {} as never, recovery: {} as never, mfa: {} as never, support: {} as never, evaluatorDevMenu: {} as never, evaluatorDevMenuRegisterVersion: 1});
+    const api = buildApi({application: fixtureApplication(), sessions: testSessionApplication([USER_IDENTITY]), allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2, passwordReset:{} as never,backupEmail:{} as never,mfaRecovery:{} as never,recoveryPermit:{} as never,consumerRecovery:{} as never,onboardingEvidence:{} as never,consumerSecurity:{} as never,consumerWebAuthn:{} as never, registration: {} as never, recovery: {} as never, mfa: {} as never, support: {} as never, evaluatorDevMenu: {} as never, evaluatorDevMenuRegisterVersion: 1});
     await api.ready();
     for (const route of contractInventory.routes) {
       const [method, path] = route.split(" ");
@@ -378,11 +388,11 @@ describe("S7 deny-by-default authorization", () => {
     // The WHOLE inventory, staff rows included, row for row (no route family is filtered out).
     const order=(a:{route:string},b:{route:string})=>a.route<b.route?-1:a.route>b.route?1:0;
     expect([...authorizationPolicyInventory].sort(order)).toEqual([...EXPECTED_AUTHORIZATION_MATRIX].sort(order));
-    // 37 staff contract routes (five of them the team limit's, four decision 33's public review, two decision 35's report queue, four
-    // 0186's approved buyers of the preview; the four threat-report routes went with the threat reports, 2026-11-19) + the two
-    // internal-allowance routes + decision 32's three (the Owner's allowance for a member).
-    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(42);
-    expect(staffContractInventory.routes).toHaveLength(37);
+    // 40 staff contract routes (five of them the team limit's, four decision 33's public review, two decision 35's report queue, four
+    // 0186's approved buyers of the preview, three 0188's asks to get back into an account; the four threat-report routes went with the
+    // threat reports, 2026-11-19) + the two internal-allowance routes + decision 32's three (the Owner's allowance for a member).
+    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(45);
+    expect(staffContractInventory.routes).toHaveLength(40);
     // The merged closed inventory adds the twenty-one external recovery routes to the current ordinary inventory and 20 staff/internal
     // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
     // GET /v1/billing/subscription/card, the auth DB batch's four MFA-recovery wait routes, beside dev's 158, and
@@ -405,8 +415,8 @@ describe("S7 deny-by-default authorization", () => {
     // The verify that also sets the password (POST /v1/auth/verify-email/password) adds one: 212.
     // The threat reports' four staff routes were removed (2026-11-19): 208.
     // 0186 adds the four staff routes of the preview's approved buyers (GET, POST and POST …/find on /v1/admin/preview-buyers,
-    // DELETE …/{ref}): 212.
-    expect(contractInventory.routes).toHaveLength(212);
+    // DELETE …/{ref}): 212. 0188 adds the five person routes of the Owner's permit for a locked-out account and the Owner's three: 220.
+    expect(contractInventory.routes).toHaveLength(220);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 
@@ -418,6 +428,7 @@ describe("S7 deny-by-default authorization", () => {
       passwordReset: {} as never,
       backupEmail: {} as never,
       mfaRecovery: {} as never,
+      recoveryPermit: {} as never,
       recovery: {} as never,
       mfa: {} as never,
       sessions: {} as never,

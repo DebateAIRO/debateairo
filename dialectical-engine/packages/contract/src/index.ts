@@ -1,5 +1,5 @@
 import { passwordResetEndpointContracts, passwordResetContractSchemas } from "./password-reset.js";
-import { mfaRecoveryEndpointContracts, backupEmailEndpointContracts, mfaRecoveryContractSchemas } from "./mfa-recovery.js";
+import { mfaRecoveryEndpointContracts, backupEmailEndpointContracts, mfaRecoveryContractSchemas, recoveryPermitEndpointContracts, recoveryPermitContractSchemas } from "./mfa-recovery.js";
 export * from "./password-reset.js";
 export * from "./mfa-recovery.js";
 import { socialAuthContractSchemas } from './social-auth.js';
@@ -2051,6 +2051,7 @@ export const contractInventory = Object.freeze({
   routes: Object.freeze([
     ...Object.keys(passwordResetEndpointContracts),
     ...Object.keys(mfaRecoveryEndpointContracts),
+    ...Object.keys(recoveryPermitEndpointContracts),
     ...Object.keys(backupEmailEndpointContracts),
     ...staffContractInventory.routes,
     ...fundedStaffContractInventory.routes,
@@ -2222,6 +2223,7 @@ export const contractInventory = Object.freeze({
   resources: Object.freeze({
     ...passwordResetContractSchemas,
     ...mfaRecoveryContractSchemas,
+    ...recoveryPermitContractSchemas,
     ...consumerAuthContractSchemas,
     ...socialAuthContractSchemas,
     ...staffContractInventory.resources,

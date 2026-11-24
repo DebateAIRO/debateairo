@@ -1735,13 +1735,15 @@ export type TokenKind = "session" | "csrf" | "login-challenge" | "step-up-grant"
   | "email-change-confirm" | "email-change-cancel" | "recovery-email-confirm" | "consumer-recovery-channel" | "consumer-recovery-enroll"
   | "password-reset-link" | "password-reset-cancel" | "password-reset-session" | "password-reset-csrf" | "backup-email-link" | "mfa-recovery-link" | "mfa-recovery-cancel" | "mfa-recovery-session" | "mfa-recovery-csrf"
   // Owner ruling 2026-10-09: the emailed link that finishes an authenticator recovery after its 24-hour wait.
-  | "mfa-recovery-finish";
+  | "mfa-recovery-finish"
+  // The Owner's permit for a locked-out account (0188): the mailbox link, the cancel link every mail carries, and the finish link after the 72 hours.
+  | "recovery-permit-link" | "recovery-permit-cancel" | "recovery-permit-finish";
 
 const TOKEN_KINDS: ReadonlySet<string> = new Set<TokenKind>([
   "session", "csrf", "login-challenge", "step-up-grant", "verification",
   "support-session", "support-case", "data-export-link", "email-change-confirm", "email-change-cancel", "recovery-email-confirm", "consumer-recovery-channel", "consumer-recovery-enroll",
   "password-reset-link", "password-reset-cancel", "password-reset-session", "password-reset-csrf", "backup-email-link", "mfa-recovery-link", "mfa-recovery-cancel", "mfa-recovery-session", "mfa-recovery-csrf",
-  "mfa-recovery-finish"
+  "mfa-recovery-finish", "recovery-permit-link", "recovery-permit-cancel", "recovery-permit-finish"
 ]);
 
 /**

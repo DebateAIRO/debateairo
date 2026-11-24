@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En bref
-eyebrow: POLITIQUE DE CONFIDENTIALITÉ · v1.1 · EN VIGUEUR LE 24 NOVEMBRE 2026
+eyebrow: POLITIQUE DE CONFIDENTIALITÉ · v1.2 · EN VIGUEUR LE 26 NOVEMBRE 2026
 title: Ce que nous conservons, et pourquoi
 lede: Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.
-endMarker: FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v1.1
+endMarker: FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v1.2
 bodyLabel: Texte de la Politique de confidentialité
 annexTitle: Annexe B — Dispositions régionales relatives à la confidentialité
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 1.1 · Effective 24 novembre 2026 · Versions antérieures sur dezbatere.ro/privacy/versions · Responsable du traitement : DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 26 novembre 2026 · Versions antérieures sur dezbatere.ro/privacy/versions · Responsable du traitement : DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Nous collectons ce dont un compte a besoin et ce que vous saisissez dans vos débats. Ce que vous écrivez à l'assistant d'aide est envoyé à son modèle d'IA pour qu'il puisse vous répondre, et nous n'en conservons rien. Vos questions sont transmises aux fournisseurs d'IA répertoriés dans notre Registre, principalement DeepInfra, aux États-Unis. Les conditions de DeepInfra, d'Anthropic et d'Amazon ne leur permettent pas d'entraîner des modèles sur ce que vous écrivez. Le fournisseur de recherche sur le web ne reçoit que les courtes expressions de recherche que rédigent les modèles (section 5). Notre fournisseur d'hébergement stocke votre compte et vos débats à Londres, au Royaume-Uni ; la section 5 précise où vos données sont envoyées par ailleurs. Sur la formule gratuite, les débats deviennent publics une fois terminés, après une vérification par IA ; sur une formule payante, ils restent privés, sauf si vous les publiez. La suppression de votre compte détruit les clés de vos données privées dans le service en exploitation, mais elle ne supprime pas nos sauvegardes, dont certaines contiennent ces clés (section 7) ; les débats publics restent publics, et votre pseudonyme en est retiré. Vous pouvez nous contacter à l'adresse privacy@dezbatere.ro, et les personnes nommées dans un débat peuvent nous écrire sans avoir de compte.
 

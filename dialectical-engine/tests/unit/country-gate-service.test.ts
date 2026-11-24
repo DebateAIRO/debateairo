@@ -154,6 +154,7 @@ describe("the country gate in front of sign-in", () => {
       recovery: recordingService(calls, "recovery"),
       passwordReset: recordingService(calls, "passwordReset"),
       mfaRecovery: recordingService(calls, "mfaRecovery"),
+      recoveryPermit: recordingService(calls, "recoveryPermit"),
       mfa: recordingService(calls, "mfa"),
       ...(gate === undefined ? {} : { countryGate: gate })
     });
@@ -175,6 +176,10 @@ describe("the country gate in front of sign-in", () => {
     "/v1/auth/password-reset/complete",
     "/v1/auth/mfa-recovery/start",
     "/v1/auth/mfa-recovery/exchange",
+    // The Owner's permit for a locked-out account: its start, its request and its finish each lead to a new sign-in.
+    "/v1/auth/recovery-permit/start",
+    "/v1/auth/recovery-permit/request",
+    "/v1/auth/recovery-permit/finish",
     // Onboarding with no session held ends in a new one: a sign-in door too.
     "/v1/auth/mfa/totp/begin",
     "/v1/auth/mfa/totp/verify",
@@ -252,7 +257,7 @@ describe("the country gate in front of sign-in", () => {
 
   it("never gates the cancel links, or a session already held", async () => {
     const { api } = signInApi(countryGate().gate);
-    for (const url of ["/v1/auth/password-reset/cancel", "/v1/auth/mfa-recovery/cancel", "/v1/auth/logout"]) {
+    for (const url of ["/v1/auth/password-reset/cancel", "/v1/auth/mfa-recovery/cancel", "/v1/auth/recovery-permit/cancel", "/v1/auth/logout"]) {
       const response = await api.inject({
         method: "POST", url, remoteAddress: "5.45.1.1", headers: { origin: TEST_APP_ORIGIN }, payload: {}
       });
