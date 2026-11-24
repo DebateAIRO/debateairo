@@ -2200,8 +2200,8 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "staff.read_audit_page(jsonb,text,integer,timestamp with time zone,uuid)", "staff.read_issued_invitation(jsonb,text,uuid)",
     // 0186: 0150's audit page beside itself, and the Owner's list of the preview's approved buyers, both behind a staff privilege token.
     "staff.read_audit_page_v2(jsonb,text,integer,timestamp with time zone,uuid)", "staff.read_preview_buyers(jsonb,text)",
-    // 0188: 0186's audit page beside itself, and the Owner's list of asks to get back into an account, both behind a staff privilege token.
-    "staff.read_audit_page_v3(jsonb,text,integer,timestamp with time zone,uuid)", "staff.read_recovery_permits(jsonb,text)",
+    // 0188: the Owner's list of asks to get back into an account, behind a staff privilege token.
+    "staff.read_recovery_permits(jsonb,text)",
     "staff.read_member_allowance_command(jsonb,text,uuid,uuid)", "staff.read_member_allowance_page(jsonb,text)",
     "staff.read_mutation_target(jsonb,text,uuid,text)", "staff.read_public_flag_queue(jsonb,text)", "staff.read_public_flag_queue_answered(jsonb,text)",
     "staff.read_public_review(jsonb,text,uuid)",

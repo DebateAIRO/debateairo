@@ -69,10 +69,8 @@ describe("0186's event list and numbers", () => {
     const before = eventList(await sqlOf("migrations/0150_public_review.sql")), after = eventList(await sqlOf(SQL_PATH));
     expect(after).toEqual([...before, "PREVIEW_BUYER_ADDED", "PREVIEW_BUYER_REMOVED"]);
   });
-  it("the API's alert sender and the database package know the events of the newest list, which only grew from 0186's", async () => {
-    // 0188 widened the list again (the two decisions on an ask to get back into an account); every event of 0186's is still in it.
-    const after = eventList(await sqlOf("migrations/0188_recovery_permit.sql"));
-    expect(after.slice(0, eventList(await sqlOf(SQL_PATH)).length)).toEqual(eventList(await sqlOf(SQL_PATH)));
+  it("the API's alert sender and the database package know the same events", async () => {
+    const after = eventList(await sqlOf(SQL_PATH));
     const alerts = await sqlOf("apps/api/src/staff/alerts.ts");
     const events = alerts.slice(alerts.indexOf("const EVENTS = new Set(["), alerts.indexOf("]);", alerts.indexOf("const EVENTS = new Set([")));
     expect([...events.matchAll(/'([A-Z_]+)'/gu)].map((match) => match[1]).sort()).toEqual([...after].sort());

@@ -949,20 +949,19 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "the preview's approved buyers (0186, below) the seventy-sixth, and the passkeys a sign-in after the first step may use (0187, below) the seventy-seventh");
   });
 
-  it("chains the recovery permit 0188 after 0187 as an expand step that keeps 0130's verifier and amends 0186's event list, and documents it", async () => {
+  it("chains the recovery permit 0188 after 0187 as an expand step that keeps 0130's verifier and changes nothing an earlier step checks, and documents it", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
-    // The chain head: four tables and twenty-seven functions, and staff.audit_event's event list widened under one reviewed pair.
+    // The chain head: four tables and twenty-six functions; no earlier object is changed.
     expect(names.slice(-2)).toEqual(["0187_passkey_allow_credentials.sql", "0188_recovery_permit.sql"]);
     const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
-    const amends = [{ step: "0186_preview_buyers.sql", relations: ["staff.audit_event"], constraints: ["audit_event_funded_event_type_check"], field: "constraint_definition" }];
     expect(JSON.parse((await bytesOf("lineage/recovery-permit-forward0188.json")).toString("utf8"))).toEqual({
       version: "recovery-permit-forward0188-v1",
       baseRecipeSha256: plan.recipeSha256,
       previous: { name: "0187_passkey_allow_credentials.sql", manifestSha256: sha256(await bytesOf("lineage/passkey-allow-credentials-forward0187.json")), verifierSha256: previous.verifierSha256 },
       migration: { name: "0188_recovery_permit.sql", sha256: sha256(await bytesOf("0188_recovery_permit.sql")) },
       verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) },
-      amendsPostconditionsOf: amends
+      amendsPostconditionsOf: []
     });
     expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/recovery-permit-forward0188.json")));
     expect(step.previousName).toBe(previous.name);
@@ -971,35 +970,47 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(step.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
     expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
     expect(step.replayVerifierSql).toBeUndefined();
-    // 0186's postcondition digests the event list this step widens, so 0186 is compared against its amendment from then on.
-    expect(step.amendsPostconditionsOf).toEqual(amends);
+    // An expand step amends nothing: the release before refuses an amendment recorded by a step it does not know.
+    expect(step.amendsPostconditionsOf ?? []).toEqual([]);
     // No billing relation or function, so 0130's verifier stays in force.
     expect(step.sql.split("\n").filter((line) => !line.startsWith("--")).join("\n")).not.toMatch(/\bbilling\./u);
-    // The loader digests every function and table the SQL creates, and the one earlier constraint it widens.
+    // The loader digests every function and table the SQL creates.
     const loader = await readFile(new URL("migration-forward0188.ts", DB_SOURCE), "utf8");
     const listed = (name: string): string[] => [...loader.slice(loader.indexOf(`const ${name}`), loader.indexOf("];", loader.indexOf(`const ${name}`)))
       .matchAll(/"([a-z_]+\.[a-z_0-9]+)(?:\([^()]*\))?"/gu)].map((match) => match[1]!);
     const created = (pattern: RegExp): string[] => [...step.sql.matchAll(pattern)].map((match) => match[1]!);
     expect(listed("FUNCTIONS").sort()).toEqual(created(/^CREATE OR REPLACE FUNCTION ([a-z_]+\.[a-z_0-9]+)\(/gmu).sort());
-    expect(listed("FUNCTIONS")).toHaveLength(27);
+    expect(listed("FUNCTIONS")).toHaveLength(26);
     expect(listed("TABLES")).toEqual(created(/^CREATE TABLE IF NOT EXISTS ([a-z_]+\.[a-z_0-9]+) \(/gmu));
     expect(listed("TABLES")).toEqual(["identity.recovery_permit", "identity.recovery_permit_notice_binding", "identity.recovery_permit_notice", "staff.recovery_permit_decision"]);
-    expect(loader).toContain('[["staff.audit_event", "audit_event_funded_event_type_check"]]');
-    // Every earlier event stays allowed: the list is 0186's with this step's two at its end.
-    const eventList = (sql: string): string[] => [...sql.slice(sql.lastIndexOf("ADD CONSTRAINT audit_event_funded_event_type_check")).matchAll(/'([A-Z_]+)'/gu)].map((match) => match[1]!);
-    const buyers = plan.forwardChain.find((entry) => entry.name === "0186_preview_buyers.sql")!;
-    expect(eventList(step.sql)).toEqual([...eventList(buyers.sql), "ACCOUNT_RECOVERY_APPROVED", "ACCOUNT_RECOVERY_REFUSED"]);
+    // The list of staff audit events is 0186's, untouched: the step has no statement on staff.audit_event, and a decision's
+    // audit row is the existing GRANT event with a reference.
+    const statements = step.sql.split("\n").filter((line) => !line.startsWith("--")).join("\n");
+    expect(statements).not.toMatch(/ALTER TABLE staff\.audit_event|audit_event_funded_event_type_check/u);
+    expect(statements).toContain("staff.record_mutation(v_operation,'GRANT',v_staff,v_staff,");
+    expect(statements).toMatch(/'account-recovery:approved' ELSE 'account-recovery:refused'/u);
+    expect(step.sql.split("\n").filter((line) => line.startsWith("-- n1: reviewed "))).toHaveLength(1);
     const readme = (await bytesOf("lineage/README.md")).toString("utf8");
     const section = readme.slice(readme.indexOf("## The recovery permit (0188)"));
     expect(section.startsWith("## The recovery permit (0188)")).toBe(true);
     for (const needle of ["0186", "0187", "0188_recovery_permit.sql", "recovery-permit-forward0188.json", "packages/db/src/migration-forward0188.ts",
       "MIGRATION_FORWARD0188_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "verify-effective-capabilities-130.sql", "replayVerifierSql",
-      "amendsPostconditionsOf", "previous.manifestSha256", "migration.sha256", "renumber", "audit_event_funded_event_type_check", "TEAM_GRANT",
+      "amendsPostconditionsOf", "previous.manifestSha256", "migration.sha256", "renumber", "MIGRATION_FORWARD_CHAIN_AMENDMENT_BINDING_DRIFT",
+      "account-recovery:approved", "account-recovery:refused", "staff.read_audit_page_v2", "TEAM_GRANT",
       "debateai_billing_runtime", "debateai_mfa_recovery_runtime", "tests/integration/recovery-permit-0188.test.ts",
       ...listed("TABLES"), ...listed("FUNCTIONS")
     ]) expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
       "the passkeys a sign-in after the first step may use (0187, below) the seventy-seventh, and the recovery permit (0188, below) the seventy-eighth");
+  });
+
+  // The release before refuses, at its restart on a database ahead of it, an amendment recorded by a step it does not
+  // know, and it checks that before the database-ahead rule. So a step that is uploaded beside the release before may
+  // amend nothing. 0169 is the one earlier step that did (a grant on 0124's pointer reader) and stays as it was applied.
+  it("no expand step amends an earlier step's recorded check, 0169 apart", async () => {
+    const plan = await loadMigrationPlan();
+    const amending = plan.forwardChain.filter((step) => step.n1.expand && (step.amendsPostconditionsOf ?? []).length > 0).map((step) => step.name);
+    expect(amending).toEqual(["0169_piece_settings_version.sql"]);
   });
 
   it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122, 0123, 0124, 0126, 0128 or 0178, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
