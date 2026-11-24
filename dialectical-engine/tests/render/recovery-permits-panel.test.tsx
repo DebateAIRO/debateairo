@@ -214,7 +214,7 @@ describe("deciding", () => {
     const api = server(basePage);
     await mount(api);
     await act(async () => button("Refuse", row(BOB))!.click());
-    expect(host.querySelector("[data-recovery-permits-confirm=refuse]")!.textContent).toContain("Refuse the request for address unavailable? Nothing on the account changes.");
+    expect(host.querySelector("[data-recovery-permits-confirm=refuse]")!.textContent).toContain("Refuse the request for address unavailable? The person gets one short email saying it was not approved, with no reason. Nothing on the account changes.");
     await confirm();
     expect(api.proofs()).toEqual([{ action: "RECOVERY_PERMIT_REFUSE", request_ref: BOB, expected_revision: 7, operation_id: expect.any(String) }]);
     const [sent] = api.decisions();

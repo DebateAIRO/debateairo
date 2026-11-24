@@ -132,7 +132,7 @@ describe("the notice worker for this flow", () => {
     const notice = { noticeId: base.messageId, leaseId: "44444444-4444-4444-8444-444444444444", userId: USER, channelId: CHANNEL, event,
       payload: encrypt(KEY, Buffer.from(JSON.stringify(payload)), emailRecoveryNoticeAad(sealedFor, USER, CHANNEL)), expiresAt: EXPIRES.toISOString(), mailLocale: "en", ...extra };
     let claimed = false;
-    const repository = { expire: vi.fn(async () => 0), claimNotice: vi.fn(async () => { if (claimed) return null; claimed = true; return notice as never; }), finishNotice: vi.fn(async () => true) };
+    const repository = { expire: vi.fn(async () => 0), claimNotice: vi.fn(async () => { if (claimed) return null; claimed = true; return notice as never; }), finishNotice: vi.fn(async (_id: string, _lease: string, _sent: boolean, _retry: number, _max: number) => true) };
     const worker = new EmailRecoveryNotificationWorker({ flow: "recovery_permit", repository, users: { load: async () => Buffer.from(KEY) } as never,
       sender: { send: async (mail) => { sent.push(mail); } }, authPolicy, reportDiagnostic: (code) => { diagnostics.push(code); }, dispatch: async (prepare) => { await (await prepare())?.(); } });
     await worker.reconcile(5);

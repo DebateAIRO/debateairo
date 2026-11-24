@@ -50,11 +50,12 @@ export function canonicalRecoveryPermitBinding(intent: RecoveryPermitIntent["act
 }
 
 /** The binding for a decision the Owner asks for, against the list as it is now: a page looking at another revision is stale before any key is touched. */
-export async function recoveryPermitBinding(service: RecoveryPermitStaffService, authentication: StaffAuthentication, intent: RecoveryPermitIntent): Promise<ActionBinding & { requestRef: string }> {
+export async function recoveryPermitBinding(service: RecoveryPermitStaffService, authentication: StaffAuthentication, intent: RecoveryPermitIntent): Promise<ActionBinding> {
   const list = await service.repository.readList(authentication.context, authentication.baseSession.tokenHash);
   const row = list.requests.find((candidate) => candidate.ref === intent.request_ref);
   if (row === undefined || row.revision !== intent.expected_revision) throw new RecoveryPermitHttpError(409, "RECOVERY_PERMITS_STALE");
-  return { ...canonicalRecoveryPermitBinding(intent.action, row.userId, row.ref, row.revision, intent.operation_id), requestRef: row.ref };
+  // The binding alone, with no key beside its five: the key ceremony refuses a binding that carries anything more.
+  return canonicalRecoveryPermitBinding(intent.action, row.userId, row.ref, row.revision, intent.operation_id);
 }
 
 type Route = (method: "GET" | "POST" | "DELETE", path: string, handler: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>) => void;

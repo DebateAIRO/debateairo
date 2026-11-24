@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: PRIVACY POLICY · v1.1 · EFFECTIVE 24 NOVEMBER 2026
+eyebrow: PRIVACY POLICY · v1.2 · EFFECTIVE 26 NOVEMBER 2026
 title: What we store, and why
 lede: Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.
-endMarker: END OF POLICY · GDPR (EU) 2016/679 · v1.1
+endMarker: END OF POLICY · GDPR (EU) 2016/679 · v1.2
 bodyLabel: Privacy Policy text
 annexTitle: Annex B — Regional privacy terms
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 1.1 · Effective 24 November 2026 · Previous versions at dezbatere.ro/privacy/versions · Controller: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.2 · Effective 26 November 2026 · Previous versions at dezbatere.ro/privacy/versions · Controller: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** We collect what an account needs and what you type into your debates. What you write to the support assistant goes to its AI model so it can answer you, and we keep none of it. Your questions go to the AI providers listed in our Register, mainly DeepInfra, in the United States. The terms of DeepInfra, Anthropic and Amazon do not allow them to train models on what you write. The web search provider receives only the short search phrases the models write (section 5). Our hosting provider stores your account and your debates in London, in the United Kingdom; section 5 says where else your data goes. On the Free plan debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Deleting your account destroys the keys to your private data in the live service, but it does not delete our backups, and some of them hold those keys (section 7); public debates stay public, and your pseudonym is removed from them. You can reach us at privacy@dezbatere.ro, and people named in a debate can write to us without an account.
 
@@ -39,6 +39,7 @@ We collect only what an account needs to function, what you choose to give us, a
 | **Declared location** | The country where you say you live and, if that is the United States, your state | You, at registration |
 | **Sessions and security** | A hashed session token; a keyed hash of your browser's user-agent string, used to notice when a session moves to a different browser; timestamps of creation, last use and expiry. We do **not** store your IP address, device name or browser details with a session, and the session list you see in Settings shows only timestamps | Your browser |
 | **Security audit trail** | An append-only log of security-relevant events — registration, verification, login attempts, recovery, publication, deletion. The IP address and user-agent of each event are stored only as one-way keyed digests (Argon2id), so they cannot be read back but can be matched within a period. Login and recovery risk signals are stored encrypted for 90 days | Your browser, at the time of each event |
+| **Requests for help getting back into your account** | If you lose your passkey or authenticator app and have no recovery code, you can ask us for help. You confirm the request with a link we email to the account's address and with your password. We keep a record of each request: when it was made, where it stands, our decision and how it ended. A member of our team decides on it after seeing a few facts about the account: a shortened form of its email address, when it was created, when it was last signed in to, which sign-in methods it has, whether a recovery code is left, whether it is under a security hold or has been marked by our security checks, whether it has ever paid, and how many such requests it made before. They do not see your password, your debates or your payment details. If we agree, we email every confirmed address on the account, so that the request can be stopped if it was not you, and after 72 hours you can set up one new sign-in method | You, when you ask for help; our team, when it decides |
 | **Bot check** | When you create an account, sign in, reset your password, recover your account or ask for a new verification email, Cloudflare Turnstile checks in your browser that you are not an automated program; to do this, Cloudflare sees your IP address and browser details. We receive only a one-time token, confirm it with Cloudflare, and keep no lasting record of the check | Cloudflare, during those steps |
 | **Debate content** | The question you type; the steering annotations you set; the claims, critiques, evidence references, scores and verdicts the engine generates; a verbatim record of what each AI provider returned; retrieval queries and source references. All of this is stored encrypted under a key specific to your account | You, and the AI models working on your question |
 | **Page settings and visits** | The reading level you choose on the debate pages; for each of your debates, when you last opened its map and a short list of what the map showed then (the ids of its points, paths, open questions and follow-up debates, each with one state word, no text); for each follow-up debate you start from a map, which debate and which place on its map it came from, and whether it was a quick look or a thorough one | You, as you use the debate pages |
@@ -80,6 +81,7 @@ The table sets out the purposes and legal bases under Article 6(1) GDPR. We do n
 | Sending your question and the engine's statements to AI providers to generate a debate | Debate content | **Contract** — Art. 6(1)(b) |
 | Keeping the service secure, detecting abuse, letting you spot a login you did not make, keeping an audit trail | Sessions, security audit trail. For the support chat, only its limit counts: held in our server's memory for at most 24 hours, with no message and no address, and never written down | **Legitimate interests** — Art. 6(1)(f): ours and yours in a secure service. You may object; section 10 |
 | Stopping automated sign-ups, sign-ins and account takeovers | The bot-check result; your IP address and browser details, as Cloudflare sees them | **Legitimate interests** — Art. 6(1)(f): keeping fake accounts, password guessing and abuse out of the service. Without the check you cannot complete these steps |
+| Helping you get back into your account when you have lost your passkey or authenticator app and have no recovery code, and making sure the request comes from you | Requests for help getting back into your account, and the facts about the account a member of our team sees to decide on them (section 2) | **Contract** — Art. 6(1)(b), at your request; **legitimate interests** — Art. 6(1)(f): ours and yours in keeping other people out of your account |
 | Proving that you accepted the Terms and gave or withdrew a consent | Acceptance and consent records | **Legal obligation** — Art. 6(1)(c), our duty to demonstrate consent under Art. 7(1) — and legitimate interests in evidencing the contract |
 | Answering support requests | Support | **Contract** — Art. 6(1)(b) |
 | Processing sensitive information you include about yourself | Debate content and questions not started yet | **Explicit consent** — Art. 9(2)(a), given on a separate screen before your first debate |
@@ -147,6 +149,7 @@ When you schedule the deletion of your account, the debates you published stay p
 | Email verification links | 24 hours | Deleted |
 | An account whose sign-up was not finished: the email address not verified, or the second sign-in step (a passkey or an authenticator app) not set up | 24 hours after the sign-up began, or once the last link we sent expires if that is later (each link is valid for 24 hours) | Deleted, with everything that belongs to the account; its email address and pseudonym can be used again. The acceptance records and the security audit trail keep their entries, as their rows say |
 | Login and recovery risk signals | 90 days, enforced by the database | Purged |
+| Requests for help getting back into your account | While the account exists. A request that was never confirmed with your password: 90 days after it ended | Deleted |
 | Security audit trail | For the life of the service | Append-only; IP and user-agent are one-way digests and cannot be read back |
 | Debate content (private) | While the account exists, unless you delete the debate or our check deletes it (section 6) | Keys destroyed when the debate is deleted or the account is closed, making the content unreadable in the live service; our backups keep copies longer (the row on backups below) |
 | Debate content (published or public) | It stays public, also after you close your account | At closure your pseudonym is removed and the page shows "a contributor"; the text stays, except any part we remove or correct after a review (section 11) |
@@ -261,7 +264,7 @@ To refuse these items, block or delete cookies and site data for this site in yo
 
 When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at dezbatere.ro/privacy/versions. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version.
 
-This policy was last updated on 24 November 2026. Version 1.1 replaced version 1.0: section 5 now says that DeepInfra runs on its own servers every model a debate is given through it, and the summary and section 4 were changed to match.
+This policy was last updated on 26 November 2026. Version 1.2 replaced version 1.1: sections 2, 4 and 7 now say that you can ask for help getting back into your account when you have lost your passkey or authenticator app and have no recovery code, what a member of our team sees to decide on the request, and how long we keep it. Version 1.1 replaced version 1.0: section 5 now says that DeepInfra runs on its own servers every model a debate is given through it, and the summary and section 4 were changed to match.
 
 ## Annex B — Regional privacy terms
 

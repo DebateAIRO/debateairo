@@ -326,7 +326,7 @@
   "staff.recoveryPermits.blockedRisk": "Approve is off: this account has a risk mark.",
   "staff.recoveryPermits.blockedCap": "Approve is off: {cap} approvals in 24 hours is the most allowed.",
   "staff.recoveryPermits.confirmApprove": "Approve the request for {address}? The account then waits 72 hours. Every address on the account is told and can cancel. After that, the person may set up one new sign-in method.",
-  "staff.recoveryPermits.confirmRefuse": "Refuse the request for {address}? Nothing on the account changes.",
+  "staff.recoveryPermits.confirmRefuse": "Refuse the request for {address}? The person gets one short email saying it was not approved, with no reason. Nothing on the account changes.",
   "staff.recoveryPermits.confirmStop": "Stop the approved request for {address}? Its link stops working, and no new sign-in method can be set up with it.",
   "staff.recoveryPermits.key": "Touch your security key to confirm.",
   "staff.recoveryPermits.confirm": "Confirm",

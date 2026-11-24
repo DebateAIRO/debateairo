@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
+import { legalEnglishTranslatedFrom } from "../support/legalText.js";
 
 /**
  * Privacy Policy 3.5 (owner-approved 2026-10-22, for counsel and NETOPIA's site check): section 2's "Payments" row
@@ -17,17 +18,21 @@ import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
  * sale.
  */
 
-const section = (locale: string, from: number): string => {
-  const markdown = readFileSync(resolve(process.cwd(), "apps/ui/legal", locale, "privacy-policy.md"), "utf8");
+const sectionOf = (markdown: string, from: number): string => {
   const body = new RegExp(`^## ${from}\\.[^\\n]*\\n([\\s\\S]*?)^## ${from + 1}\\.`, "mu").exec(markdown)?.[1];
-  if (body === undefined) throw new Error(`${locale}: no section ${from} before section ${from + 1}`);
+  if (body === undefined) throw new Error(`no section ${from} before section ${from + 1}`);
   return body;
 };
 
-/** The body rows of the section's one table, without the header and the separator. */
-const tableRows = (locale: string, from: number): string[] =>
-  section(locale, from).split("\n").filter((line) => line.startsWith("| ")).slice(1)
+/** The body rows of the section's one table in `markdown`, without the header and the separator. */
+const rowsOf = (markdown: string, from: number): string[] =>
+  sectionOf(markdown, from).split("\n").filter((line) => line.startsWith("| ")).slice(1)
     .filter((line) => !/^\|\s*-{3}/u.test(line));
+const tableRows = (locale: string, from: number): string[] =>
+  rowsOf(readFileSync(resolve(process.cwd(), "apps/ui/legal", locale, "privacy-policy.md"), "utf8"), from);
+/** Section 7's rows in the English text `locale` follows: English itself, or the English text the translations were made from. */
+const englishRetention = (locale: string): string[] =>
+  locale === "en" ? tableRows("en", 7) : rowsOf(legalEnglishTranslatedFrom("PRIVACY"), 7);
 
 const cells = (row: string): string[] => row.split("|").slice(1, -1).map((cell) => cell.trim());
 
@@ -51,16 +56,14 @@ const PINNED = {
 } as const;
 
 describe("Privacy Policy 3.5 says what we keep about payments and cards", () => {
-  const englishRetentionRows = tableRows("en", 7).length;
-
   it.each(LOCALES.map(({ code }) => [code]))("%s: the Payments row and the new message row name the 14 days", (code) => {
     const collected = tableRows(code, 2);
     const payments = cells(collected[collected.length - 2]!);
     expect(payments, `${code}: Payments row shape`).toHaveLength(3);
     expect(payments[1], `${code}: Payments row names the 14 days`).toMatch(/14/u);
     const retention = tableRows(code, 7);
-    expect(retention, `${code}: section 7 rows`).toHaveLength(englishRetentionRows);
-    const at = tableRows("en", 7).findIndex((row) => row.startsWith("| The payment provider's messages"));
+    expect(retention, `${code}: section 7 rows`).toHaveLength(englishRetention(code).length);
+    const at = englishRetention(code).findIndex((row) => row.startsWith("| The payment provider's messages"));
     const messages = cells(retention[at]!);
     expect(messages, `${code}: message row shape`).toHaveLength(3);
     expect(messages[1], `${code}: message row keeps them 14 days`).toMatch(/14/u);
@@ -76,7 +79,8 @@ describe("Privacy Policy 3.5 says what we keep about payments and cards", () => 
   });
 
   it("English no longer says card details are never held by us", () => {
-    expect(section("en", 2)).not.toContain("never by us");
-    expect(section("en", 2)).toContain("your full card number and security code never reach us");
+    const english = sectionOf(readFileSync(resolve(process.cwd(), "apps/ui/legal/en/privacy-policy.md"), "utf8"), 2);
+    expect(english).not.toContain("never by us");
+    expect(english).toContain("your full card number and security code never reach us");
   });
 });

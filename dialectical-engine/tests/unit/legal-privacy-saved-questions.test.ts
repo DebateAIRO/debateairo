@@ -10,7 +10,7 @@ import {
   providerRegister,
   SUPPORT_PROVIDER
 } from "../../apps/ui/lib/legal/pages.js";
-import { cells, legalLines, legalText, sectionLine } from "../support/legalText.js";
+import { cells, legalEnglishTranslatedFrom, legalLines, legalText, sectionLine } from "../support/legalText.js";
 
 /**
  * What the Privacy Policy says happens when you press Next, and about the questions not started yet: several AIs from
@@ -129,10 +129,24 @@ const LABELS = {
 const legalCatalog = (code: string): Record<string, string> =>
   JSON.parse(readFileSync(resolve(root, "apps/ui/messages", code, "legal.json"), "utf8"));
 
-/** Where the three lines stand: section 2's row and its paragraph on Next, and section 7's row. */
-const savedRow = (lines: readonly string[]): string => sectionLine(lines, 2, 15);
-const nextParagraph = (lines: readonly string[]): string => sectionLine(lines, 2, 26);
-const savedRetentionRow = (lines: readonly string[]): string => sectionLine(lines, 7, 22);
+/**
+ * Where the three lines stand: section 2's row and its paragraph on Next, and section 7's row, each at the place the
+ * English line has in the English text the language follows (legalEnglishTranslatedFrom: a translation can still follow
+ * the English text before a change that added rows above these lines).
+ */
+const placeOf = (code: string, section: number, english: (line: string) => boolean): number => {
+  const lines = (code === "en" ? legalText("PRIVACY", "en") : legalEnglishTranslatedFrom("PRIVACY")).split("\n");
+  const heading = lines.findIndex((line) => line.startsWith(`## ${section}. `));
+  const found = lines.findIndex((line, index) => index > heading && english(line));
+  if (heading === -1 || found === -1) throw new Error(`${code}: no such line in section ${section} of the English text it follows`);
+  return found - heading;
+};
+const savedRow = (lines: readonly string[], code: string): string =>
+  sectionLine(lines, 2, placeOf(code, 2, (line) => line === SAVED_ROW));
+const nextParagraph = (lines: readonly string[], code: string): string =>
+  sectionLine(lines, 2, placeOf(code, 2, (line) => line.startsWith(NEXT_SENTENCE)));
+const savedRetentionRow = (lines: readonly string[], code: string): string =>
+  sectionLine(lines, 7, placeOf(code, 7, (line) => line === SAVED_RETENTION_ROW));
 
 /**
  * The languages whose paragraph on Next is still its first translation: English, and each translation that
@@ -189,11 +203,11 @@ describe("Privacy Policy: what happens when you press Next, and the questions no
   it("English says the three approved rules: the tab keeps the words only, up to 20 questions, a key for each", () => {
     const text = legalText("PRIVACY", "en");
     const next = legalLines("PRIVACY", "en");
-    const row = savedRow(next);
-    const kept = savedRetentionRow(next);
+    const row = savedRow(next, "en");
+    const kept = savedRetentionRow(next, "en");
     expect(row).toBe(SAVED_ROW);
     expect(kept).toBe(SAVED_RETENTION_ROW);
-    expect(nextParagraph(next)).toBe(`${NEXT_SENTENCE} ${TAB_SENTENCE}`);
+    expect(nextParagraph(next, "en")).toBe(`${NEXT_SENTENCE} ${TAB_SENTENCE}`);
     // The browser tab keeps the words only.
     expect(text).not.toMatch(/site update/u);
     // Up to 20, and nothing goes without you.
@@ -214,21 +228,21 @@ describe("Privacy Policy: what happens when you press Next, and the questions no
     const next = legalLines("PRIVACY", code);
 
     // Section 2's row: three cells and a bold category, as its neighbours; section 7's row names it.
-    const row = savedRow(next);
+    const row = savedRow(next, code);
     expect(row.startsWith("| ") && row.endsWith(" |"), `${code}: section 2's row is a table row`).toBe(true);
     const category = cells(row);
     expect(category, `${code}: section 2's row shape`).toHaveLength(3);
     expect(category[0], `${code}: a bold category`).toMatch(/^\*\*[^*]+\*\*$/u);
     expect(category[1], `${code}: up to 20`).toMatch(/(^|\D)20(\D|$)/u);
-    const kept = savedRetentionRow(next);
+    const kept = savedRetentionRow(next, code);
     expect(kept.startsWith("| ") && kept.endsWith(" |"), `${code}: section 7's row is a table row`).toBe(true);
     expect(cells(kept), `${code}: section 7's row shape`).toHaveLength(3);
     expect(cells(kept)[0], `${code}: section 7's row names section 2's`).toBe(category[0]!.slice(2, -2));
 
     // The paragraph on Next: as many sentences as the English, the first two unchanged since they were approved.
-    const said = sentencesOf(nextParagraph(next));
+    const said = sentencesOf(nextParagraph(next, code));
     expect(said, `${code}: the paragraph's sentences`).toHaveLength(sentencesOf(`${NEXT_SENTENCE} ${TAB_SENTENCE}`).length);
-    expect(said.join(gap), `${code}: one gap between the sentences`).toBe(nextParagraph(next));
+    expect(said.join(gap), `${code}: one gap between the sentences`).toBe(nextParagraph(next, code));
     expect(sha256Of(`${said[0]!}${gap}${said[1]!}`), `${code}: the first two sentences, unchanged`).toBe(FIRST_TWO_SENTENCES[code]);
     // The third sentence names the 10 minutes and section 2's row; the tab sentence is last.
     expect(said[2], `${code}: the third sentence names the 10 minutes`).toMatch(/(^|\D)10(\D|$)/u);
