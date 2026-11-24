@@ -2044,8 +2044,8 @@ payments are real (part 7). The site password keeps it small: only people who kn
   before they ask. When STAFFCHECK (1.6) says `the AI check for publication and reports: off`, or a check cannot answer
   (the Anthropic gate refuses the call, is halted or busy, or its day is used up), nothing goes public: the finished
   debate stays private and waits. The API tries its check again by itself, a minute after a failure, then after longer
-  and longer waits, up to an hour. No staff screen lists a Free debate that waits for a check, and nobody can publish
-  one by hand: it goes public by itself once the checks allow it, unless too many older Free debates wait ahead of it
+  and longer waits, up to an hour. No staff screen lists a Free debate that waits for a check, and no staff member can
+  publish one by hand: it goes public by itself once the checks allow it, unless too many older Free debates wait ahead of it
   (the warning below). The person is not told that it waits. A debate whose own check keeps failing is tried again
   less and less often. The API makes its checks one at a time, contributions and reports included, so a check that
   runs long (up to two minutes on a busy gate) delays the others by that much; after one end-of-debate check fails,
@@ -3783,8 +3783,8 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
      debate at once (once per debate).
    - Off, or the gate not letting it through (`AICHECK_NOT_DONE`): no Free debate goes public. Each finished one stays
      private and waits; the API tries its checks again by itself, and the debate goes public once the checks allow it,
-     unless 100 older Free debates wait ahead of it (5.1b). No staff screen lists the waiting ones, and nobody can
-     publish one by hand. Every report waits for you.
+     unless 100 older Free debates wait ahead of it (5.1b). No staff screen lists the waiting ones, and no staff member
+     can publish one by hand. Every report waits for you.
 
    Either way, read the Public tab and the report mails every day: with strangers in, the Terms' promises about
    reports and removals (section 10) are owed to real people. If you want the check and AICHECK says

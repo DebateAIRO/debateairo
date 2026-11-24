@@ -207,8 +207,9 @@ describe('the runbook says what really happens to a Free debate and a report, an
 
   it('an unchecked Free debate stays private and waits, retried by the API, on no staff screen: never "a publication review on the Team page"', () => {
     expect(flat).not.toContain('publication review on the Team page');
-    expect(flat).toContain('nothing goes public: the finished debate stays private and waits. The API tries its check again by itself, a minute after a failure, then after longer and longer waits, up to an hour. No staff screen lists a Free debate that waits for a check, and nobody can publish one by hand: it goes public by itself once the checks allow it, unless too many older Free debates wait ahead of it (the warning below).');
-    expect(flat).toContain('Each finished one stays private and waits; the API tries its checks again by itself, and the debate goes public once the checks allow it, unless 100 older Free debates wait ahead of it (5.1b). No staff screen lists the waiting ones, and nobody can publish one by hand.');
+    expect(flat).toContain('nothing goes public: the finished debate stays private and waits. The API tries its check again by itself, a minute after a failure, then after longer and longer waits, up to an hour. No staff screen lists a Free debate that waits for a check, and no staff member can publish one by hand: it goes public by itself once the checks allow it, unless too many older Free debates wait ahead of it (the warning below).');
+    expect(flat).toContain('Each finished one stays private and waits; the API tries its checks again by itself, and the debate goes public once the checks allow it, unless 100 older Free debates wait ahead of it (5.1b). No staff screen lists the waiting ones, and no staff member can publish one by hand.');
+    expect(flat).not.toContain('nobody can publish one by hand');
     // No sentence promises that a waiting Free debate goes public however long it waits: the list the API reads ends.
     expect(flat).not.toContain('however long after it finished');
   });
