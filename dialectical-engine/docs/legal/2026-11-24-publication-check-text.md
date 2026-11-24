@@ -39,18 +39,18 @@ The owner's decision of 24 November 2026: clarify the texts in the same upload a
     identifies you or your account.", so it stays true for that check and no longer reads as covering every check;
   - after the question check's sentence, new sentences: "Before a debate on the Free plan goes public, and when you
     publish a debate, we send its public text to Claude Haiku 5.5, which checks it against our rule on content: none of
-    it may be hate speech, or deny, justify or make light of a genocide or a crime against humanity. The public text is what the public page would show: the
-    question, the summary and the conclusion, the arguments, the web sources they cite with their quotes, titles and
-    links, the comments of the AIs that reviewed the arguments, the story of the verdict, and anything already added to
-    the public debate. We send it in parts, without your pseudonym or any date, and with nothing that identifies you or
-    your account. The same model checks what is added to a public debate when someone digs into it, before it changes
-    the public page.";
+    it may be hate speech, or deny, justify or make light of a genocide or a crime against humanity. The public text is
+    what the public page would show: the question, the summary and the conclusion, the arguments, the web sources they
+    cite with their quotes, titles and links, the comments of the AIs that reviewed the arguments, the story of the
+    verdict, and anything already added to the public debate. We send it in parts, without your pseudonym or any date,
+    and with nothing that identifies you or your account. The same model checks what is added to a public debate when
+    someone digs into it, before it changes the public page.";
   - the Report sentence names the model: "... we send the words of your report and the public text of the debate to
     Claude Haiku 5.5, which checks the report; ...".
 - In section 5, "Which providers", the Register's list of purposes gains "checking a debate's public text before it
   goes public" and "checking a report made with the Report button" (the Register already gave Anthropic the job of
-  checking a report; the list left it out). In Annex B.6 (South Korea), the list of what is sent abroad gains "before it goes public, its public
-  text to be checked".
+  checking a report; the list left it out). In Annex B.6 (South Korea), the list of what is sent abroad gains "before
+  it goes public, its public text to be checked".
 - Section 14 says what changed, before the 1.1 line: "Version 1.2 replaced version 1.1: section 5 now says that, before
   a debate goes public, its public text is sent to Claude Haiku 5.5 to be checked, and that the same model checks what
   is added to a public debate and the reports made with the Report button; it makes clear that only the synthesis text
@@ -59,8 +59,10 @@ The owner's decision of 24 November 2026: clarify the texts in the same upload a
 - **The Provider Register.** A new job, `publicationCheck`: "A debate's public text before it goes public, and what is
   added to a public debate — to check it against our rule on content". It stands on Anthropic's row and, when that row
   is not shown, on the support chat's row (the same model and contract), as the other checks do. French and Romanian
-  carry their own wording; the 32 other catalogues carry the English line, as earlier lines did, because every
-  catalogue must hold the same keys (`apps/ui/lib/i18n/legal.test.mjs`).
+  carry their own wording. The 32 other catalogues carry the English line until they are translated, because every
+  catalogue must hold the same keys (`apps/ui/lib/i18n/legal.test.mjs`). Some earlier lines were added the same way
+  (`retentionAmazon`, `basisAmazon`); the other check jobs (`synthesisCheck`, `questionCheck`, `reportCheck`) are
+  translated in all 35.
 - **The 32 other languages** change only the Privacy Policy's version number and day: their text still follows an older
   English text, as before.
 - **The re-dating command.** `pnpm run legal:redate` set one day for both documents and refused when a current version
@@ -81,18 +83,21 @@ The owner's decision of 24 November 2026: clarify the texts in the same upload a
 The drafts carry Privacy Policy 1.2 with the working day 25 November 2026, the day after 1.1's, as 1.1 carried a
 working day before its upload. Version 1.2 cannot take effect on 24 November 2026: 1.1 took effect that day, and
 `legal:redate` refuses a day that is not after the day of the version it replaces. The upload that carries the code and
-this text can therefore be no earlier than 25 November 2026. Terms 1.1 keeps 24 November 2026. Before the upload's SB1, on the Mac, with the upload
-day (the release guide, "The legal texts' day"): `pnpm run legal:redate --date YYYY-MM-DD --dry-run`, then the same
-without `--dry-run`, commit what it writes through a pull request into dev, then SB1. It dates the Privacy Policy only
-and prints that the Terms of Service 1.1 keeps 24 November 2026.
+this text can therefore be no earlier than 25 November 2026. Terms 1.1 keeps 24 November 2026. Before the upload's
+SB1, on the Mac, with the upload day (the release guide, "The legal texts' day"): `pnpm run legal:redate --date
+YYYY-MM-DD --dry-run`, then the same without `--dry-run`, commit what it writes through a pull request into dev, then
+SB1. It dates the Privacy Policy only and prints that the Terms of Service 1.1 keeps 24 November 2026.
 
-**This blocks the upload until the release guide changes.** The drained upload's PRECHECK reads both English texts for
-"Effective <upload day>" and reports `legal-date` when one does not carry it; the guide says `legal-date` means stop.
-Terms 1.1 keeps 24 November 2026, and Privacy 1.2 cannot take that day, so on every possible upload day PRECHECK stops
-on the Terms. The check is in the release guide (`deploy/preview-release/v1/README.md`, the PRECHECK step), which this
-change does not touch, because the guide is outside its scope. A separate change to the guide, in the same upload and
-merged before SB1, must make PRECHECK read the day only of a document whose current version is not yet in the release
-the site runs, which is the rule `legal:redate` now follows.
+**The release guide's check follows the same rule.** Before this change, the drained upload's PRECHECK read both
+English texts for "Effective <upload day>", so with Terms 1.1 keeping 24 November 2026 it would have stopped every
+upload on the Terms. This same change makes PRECHECK follow the rule `legal:redate` follows
+(`deploy/preview-release/v1/README.md`, the PRECHECK step). A text whose current version has an archive copy in the
+commit of the release the site runs (`OREV`, read on the server from the release lock and the reference clone) must
+keep the day it has there; any other text must carry the upload day. So on the upload day PRECHECK reads Terms 1.1 as
+kept at 24 November 2026 and Privacy 1.2 as new, and stops only if 1.2 does not carry that day. The guide's section
+"The legal texts' day" now says what the command dates, leaves and refuses, and what else checks the day.
+MAIN-SITE.md's date line (`deploy/preview-auth-dev/v1/MAIN-SITE.md`, 1.8 step 3 and 2.1 step 1) was written for the
+upload of version 1.0 and still asks for the upload day in both texts; it is not changed here.
 
 ## What was left, and why
 

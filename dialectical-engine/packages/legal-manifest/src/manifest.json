@@ -332,7 +332,7 @@
       },
       "fr": {
         "version": "1.2",
-        "sha256": "96bd66b49339228ee458e14b868cf84f94795f2b93611245baa5d74226cc3ba5"
+        "sha256": "9de1ecb77a159dd34bcec01a652681aca9efecbe3c6202cca316c9de6fcee5fe"
       },
       "ga": {
         "version": "1.2",
@@ -599,9 +599,9 @@
           "version": "1.0",
           "path": "apps/ui/legal/archive/fr/404cce26d246f87be9a1f567e6065771f636afe671e1b85a2da75ca6ff4ea9fd.md"
         },
-        "96bd66b49339228ee458e14b868cf84f94795f2b93611245baa5d74226cc3ba5": {
+        "9de1ecb77a159dd34bcec01a652681aca9efecbe3c6202cca316c9de6fcee5fe": {
           "version": "1.2",
-          "path": "apps/ui/legal/archive/fr/96bd66b49339228ee458e14b868cf84f94795f2b93611245baa5d74226cc3ba5.md"
+          "path": "apps/ui/legal/archive/fr/9de1ecb77a159dd34bcec01a652681aca9efecbe3c6202cca316c9de6fcee5fe.md"
         }
       },
       "ro": {
