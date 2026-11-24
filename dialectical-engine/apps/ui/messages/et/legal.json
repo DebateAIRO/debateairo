@@ -127,6 +127,7 @@
   "legal.providers.purpose.judging": "Väitluse tekst — argumentide hindamiseks ja kontrollimiseks",
   "legal.providers.purpose.story": "Lõpetatud väitlus — otsuse loo kirjutamiseks",
   "legal.providers.purpose.synthesisCheck": "Lõppenud väitluse süntees — selle kontrollimiseks nelja kategooria suhtes",
+  "legal.providers.purpose.publicationCheck": "Väitluse avalik tekst enne, kui see muutub avalikuks, ja see, mida avalikule väitlusele lisatakse — selle kontrollimiseks meie sisureegli alusel",
   "legal.providers.purpose.reportCheck": "Teatage-nupuga tehtud teade ja väitluse avalik tekst — teate kontrollimiseks",
   "legal.providers.purpose.questionCheck": "Küsimus enne väitluse algust — kontrollimiseks, kas väitlus võib alata",
   "legal.providers.purpose.clarifyQuestions": "Enne väitluse algust: täpsustavate küsimuste pakkumine",

@@ -2,6 +2,10 @@
 
 Written on 24 November 2026.
 
+Version 1.2 holds two changes: this one, and what the AI checks of public text receive and decide, which
+`2026-11-24-publication-check-text.md` describes. They were made on two branches and joined before either reached the
+site, so there is one version 1.2. Version 1.1 and the Terms (1.1, 24 November 2026) do not change.
+
 These notes are not legal advice.
 
 ## The facts
@@ -11,9 +15,9 @@ These notes are not legal advice.
   password (migration 0188, `apps/api/src/recovery-permit.ts`).
 - A member of the team then approves or refuses the request on an internal page. To decide, they see only: a shortened
   form of the account's sign-in email address, when the account was created, when it was last signed in to, its
-  sign-in methods (how many passkeys, whether it has an authenticator app), how many recovery codes are left, whether it
-  is under a security hold or has a risk mark, whether it has ever paid (yes or no, no amounts) and how many such
-  requests it made before (`apps/api/src/staff/recovery-permits.ts`). They do not see the password, the debates,
+  sign-in methods (how many passkeys, whether it has an authenticator app), whether a recovery code is left (yes or no),
+  whether it is under a security hold or has a risk mark, whether it has ever paid (yes or no, no amounts) and how many
+  such requests it made before (`apps/api/src/staff/recovery-permits.ts`). They do not see the password, the debates,
   payment details or anything the person typed.
 - If the request is approved, the account waits 72 hours, every verified address on it is emailed with a way to stop
   the request, and then the person can set up one new sign-in method.
@@ -39,28 +43,33 @@ the account holder.
     request never confirmed with the password, 90 days after it ended.
   Section 14 says what changed: "Version 1.2 replaced version 1.1: sections 2, 4 and 7 now say that you can ask for
   help getting back into your account when you have lost your passkey or authenticator app and have no recovery code,
-  what a member of our team sees to decide on the request, and how long we keep it." The 1.1 summary stays after it.
+  what a member of our team sees to decide on the request, and how long we keep it." The same summary goes on with the
+  other change in 1.2 (sections 5 and 8 and Annex B on the AI checks; `2026-11-24-publication-check-text.md`), and the
+  1.1 summary stays after it. French and Romanian carry the three rows and the summary, sentence for sentence.
 - **A new version, not an edit of 1.1.** Privacy Policy 1.1 is in the release the site runs (its archive copies are in
   the commit `tests/n1-baseline.json` names), and the release check refuses a changed text under a number the archive
   already holds. The Terms stay at 1.1, with their day.
-- **The other 34 languages change only their number and day** (eyebrow, end marker and version line). Since 24
-  November 2026 the release offers all 35 languages, and each has a translation of the English 1.1 texts
-  (`RELEASE_LEGAL_LOCALES`, all archived at 1.1). None of the 34 translations is translated again in this change: each
-  keeps the body translated from the English 1.1, and `apps/ui/legal/translated-from.json` still records every one as
-  translated from the English 1.1, which is how the tooling marks a translation that lags. `pnpm run generate:legal`
-  says so ("privacy: 34 translation(s) follow an older English text (ar, bg, …, zh); bring them up to date before
-  release"), and `pnpm run legal:release-check` refuses a release until they are translated and recorded, one language
-  at a time or several together:
+- **The translations.** Since 24 November 2026 the release offers all 35 languages, and each has a translation of the
+  English 1.1 texts (`RELEASE_LEGAL_LOCALES`, all archived at 1.1). The 34 translations follow the English 1.2, with
+  both changes, sentence for sentence, and `apps/ui/legal/translated-from.json` records each as translated from it.
+  French and Romanian were translated first. The 32 other languages first carried only the other change, translated
+  from its first English 1.2 text, and were then brought up to the English 1.2 and recorded:
   `node apps/ui/scripts/generate-legal-data.mjs --translated --document privacy --locale <code> [--locale <code> …]`.
-- **No archive copy of 1.2 yet.** `pnpm run generate:legal:archive` copies the current text of every language the
-  release offers, now all 35, and an archive copy is kept for good. Run now, it would keep the 34 untranslated texts as
-  version 1.2, and their translations could then never be archived under that number. The archive step runs once every
-  translation follows the English 1.2; the 1.0 copies (English, French, Romanian) and the 1.1 copies (all 35 languages)
-  are unchanged.
-- **The working day is 26 November 2026**, in every language's Privacy Policy (and in the English "last updated"
-  sentence; the translations' own "last updated" sentence keeps the day of the English 1.1 they follow). The effective
-  day is the upload day: once the 34 translations are translated and recorded, `pnpm run legal:redate --date
-  YYYY-MM-DD` (with `--dry-run` first) sets it, regenerates, archives and runs the release check.
+  `pnpm run legal:release-check` now passes. None of the translations has been reviewed by a native speaker or by
+  counsel.
+- **One archive copy of 1.2 per language.** `pnpm run generate:legal:archive` copies the current text of every language
+  the release offers, and an archive copy is kept for good, so it ran only once every translation followed the English
+  1.2. It holds one 1.2 copy for each of the 35 languages, made from the final texts. The other change had archived its
+  first English 1.2 text and its translations; none of them was released, and those copies were removed when the two
+  changes were joined, since 1.2's text changed. The 1.0 copies (English, French, Romanian) and the 1.1 copies (all 35
+  languages) are unchanged. The 1.2 copies are not released yet, so `legal:redate` removes them and makes them again
+  when it re-dates 1.2.
+- **The effective day is 25 November 2026, the upload day**, in every language's Privacy Policy: the eyebrow, the
+  version line and the "last updated" sentence. The drafts first carried the working day 26 November 2026.
+  `pnpm run legal:redate --date 2026-11-25` (with `--dry-run` first) set the upload day: it re-dated those three places
+  in all 35 Privacy Policies, recorded the 34 translations again, made the 35 archive copies of 1.2 again, kept the
+  Terms at 24 November 2026 and passed the release check. Run again for 25 November 2026, it changes nothing. If the
+  upload moves to a later day, the same command with that day does the same again.
 - **The re-dating command now handles one document at a time.** `apps/ui/scripts/legal-redate.mjs` used to give both
   documents one day and refused when either current version was released. It now leaves a document whose current
   version was released as it is (the Terms 1.1 keep 24 November 2026) and re-dates the other; it refuses only when
@@ -69,12 +78,15 @@ the account holder.
 - **Nobody is asked to accept again.** The re-acceptance floors stay at 1.0 for both documents.
 - **Tests.** The version pins move to Privacy 1.2 (Terms 1.1); each document's effective day is read from its own
   English version line (`legalEffectiveDay(kind)`, `tests/support/legalText.ts`). The checks that hold every translation
-  to English's rows and places compare a translation with the English text it was made from
-  (`legalEnglishTranslatedFrom`, read from the archive while the translations lag), and English with itself.
-  `tests/unit/legal-reset-10.test.ts` pins the launch languages' 1.0 and 1.1 copies by hash, one 1.1 copy for each of the
-  other 32 languages, the 1.2 change summary in English, and all 34 translations as made from the English 1.1. The full
-  run of `legal:redate` in `tests/unit/legal-redate.test.ts` runs once every translation follows the English texts;
-  until then the tests pin its refusal and its dry run.
+  to English's rows and places compare a translation with the English text French was made from
+  (`legalEnglishTranslatedFrom`), which is the current English text, since French follows it; English is compared with
+  itself. `tests/unit/legal-reset-10.test.ts` pins the launch languages' 1.0 and 1.1 copies by hash, one 1.1 copy for
+  each of the other 32 languages, and one 1.2 copy for each of the 35, which is that language's current text; it pins
+  the 1.2 change summary in English, French and Romanian, both summaries in every language, and every translation as
+  made from the current English text. `tests/unit/legal-redate.test.ts` pins the plan and the command with the release
+  the site runs as it is (every archive copy but the 1.2 ones): the Terms are kept, every language's Privacy Policy is
+  re-dated in its eyebrow, version line and "last updated" sentence, and a full run on a copy of the legal files makes
+  the 1.2 copies again from the re-dated texts, leaves every released copy byte for byte and passes the release check.
 
 ## Open: telling account holders before the new processing starts
 

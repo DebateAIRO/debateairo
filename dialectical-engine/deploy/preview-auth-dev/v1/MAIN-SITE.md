@@ -999,9 +999,10 @@ text under that step, or the repair map (after step 23), or ask. Never put a `.b
 the live site already carries must show its live day (in this upload the Terms 1.1: 24 November 2026), and a new
 version must show today (in this upload the Privacy Policy 1.2; the release guide's section "The legal texts' day",
 `deploy/preview-release/v1/README.md`). If a line shows another day, stop before piece 1 and ask. PRECHECK (step 14)
-still asks both texts to take effect today: on an upload day after 24 November its `legal-date` subject stops it while
-the Terms 1.1 keep their live day, as they do in this upload; the Privacy Policy 1.2 takes the upload day and does not
-stop it. Ask before the upload day how that is settled.
+reads both texts by the same rule. In this upload it prints `legal day: terms-of-service 1.1, in the live release,
+keeps 24 November 2026` and `legal day: privacy-policy 1.2, new in this release, takes <today>`. Its `legal-date`
+subject stops it only when a text does not carry that day; a new day then needs a new commit (the release guide's
+section says how).
 
 **2. GATESBEFORE** (server; the release guide's "Before piece 1"). It only reads: each older gate's start checks, run
 by hand as systemd would run them, then its state and its calls in flight. Expect one line per gate, `<gate>: start

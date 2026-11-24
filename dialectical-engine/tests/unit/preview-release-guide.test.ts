@@ -1143,12 +1143,45 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(prose).toContain('pnpm run legal:redate --date YYYY-MM-DD --dry-run');
     expect(prose).toContain('pnpm run legal:redate --date YYYY-MM-DD # sets the day everywhere');
     expect(prose).toContain('A day before the upload would read as a change made retroactive, which the Terms promise never to do.');
-    // The day reaches the upload through dev (SB1's REV), re-set when the switch slips, and nothing else checks it.
+    // The day reaches the upload through dev (SB1's REV) and is re-set when the switch slips.
     expect(prose).toContain('Commit what it wrote, open a pull request into dev, and merge it. 4. Only then SB1: its `REV` is that merge.');
     expect(prose).toContain('run the command again with the new day, through the same four steps, before SB1');
-    expect(prose).toContain('Nothing else checks the day');
     expect(prose).toContain('that answer is recorded in the note before SB1');
     expect(prose).toContain('after an upload, do not re-date the version that upload carried');
+    // A released document keeps its day and the other takes the new one; the command never refuses for that alone.
+    expect(prose).toContain('the command leaves it at the day it has, and prints `<document>: released, keeps <day>`');
+    expect(prose).toContain('a day when both documents are released and carry another day');
+    expect(prose).not.toContain('Nothing else checks the day');
+    // The day given is a document's own day: nothing changes, and the command prints that day twice, released or not.
+    expect(prose).toContain('A document that already carries the day given changes nothing, released or not, and the command prints `<document>: from <day> to <day>; translations recorded again: none` for it, the same day twice.');
+    expect(prose).toContain('When no document changes, it prints `no text to re-date to <day>: nothing to change` and still runs `legal:release-check`.');
+    // Every refusal the command makes before it writes anything.
+    expect(prose).toContain('an English version line it cannot read (`**Version N.M · Effective <day> <Month> <year> · …`)');
+    expect(prose).toContain('a `tests/n1-baseline.json` that names no commit');
+    expect(prose).toContain('a clone that does not hold the commit `tests/n1-baseline.json` names (fetch it first)');
+    expect(prose).toContain('any change while a translation of either document, in a language the release offers, follows an older English text');
+    // The main-site runbook follows the same rule in both places it checks the day, and the guide names them.
+    expect(prose).toContain('The main-site runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`) follows the same rule in both places it checks the day: 1.8 step 3, in the preparation, and 2.1 step 1, on the upload day before the downtime.');
+    expect(prose).not.toContain('it does not follow this rule yet');
+    const runbook = read('deploy/preview-auth-dev/v1/MAIN-SITE.md');
+    const preparation = sectionOf(runbook, '### 1.8 The preparation: the day before, or earlier on the upload day').replace(/\s+/g, ' ');
+    const beforeDowntime = sectionOf(runbook, '### 2.1 Before the downtime (the site is up)').replace(/\s+/g, ' ');
+    expect(runbook.replace(/\s+/g, ' ')).not.toContain('It must print the same line twice, `Effective <the upload day>`');
+    expect(preparation).toContain('**3. The legal texts, on the Mac.**');
+    expect(preparation).toContain('The day follows a rule for each text on its own (the release guide\'s section "The legal texts\' day"');
+    expect(beforeDowntime).toContain('**1. The texts\' days are still right** (Mac, the upload folder). Run the date line of 1.8, step 3, again. A version the live site already carries must show its live day');
+    expect(prose).not.toContain('it is not changed here');
+    // What else reads the day: no check on the side-by-side path; PRECHECK on the drained path, by the same rule.
+    expect(prose).toContain('`legal:release-check` does not: it passes with any day the command accepts. On the side-by-side path nothing else does either, so this step is the check.');
+    expect(prose).toContain('On the drained path PRECHECK reads both English texts of the new release by the same rule');
+    // The words the guide quotes are the ones the command prints.
+    const redate = read('apps/ui/scripts/legal-redate.mjs');
+    expect(redate).toContain('`${name}: released, keeps ${before}\\n`');
+    expect(redate).toContain('; translations recorded again: ');
+    expect(redate).toContain('`no text to re-date to ${day}: nothing to change\\n`');
+    expect(redate).toContain('follows an older English text: translate it and record it (generate-legal-data.mjs --translated) first');
+    expect(redate).toContain('the English version line gives no version and day in the form `Version N.M · Effective <day> <Month> <year>`');
+    expect(redate).toContain('tests/n1-baseline.json names no commit');
     const scripts = (JSON.parse(read('package.json')) as { scripts: Record<string, string> }).scripts;
     expect(scripts['legal:redate']).toBe('node apps/ui/scripts/legal-redate.mjs');
   });
@@ -1165,10 +1198,14 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(runbook).toContain('The same version must show the same day. A newer version must show the upload day.');
     expect(runbook).toContain('`Legal texts: ready for release.` with each text\'s day right (its live day for a version the site carries, the upload day for a new one: the release guide\'s section "The legal texts\' day")');
     expect(runbook).toContain('**1. The texts\' days are still right** (Mac, the upload folder). Run the date line of 1.8, step 3, again. A version the live site already carries must show its live day (in this upload the Terms 1.1: 24 November 2026), and a new version must show today (in this upload the Privacy Policy 1.2; the release guide\'s section "The legal texts\' day", `deploy/preview-release/v1/README.md`).');
-    // PRECHECK still asks both texts for the upload day, and the runbook says so until that changes.
-    expect(guide).toContain('for T in terms-of-service privacy-policy; do grep -qF "Effective $DAY "');
-    expect(runbook).toContain('PRECHECK (step 14) still asks both texts to take effect today: on an upload day after 24 November its `legal-date` subject stops it while the Terms 1.1 keep their live day, as they do in this upload; the Privacy Policy 1.2 takes the upload day and does not stop it.');
-    expect(runbook).not.toContain('as both do today');
+    // PRECHECK reads each text by its own rule, and the runbook quotes the two lines it prints for this upload.
+    const precheck = scriptOf('PRECHECK').lines;
+    expect(precheck).toContain('for KT in TERMS:terms-of-service PRIVACY:privacy-policy; do');
+    expect(precheck.join('\n')).toContain('echo "legal day: $T ${V:-unread}, in the live release, keeps ${WANT:-unread}"');
+    expect(precheck.join('\n')).toContain('echo "legal day: $T ${V:-unread}, new in this release, takes $DAY"');
+    expect(guide).not.toContain('for T in terms-of-service privacy-policy; do grep -qF "Effective $DAY "');
+    expect(runbook).toContain('PRECHECK (step 14) reads both texts by the same rule. In this upload it prints `legal day: terms-of-service 1.1, in the live release, keeps 24 November 2026` and `legal day: privacy-policy 1.2, new in this release, takes <today>`. Its `legal-date` subject stops it only when a text does not carry that day; a new day then needs a new commit (the release guide\'s section says how).');
+    for (const gone of ['still asks both texts to take effect today', 'Ask before the upload day how that is settled', 'as both do today']) expect(runbook, gone).not.toContain(gone);
     // The versions the runbook names for this upload are the ones in the texts.
     expect(read('apps/ui/legal/en/terms-of-service.md')).toContain('Version 1.1 · Effective 24 November 2026');
     expect(read('apps/ui/legal/en/privacy-policy.md')).toMatch(/Version 1\.2 · Effective /u);
@@ -2169,6 +2206,82 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
     // It comes right after DR1 in the guide and before DR2.
     expect(drained.indexOf('\n#### PRECHECK. ')).toBeGreaterThan(drained.indexOf('\n#### DR1. '));
     expect(drained.indexOf('\n#### PRECHECK. ')).toBeLessThan(drained.indexOf('\n#### DR2. '));
+  });
+
+  it('PRECHECK\'s day check, run by bash on stand-in texts: a new version takes today, a version the live release carries keeps its day', () => {
+    const hasJq = spawnSync('jq', ['--version']).status === 0;
+    if (!hasJq) { expect(process.env.CI, 'CI has jq').toBeFalsy(); return; }
+    const lines = scriptOf('PRECHECK').lines;
+    const first = lines.findIndex(line => line.startsWith('# The legal texts\' day'));
+    const last = lines.findIndex((line, index) => index > first && line === 'done');
+    expect(first).toBeGreaterThan(-1);
+    expect(last).toBeGreaterThan(first);
+    const check = lines.slice(first, last + 1);
+    const dir = mkdtempSync(join(tmpdir(), 'guide-precheck-day-'));
+    const git = (...args: string[]) => execFileSync('git', ['-C', join(dir, 'source-reference'), ...args], { encoding: 'utf8' }).trim();
+    const text = (title: string, version: string, day: string) => `# ${title}\n\n**Version ${version} · Effective ${day} · Previous versions at dezbatere.ro · Language: English.**\n\nBody.\n`;
+    const archive = (kind: string, version: string) => `apps/ui/legal/archive/en/${kind.toLowerCase()}-${version}.md`;
+    /** One folder as a release holds it: the two English texts and an archive copy of each version listed. */
+    const writeRelease = (root: string, texts: { TERMS: [string, string]; PRIVACY: [string, string] }, versions: { TERMS: string[]; PRIVACY: string[] }) => {
+      const engine = join(root, 'dialectical-engine');
+      for (const folder of ['apps/ui/legal/en', 'apps/ui/legal/archive/en', 'packages/legal-manifest/src']) mkdirSync(join(engine, folder), { recursive: true });
+      writeFileSync(join(engine, 'apps/ui/legal/en/terms-of-service.md'), text('Terms of Service', ...texts.TERMS));
+      writeFileSync(join(engine, 'apps/ui/legal/en/privacy-policy.md'), text('Privacy Policy', ...texts.PRIVACY));
+      const manifest: Record<string, Record<string, Record<string, { version: string; path: string }>>> = { TERMS: { en: {} }, PRIVACY: { en: {} } };
+      for (const kind of ['TERMS', 'PRIVACY'] as const) {
+        for (const version of versions[kind]) {
+          writeFileSync(join(engine, archive(kind, version)), `${kind} ${version}\n`);
+          manifest[kind]!.en![`${kind}-${version}`] = { version, path: archive(kind, version) };
+        }
+      }
+      writeFileSync(join(engine, 'packages/legal-manifest/src/manifest.json'), JSON.stringify({ archive: manifest }));
+    };
+    try {
+      // The reference clone: one commit for a live release with both texts at 1.0, one with both at 1.1 (24 November).
+      mkdirSync(join(dir, 'source-reference'));
+      git('init', '-q');
+      writeRelease(join(dir, 'source-reference'), { TERMS: ['1.0', '20 November 2026'], PRIVACY: ['1.0', '20 November 2026'] }, { TERMS: ['1.0'], PRIVACY: ['1.0'] });
+      git('add', '-A');
+      git('-c', 'user.name=test', '-c', 'user.email=test@example.test', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '-q', '-m', 'release with 1.0');
+      const live10 = git('rev-parse', 'HEAD');
+      writeRelease(join(dir, 'source-reference'), { TERMS: ['1.1', '24 November 2026'], PRIVACY: ['1.1', '24 November 2026'] }, { TERMS: ['1.0', '1.1'], PRIVACY: ['1.0', '1.1'] });
+      git('add', '-A');
+      git('-c', 'user.name=test', '-c', 'user.email=test@example.test', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '-q', '-m', 'release with 1.1');
+      const live11 = git('rev-parse', 'HEAD');
+      const run = (live: string, today: string, texts: { TERMS: [string, string]; PRIVACY: [string, string] }, versions: { TERMS: string[]; PRIVACY: string[] }) => {
+        rmSync(join(dir, 'cui'), { recursive: true, force: true });
+        writeRelease(join(dir, 'cui'), texts, versions);
+        return bash(['set -euo pipefail', `CUI='${dir}/cui'; ART='${dir}'; OREV='${live}'`, `date() { printf '%s\\n' '${today}'; }`,
+          "BAD=''; bad() { echo \"BAD ($1): $2\"; case \" $BAD \" in *\" $1 \"*) ;; *) BAD=\"$BAD $1\";; esac; }", ...check, 'echo "BAD=$BAD"']).split('\n');
+      };
+      // Both texts new in this release: both must carry today.
+      const bothNew = { TERMS: ['1.0', '1.1'], PRIVACY: ['1.0', '1.1'] };
+      expect(run(live10, '25 November 2026', { TERMS: ['1.1', '25 November 2026'], PRIVACY: ['1.1', '25 November 2026'] }, bothNew)).toEqual([
+        'legal day: terms-of-service 1.1, new in this release, takes 25 November 2026',
+        'legal day: privacy-policy 1.1, new in this release, takes 25 November 2026', 'BAD=']);
+      expect(run(live10, '26 November 2026', { TERMS: ['1.1', '25 November 2026'], PRIVACY: ['1.1', '25 November 2026'] }, bothNew)).toEqual([
+        'legal day: terms-of-service 1.1, new in this release, takes 26 November 2026',
+        'BAD (legal-date): the terms-of-service text 1.1 is new in this release and does not carry today\'s day (26 November 2026): it must be re-dated before SB1 (The legal texts\' day)',
+        'legal day: privacy-policy 1.1, new in this release, takes 26 November 2026',
+        'BAD (legal-date): the privacy-policy text 1.1 is new in this release and does not carry today\'s day (26 November 2026): it must be re-dated before SB1 (The legal texts\' day)',
+        'BAD= legal-date']);
+      // Terms 1.1 already live, Privacy Policy 1.2 new: the Terms keep 24 November, the Privacy Policy takes today.
+      const oneNew = { TERMS: ['1.0', '1.1'], PRIVACY: ['1.0', '1.1', '1.2'] };
+      expect(run(live11, '25 November 2026', { TERMS: ['1.1', '24 November 2026'], PRIVACY: ['1.2', '25 November 2026'] }, oneNew)).toEqual([
+        'legal day: terms-of-service 1.1, in the live release, keeps 24 November 2026',
+        'legal day: privacy-policy 1.2, new in this release, takes 25 November 2026', 'BAD=']);
+      // The new text on a day that is not today: refused, and the released one is still read by its own day.
+      expect(run(live11, '26 November 2026', { TERMS: ['1.1', '24 November 2026'], PRIVACY: ['1.2', '25 November 2026'] }, oneNew)).toEqual([
+        'legal day: terms-of-service 1.1, in the live release, keeps 24 November 2026',
+        'legal day: privacy-policy 1.2, new in this release, takes 26 November 2026',
+        'BAD (legal-date): the privacy-policy text 1.2 is new in this release and does not carry today\'s day (26 November 2026): it must be re-dated before SB1 (The legal texts\' day)',
+        'BAD= legal-date']);
+      // A released text moved to today: refused, since a released text keeps its day.
+      expect(run(live11, '25 November 2026', { TERMS: ['1.1', '25 November 2026'], PRIVACY: ['1.2', '25 November 2026'] }, oneNew)).toEqual([
+        'legal day: terms-of-service 1.1, in the live release, keeps 24 November 2026',
+        'BAD (legal-date): the terms-of-service text 1.1 is in the live release, and this release does not keep the day it has there (24 November 2026)',
+        'legal day: privacy-policy 1.2, new in this release, takes 25 November 2026', 'BAD= legal-date']);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
   it('DR2 refuses an earlier cold copy before it stops anything; DR3 records the folders\' modes before its stop and names DBBACK after it', () => {

@@ -160,3 +160,8 @@ c6c932f6e02dcf6392683c92acb732f776f9303e:dialectical-engine/apps/ui/messages/hr/
 c6c932f6e02dcf6392683c92acb732f776f9303e:dialectical-engine/apps/ui/messages/lt/v4.json:generic-api-key:229
 # The same change: the Lithuanian sentence "this page could not be read this time". Not a credential.
 c6c932f6e02dcf6392683c92acb732f776f9303e:dialectical-engine/apps/ui/messages/lt/v4.json:generic-api-key:552
+# 2026-11-24 — the AI content checks through the Anthropic gate: generic-api-key matched a made-up value in a test that
+# proves the gate route never reads the API's own key (it counts the reads and expects none). The value has the prefix
+# the support adapter checks and a 16-character tail, far shorter than a real key of that kind, and it opens nothing.
+# Classified by reading it, as .gitleaks.toml describes.
+48053cf6d9fac5194cdfdff635a19200681284c9:dialectical-engine/tests/unit/content-checks-composition.test.ts:generic-api-key:27

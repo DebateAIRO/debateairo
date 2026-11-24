@@ -92,7 +92,7 @@ describe("Privacy Policy 3.11 names SmartBill, Quaderno, RO e-Factura and the ba
       expect(authorities, `${code}: public authorities name ${name}`).toContain(name);
     }
 
-    // Section 14's change summaries (1.1, and 1.2 in English) name none of these recipients.
+    // Section 14's change summaries (1.1 and 1.2) name none of these recipients.
     expect(section(code, 14), `${code}: section 14 names no recipient`).not.toMatch(/SmartBill|Quaderno/u);
 
     const generated = await generatedSectionFive(code);

@@ -173,10 +173,10 @@ export function inventoryCopy(legal: MessageCatalog): MessageCatalog {
  * Privacy 3.12 (V4 start step, owner 3 Nov 2026): `clarifyQuestions` and `suggestPaths` are the two calls made when
  * the person presses Next, before a debate starts.
  */
-export type ProviderPurpose = "arguments" | "judging" | "story" | "search" | "synthesisCheck" | "questionCheck" | "reportCheck" | "clarifyQuestions" | "suggestPaths" | "support" | "payments";
+export type ProviderPurpose = "arguments" | "judging" | "story" | "search" | "synthesisCheck" | "publicationCheck" | "questionCheck" | "reportCheck" | "clarifyQuestions" | "suggestPaths" | "support" | "payments";
 
 /** Privacy 3.15: `payments` is the payment provider's one job (NETOPIA_PROVIDER), the only row that is not an AI provider. */
-export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "search", "synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support", "payments"]);
+export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "search", "synthesisCheck", "publicationCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support", "payments"]);
 
 /**
  * A yes/no fact from the provider's contract, or "unconfirmed" until someone has read that contract. "notApplicable"
@@ -374,8 +374,9 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   // It is also the model of the end-of-debate check of each synthesis (synthesis-flag S01-R9; PP §5)
   // and of the question check before a debate starts (synthesis-flag S04-R5; PP §5). Privacy 3.12: when the person
   // presses Next it suggests the clarifying questions (ask.clarify) and merges the lists of what to look into (the
-  // start step's one Haiku merge).
-  purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "story", "synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths"]),
+  // start step's one Haiku merge). It is also the model of the publication check, which reads a debate's public text
+  // before it goes public and what is added to a public debate (PP §5), and of the Report button's check.
+  purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "story", "synthesisCheck", "publicationCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths"]),
   purposesConfirmed: true,
   locationKey: "legal.providers.locationAnthropic",
   retentionKey: "legal.providers.retentionAnthropic",
@@ -564,13 +565,13 @@ export function providerRegister(companies: readonly string[] | null): readonly 
   const unchecked = named === null ? [] : [...named]
     .filter((company) => !REVIEWED_COMPANY_KEYS.has(company) && company !== PERPLEXITY_PROVIDER.key).sort()
     .map(uncheckedCompanyEntry);
-  // The two checks always call Claude Haiku 5.5 on Anthropic's API (synthesis-flag S01-R9, S04-R5), the model and
-  // contract the support chat uses. When the Anthropic row is not shown, the support chat's row names both checks,
-  // so the Register still names their recipient (REV-S03-p1 privacy N2). Privacy 3.12: the same holds for the two jobs
-  // before a debate starts that run on Claude Haiku 5.5.
+  // The checks (of a synthesis, of a debate's public text before it goes public, of a question and of a report) always
+  // call Claude Haiku 5.5 on Anthropic's API, the model and contract the support chat uses. When the Anthropic row is
+  // not shown, the support chat's row names every check, so the Register still names their recipient. The same holds
+  // for the two jobs before a debate starts that run on Claude Haiku 5.5.
   const support = reviewed.includes(ANTHROPIC_PREVIEW_PROVIDER)
     ? SUPPORT_PROVIDER
-    : Object.freeze({ ...SUPPORT_PROVIDER, purposes: Object.freeze<ProviderPurpose[]>(["synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support"]) });
+    : Object.freeze({ ...SUPPORT_PROVIDER, purposes: Object.freeze<ProviderPurpose[]>(["synthesisCheck", "publicationCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support"]) });
   return Object.freeze([...reviewed, ...unchecked, PERPLEXITY_PROVIDER, support]);
 }
 

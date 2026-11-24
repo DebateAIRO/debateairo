@@ -127,6 +127,7 @@
   "legal.providers.purpose.judging": "نص المناظرة — للحكم على الحجج والتحقق منها",
   "legal.providers.purpose.story": "المناظرة المكتملة — لكتابة قصة الحكم",
   "legal.providers.purpose.synthesisCheck": "تركيب المناظرة المنتهية — لفحصه بحثًا عن أربع فئات",
+  "legal.providers.purpose.publicationCheck": "النص العام للمناظرة قبل أن يصبح عامًا، وما يُضاف إلى مناظرة عامة — لفحصهما وفق قاعدتنا بشأن المحتوى",
   "legal.providers.purpose.reportCheck": "البلاغ المقدَّم بزر الإبلاغ، ونص المناظرة العام — للتحقق من البلاغ",
   "legal.providers.purpose.questionCheck": "السؤال قبل بدء المناظرة — لفحص ما إذا كان يجوز للمناظرة أن تبدأ",
   "legal.providers.purpose.clarifyQuestions": "قبل بدء المناظرة: اقتراح أسئلة توضيحية",
