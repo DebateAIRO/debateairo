@@ -210,6 +210,7 @@
   "settings.security.codesRemaining": "Codes de récupération : {count}",
   "settings.security.regenerate": "Générer de nouveaux codes de récupération",
   "settings.security.lockoutReminder": "Vous n’avez encore ni codes de récupération ni clé d’accès. Si vous perdez votre téléphone, ils vous permettent de revenir aussitôt dans votre compte.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "Les informations de sécurité n’ont pas pu être actualisées. Rechargez la page.",
   "settings.security.pendingRecovery.title": "Quelqu’un a commencé à remplacer votre application d’authentification",
   "settings.security.pendingRecovery.body": "Quelqu’un a utilisé votre mot de passe et un lien reçu par e-mail pour commencer à remplacer l’application d’authentification de ce compte. Vous pourrez terminer ce remplacement à partir de {time}.",

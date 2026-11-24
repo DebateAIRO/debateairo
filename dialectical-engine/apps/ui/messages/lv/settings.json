@@ -210,6 +210,7 @@
   "settings.security.codesRemaining": "Atkopšanas kodi: {count}",
   "settings.security.regenerate": "Ģenerēt jaunus atkopšanas kodus",
   "settings.security.lockoutReminder": "Jums vēl nav atkopšanas kodu vai piekļuves atslēgas. Ja pazaudēsiet tālruni, ar tiem uzreiz atgūsiet piekļuvi.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "Drošības datus nevarēja atsvaidzināt. Pārlādējiet lapu.",
   "settings.security.pendingRecovery.title": "Kāds ir sācis aizstāt jūsu autentifikācijas lietotni",
   "settings.security.pendingRecovery.body": "Kāds izmantoja jūsu paroli un e-pasta saiti, lai sāktu šī konta autentifikācijas lietotnes aizstāšanu. Pabeigt var no {time}.",

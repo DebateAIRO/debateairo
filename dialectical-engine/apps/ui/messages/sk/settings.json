@@ -211,6 +211,7 @@
   "settings.security.codesRemaining": "Obnovovacie kódy: {count}",
   "settings.security.regenerate": "Vygenerovať nové obnovovacie kódy",
   "settings.security.lockoutReminder": "Zatiaľ nemáte obnovovacie kódy ani prístupový kľúč. Ak stratíte telefón, vďaka nim sa do účtu hneď vrátite.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "Podrobnosti zabezpečenia sa nepodarilo obnoviť. Načítajte stránku znova.",
   "settings.security.pendingRecovery.title": "Niekto začal výmenu vašej overovacej aplikácie",
   "settings.security.pendingRecovery.body": "Niekto použil vaše heslo a odkaz z e-mailu, aby začal výmenu overovacej aplikácie na tomto účte. Dokončiť ju môžete od {time}.",

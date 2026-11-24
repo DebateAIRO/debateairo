@@ -208,6 +208,7 @@
   "settings.security.codesRemaining": "恢复代码：{count}",
   "settings.security.regenerate": "生成新的恢复代码",
   "settings.security.lockoutReminder": "您还没有恢复代码或通行密钥。如果您丢失了手机，有了它们即可立即重新登录。",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "无法刷新安全信息。请重新加载页面。",
   "settings.security.pendingRecovery.title": "有人开始更换您的身份验证器应用",
   "settings.security.pendingRecovery.body": "有人使用您的密码和一封电子邮件中的链接，开始更换此账户的身份验证器应用。您可以从 {time} 起完成更换。",

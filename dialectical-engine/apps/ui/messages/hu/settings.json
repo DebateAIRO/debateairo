@@ -209,6 +209,7 @@
   "settings.security.codesRemaining": "Helyreállítási kódok: {count}",
   "settings.security.regenerate": "Új helyreállítási kódok létrehozása",
   "settings.security.lockoutReminder": "Még nincsenek helyreállítási kódjai, és hozzáférési kulcsa sincs. Ha elveszíti a telefonját, ezekkel azonnal visszajut a fiókjába.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "A biztonsági adatokat nem sikerült frissíteni. Töltse be újra az oldalt.",
   "settings.security.pendingRecovery.title": "Valaki elkezdte kicserélni a hitelesítő alkalmazását",
   "settings.security.pendingRecovery.body": "Valaki az Ön jelszavával és egy e-mailben kapott linkkel elkezdte kicserélni a hitelesítő alkalmazást ezen a fiókon. Ekkortól fejezheti be: {time}.",

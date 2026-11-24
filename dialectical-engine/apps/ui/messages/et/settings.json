@@ -209,6 +209,7 @@
   "settings.security.codesRemaining": "Taastekoodid: {count}",
   "settings.security.regenerate": "Loo uued taastekoodid",
   "settings.security.lockoutReminder": "Teil pole veel taastekoode ega pääsuvõtit. Kui kaotate telefoni, pääsete nendega kohe tagasi sisse.",
+  "settings.security.lockoutReminderPasskey": "You have no recovery codes yet. If you lose your passkey, a saved recovery code is the only way back into your account.",
   "settings.security.refreshFailed": "Turbeandmeid ei saanud värskendada. Laadi leht uuesti.",
   "settings.security.pendingRecovery.title": "Keegi on alustanud teie autentimisrakenduse asendamist",
   "settings.security.pendingRecovery.body": "Keegi kasutas teie parooli ja e-posti linki, et alustada selle konto autentimisrakenduse asendamist. Saate lõpetada alates {time}.",
