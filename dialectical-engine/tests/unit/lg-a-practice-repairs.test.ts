@@ -224,13 +224,15 @@ describe("LG-A practice: the call join (practiceTryJoiner, review round 1, Revie
     expect(slipRule(rows, out)).toEqual({ [GLM]: { answered: 1, slips: 1, repaired: 1, unrecovered: 0 } });
   });
 
-  it("(b) a refused structure repair, then GLM's final retry: one GLM call; the refused repair is the call's, never Haiku's slip", async () => {
+  it("(b) a refused structure repair, then GLM's final retry: one GLM call; the refused repair is the call's, never Haiku's slip, and its row names Haiku", async () => {
     const rows = [glmRefused,
       { actorRef: HAIKU_REF, model: HAIKU, callSiteKey: `REPAIR:STRUCTURE:${K}`, outcome: "FAILED", formatFailed: true, recordedForm: "STRUCTURE" },
       { actorRef: GLM_REF, model: GLM, callSiteKey: K, outcome: "OK", formatFailed: false, recordedForm: "ORIGINAL" }];
     const { out } = await joined(rows);
     expect(out.map((join) => join.callKey)).toEqual(Array(3).fill(`${GLM_REF}\u0000${K}`));
-    expect(out.map((join) => join.recordModel)).toEqual([GLM, GLM, GLM]);
+    // The refused repair is Haiku's own copy: the report's rows name Haiku for it, while the call stays GLM's.
+    expect(out.map((join) => join.recordModel)).toEqual([GLM, HAIKU, GLM]);
+    expect(out.map((join) => join.callModel)).toEqual([GLM, GLM, GLM]);
     expect(out.map((join) => join.replyForm)).toEqual(["ORIGINAL", "STRUCTURE", "ORIGINAL"]);
     expect(slipRule(rows, out)).toEqual({ [GLM]: { answered: 1, slips: 1, repaired: 1, unrecovered: 0 } });
   });
@@ -258,6 +260,27 @@ describe("LG-A practice: the call join (practiceTryJoiner, review round 1, Revie
     // An accepted try of the same key between the refusal and its repair leaves the repair with the refused call.
     const between = await joined([glmRefused, accepted, repair]);
     expect(between.out.map((join) => join.callKey)).toEqual([`${GLM_REF}\u0000${K}`, `${MIMO_REF}\u0000${K}`, `${GLM_REF}\u0000${K}`]);
+  });
+
+  it("(e) an unrecovered repair's summary line names the model that made the repair call, not the AI it repaired", async () => {
+    const review = { actorRef: GLM_REF, model: GLM, callSiteKey: K2, outcome: "FAILED", formatFailed: true, recordedForm: "ORIGINAL" };
+    const refusedRepair = { actorRef: HAIKU_REF, model: HAIKU, callSiteKey: `REPAIR:STRUCTURE:${K2}`, outcome: "FAILED", formatFailed: true,
+      recordedForm: "STRUCTURE" };
+    const { out } = await joined([review, refusedRepair]);
+    const records: PracticeTryRecord[] = [
+      { callKey: out[0]!.callKey, model: out[0]!.recordModel, callSiteKey: K2, outcome: "FAILED", parseStatus: "PARSE_FAILED",
+        replyForm: out[0]!.replyForm, repairs: null, failureClass: "STRUCTURE", issue: null, replyText: "{\"outcome\":\"agree\"" },
+      { callKey: out[1]!.callKey, model: out[1]!.recordModel, callSiteKey: `REPAIR:STRUCTURE:${K2}`, outcome: "FAILED",
+        parseStatus: "SCHEMA_FAILED", replyForm: out[1]!.replyForm, repairs: null, failureClass: "CONTENT",
+        issue: "STRUCTURE_REPAIR_NOT_VERBATIM@$", replyText: "{\"outcome\":\"agree\"}" }
+    ];
+    const rows = practiceUnrepairedRows(records);
+    expect(rows.map((row) => [row.model, row.step, row.code])).toEqual([
+      [GLM, "reviewer", "PARSE_FAILED"], [HAIKU, "structure_repair", "STRUCTURE_REPAIR_NOT_VERBATIM"]]);
+    const markdown = reportMarkdown({ mode: "debate", verdict: "PASS", exitCode: 0, reasons: [], startedAt: "s", finishedAt: "f",
+      unrepaired: rows } as never);
+    expect(markdown).toContain(`- ${HAIKU} · structure_repair · CONTENT · STRUCTURE_REPAIR_NOT_VERBATIM@$ · next: NONE · not recovered`);
+    expect(markdown).not.toContain(`- ${GLM} · structure_repair`);
   });
 });
 
@@ -294,8 +317,8 @@ const RESCUES: readonly PracticeTryRecord[] = [
     repairs: ["ECHO_DROPPED"], failureClass: null, issue: null, replyText: null },
   { callKey: "glm|PANEL:b", model: GLM, callSiteKey: "PANEL:JUDGE:cross-root:2->3", outcome: "FAILED", parseStatus: "PARSE_FAILED",
     replyForm: "ORIGINAL", repairs: null, failureClass: "STRUCTURE", issue: "PARSE_FAILED@$", replyText: "{" },
-  // The joiner records a refused Haiku try under the call's model (practice-debate.ts:289-294; pre-flight PF-S19).
-  { callKey: "glm|PANEL:b", model: GLM, callSiteKey: "REPAIR:STRUCTURE:PANEL:JUDGE:cross-root:2->3", outcome: "FAILED",
+  // The joiner records a refused Haiku try under the call's key and Haiku's own name (`practiceTryJoiner`).
+  { callKey: "glm|PANEL:b", model: HAIKU, callSiteKey: "REPAIR:STRUCTURE:PANEL:JUDGE:cross-root:2->3", outcome: "FAILED",
     parseStatus: "SCHEMA_FAILED", replyForm: "STRUCTURE", repairs: null, failureClass: "CONTENT", issue: "STRUCTURE_REPAIR_NOT_VERBATIM@$", replyText: "{}" },
   { callKey: "glm|PANEL:b", model: GLM, callSiteKey: "PANEL:JUDGE:cross-root:2->3", outcome: "OK", parseStatus: "PARSED", replyForm: "PATCH",
     repairs: null, failureClass: null, issue: null, replyText: null }

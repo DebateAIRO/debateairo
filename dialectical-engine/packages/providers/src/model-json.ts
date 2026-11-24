@@ -108,15 +108,19 @@ export type ModelJsonStructureRepair = typeof MODEL_JSON_STRUCTURE_REPAIRS[numbe
 export const MAP_REPLY_SALVAGE_REPAIRS = Object.freeze(["MAP_TEXT_TRIMMED", "MAP_LEANS_DEFAULTED", "MAP_IDS_DROPPED", "MAP_IDS_NORMALISED"] as const);
 export type MapReplySalvageRepair = typeof MAP_REPLY_SALVAGE_REPAIRS[number];
 /**
- * Refused-repair salvage (2026-10-16, A1): the DROPS `salvageStructureReply` (./structure-repair.ts) makes in code, with no
- * call, on a STRUCTURE reply read as a tree, before the structure-repair call. It only ever drops a value, never moves,
- * changes or fills one, and its result is accepted only when the step's own check then accepts it:
+ * Refused-repair salvage: the repairs `salvageStructureReply` (./structure-repair.ts) makes in code, with no call, on a
+ * STRUCTURE reply, before the structure-repair call. The first four only ever drop a value of a reply read as a tree,
+ * never move, change or fill one; the last moves one bracket the reply wrote. Its result is accepted only when the word
+ * check and the step's own check then accept it:
  *  · KEYLESS_VALUE_DROPPED: a text written in an object with no key name of its own (judge steps only);
  *  · DUPLICATE_KEY_DROPPED: a key written again in one object with the SAME value;
  *  · ECHO_DROPPED: a value under a name the form states at one other place, equal to the value kept there;
- *  · UNASKED_VALUE_DROPPED: a text, null, `{}` or `[]` under a name not stated at its place, as the step's fixer drops it.
+ *  · UNASKED_VALUE_DROPPED: a text, null, `{}` or `[]` under a name not stated at its place, as the step's fixer drops it;
+ *  · LIST_CLOSER_MOVED: a list closed one key too late (`["…","edge_bearings":[0.85]]`), its `]` moved to right before
+ *    that key, only under the rule `listCloserMoved` states; a mended object the step refuses is not handed on.
  */
-export const STRUCTURE_SALVAGE_REPAIRS = Object.freeze(["KEYLESS_VALUE_DROPPED", "DUPLICATE_KEY_DROPPED", "ECHO_DROPPED", "UNASKED_VALUE_DROPPED"] as const);
+export const STRUCTURE_SALVAGE_REPAIRS = Object.freeze(["KEYLESS_VALUE_DROPPED", "DUPLICATE_KEY_DROPPED", "ECHO_DROPPED", "UNASKED_VALUE_DROPPED",
+  "LIST_CLOSER_MOVED"] as const);
 export type StructureSalvageRepair = typeof STRUCTURE_SALVAGE_REPAIRS[number];
 /**
  * The repair codes a classification can name (`ContentClassification.jsonRepair`): the decode repairs (`ModelJsonDecodeRepair`),

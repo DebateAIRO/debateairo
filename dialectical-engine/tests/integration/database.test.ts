@@ -5502,6 +5502,71 @@ describe("apps/runner — legal command lifecycle", () => {
   });
 });
 
+describe("a review refused for its content (production runner, plain gateways)", () => {
+  it("guard: ends a refused review as NODE_REVIEW_UNAVAILABLE when the next reviewer's call has no allowance of its own, never CALL_BUDGET_EXHAUSTED", async () => {
+    // Three makers on plain gateways (no per-maker count): every reviewer of a point shares that point's one call-site
+    // allowance of one attempt. Maker B's first review reply is refused for its content and spends it, so the next
+    // reviewer's call would be refused before it is sent: the point cannot be offered to another reviewer. A guard: the
+    // review ends here the same way with or without the hand-off to another reviewer, which must never turn this ending
+    // into CALL_BUDGET_EXHAUSTED.
+    const makerA = await startProviderDouble([
+      ...Array.from({ length: 5 }, (_, index) => judgementDouble(`Shared allowance A position ${index + 1}`)),
+      ...Array.from({ length: 15 }, (_, index) => reviewDouble("agree", `Shared allowance A review ${index + 1}`))
+    ]);
+    const makerB = await startProviderDouble([
+      ...Array.from({ length: 5 }, (_, index) => judgementDouble(`Shared allowance B position ${index + 1}`)),
+      JSON.stringify({ outcome: "agree" }),
+      ...Array.from({ length: 14 }, (_, index) => reviewDouble("dispute", `Shared allowance B review ${index + 2}`))
+    ]);
+    const makerC = await startProviderDouble([
+      ...Array.from({ length: 5 }, (_, index) => judgementDouble(`Shared allowance C position ${index + 1}`)),
+      ...Array.from({ length: 15 }, (_, index) => reviewDouble("cannot-assess", `Shared allowance C review ${index + 1}`))
+    ]);
+    try {
+      const runId = await createRun("review-refused-shared-allowance", 60, 3, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: "runner-test:review-refused-shared-allowance"
+      });
+      const gateway = (endpoint: string, model: string, maker: string) => createPostgresProviderGateway(runnerPool, { endpoint, model, maker });
+      const runner = new WalkingSkeletonRunner(runnerPool, gateway(makerA.endpoint, "test-layer/shared-a", "Shared allowance maker A"), {
+        ...runnerSettings(),
+        providerRef: "provider:test-layer",
+        maker: "Shared allowance maker A",
+        critique: {
+          provider: gateway(makerB.endpoint, "test-layer/shared-b", "Shared allowance maker B"),
+          providerRef: "provider:test-layer:secondary",
+          maker: "Shared allowance maker B"
+        },
+        additionalMakers: [{
+          provider: gateway(makerC.endpoint, "test-layer/shared-c", "Shared allowance maker C"),
+          providerRef: "provider:test-layer:third",
+          maker: "Shared allowance maker C"
+        }],
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      });
+
+      const failure = await runner.executeWorkItem(workItemId).then(() => null, (error: unknown) => error);
+      expect(failure).toMatchObject({ code: "NODE_REVIEW_UNAVAILABLE" });
+      const nodeId = /^No valid cross-maker review was recorded for node (\S+)$/u.exec((failure as Error).message)?.[1];
+      expect(nodeId).toBeDefined();
+      // The point's one review call is B's refused one: no other reviewer's call was sent, and no review was recorded.
+      const calls = await database.pool.query<{ actor_ref: string; outcome: string }>(
+        `SELECT actor_ref, outcome FROM ledger.ledger_entry
+          WHERE run_id=$1 AND action_kind='MODEL_CALL' AND call_site_key LIKE $2 ORDER BY sequence`,
+        [runId, `JUDGE:review:${nodeId!}%`]
+      );
+      expect(calls.rows).toEqual([{ actor_ref: "provider:test-layer:secondary", outcome: "FAILED" }]);
+      const reviews = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM ledger.node_review WHERE run_id=$1 AND node_id=$2::uuid", [runId, nodeId]);
+      expect(reviews.rows[0]?.count).toBe("0");
+    } finally {
+      await makerC.stop();
+      await makerB.stop();
+      await makerA.stop();
+    }
+  });
+});
+
 /**
  * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — A STOP WHILE ARGUING NEVER SKIPS
  * THE ANSWER, through the PRODUCTION runner on the embedded Postgres.
