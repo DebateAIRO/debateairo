@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { ContractClient } from "@debateai/contract";
+import { RUN_VISIBILITY_PUBLIC_STAGES, type ContractClient } from "@debateai/contract";
 import { contractClient } from "../api.js";
 
 /*
@@ -7,11 +7,12 @@ import { contractClient } from "../api.js";
  * globe line under the breadcrumb ("Public · See its page · Copy link") and the "This will be public." line under the
  * boxes where the person types words that go on its public page.
  *
- * What the server says today: GET /v1/runs/{id}/visibility answers PUBLISHED with the public page's reference, or PRIVATE.
- * PUBLISHED is certain, so "Public" shows from it. PRIVATE cannot tell "will be public when finished" or "being checked"
- * from "kept private because it did not pass the check" or a paid debate that simply is private, so those three stages
- * come only from an OPTIONAL field the server does not send yet (`public_stage`, the track's server note); the
- * contract's read is strict, so they arrive once the contract names it. Until then PRIVATE shows nothing: the page never
+ * What the server says: GET /v1/runs/{id}/visibility answers PUBLISHED with the public page's reference, or PRIVATE.
+ * PUBLISHED is certain, so "Public" shows from it. PRIVATE alone cannot tell "will be public when finished" or "being
+ * checked" from "kept private because it did not pass the check" or a paid debate that simply is private, so those three
+ * stages come only from the read's OPTIONAL `public_stage` field, whose values the contract names
+ * (RUN_VISIBILITY_PUBLIC_STAGES). The server sends KEPT_PRIVATE to the owner of a Free debate the publication check
+ * refused (migration 0188), and neither stage before the check. PRIVATE without a stage shows nothing: the page never
  * guesses Free or paid, so a paid person is never told their debate is public. No browser storage.
  */
 
@@ -21,9 +22,9 @@ export type PublicStage =
   | Readonly<{ kind: "PUBLIC"; publicRef: string }>
   | Readonly<{ kind: "KEPT_PRIVATE" }>;
 
-/** The visibility read's optional field naming the stages before and after the check (not sent yet). */
+/** The visibility read's optional field naming the stages before and after the check. */
 export const PUBLIC_STAGE_FIELD = "public_stage";
-const PENDING_STAGES = ["WILL_BE_PUBLIC", "BEING_CHECKED", "KEPT_PRIVATE"] as const;
+const PENDING_STAGES = RUN_VISIBILITY_PUBLIC_STAGES;
 const REF = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 /** While the stage may still change by itself (will be public, being checked), how often it is read again. */
 export const PUBLIC_STAGE_REREAD_MS = 30_000;

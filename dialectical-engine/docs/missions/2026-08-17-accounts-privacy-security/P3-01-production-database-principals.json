@@ -3663,6 +3663,13 @@
       "grants": [
         "EXECUTE ON FUNCTION identity.read_consumer_passkey_allow_credentials(text,text)"
       ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0188_free_debate_refused_by_check.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_free_debate_refused_by_check(uuid,uuid)"
+      ]
     }
   ],
   "privilegeRevocations": [

@@ -290,7 +290,8 @@ describe("S8 publication HTTP boundary", () => {
   it("the visibility read tells the page a dig is one, and says nothing more for a debate that is not (security review F2)", async () => {
     for (const visibility of [
       { state: "PRIVATE", public_ref: null, dig: true },
-      { state: "PRIVATE", public_ref: null }
+      { state: "PRIVATE", public_ref: null },
+      { state: "PRIVATE", public_ref: null, public_stage: "KEPT_PRIVATE" }
     ] as const) {
       const api = buildApi({
         application: application(), sessions: sessions(), allowedOrigin: ORIGIN,
@@ -301,6 +302,44 @@ describe("S8 publication HTTP boundary", () => {
       expect(response.json()).toStrictEqual(visibility);
       await api.close();
     }
+  });
+
+  it("the visibility read says KEPT_PRIVATE only of the owner's private debate the database says the check refused; every other answer is as before", async () => {
+    type VisibilityRow = Readonly<{ state: "PRIVATE" | "PUBLISHED"; publication_ref: string | null; dig: boolean; kept_private: boolean }>;
+    const answers: VisibilityRow[] = [];
+    const query = vi.fn(async (statement: string, _values: readonly unknown[]) => {
+      // The repository's one visibility statement, which asks 0188's reader beside 0171's.
+      if (statement.includes("identity.read_free_debate_refused_by_check($3,run.run_id)")) return { rows: answers.splice(0, 1) };
+      throw new Error(`UNEXPECTED_QUERY:${statement}`);
+    });
+    const api = buildApi({
+      application: application(), sessions: sessions(), allowedOrigin: ORIGIN,
+      publications: new PostgresPublicationApplication(
+        new PostgresPublicationRepository({ query } as never, {} as never),
+        {} as unknown as PublicationCipher
+      )
+    });
+    const read = async (headers: Readonly<Record<string, string>> = mutationHeaders) => {
+      const response = await api.inject({ method: "GET", url: `/v1/runs/${RUN_ID}/visibility`, headers });
+      return { status: response.statusCode, body: response.json() as unknown };
+    };
+    // The owner's private Free debate the check refused: the stage, asked for the session's own account.
+    answers.push({ state: "PRIVATE", publication_ref: null, dig: false, kept_private: true });
+    expect(await read()).toEqual({ status: 200, body: { state: "PRIVATE", public_ref: null, public_stage: "KEPT_PRIVATE" } });
+    expect(query.mock.calls[0]![1]).toEqual([RUN_ID, authenticated.userId, authenticated.ownerRef]);
+    // A private debate the reader says nothing of (still waiting, refused with no check, paid): exactly as before.
+    answers.push({ state: "PRIVATE", publication_ref: null, dig: false, kept_private: false });
+    expect(await read()).toEqual({ status: 200, body: { state: "PRIVATE", public_ref: null } });
+    // A public debate is unchanged, whatever the flag says.
+    answers.push({ state: "PUBLISHED", publication_ref: PUBLIC_REF, dig: false, kept_private: true });
+    expect(await read()).toEqual({ status: 200, body: { state: "PUBLISHED", public_ref: PUBLIC_REF } });
+    // Another account's debate: the statement finds no row for this owner, so the same 404 as before.
+    expect(await read()).toEqual({ status: 404, body: { error: "RUN_NOT_FOUND" } });
+    // Signed out: refused before anything is read.
+    const asked = query.mock.calls.length;
+    expect((await read({ origin: ORIGIN, "user-agent": "s8-test-browser" })).status).toBe(401);
+    expect(query.mock.calls).toHaveLength(asked);
+    await api.close();
   });
 
   it("has no Unpublish route: a signed-in owner's request is refused and nothing changes (owner decision 13)", async () => {

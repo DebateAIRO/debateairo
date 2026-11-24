@@ -9,7 +9,7 @@ import { typedGoesPublic, type PublicStage } from "./publicState.js";
  *  - The debate's public state says it goes (or went) public (public, will be public, being checked): journey-f20's
  *    "This will be public." under the own-view box, and public-f26's "This adds to your public debate." in the tray.
  *  - It says the check kept it private: nothing.
- *  - It says nothing more than private (today's server, until its optional `public_stage` field comes) on a debate that
+ *  - It says nothing more than private (the server sends no stage while a Free debate waits for its check) on a debate that
  *    ran on Free: dig-f26's own line, which the record words with "may", "Free debates are public, so your view may be
  *    shown on this public page.", under the own-view box only (the tray's sentence is definite, so it waits for the
  *    stage). A paid debate: nothing.
