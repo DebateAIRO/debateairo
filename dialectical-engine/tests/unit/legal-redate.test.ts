@@ -40,8 +40,10 @@ const currentOf = (kind: "PRIVACY" | "TERMS") => englishVersionAndDay(readDraft(
  * The record of translations once French and Romanian follow the current English texts, as they must before an upload
  * re-dates them. The plan reads only the record, not the translations' words.
  */
-const caughtUp = (): LegalTranslations => {
-  const record = structuredClone(translations()) as LegalTranslations;
+/** A copy this file may write to: the record's and the manifest's own types are read-only. */
+type Writable<T> = { -readonly [K in keyof T]: Writable<T[K]> };
+const caughtUp = (): Writable<LegalTranslations> => {
+  const record = structuredClone(translations()) as Writable<LegalTranslations>;
   for (const kind of KINDS) {
     for (const code of ["fr", "ro"]) record[kind][code] = { version: currentOf(kind).version, sha256: sha(readDraft("en", kind)) };
   }
@@ -161,7 +163,7 @@ describe("the plan on the drafts as they are", () => {
         `LEGAL_REDATE_REFUSED: ${day.year}-${String(day.month).padStart(2, "0")}-${String(day.day).padStart(2, "0")} is not after ${legalDayText("en", launched, "line")}, the day the Privacy Policy 1.0 took effect`);
     }
     // Both current versions released: an archive copy of each in the release the site runs.
-    const both = structuredClone(manifest()) as { archive: Record<string, Record<string, Record<string, { version: string; path: string }>>> } & LegalManifest;
+    const both = structuredClone(manifest()) as Writable<LegalManifest>;
     for (const kind of KINDS) {
       const { version } = currentOf(kind);
       if (!Object.values(both.archive[kind].fr ?? {}).some((entry) => entry.version === version)) {

@@ -130,7 +130,9 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "public_report_check", "public_report_writer",
       // 0150: a public debate under review: its log, its corrections, the digs detached when it was hidden, what each reviewer read.
       "public_review_correction", "public_review_detached", "public_review_event", "public_review_purged", "public_review_read", "public_update_ref",
-      "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "restore_fence", "run_execution_binding",
+      "publication_event_binding", "recovery_code", "recovery_email_request",
+      // 0188 the Owner's permit for a locked-out account: the asks, and the sealed mails of each.
+      "recovery_permit", "recovery_permit_notice", "recovery_permit_notice_binding", "registration_region", "restore_fence", "run_execution_binding",
       // 0143 the hand-over of a paused debate: which release and settings version it moved from and to.
       "run_handover",
       // 0134 the month pause of a running debate.
