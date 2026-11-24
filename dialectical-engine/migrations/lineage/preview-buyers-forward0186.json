@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0186_preview_buyers.sql",
-    "sha256": "c4b1b627a89b1070c620913be14fe8c4581463c1f349f72fb8d6c392fa570c59"
+    "sha256": "94453bd894bb222669c25d6b17df70a35640c48ea12682b3aec68c78d1e722f8"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

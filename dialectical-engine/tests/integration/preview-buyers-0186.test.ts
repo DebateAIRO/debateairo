@@ -261,6 +261,30 @@ describe("the account and the list", () => {
       expect(await consumed(stored.proofId)).toBeNull();
     }
   });
+  it("a listed account that is suspended cannot buy, stays on the Owner's list, and can buy again once it is active", async () => {
+    // A change of state sends the account a security notice, which is written in a mail language.
+    const ana = await buyer("suspended-listed"), state = (value: string) =>
+      withMailLocale(database.pool, "en", (c) => c.query(`UPDATE identity."user" SET state=$2 WHERE user_id=$1`, [ana.userId, value]));
+    const onList = async () => (await repository.readList(owner.context as never, hash(owner.sessionId))).buyers.some((row) => row.userId === ana.userId);
+    await change(owner, "PREVIEW_BUYER_ADD", ana.userId);
+    expect(await repository.listed(ana.userId)).toBe(true);
+    // Suspended: the pay button's yes or no says no, with no change to the list.
+    const at = await revision();
+    await state("suspended");
+    expect(await repository.listed(ana.userId)).toBe(false);
+    expect(await onList()).toBe(true);
+    expect(await revision()).toBe(at);
+    // Active again: it buys again, still on the list, with no new approval.
+    await state("active");
+    expect(await repository.listed(ana.userId)).toBe(true);
+    // While suspended, the Owner can still take it off the list, and it stays off once active.
+    await state("suspended");
+    await change(owner, "PREVIEW_BUYER_REMOVE", ana.userId);
+    expect(await onList()).toBe(false);
+    await state("active");
+    expect(await repository.listed(ana.userId)).toBe(false);
+    expect((await rows(ana.userId)).map((row) => row.kind)).toEqual(["ADDED", "REMOVED"]);
+  });
   it("an account already listed cannot be added again, and one not listed cannot be removed", async () => {
     const ana = await buyer("preconditions");
     await change(owner, "PREVIEW_BUYER_ADD", ana.userId);

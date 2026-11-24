@@ -2346,7 +2346,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
       "0126's question whether the check removed a debate, a refusal: an owner question would read a mismatch as not removed; one boolean of a run id",
     "staff.hold_threat_report_email(uuid,text)": "0128's hold of an erasing account's address on its threat reports, gated by the id of a prepared, uncommitted erasure",
     "staff.preview_buyer_listed(uuid)":
-      "0186's one bit of a user id, whether that account is on the Owner's list of the preview's approved buyers; the API's billing role's alone, asked at the pay button for the signed-in account",
+      "0186's one bit of a user id, whether that account is on the Owner's list of the preview's approved buyers and active; the API's billing role's alone, asked at the pay button for the signed-in account",
     "staff.release_alert_delivery(uuid,uuid)": "0112's verifier pins it, and it gives back only a live claim, whose token only the marker's claim hands out"
   };
   /**

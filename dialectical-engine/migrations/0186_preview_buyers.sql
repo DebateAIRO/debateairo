@@ -8,9 +8,11 @@
 --                               it, by whom, under which operation, and at which revision of the list. An account's
 --                               last row says whether it is listed now. No address is stored. A row leaves only with
 --                               its account (the account's erasure deletes identity."user", and the rows cascade).
---   staff.preview_buyer_listed  one yes or no for one account, read by the API at the pay button. The team line keeps
---                               its own meaning: the API asks the table only for an account not on that line, and
---                               only while the site is open that way; with real payments it never asks.
+--   staff.preview_buyer_listed  one yes or no for one account, read by the API at the pay button: listed and active. A
+--                               listed account that is suspended cannot buy, stays on the Owner's list so it can be
+--                               removed, and buys again only once it is active again. The team line keeps its own
+--                               meaning: the API asks the table only for an account not on that line, and only while
+--                               the site is open that way; with real payments it never asks.
 --   staff.read_preview_buyers   the list and its revision, for the Owner alone.
 --   staff.preview_buyer_act     the one door that changes the list: the Owner's fresh hardware-key proof, made under
 --                               the existing action TEAM_GRANT and bound to the change (add or remove), the account,
@@ -35,9 +37,11 @@
 
 CREATE TABLE IF NOT EXISTS staff.preview_buyer_event (
  event_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
- -- One counter for the whole list: each change takes the next number, and every proof binds the number it was made at.
- -- An account's erasure can take the latest rows with it; the list then reads a lower number, and a proof made at the
- -- higher one is stale.
+ -- One counter for the whole list: a change takes the highest number on the table plus one, and every proof binds the
+ -- number it was made at. The number is not always rising: an account's erasure can take the latest rows with it, the
+ -- list then reads a lower number, and the next change takes a number used before. That is harmless: a proof made at
+ -- the higher number is stale, and one made at the lower number still binds the same Owner, account, change and
+ -- operation, is used once and expires within minutes.
  revision bigint NOT NULL UNIQUE CHECK(revision BETWEEN 1 AND 9007199254740991),
  user_id uuid NOT NULL REFERENCES identity."user" ON DELETE CASCADE,
  kind text NOT NULL CHECK(kind IN('ADDED','REMOVED')),
@@ -57,7 +61,9 @@ CREATE INDEX IF NOT EXISTS preview_buyer_event_user ON staff.preview_buyer_event
 CREATE OR REPLACE TRIGGER staff_immutable BEFORE UPDATE OR TRUNCATE ON staff.preview_buyer_event
  FOR EACH STATEMENT EXECUTE FUNCTION staff.reject_mutation();
 
--- Whether one account is on the list now: its latest row is an addition. The API's request login asks it at the pay
+-- Whether one account may buy through the list now: its latest row is an addition and the account is active. The list
+-- follows the account only while it is active, so a suspended account is refused at the pay button without a removal,
+-- and buys again once it is active, still on the list, with no new approval. The API's request login asks it at the pay
 -- button for the signed-in account. It takes the id rather than reading the session because the session's account
 -- is 0130's to tell, and this expand step changes no right of 0130's functions; what it hands back is one yes or no
 -- about an account the caller must already know, nothing else of it, and only the API's billing role may ask (the
@@ -65,6 +71,7 @@ CREATE OR REPLACE TRIGGER staff_immutable BEFORE UPDATE OR TRUNCATE ON staff.pre
 CREATE OR REPLACE FUNCTION staff.preview_buyer_listed(p_user uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT COALESCE((SELECT e.kind='ADDED' FROM staff.preview_buyer_event e WHERE e.user_id=p_user ORDER BY e.revision DESC LIMIT 1),false)
+  AND EXISTS(SELECT 1 FROM identity."user" u WHERE u.user_id=p_user AND u.state='active')
 $$;
 
 -- The body a proof for this list binds, the same canonical JSON the API digests (apps/api/src/staff/preview-buyers.ts):
@@ -134,7 +141,8 @@ BEGIN
  END IF;
  SELECT COALESCE(max(revision),0) INTO v_revision FROM staff.preview_buyer_event;
  IF (p_command->>'expectedRevision')::bigint<>v_revision THEN RAISE EXCEPTION 'PREVIEW_BUYERS_STALE'; END IF;
- v_listed:=staff.preview_buyer_listed(v_target);
+ -- On the list, whatever the account's state: a suspended account stays listed until the Owner removes it.
+ v_listed:=COALESCE((SELECT e.kind='ADDED' FROM staff.preview_buyer_event e WHERE e.user_id=v_target ORDER BY e.revision DESC LIMIT 1),false);
  IF v_intent='PREVIEW_BUYER_ADD' THEN
   IF NOT EXISTS(SELECT 1 FROM identity."user" WHERE user_id=v_target AND state='active') THEN RAISE EXCEPTION 'PREVIEW_BUYER_ACCOUNT_INVALID'; END IF;
   IF v_listed THEN RAISE EXCEPTION 'PREVIEW_BUYER_ALREADY'; END IF;

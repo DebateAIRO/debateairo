@@ -488,7 +488,7 @@ describe('OPENCHECK', () => {
     withWorld({ ...OPEN, answers: { login: '200', plans: '2\n', pages: '1\n' } }, w => {
       const result = run('OPENCHECK', w);
       expect(result.lines).toContain('accounts not on the list now: open sandbox plans 2, unfinished payment pages 1');
-      expect(result.lines).toContain('LOOK: plans or payment pages of accounts not on the list (from before the opening, or of accounts you took off it): each goes on until it is withdrawn or cancelled; settle them as 3.3 says');
+      expect(result.lines).toContain('LOOK: plans or payment pages of accounts not on the list (from before the opening, of accounts you took off it, or of accounts suspended while on it): each goes on until it is withdrawn or cancelled; settle them as 3.3 says');
       expect(result.last).toBe('OPENCHECK_DONE');
     });
   });

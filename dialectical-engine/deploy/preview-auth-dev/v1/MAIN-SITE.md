@@ -3624,7 +3624,8 @@ OPENCHECK (6b.4) checks every morning that it held.
   box "Who may buy while payments are in test mode" on the Team page (https://dezbatere.ro/admin/team). Only you, the
   Owner, see it and change it, each change with your security key; nothing restarts, and the API reads it at the
   moment someone presses the pay button (6b.3). It counts only while 6b is open; it starts empty at each opening
-  (ASKS_OPEN refuses otherwise, 6.1).
+  (ASKS_OPEN refuses otherwise, 6.1). An account on it buys only while it is active: a suspended account cannot buy,
+  stays in the box with **Remove**, and can buy again if it becomes active again, unless you remove it.
 
 The list holds at most `PREVIEW_TEAM_MAX_MEMBERS` accounts, the team included, its two parts together: that is the
 cap's name in the code (`packages/providers/src/preview-test.ts`). The Team page refuses an account past it, and BUYERS
@@ -3952,7 +3953,7 @@ if [ "$LT" = t ] && [ -n "$J" ] && [ -n "$EVER" ]; then
   else bad "the Team page's list does not read (the database did not answer, or the cap does not read from this release's code)"; fi
 elif [ "$LT" = f ]; then [ "$TP" = no ] || bad "this release carries the Team page's list, but the database does not hold it: ask"
 elif [ "$LT" != t ]; then bad "whether the database holds the Team page's list does not read (the database did not answer)"; fi
-# Plans and payment pages of accounts not on the list now (not on the team line and not on the Team page's list). A plan: a sandbox plan whose latest event is not ENDED, WITHDRAWN, ERASURE_STOPPED or CREATED (a cancelled plan still in its month counts). A payment page: a sandbox checkout or upgrade (a charge of kind INITIAL or UPGRADE) with neither a SUCCEEDED nor a FAILED event, on a plan that has not ended.
+# Plans and payment pages of accounts not on the list now (not on the team line, and not on the Team page's list or suspended while on it: such an account cannot buy). A plan: a sandbox plan whose latest event is not ENDED, WITHDRAWN, ERASURE_STOPPED or CREATED (a cancelled plan still in its month counts). A payment page: a sandbox checkout or upgrade (a charge of kind INITIAL or UPGRADE) with neither a SUCCEEDED nor a FAILED event, on a plan that has not ended.
 # Since the opening: checkouts and upgrades started at or after ASKS_OPEN by accounts on no team line since then and not on the Team page's list at any moment of the two minutes before the charge (the pay button's check comes a moment before the charge is written, and a removal may fall between). A refused checkout or upgrade writes no row, so this count must be 0. A charge of an account erased since has no account left to look up: those are counted on their own.
 notlisted() { printf "NOT EXISTS (SELECT 1 FROM identity.\"user\" u WHERE u.owner_ref = %s.owner_ref AND u.user_id::text IN (SELECT jsonb_array_elements_text('%s'::jsonb)))" "$1" "$2"; }
 notapproved() { if [ "$LT" = t ]; then printf "NOT EXISTS (SELECT 1 FROM identity.\"user\" u WHERE u.owner_ref = %s.owner_ref AND staff.preview_buyer_listed(u.user_id))" "$1"; else printf 'true'; fi; }
@@ -3969,7 +3970,7 @@ elif printf '%s\n' "$EVER" | grep -qxE "$LIST"; then
     echo "accounts not on the list now: open sandbox plans $PLANS, unfinished payment pages $PAGES"
     echo "checkouts and upgrades started since the opening by accounts never on the list: $SINCE"
     [ "$SINCE" = 0 ] || bad "an account that was never on the list started a checkout or an upgrade since the opening: the buyer rule did not hold: PWON now (6.5 (b)), then ask"
-    [ "$PLANS/$PAGES" = 0/0 ] || echo "LOOK: plans or payment pages of accounts not on the list (from before the opening, or of accounts you took off it): each goes on until it is withdrawn or cancelled; settle them as 3.3 says"
+    [ "$PLANS/$PAGES" = 0/0 ] || echo "LOOK: plans or payment pages of accounts not on the list (from before the opening, of accounts you took off it, or of accounts suspended while on it): each goes on until it is withdrawn or cancelled; settle them as 3.3 says"
     [ "$GONE" = 0 ] || echo "LOOK: $GONE checkout(s) or upgrade(s) since the opening by accounts erased since: whether they were on the list no longer reads; if you know of no such erasure, ask"
   fi
 else bad "the opening's time or the kept copies of the list do not read (ASKS_OPEN of this guide writes them): ask"; fi
@@ -3986,7 +3987,8 @@ and a share of the limit.
 
 **What its counts mean.**
 - `open sandbox plans` and `unfinished payment pages` of accounts not on the list now: a plan or a page from before
-  the opening (an earlier sandbox test, a friends' test), or of an account you took off the list. Each goes on until
+  the opening (an earlier sandbox test, a friends' test), of an account you took off the list, or of an account on the
+  Team page's list that is suspended (it cannot buy while suspended). Each goes on until
   it is withdrawn or cancelled, and each blocks real payments: settle them as 3.3 says (WITHDRAWOTHER within 14 days
   of the purchase, after you tell them, or the holder cancels). A non-zero count is a `LOOK:` line, not a failure.
 - `checkouts and upgrades started since the opening by accounts never on the list` must be 0: a checkout or an upgrade

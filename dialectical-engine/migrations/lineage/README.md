@@ -1379,9 +1379,12 @@ meaning; the list counts only under that value with the sandbox's payments, and 
   refused; there is no DELETE guard on purpose, so the account's erasure takes its rows with it (`ON DELETE CASCADE`), and
   no login holds DELETE. No login may read or write the table.
 - `staff.preview_buyer_listed(uuid)`: one yes or no for one account, which the API asks at the pay button, only for an
-  account not on the team line (`previewBuyerNeedsApproval` in `packages/providers/src/preview-test.ts`). It takes the
-  id rather than reading the session because the session's account is 0130's functions' to tell and this expand step
-  changes no right of theirs; it answers nothing else of the account.
+  account not on the team line (`previewBuyerNeedsApproval` in `packages/providers/src/preview-test.ts`). Yes means the
+  account's latest row is an addition and the account is active: the list follows the account while it is active. A
+  listed account that is suspended cannot buy, stays on the Owner's list (so the Owner can remove it; the door asks the
+  list itself, whatever the state), and can buy again once it is active, with no new approval. It takes the id rather
+  than reading the session because the session's account is 0130's functions' to tell and this expand step changes no
+  right of theirs; it answers nothing else of the account.
 - `staff.read_preview_buyers(jsonb,text)`: the Owner's list (each listed account by the ref of its latest addition) and
   its revision, behind `staff.require_http_authority` with `TEAM_GRANT`.
 - `staff.preview_buyer_act(jsonb,uuid,jsonb,jsonb,jsonb)`: the one door. Under the two accounts' security-subject locks
