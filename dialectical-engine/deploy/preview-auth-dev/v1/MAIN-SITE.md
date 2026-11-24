@@ -785,8 +785,8 @@ Terms or the Privacy Policy that is older than the English text), and only a new
 The Terms and the Privacy Policy each name their version and the day it takes effect. The day follows a rule for each
 text on its own (the release guide's section "The legal texts' day", `deploy/preview-release/v1/README.md`): a text
 whose current version the live site already carries keeps its day, and a new version takes the upload day, because it
-goes live on the site at DR6. Today the Terms 1.1 are on the live site and keep 24 November 2026; a new Privacy Policy
-version takes the upload day. Check both, in the same folder:
+goes live on the site at DR6. Today the Terms 1.1 and the Privacy Policy 1.1 are on the live site and keep 24 November
+2026; a newer version of either takes the upload day. Check both, in the same folder:
 
 ```sh
 grep -Ho 'Version [0-9.]* · Effective [0-9]* [A-Za-z]* 20[0-9]*' apps/ui/legal/en/terms-of-service.md apps/ui/legal/en/privacy-policy.md
@@ -995,11 +995,11 @@ text under that step, or the repair map (after step 23), or ask. Never put a `.b
 ### 2.1 Before the downtime (the site is up)
 
 **1. The texts' days are still right** (Mac, the upload folder). Run the date line of 1.8, step 3, again. A version
-the live site already carries must show its live day (today the Terms 1.1: 24 November 2026), and a new version must
-show today (the release guide's section "The legal texts' day", `deploy/preview-release/v1/README.md`). If a line
-shows another day, stop before piece 1 and ask. PRECHECK (step 14) still asks both texts to take effect today: on an
-upload day after 24 November its `legal-date` subject stops it while the Terms keep their day. Ask before the upload
-day how that is settled.
+the live site already carries must show its live day (today the Terms 1.1 and the Privacy Policy 1.1: 24 November
+2026), and a new version must show today (the release guide's section "The legal texts' day",
+`deploy/preview-release/v1/README.md`). If a line shows another day, stop before piece 1 and ask. PRECHECK (step 14)
+still asks both texts to take effect today: on an upload day after 24 November its `legal-date` subject stops it while
+either text keeps its live day, as both do today. Ask before the upload day how that is settled.
 
 **2. GATESBEFORE** (server; the release guide's "Before piece 1"). It only reads: each older gate's start checks, run
 by hand as systemd would run them, then its state and its calls in flight. Expect one line per gate, `<gate>: start
@@ -2043,9 +2043,11 @@ payments are real (part 7). The site password keeps it small: only people who kn
   (the Anthropic gate refuses the call, is halted or busy, or its day is used up), nothing goes public: the finished
   debate stays private and waits. The API tries its check again by itself, a minute after a failure, then after longer
   and longer waits, up to an hour. No staff screen lists a Free debate that waits for a check, and nobody can publish
-  one by hand: it goes public by itself once the checks allow it, however long after it finished. The person is not
-  told that it waits. A debate whose own check keeps failing is tried again less and less often, and holds back no
-  other debate, contribution or report.
+  one by hand: it goes public by itself once the checks allow it, unless too many older Free debates wait ahead of it
+  (the warning below). The person is not told that it waits. A debate whose own check keeps failing is tried again
+  less and less often. The API makes its checks one at a time, contributions and reports included, so a check that
+  runs long (up to two minutes on a busy gate) delays the others by that much; after one end-of-debate check fails,
+  the other Free debates that need one wait for the API's next try, about 15 seconds later.
 - **The Report button.** It needs no staff. If the same AI check agrees with a report, the debate hides at once (once
   per debate). If it finds nothing on the page that bears the report out, the report is closed by itself and the
   person who sent it is told so. When the check is off, does not answer within its 20 seconds, or is unsure, the report
@@ -2070,19 +2072,22 @@ payments are real (part 7). The site password keeps it small: only people who kn
   - A Free debate waits for that approval too. Its own way to the public page (the first point above) asks this check
     first: a clear answer, or a flag that a staff approval covers, lets it go on to the AI check for publication. A
     Free debate this check flagged is never refused for good: it stays private and waits, and once a staff member
-    approves it, it goes public on the API's next try (within a minute) if the AI check for publication allows it.
+    approves it, it goes public on a later try of the API (usually within a minute; longer while the checks wait after
+    a failure or the gate is busy) if the AI check for publication allows it.
     Its owner sees nothing of this on the debate's page (`/v4/debate/<id>`): no flag, no "waiting" and no **Cereți
     aprobarea**. Only the older page `/debate/<id>`, which no V4 page links to, shows the flag and the button. So
     unless you tell the owner, nobody asks, and the debate stays private.
-  - The API looks at the 20 oldest waiting Free debates on each try. A flagged one stays among them until it is
-    approved, so once 20 flagged ones wait, no newer Free debate goes public. AICHECK's `Free debates` line (6b.1)
-    counts them among the waiting: if that count stays at 20 or more, ask.
+  - The API looks at the 100 oldest waiting Free debates on each try, and cannot look past them. A flagged one stays
+    among them until it is approved, and so does one whose deletion cannot finish yet. So once 100 such debates wait,
+    no newer Free debate goes public, and nobody is told. AICHECK's `Free debates` line (6b.1) counts them among the
+    waiting: if that count keeps rising while none went public in the last day, ask.
   - A debate that is already public when this check asks for its deletion is not deleted. This can happen to a debate
     published before the check existed, or to a later version of its answer. Its public page stays readable, and the
     API's log repeats `[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED` every 30 seconds for as long as it is public.
     Meanwhile its owner is treated as if it were deleted: it leaves their list, their Publish answers that it is
-    gone, and they see "We deleted this debate". If you see that line, Hide now takes the page down; ask before
-    anything else.
+    gone, and they see "We deleted this debate". If you see that line, ask. Hide now can take the page down only
+    while the staff screens are on (STAFFCHECK says `staff tools are on`, and after the rename only once 5.7 is
+    done).
 - **Staff mails.** You still get the mails that say a report waits, or that a debate was hidden
   by itself. You cannot open them in the app until the staff screens come back. That is expected. (The threat report
   screen and its mail are gone since this upload: 1.6.)
@@ -3754,10 +3759,12 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
    Their calls count in the Anthropic gate's pot and day's calls, beside the debates' own Claude Haiku calls and the
    question check, and they take the gate's few slots (`max_concurrent_calls` in its GO) from those calls. A check that
    runs by itself sends one call at a time: a Free debate's, a contribution's or an AI-written report's check one call,
-   and the end-of-debate check one finished debate at a time. An owner's Publish sends two. So one check holds at most
-   one slot (an owner's Publish two). But the checks run apart from each other: when two run at the same moment (for
-   example the end-of-debate check and a Free debate's check), they hold two slots together, all that a gate of two
-   has, for the few seconds a call takes.
+   and the end-of-debate check one finished debate at a time. For a Free debate the end-of-debate check could not
+   answer in time, the API's tries of the Free debates run that check themselves, one call, taking their turn with
+   those debates' other checks. An owner's Publish sends two. So one check holds at most one slot (an owner's Publish
+   two). But the checks run apart from each other: when two run at the same moment (for example the end-of-debate
+   check and a Free debate's check), they hold two slots together, all that a gate of two has, for the few seconds a
+   call takes.
    While a check runs, a debate's call or a person's question check may wait in the gate's queue for one of its calls
    to end, and on a gate whose slots are all taken such a call is refused after the gate's wait of a minute. A Free
    debate, a contribution or an AI-written report whose check keeps failing is tried again by itself, after its first
@@ -3774,8 +3781,8 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
      debate at once (once per debate).
    - Off, or the gate not letting it through (`AICHECK_NOT_DONE`): no Free debate goes public. Each finished one stays
      private and waits; the API tries its checks again by itself, and the debate goes public once the checks allow it,
-     however long after it finished. No staff screen lists the waiting ones, and nobody can publish one by hand. Every
-     report waits for you.
+     unless 100 older Free debates wait ahead of it (5.1b). No staff screen lists the waiting ones, and nobody can
+     publish one by hand. Every report waits for you.
 
    Either way, read the Public tab and the report mails every day: with strangers in, the Terms' promises about
    reports and removals (section 10) are owed to real people. If you want the check and AICHECK says
