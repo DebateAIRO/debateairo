@@ -5330,9 +5330,9 @@ QWENOUT ("Taking Qwen out of the live line-up") must print `QWENOUT_DONE`. While
 and SB3 stop anyway, with the site unchanged; while an open debate can still call Qwen, nothing else stops the upload,
 and its texts would go live untrue.
 
-**The legal texts' day.** An upload that carries a new version of the Terms of Service or the Privacy Policy gives it the
-upload day as its effective day. Every upload is built from `origin/dev` (SB1's `REV`), and dev changes only through a
-pull request, so the day reaches the upload this way, on the Mac, before SB1:
+**The legal texts' day.** An upload that carries a new version of the Terms of Service or the Privacy Policy gives it
+the upload day as its effective day. Every upload is built from `origin/dev` (SB1's `REV`), and dev changes only through
+a pull request, so the day reaches the upload this way, on the Mac, before SB1:
 
 1. A branch from `origin/dev`.
 2. From `dialectical-engine/`, with the upload day, the dry run, then the real run:
@@ -5352,14 +5352,17 @@ day, <day>`. Every other document takes the new day: in every language, the day 
 in English, and in each translation that follows the current English text, the same day wherever else the text gives it;
 then its archive copies of the current version are made again, the modules and the manifest are regenerated, and
 `legal:release-check` runs last. So when only one document has a new version (Privacy Policy 1.2 beside a released Terms
-1.1), only that one takes the upload day, and the other keeps its own.
+1.1), only that one takes the upload day, and the other keeps its own. A document that already carries the day given
+changes nothing, and the command prints `<document>: from <day> to <day>; translations recorded again: none` for it, the
+same day twice; it does so for a released document too, and then does not print the line above.
 
 What it refuses, before it writes anything: a day not written `YYYY-MM-DD`; a day before today (Romanian time); a day
 not after the day the document's previous version took effect; a day when both documents are released and carry another
-day (a released text keeps its day, so a change to it needs a new version number); a draft whose eyebrow or version line
-does not carry its current day in the command's words; and a clone that does not hold the commit
-`tests/n1-baseline.json` names (fetch it first). That file names a new release only once the pull request after its
-upload (SB13c) is merged, so until then the command does not see that release: after an upload, do not re-date the
+day (a released text keeps its day, so a change to it needs a new version number); an English version line it cannot
+read (`**Version N.M · Effective <day> <Month> <year> · …`); a draft whose eyebrow or version line does not carry its
+current day in the command's words; a `tests/n1-baseline.json` that names no commit; and a clone that does not hold the
+commit `tests/n1-baseline.json` names (fetch it first). That file names a new release only once the pull request after
+its upload (SB13c) is merged, so until then the command does not see that release: after an upload, do not re-date the
 version that upload carried.
 
 A day before the upload would read as a change made retroactive, which the Terms promise never to do. So if the switch
@@ -5373,8 +5376,7 @@ side-by-side path nothing else does either, so this step is the check. On the dr
 texts of the new release by the same rule, with the live release read on the server: a text whose current version has an
 archive copy in `OREV`'s commit (the live release, from the release lock, read in the reference clone A2 made) must keep
 the day it has in that commit; any other text must carry today (Bucharest). A text that does not stops PRECHECK with
-`legal-date`. MAIN-SITE.md's date line (its 1.8 step 3 and 2.1 step 1, in `deploy/preview-auth-dev/v1/`) was written for
-the upload of version 1.0, when both texts were new, and asks for the upload day in both; it is not changed here.
+`legal-date`. The main-site runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`) follows the same per-document rule.
 
 ### SB1. Names, the archive `$S` and the copies the way back needs
 
@@ -6988,13 +6990,12 @@ in or around it, no extra tablespace) and the free space DR3 needs; the four fun
 three that must share the ledger's owner, and the one whose owner must be a superuser) and that no schema
 `erasure_reconcile` exists; that none of the API's, the runner's and the scheduler's logins has a connection limit
 (other logins, such as Hatchet's, the migrator's and the staff readiness writer's, have theirs on purpose and are not
-read); that no session has sat idle in a
-transaction for a minute; that the Terms and the Privacy Policy of this release carry the right effective day (today,
-Bucharest, for a version the live release does not carry yet; the day it has in the live release for one it does, the
-rule `legal:redate` follows); that Caddy serves the payment marks when the new ui file names them (DR5's own test);
-that SB3's plan, proposal, ledger, register and active settings version are still the ones SB3 read; and that the release lock
-still has room for DR5's pin (SB4's room check, read again). It prints names, counts,
-`same`, `DIFFERENT` and states, never a value or a path of a key.
+read); that no session has sat idle in a transaction for a minute; that the Terms and the Privacy Policy of this release
+carry the right effective day (today, Bucharest, for a version the live release does not carry yet; the day it has in
+the live release for one it does, the rule `legal:redate` follows); that Caddy serves the payment marks when the new ui
+file names them (DR5's own test); that SB3's plan, proposal, ledger, register and active settings version are still the
+ones SB3 read; and that the release lock still has room for DR5's pin (SB4's room check, read again). It prints names,
+counts, `same`, `DIFFERENT` and states, never a value or a path of a key.
 
 ```sh
 set -euo pipefail
@@ -7060,7 +7061,7 @@ for KT in TERMS:terms-of-service PRIVACY:privacy-policy; do
     [ -n "$WANT" ] && grep -qF "Effective $WANT " "$TX" || bad legal-date "the $T text ${V:-unread} is in the live release, and this release does not keep the day it has there (${WANT:-unread})"
   else
     echo "legal day: $T ${V:-unread}, new in this release, takes $DAY"
-    grep -qF "Effective $DAY " "$TX" || bad legal-date "the $T text ${V:-unread} is new in this release and does not take effect today ($DAY): the day turned since the texts' date"
+    grep -qF "Effective $DAY " "$TX" || bad legal-date "the $T text ${V:-unread} is new in this release and does not carry today's day ($DAY): it must be re-dated before SB1 (The legal texts' day)"
   fi
 done
 # The payment marks (DR5's own test).
@@ -7092,9 +7093,10 @@ the site is up: give no yes. `proof`, `fence` and `payment-marks` name the step 
 step 2, PM2); before the launch plans exist those steps can still run. `legal-date` means a text with a new version
 does not carry the upload day, or a text the live release already carries does not keep its day there: stop, a new
 day needs a new commit ("The legal texts' day", before SB1). The `legal day:` lines say how each text was read.
-`open-transactions` names the program that holds the transaction: close it, then PRECHECK again. `release-lock`: run SB4 again (with the lock full it stops before the release check and names
-the retired release to archive), then SB15 with that label on the owner's yes, then PRECHECK again. Every other
-subject: stop and ask; it is a reviewed step before any upload.
+`open-transactions` names the program that holds the transaction: close it, then PRECHECK again. `release-lock`: run SB4
+again (with the lock full it stops before the release check and names the retired release to archive), then SB15 with
+that label on the owner's yes, then PRECHECK again. Every other subject: stop and ask; it is a reviewed step before any
+upload.
 
 #### DR2. The downtime starts: nothing open, the old release stopped
 

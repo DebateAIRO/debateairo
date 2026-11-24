@@ -1152,11 +1152,24 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(prose).toContain('the command leaves it at the day it has, and prints `<document> <version>: in the release the site runs (tests/n1-baseline.json), so it keeps its day, <day>`');
     expect(prose).toContain('a day when both documents are released and carry another day');
     expect(prose).not.toContain('Nothing else checks the day');
+    // The day given is a document's own day: nothing changes, and the command prints that day twice, released or not.
+    expect(prose).toContain('A document that already carries the day given changes nothing, and the command prints `<document>: from <day> to <day>; translations recorded again: none` for it, the same day twice; it does so for a released document too, and then does not print the line above.');
+    // Every refusal the command makes before it writes anything.
+    expect(prose).toContain('an English version line it cannot read (`**Version N.M · Effective <day> <Month> <year> · …`)');
+    expect(prose).toContain('a `tests/n1-baseline.json` that names no commit');
+    expect(prose).toContain('a clone that does not hold the commit `tests/n1-baseline.json` names (fetch it first)');
+    // The main-site runbook reads the day by the same rule.
+    expect(prose).toContain('The main-site runbook (`deploy/preview-auth-dev/v1/MAIN-SITE.md`) follows the same per-document rule.');
+    expect(prose).not.toContain('it is not changed here');
     // What else reads the day: no check on the side-by-side path; PRECHECK on the drained path, by the same rule.
     expect(prose).toContain('`legal:release-check` does not: it passes with any day the command accepts. On the side-by-side path nothing else does either, so this step is the check.');
     expect(prose).toContain('On the drained path PRECHECK reads both English texts of the new release by the same rule');
     // The words the guide quotes are the ones the command prints.
-    expect(read('apps/ui/scripts/legal-redate.mjs')).toContain(': in the release the site runs (tests/n1-baseline.json), so it keeps its day, ');
+    const redate = read('apps/ui/scripts/legal-redate.mjs');
+    expect(redate).toContain(': in the release the site runs (tests/n1-baseline.json), so it keeps its day, ');
+    expect(redate).toContain('; translations recorded again: ');
+    expect(redate).toContain('the English version line gives no version and day in the form `Version N.M · Effective <day> <Month> <year>`');
+    expect(redate).toContain('tests/n1-baseline.json names no commit');
     const scripts = (JSON.parse(read('package.json')) as { scripts: Record<string, string> }).scripts;
     expect(scripts['legal:redate']).toBe('node apps/ui/scripts/legal-redate.mjs');
   });
@@ -2208,9 +2221,9 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
         'legal day: privacy-policy 1.1, new in this release, takes 25 November 2026', 'BAD=']);
       expect(run(live10, '26 November 2026', { TERMS: ['1.1', '25 November 2026'], PRIVACY: ['1.1', '25 November 2026'] }, bothNew)).toEqual([
         'legal day: terms-of-service 1.1, new in this release, takes 26 November 2026',
-        'BAD (legal-date): the terms-of-service text 1.1 is new in this release and does not take effect today (26 November 2026): the day turned since the texts\' date',
+        'BAD (legal-date): the terms-of-service text 1.1 is new in this release and does not carry today\'s day (26 November 2026): it must be re-dated before SB1 (The legal texts\' day)',
         'legal day: privacy-policy 1.1, new in this release, takes 26 November 2026',
-        'BAD (legal-date): the privacy-policy text 1.1 is new in this release and does not take effect today (26 November 2026): the day turned since the texts\' date',
+        'BAD (legal-date): the privacy-policy text 1.1 is new in this release and does not carry today\'s day (26 November 2026): it must be re-dated before SB1 (The legal texts\' day)',
         'BAD= legal-date']);
       // Terms 1.1 already live, Privacy Policy 1.2 new: the Terms keep 24 November, the Privacy Policy takes today.
       const oneNew = { TERMS: ['1.0', '1.1'], PRIVACY: ['1.0', '1.1', '1.2'] };
@@ -2221,7 +2234,7 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
       expect(run(live11, '26 November 2026', { TERMS: ['1.1', '24 November 2026'], PRIVACY: ['1.2', '25 November 2026'] }, oneNew)).toEqual([
         'legal day: terms-of-service 1.1, in the live release, keeps 24 November 2026',
         'legal day: privacy-policy 1.2, new in this release, takes 26 November 2026',
-        'BAD (legal-date): the privacy-policy text 1.2 is new in this release and does not take effect today (26 November 2026): the day turned since the texts\' date',
+        'BAD (legal-date): the privacy-policy text 1.2 is new in this release and does not carry today\'s day (26 November 2026): it must be re-dated before SB1 (The legal texts\' day)',
         'BAD= legal-date']);
       // A released text moved to today: refused, since a released text keeps its day.
       expect(run(live11, '25 November 2026', { TERMS: ['1.1', '25 November 2026'], PRIVACY: ['1.2', '25 November 2026'] }, oneNew)).toEqual([

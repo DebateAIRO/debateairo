@@ -199,7 +199,7 @@ describe("which English text each translation follows", () => {
       for (const [code, entry] of Object.entries(ledger[kind])) {
         expect(entry.version).toMatch(/^[0-9]+\.[0-9]+$/u);
         expect(entry.sha256).toMatch(/^[0-9a-f]{64}$/u);
-        // Every language was translated again from the English 1.1 text for the release of 24 November 2026.
+        // Every language is translated from the current English text and recorded as following it.
         expect(entry, `${code}/${kind}`).toEqual({ version: english.version, sha256: english.sha256 });
         expect(follows(code, kind), `${code}/${kind}`).toBe(true);
       }

@@ -18,8 +18,16 @@ These notes are not legal advice.
   no hate speech, and no denying, justifying or making light of genocides and crimes against humanity
   (`apps/api/src/publication-check/policy.ts`, `packages/providers/src/content-rule.ts`).
 - When the publication check answers BLOCK or UNSURE, the debate stays private for good, with no person involved
-  (`apps/api/src/publications.ts`, `packages/db/src/public-debates.ts`). Nothing tells the person yet: the site's "Kept
-  private" mark reads a field the API does not send (`apps/ui/lib/v4/publicState.ts`).
+  (`apps/api/src/publications.ts`, `packages/db/src/public-debates.ts`). For a finished Free debate nothing tells the
+  person yet: the site's "Kept private" mark reads a field the API does not send (`apps/ui/lib/v4/publicState.ts`).
+  When the owner presses Publish, the refusal is shown on screen with the parts the check found, that an automated tool
+  decided, and that a person reviews it on a request to office@dezbatere.ro
+  (`apps/ui/components/PublicationControl.tsx`, `public.publication.contentCheck.*`). A refused contribution is shown
+  to its writer as "This stayed private: it did not pass the check" (`v4.contribution.KEPT_PRIVATE`).
+- When the Report button's check agrees with a report and the debate was never hidden before, the debate is hidden at
+  once with no person (`apps/api/src/public-flag.ts`). A person then reviews it. The debate's owner, and each person
+  whose contribution or report leaves the page with it, gets a statement of reasons that says the hide was automated
+  (`migrations/0157_moderation_statements.sql`).
 - Privacy Policy 1.1 described only the synthesis check here. Its section 5 said "For this check we send only the
   synthesis text", in a paragraph that lists several checks, so it could be read as covering every check. For the
   Report button it named "an AI", not the model.
@@ -32,9 +40,15 @@ These notes are not legal advice.
 
 The owner's decision of 24 November 2026: clarify the texts in the same upload as the code that makes the checks run.
 
+The owner's second decision of 24 November 2026, on question (b) below: Privacy Policy 1.2 names all four decisions the
+automatic checks make with no person involved.
+
 ## What changed
 
-- **Privacy Policy 1.2, in English, French and Romanian.** In section 5, "What is sent":
+- **Privacy Policy 1.2, in all 35 languages.** It is written in English first; French and Romanian follow it sentence
+  for sentence, and the 32 other languages are translated from the English 1.2 text and recorded in
+  `apps/ui/legal/translated-from.json`, as the 1.1 texts were. None of the translations has been reviewed by a native
+  speaker or by counsel. In section 5, "What is sent":
   - the synthesis sentence now reads "For this end-of-debate check we send only the synthesis text, with nothing that
     identifies you or your account.", so it stays true for that check and no longer reads as covering every check;
   - after the question check's sentence, new sentences: "Before a debate on the Free plan goes public, and when you
@@ -51,20 +65,34 @@ The owner's decision of 24 November 2026: clarify the texts in the same upload a
   goes public" and "checking a report made with the Report button" (the Register already gave Anthropic the job of
   checking a report; the list left it out). In Annex B.6 (South Korea), the list of what is sent abroad gains "before
   it goes public, its public text to be checked".
+- **The four automatic decisions.** Section 8 now says that four automatic checks decide with no person involved: the
+  end-of-debate check can delete a debate, the question check can refuse to start a debate, the publication check can
+  keep a debate or a contribution private, and the Report button's check can hide a public debate. Two new paragraphs
+  describe the last two. The publication check: a Free debate it does not allow stays private, a debate the owner
+  publishes is not published, a contribution stays private to its writer and the page does not change; the page says
+  so when someone publishes or adds to a public debate; no person reviews it first, and a complaint as the Terms
+  describe is reviewed by a person. The Report button's check: it hides the debate at once when it agrees with a report
+  and the debate was never hidden before; a person then reviews it; the owner and each person whose contribution or
+  report leaves the page get a statement of reasons that says the hide was automated, and can complain. The second
+  paragraph's promise of review by a person now says it covers these two and not the deletion or the question check.
+  It says "If we automate a decision" instead of "If we ever automate a decision", since refusing to publish is now
+  automated. Annex B.4 (Australia) now lists five kinds of decisions (the publication check and the Report button's
+  check added, each with the personal information it uses). Annex B.6 (South Korea) names the four decisions instead
+  of two, and no longer says that each tells you on screen what happened, because a refused Free debate is not told
+  yet (see "The facts"); it says that section 8 says what you can do after each, and that you can complain about each.
 - Section 14 says what changed, before the 1.1 line: "Version 1.2 replaced version 1.1: section 5 now says that, before
   a debate goes public, its public text is sent to Claude Haiku 5.5 to be checked, and that the same model checks what
   is added to a public debate and the reports made with the Report button; it makes clear that only the synthesis text
   is sent for the end-of-debate check; its list of what the Register states for each provider names the new check and
-  the check of a report; the Register lists the new check for Anthropic, and Annex B.6 was changed to match."
+  the check of a report; the Register lists the new check for Anthropic; section 8 now names the four decisions our
+  automatic checks make with no person involved, and what you can do after each; Annex B.4 and Annex B.6 were changed
+  to match."
 - **The Provider Register.** A new job, `publicationCheck`: "A debate's public text before it goes public, and what is
   added to a public debate — to check it against our rule on content". It stands on Anthropic's row and, when that row
-  is not shown, on the support chat's row (the same model and contract), as the other checks do. French and Romanian
-  carry their own wording. The 32 other catalogues carry the English line until they are translated, because every
-  catalogue must hold the same keys (`apps/ui/lib/i18n/legal.test.mjs`). Some earlier lines were added the same way
-  (`retentionAmazon`, `basisAmazon`); the other check jobs (`synthesisCheck`, `questionCheck`, `reportCheck`) are
-  translated in all 35.
-- **The 32 other languages** change only the Privacy Policy's version number and day: their text still follows an older
-  English text, as before.
+  is not shown, on the support chat's row (the same model and contract), as the other checks do. Every one of the 35
+  catalogues carries its own wording of it (`apps/ui/messages/<language>/legal.json`), as for the other check jobs
+  (`synthesisCheck`, `questionCheck`, `reportCheck`); every catalogue must hold the same keys
+  (`apps/ui/lib/i18n/legal.test.mjs`).
 - **The re-dating command.** `pnpm run legal:redate` set one day for both documents and refused when a current version
   was in the release the site runs. With Terms 1.1 released and Privacy 1.2 not, it could not date 1.2 at all. It now
   leaves a document whose current version is released at its day, says so, and dates the other; it still refuses a day
@@ -75,8 +103,10 @@ The owner's decision of 24 November 2026: clarify the texts in the same upload a
   debate starts; it does not say that nothing else is sent. Section 9 already says that an AI checks a finished Free
   debate before anyone can read it and that contributions are checked by an AI; section 10 already says that an AI
   reads a report beside the public text. The Terms name no model for these checks, so naming one is left to the Privacy
-  Policy and the Register. What the Terms say about decisions, and the statement of reasons they promise, is a
-  different matter, and two open questions about it are below ("What was left, and why").
+  Policy and the Register. What the Terms say about decisions agrees with section 8's four decisions: section 9 says a
+  refused Free debate and a refused contribution stay private, and section 10 says the Report button's check hides a
+  debate with no person and a person then reviews it. The statement of reasons the Terms promise is still an open
+  question, below ("What was left, and why").
 
 ## The day
 
@@ -86,7 +116,8 @@ working day before its upload. Version 1.2 cannot take effect on 24 November 202
 this text can therefore be no earlier than 25 November 2026. Terms 1.1 keeps 24 November 2026. Before the upload's
 SB1, on the Mac, with the upload day (the release guide, "The legal texts' day"): `pnpm run legal:redate --date
 YYYY-MM-DD --dry-run`, then the same without `--dry-run`, commit what it writes through a pull request into dev, then
-SB1. It dates the Privacy Policy only and prints that the Terms of Service 1.1 keeps 24 November 2026.
+SB1. It dates the Privacy Policy only and prints that the Terms of Service 1.1 keeps 24 November 2026. On
+25 November 2026 it changes nothing and prints "Privacy Policy: from 25 November 2026 to 25 November 2026".
 
 **The release guide's check follows the same rule.** Before this change, the drained upload's PRECHECK read both
 English texts for "Effective <upload day>", so with Terms 1.1 keeping 24 November 2026 it would have stopped every
@@ -95,30 +126,28 @@ upload on the Terms. This same change makes PRECHECK follow the rule `legal:reda
 commit of the release the site runs (`OREV`, read on the server from the release lock and the reference clone) must
 keep the day it has there; any other text must carry the upload day. So on the upload day PRECHECK reads Terms 1.1 as
 kept at 24 November 2026 and Privacy 1.2 as new, and stops only if 1.2 does not carry that day. The guide's section
-"The legal texts' day" now says what the command dates, leaves and refuses, and what else checks the day.
-MAIN-SITE.md's date line (`deploy/preview-auth-dev/v1/MAIN-SITE.md`, 1.8 step 3 and 2.1 step 1) was written for the
-upload of version 1.0 and still asks for the upload day in both texts; it is not changed here.
+"The legal texts' day" now says what the command dates, leaves and refuses, and what else checks the day, and that the
+main-site runbook follows the same per-document rule. MAIN-SITE.md itself (`deploy/preview-auth-dev/v1/MAIN-SITE.md`,
+1.8 step 3 and 2.1 step 1) is not part of this change; until its own change is merged, it still asks for the upload
+day in both texts.
 
 ## What was left, and why
 
 - **Section 4's table.** The row "Making a debate public" already names debate content as its data and the contract as
   its basis; the new check has no row or basis of its own. Whether it needs one is not reviewed by counsel.
-- **Automatic decisions and statements of reasons.** These passages are about decisions, not about what is sent. The
-  owner's decision covers what is sent, so this change leaves them. Two questions are open for the owner and counsel
-  before the upload:
-  - **(a) Terms section 10, "Statement of reasons".** It promises a statement of reasons, by email, "whenever we remove
-    or restrict the visibility of your content". With the checks running, a Free debate the publication check refuses
-    (BLOCK or UNSURE) stays private for good, a contribution the check refuses does not reach the public page, and a
-    debate the Report button's check agrees with is hidden at once with no person (Terms section 10 says so). Nothing
-    tells the person about a refused publication today (see "The facts"). Whether a refusal to publish counts as
-    restricting visibility under that paragraph, when no statement of reasons is sent, is not decided.
-  - **(b) The count of automatic decisions.** Annex B.6 (South Korea) says "Two automatic checks decide with no person
-    involved": one refuses to start a debate, the other deletes one. Section 8 and Annex B.4 (Australia) likewise name
-    only the end-of-debate check and the question check. Once the publication check's refusal and the Report button's
-    automatic hide run, that count of two is no longer the whole list. Whether these passages must name the two other
-    decisions is not decided.
-- **The 32 other languages** follow an older English text by design; they are brought up to date before a release that
-  offers them.
+- **Automatic decisions and statements of reasons.** Two questions were open for the owner and counsel; one is decided.
+  - **(a) Terms section 10, "Statement of reasons". Still open, for the owner and counsel, before the upload.** It
+    promises a statement of reasons, by email, "whenever we remove or restrict the visibility of your content". With
+    the checks running, a Free debate the publication check refuses (BLOCK or UNSURE) stays private for good, and a
+    contribution the check refuses does not reach the public page. Nothing tells the person about a refused Free debate
+    today, and a refused publish or contribution is told on screen but not by email (see "The facts"). Whether a
+    refusal to publish counts as restricting visibility under that paragraph, when no statement of reasons is sent, is
+    not decided. Privacy Policy 1.2 promises no statement of reasons for it: section 8 says a person reviews a
+    complaint. The Report button's automatic hide does send one.
+  - **(b) The count of automatic decisions. Decided.** Version 1.1 said in Annex B.6 (South Korea) "Two automatic checks
+    decide with no person involved", and section 8 and Annex B.4 (Australia) named only the end-of-debate check and
+    the question check. The owner decided on 24 November 2026 that version 1.2 names all four; "What changed" says
+    how.
 
 ## Section 14 and this change
 

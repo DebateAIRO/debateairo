@@ -214,7 +214,8 @@ describe("privacy policy modal — rendered", () => {
     // 58 until section 7's drafting note on support and backup retention left on 15 November 2026.
     // 58 again since section 5 gained its paragraph on DeepInfra on 16 November 2026.
     // 59 since section 5 gained its paragraph on Amazon (Privacy 3.16).
-    expect(expectedParagraphs).toBe(59);
+    // 61 since section 8 gained its paragraphs on the publication check and the Report button's check (Privacy 1.2).
+    expect(expectedParagraphs).toBe(61);
     // R22 item 15: section 2's and section 7's "Page settings and visits" rows add two. R22 decisions 35 and 36: the report's rows and the sealed original's row add three.
     // Privacy 3.12 (plan Task 83c): section 2's and section 7's "Questions not started yet" rows add two.
     // 0157 (Privacy 3.11, amended in place): three table rows more.
