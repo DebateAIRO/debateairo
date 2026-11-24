@@ -93,7 +93,7 @@ import {
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import type { PreparedPublicationCipher } from "@debateai/crypto";
-import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, PostgresPreviewBuyerRepository, PostgresRecoveryPermitRepository, PostgresRecoveryPermitStaffRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportShredRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
+import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, PostgresPreviewBuyerRepository, PostgresRecoveryPermitRepository, PostgresRecoveryPermitStaffRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportShredRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository, PostgresCheckDeletedPublicPageRepository } from "@debateai/db";
 import { recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
 // FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
@@ -199,7 +199,7 @@ import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication, buildPublicDebateBody, type FreeEndCheck } from "./publications.js";
 import { PUBLIC_REVIEW_PURGE_EVERY_MS, sweepPublicReviewPurge } from "./public-flag.js";
-import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, checksInTurn, publicReportCarrierMaker, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
+import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, checksInTurn, freeSweepCursor, publicReportCarrierMaker, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
 import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
 import { composeQuestionCheck } from "./question-check/compose.js";
@@ -1537,8 +1537,12 @@ const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
   runKeyStore,publicationCipher
 );
+// 0190: a public debate the end-of-debate check deletes comes down first, on the system login outside any request (the
+// erasure login stays as the release before attests it); the publication key cleanup above destroys its key, and the next
+// pass erases it as a private debate.
 const synthesisCheckErasure = new SynthesisCheckErasureCoordinator(
-  new PostgresSynthesisCheckErasureRepository(erasurePool), runKeyStore, publicationCipher
+  new PostgresSynthesisCheckErasureRepository(erasurePool), runKeyStore, publicationCipher,
+  (line) => console.error(line), new PostgresCheckDeletedPublicPageRepository(pool)
 );
 const erasureApplication=new PostgresAccountErasureApplication(
   accountErasureRepository,privateErasure
@@ -2536,10 +2540,12 @@ if (publications !== undefined) {
     stateOf: (target) => synthesisAnswerAccess.stateOf(target),
     decide: (target) => sweepSynthesisPublishGate.decide(target)
   };
+  // Where the Free sweep's next pass reads from, so it walks the whole list of waiting debates across its passes.
+  const freePublicationCursor = freeSweepCursor();
   const triggerPublicPage = createSingleFlightErasureReconciler(() => inTurn.pass(async () => {
     await sweepPublicPage({ pool, page: publicPage, contributions: publicContributions, tree: publicTreeRepository, contentCheck: sweepContentCheck, reportContentCheck: sweepReportCheck,
       withPublicationKey: (publicationRef, use) => publications.withPublicationKey(publicationRef, use) });
-    await sweepFreePublications({ contributions: publicContributions, publishOne: async (waiting) => {
+    await sweepFreePublications({ contributions: publicContributions, cursor: freePublicationCursor, publishOne: async (waiting) => {
       const owner = await publicPage.readFreeOwner(waiting.run_id);
       if (owner === null) return "NOT_WAITING";
       const session = ownerSession(owner.owner_ref, "00000000-0000-0000-0000-000000000000");

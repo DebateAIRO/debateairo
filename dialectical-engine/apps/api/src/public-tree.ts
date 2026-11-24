@@ -698,18 +698,26 @@ export function checksInTurn(shared: BackedOffContentCheck, input: Readonly<{ no
  * and the publication check allows it, or stays private for good on the publication check's refusal (publishFreeDebate). While the end-of-debate check may still answer, cannot answer, or
  * flagged it with no staff approval, it keeps waiting; one it asks to delete is never published. An unavailable check records nothing: the next pass tries again, so a crash anywhere loses
  * nothing. It waits for the story for a while: a debate published a minute earlier would go out without its short answer.
- * Each pass reads the oldest waiting debates, as many as the database's list gives (FREE_PUBLICATIONS_LISTED). A debate flagged with no approval, or one whose deletion cannot finish yet,
- * keeps its place at the head of that list, and the list has no way to read past it: once that many such debates wait, no newer one is read, checked or published.
+ * Each pass reads the waiting debates from where the pass before stopped (`cursor`), as many as the database's list gives (FREE_PUBLICATIONS_LISTED), in the list's own order, and
+ * starts again from the first once a read comes back short. So a debate flagged with no approval, or one whose deletion cannot finish yet, never keeps a newer one from being read:
+ * every waiting debate is read once in each round of the list, and a flagged one a staff member approved meanwhile goes public on its next turn. A restart starts from the first.
  */
 const FREE_PUBLICATIONS_LISTED = 100;
+/** Where the next pass of the Free sweep reads from: the last debate the pass before read, or null for the first. One per process. */
+export type FreeSweepCursor = { after: Readonly<{ notice_at: string; run_id: string }> | null };
+export const freeSweepCursor = (): FreeSweepCursor => ({ after: null });
 export type FreeSweepDeps = Readonly<{
-  contributions: Pick<PostgresPublicDebateRunnerRepository, "readFreeToPublish" | "refuseFree">;
+  contributions: Pick<PostgresPublicDebateRunnerRepository, "readFreeToPublishAfter" | "refuseFree">;
+  cursor: FreeSweepCursor;
   publishOne: (waiting: Readonly<{ run_id: string; owner_ref: string; notice_at: string }>) => Promise<string>;
   log?: (event: string, detail: Record<string, unknown>) => void;
 }>;
 export async function sweepFreePublications(deps: FreeSweepDeps): Promise<Readonly<{ listed: number; published: number }>> {
   let published = 0;
-  const waiting = await deps.contributions.readFreeToPublish(FREE_PUBLICATIONS_LISTED).catch(() => []);
+  const waiting = await deps.contributions.readFreeToPublishAfter(FREE_PUBLICATIONS_LISTED, deps.cursor.after).catch(() => null);
+  if (waiting === null) return Object.freeze({ listed: 0, published });
+  const last = waiting.at(-1);
+  deps.cursor.after = waiting.length < FREE_PUBLICATIONS_LISTED || last === undefined ? null : { notice_at: last.notice_at, run_id: last.run_id };
   for (const row of waiting) {
     try {
       const outcome = await deps.publishOne(row);

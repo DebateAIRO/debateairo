@@ -21,8 +21,8 @@ import type { CryptoEnvelope } from "@debateai/crypto";
  * - The names: `contributor` is read live from the account, null once it went: the page says "a contributor". Same for the first
  *   author: the snapshot holds no name, and `PostgresPublicationRepository.readPublic` reads it with the snapshot.
  * - A Free ask that showed the notice calls `recordFreeNotice`; only those debates ever go public. The sweep lists them
- *   (`readFreeToPublish`), runs the check, then `prepareFreePublication`, makes the key, and `publishFree`; a refusal is
- *   `refuseFree` (private for good); an unavailable check records nothing and the sweep tries again.
+ *   (`readFreeToPublishAfter`, from where its last pass stopped), runs the check, then `prepareFreePublication`, makes the key, and
+ *   `publishFree`; a refusal is `refuseFree` (private for good); an unavailable check records nothing and the sweep tries again.
  * - A report on a public debate: 0147's `identity.open_public_report` (public-tree.ts); each PUBLIC_REPORT charge names the root's run
  *   and its payer through `recordReportCharge` (the runner's: the cross-account marker's since 0171); the window readers count it through
  *   0149's read_public_report_spent_by_funding (0137's read_public_report_spent had no caller and is no role's since 0171).
@@ -117,9 +117,18 @@ export class PostgresPublicDebateRunnerRepository {
       "SELECT identity.read_public_debate_updates($1) AS updates", [publicationRef])).rows[0]!.updates;
   }
 
-  /** The Free debates that finished and wait for their check. */
+  /** The Free debates that finished and wait for their check, the oldest first (0137's list, which the release before reads). */
   async readFreeToPublish(limit = 20): Promise<readonly FreeToPublish[]> {
     return (await this.pool.query<{ waiting: FreeToPublish[] }>("SELECT identity.read_free_debates_to_publish($1) AS waiting", [limit])).rows[0]!.waiting;
+  }
+
+  /**
+   * The same list after `after` (a row an earlier read returned) in its order, or from the first when null (0190): the sweep
+   * walks the whole list across its passes, so no number of debates that cannot move keeps it from a newer one.
+   */
+  async readFreeToPublishAfter(limit: number, after: Pick<FreeToPublish, "notice_at" | "run_id"> | null): Promise<readonly FreeToPublish[]> {
+    return (await this.pool.query<{ waiting: FreeToPublish[] }>("SELECT identity.read_free_debates_to_publish_after($1,$2,$3) AS waiting",
+      [limit, after?.notice_at ?? null, after?.run_id ?? null])).rows[0]!.waiting;
   }
 
   /** Reserves the reference and the key's intent. Make the key only on PREPARED; `publishFree` repeats the token. */

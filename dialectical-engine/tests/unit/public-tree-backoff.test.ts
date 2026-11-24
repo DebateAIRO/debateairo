@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PublicDebate } from "@debateai/contract";
 import type { PublicationCheckResult, PublicationContentCheck } from "../../apps/api/src/publication-check/check.js";
-import { PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, checksInTurn, sweepFreePublications } from "../../apps/api/src/public-tree.js";
+import { PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, checksInTurn, freeSweepCursor, sweepFreePublications } from "../../apps/api/src/public-tree.js";
 import { crisisWordsOf } from "../../apps/ui/lib/v4/askText.js";
 
 const request = { runId: "11111111-1111-4111-8111-111111111111", snapshot: {} as PublicDebate };
@@ -92,7 +92,8 @@ function sweepsWorld(input: Readonly<{ rows: readonly string[]; failing: (name: 
     await pageList("c", PUBLIC_PAGE_SWEEP_DEFAULTS.giveUpMs);
     await pageList("r", PUBLIC_PAGE_SWEEP_DEFAULTS.reportGiveUpMs);
     await sweepFreePublications({
-      contributions: { readFreeToPublish: async () => listOf("f").map((name) => ({ run_id: name, owner_ref: "o", notice_at: "2026-11-24T08:00:00.000Z" })), refuseFree: async () => "REFUSED" as never },
+      cursor: freeSweepCursor(),
+      contributions: { readFreeToPublishAfter: async () => listOf("f").map((name) => ({ run_id: name, owner_ref: "o", notice_at: "2026-11-24T08:00:00.000Z" })), refuseFree: async () => "REFUSED" as never },
       publishOne: async (row) => {
         const result = await check.check({ runId: row.run_id, snapshot: {} as PublicDebate });
         if (result.outcome !== "ALLOW") return "CHECK_UNAVAILABLE";
@@ -259,7 +260,8 @@ describe("one item whose check always fails holds back no other, in any of the s
     } }, { now: () => clock });
     const turn = checksInTurn(shared, { now: () => clock });
     const pass = () => turn.pass(() => sweepFreePublications({
-      contributions: { readFreeToPublish: async () => input.waiting.map((name) => ({ run_id: name, owner_ref: "o", notice_at: "2026-11-24T08:00:00.000Z" })), refuseFree: async () => "REFUSED" as never },
+      cursor: freeSweepCursor(),
+      contributions: { readFreeToPublishAfter: async () => input.waiting.map((name) => ({ run_id: name, owner_ref: "o", notice_at: "2026-11-24T08:00:00.000Z" })), refuseFree: async () => "REFUSED" as never },
       publishOne: async (row) => {
         const decision = input.stored.has(row.run_id) ? "PROCEED" : await turn.checkBefore(row.run_id, async () => {
           endAsked.push([row.run_id, clock]);

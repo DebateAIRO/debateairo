@@ -301,14 +301,26 @@ describe('the runbook says what the end-of-debate check does by itself on this s
     // The hold: the background time on the gate (D of at most 60 s plus the gate's slot wait of 60 s), less a margin the hold adds back.
     expect(read('packages/providers/src/preview-test.ts')).toContain('export const PREVIEW_GATE_SLOT_WAIT_MS = 60_000 as const;');
     expect(read('packages/serve/src/synthesis-check.ts')).toContain('return Math.max(1_000, longestHoldMs - SYNTHESIS_CHECK_SEAL_MARGIN_MS);');
-    // The sweep's list is the 100 oldest waiting asks, the most the database's list gives, with no way to read past them; the
-    // erasure waits while the debate is public, and says so in the log.
-    expect(read('apps/api/src/public-tree.ts')).toContain('\nconst FREE_PUBLICATIONS_LISTED = 100;');
-    expect(read('apps/api/src/public-tree.ts')).toContain('await deps.contributions.readFreeToPublish(FREE_PUBLICATIONS_LISTED)');
-    expect(read('migrations/0137_public_debates.sql')).toContain('IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 100 THEN');
-    expect(read('migrations/0137_public_debates.sql')).toContain('ORDER BY ask.notice_at, ask.run_id\n      LIMIT p_limit');
+    // The sweep reads the waiting asks 100 at a time, the most the database's list gives, from where its last pass stopped, and
+    // starts again from the first after a short read (0190's list after a place).
+    const sweep = read('apps/api/src/public-tree.ts');
+    expect(sweep).toContain('\nconst FREE_PUBLICATIONS_LISTED = 100;');
+    expect(sweep).toContain('await deps.contributions.readFreeToPublishAfter(FREE_PUBLICATIONS_LISTED, deps.cursor.after)');
+    expect(sweep).toContain('deps.cursor.after = waiting.length < FREE_PUBLICATIONS_LISTED || last === undefined ? null : { notice_at: last.notice_at, run_id: last.run_id };');
+    expect(read('apps/api/src/main.ts')).toContain('cursor: freePublicationCursor,');
+    const step = read('migrations/0190_check_deletes_public_debate.sql');
+    expect(step).toContain('IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 100 OR (p_after_notice_at IS NULL) <> (p_after_run_id IS NULL) THEN');
+    expect(step).toContain('AND (p_after_notice_at IS NULL OR (ask.notice_at, ask.run_id) > (p_after_notice_at, p_after_run_id))');
+    expect(step).toContain('ORDER BY ask.notice_at, ask.run_id\n      LIMIT p_limit');
+    // 0126's prepare still waits while a debate is public; the API takes the page down first (0190), on its system login, and logs it once.
     expect(read('migrations/0126_synthesis_check.sql')).toContain("IF v_latest_visibility='PUBLISHED' THEN\n        RETURN QUERY SELECT 'PUBLISHED'::text,NULL::uuid,v_request.run_id;");
-    expect(read('packages/db/src/synthesis-check-erasure.ts')).toContain('this.log("[SYNTHESIS_CHECK_ERASURE_WAITING] " + prepared.outcome);');
+    expect(step).toContain("2,'COPIES_MAY_PERSIST_V1',v_now,ledger.allocate_sequence()");
+    expect(step).toContain("RETURN QUERY SELECT 'NOT_SHOWN'::text,v_request.run_id;");
+    const erasure = read('packages/db/src/synthesis-check-erasure.ts');
+    expect(erasure).toContain('if (page.outcome === "TAKEN_DOWN") this.log("[SYNTHESIS_CHECK_PUBLIC_DEBATE_TAKEN_DOWN]");');
+    expect(erasure).toContain('this.log("[SYNTHESIS_CHECK_ERASURE_WAITING] " + outcome);');
+    expect(erasure).toContain('"PUBLISHED", "NOT_SHOWN", "NO_SESSION", "LEGACY_PLAINTEXT_RETAINED", "OWNERSHIP_MOVED"');
+    expect(read('apps/api/src/main.ts')).toContain('(line) => console.error(line), new PostgresCheckDeletedPublicPageRepository(pool)');
     // Only the older page offers the review; the V4 debate page has none.
     expect(read('apps/ui/components/PublicationControl.tsx')).toContain('<PublicationReviewPanel');
     expect(read('apps/ui/components/v4/V4DebateClient.tsx')).not.toMatch(/PublicationReview|publicationReview/u);
