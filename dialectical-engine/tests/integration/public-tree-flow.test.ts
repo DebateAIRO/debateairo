@@ -1628,6 +1628,33 @@ describe("a Free debate goes public only when the end-of-debate check allows it"
   }, 30_000);
 });
 
+describe("a debate already public when the end-of-debate check asks for its deletion", () => {
+  it("is not deleted: the deletion waits for as long as the debate is public, its page stays public and its key is kept, while its owner is told it was deleted and can no longer open it", async () => {
+    const author = await account();
+    const { root, ref } = await publishedDebate(author);
+    const answerId = (await database.pool.query<{ answer_id: string }>("SELECT answer_id FROM serve.answer WHERE run_id=$1", [root])).rows[0]!.answer_id;
+    const checks = new SynthesisCheckRepository(api);
+    // The check, run on a version of its answer after it went public (or on a debate published before it existed), asks for its deletion.
+    const attempt = await checks.startPublishAttempt({ runId: root, answerId, answerVersion: 1 });
+    expect(await checks.insertResult({ attemptId: attempt.attemptId, runId: root, answerId, answerVersion: 1, synthesisOriginVersion: 1,
+      outcome: { verdict: "FLAGGED", categories: ["SUICIDE_OR_HARM_TO_OTHERS"] }, modelProviderRef: "anthropic", modelId: "claude-haiku-5-5",
+      policyVersion: "synthesis.content-check.v1@0123456789abcdef", callCount: 1, deadlineMs: 60_000 })).toBe("INSERTED");
+    const lines: string[] = [];
+    const coordinator = new SynthesisCheckErasureCoordinator(new PostgresSynthesisCheckErasureRepository(erasure), runKeys, publicationCipher, (line) => lines.push(line));
+    for (let tick = 0; tick < 2; tick += 1) {
+      expect((await coordinator.reconcile(100)).filter((outcome) => outcome.runId === root)).toEqual([{ runId: root, outcome: "PUBLISHED" }]);
+    }
+    expect(lines).toContain("[SYNTHESIS_CHECK_ERASURE_WAITING] PUBLISHED");
+    // Its page and its key stay; the deletion request stays, waiting.
+    expect((await page(ref)).question).toBe(QUESTION);
+    expect(await runKeys.exists(root)).toBe(true);
+    expect(await checks.runRemovedByCheck(root)).toBe(true);
+    // Its owner's own reads treat it as deleted, and the notice telling them so is there.
+    expect(await createSynthesisAnswerAccess({ repository: checks, deadlineMs: 60_000 }).stateOf({ runId: root })).toBe("REMOVED");
+    expect(await checks.removalNoticeExists(author.ownerRef)).toBe(true);
+  });
+});
+
 describe("over HTTP", () => {
   const askOf = (public_parent: object) => ({ question_line: "Would winter ridership fill it?", risk_tier: "standard", tier_source: "MACHINE_DEFAULT", tier_provenance_ref: "machine:deployment-floor", composition_budget_tier: "low",
     depth_params: { depth: 1 }, decision_scope: "test-layer scope", as_of: "2026-08-07T00:00:00.000Z", steering_presets: [], plan_tier: "free", steering_annotations: [], public_parent });
