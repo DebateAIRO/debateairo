@@ -437,7 +437,7 @@ describe("the names file's start helpers, and the steps that stop the website", 
   });
 
   /** The steps that restart only the API, with the website running. */
-  const API_ONLY = ['MAIL_ALLOW', 'MAIL_OPEN', 'MAIL_CLOSE', 'STAFFOFF', 'STAFFON', 'STAFFMAIN', 'ASKS_OPEN', 'ASKS_CLOSE', 'BUYERS', 'PAY_SWITCH', 'PAY_BACK'];
+  const API_ONLY = ['MAIL_ALLOW', 'MAIL_OPEN', 'MAIL_CLOSE', 'STAFFOFF', 'STAFFON', 'STAFFMAIN', 'ASKS_OPEN', 'ASKS_CLOSE', 'BUYERS', 'PAY_SWITCH', 'PAY_BACK', 'PUBON', 'PUBOFF'];
 
   it('every step that restarts only the API refuses an older names file before it changes anything, and its last line is true when the API refuses or the website does not answer', () => {
     // Exactly these steps call apiup.
