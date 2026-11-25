@@ -304,6 +304,15 @@ class ReadmeTests(unittest.TestCase):
         key = self.readme[step4:step5]
         self.assertLess(key.index('systemctl show -p InaccessiblePaths debateai-preview-$U.service'), key.index('preview_key.py install bedrock'))
         self.assertIn('after "Switch it on" steps 1 and 2', ' '.join(key.split()))
+        # A release from before the rule that an ask checks only its line-up's models checks Luna at every ask once the
+        # key is in. So step 3 reads the current release's code before the key, and the key step waits for that check.
+        line = '. /root/preview-archive/rNN-names.sh; grep -c probeModelIds "$CAPI/dialectical-engine/apps/api/src/provider-discovery.ts"'
+        self.assertIn('\n```sh\n' + line + '\n```\n', switch_on)
+        self.assertLess(steps[2], switch_on.index(line))
+        self.assertLess(switch_on.index(line), switch_on.index('Then install step 4 (the key)'))
+        self.assertLess(switch_on.index(line), steps[3])
+        self.assertIn('A 0, or an error, means a release from before the rule', ' '.join(switch_on.split()))
+        self.assertIn('and only when the `probeModelIds` line of "Switch it on" step 3 printed 1 or more.', ' '.join(key.split()))
 
     def test_the_pot_range_block_prints_what_activate_accepts(self):
         # Step 5's first block, run on made-up caps and GO files; the gate's own test seams stand in for root's custody.

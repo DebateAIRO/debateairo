@@ -2141,6 +2141,58 @@ describe('the upload that brings the Amazon gate: its steps come where the uploa
       expect(existsSync(`${moved}.before-luna`)).toBe(false);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   }, 60_000);
+
+  it('piece 4 and "Switch it on" step 3 each give the one line that tells, before the key, whether the current release asks only its line-up\'s models', () => {
+    const LINE = '. /root/preview-archive/rNN-names.sh; grep -c probeModelIds "$CAPI/dialectical-engine/apps/api/src/provider-discovery.ts"';
+    const oneLine = (text: string) => text.replace(/\s+/g, ' ');
+    // Piece 4, step 3: the line, the numbers that let the key in, and the way back's folder.
+    const piece4 = bedrock.slice(bedrock.indexOf('**Piece 4, any day after the upload: Luna in the line-up.**'), bedrock.indexOf('**The way back.**'));
+    const step3 = piece4.slice(piece4.indexOf('\n3. '), piece4.indexOf('\n4. '));
+    expect(step3.split('\n'), step3).toContain(`   \`${LINE}\`.`);
+    for (const text of ['Before the key: the key goes in only when the current release\'s `apps/api/src/provider-discovery.ts` contains `probeModelIds`',
+      'prints 1 or more (after a way back, `$OCAPI` in place of `$CAPI`)', 'A 0, or an error, means a release from before this rule', 'keep the key out.'])
+      expect(oneLine(step3), text).toContain(text);
+    expect(flat).toContain('has no `probeModelIds`; piece 4, step 3, checks this before the key)');
+    // "Switch it on" step 3: the same line, in its own block, after the window check and before the key; install step 4
+    // lets the key in only after it.
+    const gate = read('deploy/preview-gate/v3/README-bedrock.md');
+    const switchOn3 = gate.slice(gate.indexOf('**3. The key and the probe'), gate.indexOf('**4. The runner.**'));
+    expect(switchOn3).toContain(`\n\`\`\`sh\n${LINE}\n\`\`\`\n`);
+    expect(switchOn3.indexOf('window_open')).toBeLessThan(switchOn3.indexOf(LINE));
+    expect(switchOn3.indexOf(LINE)).toBeLessThan(switchOn3.indexOf('Then install step 4 (the key)'));
+    for (const text of ['prints 1 or more (after a way back, put `$OCAPI` in place of `$CAPI`)', 'A 0, or an error, means a release from before the rule', 'keep the key out, and stop here.'])
+      expect(oneLine(switchOn3), text).toContain(text);
+    const key = gate.slice(gate.indexOf('**4. The Amazon key.'), gate.indexOf('**5. The GO'));
+    expect(oneLine(key)).toContain('and only when the `probeModelIds` line of "Switch it on" step 3 printed 1 or more.');
+    expect(oneLine(gate)).toContain('has no `probeModelIds` ("Switch it on" step 3 checks this, right before the key).');
+    // The word the line counts is the one the rule's code carries: the ask's discovery round takes `probeModelIds`.
+    const discovery = read('apps/api/src/provider-discovery.ts');
+    expect(discovery).toContain('export type DiscoverProviderPanel = (probeModelIds?: readonly string[]) => Promise<DiscoveredProviderPanel>;');
+    // Run by bash on a made-up server: the newest upload's release carries the rule, the release before it does not.
+    const dir = mkdtempSync(join(tmpdir(), 'guide-release-check-'));
+    try {
+      mkdirSync(join(dir, 'new'));
+      symlinkSync(ROOT, join(dir, 'new', 'dialectical-engine'));
+      mkdirSync(join(dir, 'old', 'dialectical-engine', 'apps', 'api', 'src'), { recursive: true });
+      writeFileSync(join(dir, 'old', 'dialectical-engine', 'apps', 'api', 'src', 'provider-discovery.ts'), discovery.replaceAll('probeModelIds', 'models'));
+      const names = join(dir, 'rNN-names.sh');
+      const run = (capi: string, line = LINE) => {
+        writeFileSync(names, `CAPI=${join(dir, capi)}\nOCAPI=${join(dir, 'old')}\n`);
+        return spawnSync('bash', ['-c', line.replace('/root/preview-archive/rNN-names.sh', names)], { encoding: 'utf8' });
+      };
+      const current = run('new');
+      expect(current.status, current.stderr).toBe(0);
+      expect(Number(current.stdout.trim())).toBeGreaterThanOrEqual(1);
+      // After a way back the release before is current: with `$OCAPI` the line prints 0, and the key stays out.
+      const wayBack = run('new', LINE.replace('$CAPI', '$OCAPI'));
+      expect([wayBack.status, wayBack.stdout.trim()]).toEqual([1, '0']);
+      // A release folder without the file: an error and no number, and the key stays out.
+      const missing = run('none');
+      expect(missing.status).toBe(2);
+      expect(missing.stdout.trim()).toBe('');
+      expect(missing.stderr).toContain('provider-discovery.ts');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
 });
 
 // ---------------------------------------------------------------------------------------------------------------------

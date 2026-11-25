@@ -3759,10 +3759,11 @@ owner's first probe. On that day it also comes after the notice's time to object
 the halt watcher and the address timer have started. The activation follows the next day, after the bill check.
 
 **Before this rule, an ask checked every declared model.** A release from before this rule (its
-`apps/api/src/provider-discovery.ts` has no `probeModelIds`) checks at every ask every model whose address it declares
-and whose last check is old, not only the line-up's. With such a release running and the key in, every ask
-sends Luna a paid check, the first one from someone's ask, before the owner's own probe. While Amazon refuses the key
-(401 or 403), that first ask halts the Amazon gate (`provider_key_refused`). A halted gate is not `active`, so the
+`apps/api/src/provider-discovery.ts` has no `probeModelIds`; piece 4, step 3, checks this before the key) checks at
+every ask every model whose address it declares and whose last check is old, not only the line-up's. With such a
+release running and the key in, every ask sends Luna a paid check, the first one from someone's ask, before the
+owner's own probe. While Amazon refuses the key (401 or 403), that first ask halts the Amazon gate
+(`provider_key_refused`). A halted gate is not `active`, so the
 release check, a settings activation, the switch, GATEREADY and GATELIVE all refuse until it is opened again: read its
 `reason`, put a key Amazon accepts in first ("A new key"), then `activate` (`README-bedrock.md`, "Re-open after a
 halt"). Without the key nothing is sent or charged, and the gate does not halt. So while such a release runs, keep the
@@ -3790,7 +3791,12 @@ key out of the Amazon gate.
 3. At a quiet hour, in one sitting ("Switch it on", step 3): the AWS console (install step 0), if not done yet; the key
    at the hidden prompt (install step 4, which first checks that the older units still hide the Amazon folder); and
    right after it the probe, twice (install step 8). Every field must show its "Good" value. The day after, the
-   gate's `today_spend_usd` of the probe's day against the AWS Billing page.
+   gate's `today_spend_usd` of the probe's day against the AWS Billing page. Before the key: the key goes in only when
+   the current release's `apps/api/src/provider-discovery.ts` contains `probeModelIds`, that is, when this line, with
+   the newest upload's names file, prints 1 or more (after a way back, `$OCAPI` in place of `$CAPI`):
+   `. /root/preview-archive/rNN-names.sh; grep -c probeModelIds "$CAPI/dialectical-engine/apps/api/src/provider-discovery.ts"`.
+   A 0, or an error, means a release from before this rule ("Before this rule, an ask checked every declared model",
+   above): keep the key out.
 4. The runner restarted, when it could not read the gate at its start ("Switch it on", step 4).
 5. The activation ("Switch it on", step 6; the Privacy Policy and the Terms that name Amazon are live on the site from
    this upload on): "The line-up, the thinking levels and the answer seats" above, with a line-up file that adds

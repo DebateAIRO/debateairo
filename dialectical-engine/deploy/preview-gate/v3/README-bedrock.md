@@ -69,9 +69,10 @@ One reviewed model:
   and the address timer run, right before the probe (step 8). The line-up activation follows the next day, after the
   bill check; from then on an ask whose line-up seats Luna checks it with a real paid call through this gate.
 - **A release from before that rule checks every declared model at every ask.** Its
-  `apps/api/src/provider-discovery.ts` has no `probeModelIds`. It probes, at every ask, every model it declares whose
-  last check is old, not only the line-up's. With such a release running, once the key and Luna's address (the app's
-  settings, "Switch it on" step 5) are both in, every ask makes a paid check of Luna, before the owner's probe. While
+  `apps/api/src/provider-discovery.ts` has no `probeModelIds` ("Switch it on" step 3 checks this, right before the
+  key). It probes, at every ask, every model it declares whose last check is old, not only the line-up's. With such a
+  release running, once the key and Luna's address (the app's settings, "Switch it on" step 5) are both in, every ask
+  makes a paid check of Luna, before the owner's probe. While
   Amazon refuses the key (401 or 403), the first such ask halts this gate (`provider_key_refused`), and the release
   tools and the owner's runbook refuse until it is open again ("Re-open after a halt", after "A new key"). Without the
   key the gate refuses those checks before anything is set aside: nothing is sent or charged, and the gate does not
@@ -242,9 +243,9 @@ harmless: they stay `active`.
 
 **4. The Amazon key. The OWNER runs this, at the server's terminal (an agent never does).** Not at the upload: on the
 day of the probe, right before step 8, after "Switch it on" steps 1 and 2 ("Decisions you should know about", "The key
-goes in right before the first probe"). First check, as step 3a did at the upload, that the six older gate units still
-hide this gate's folder and GO. This only reads. It must print `1` six times; if a line shows `0`, stop: do not put
-the key in.
+goes in right before the first probe"), and only when the `probeModelIds` line of "Switch it on" step 3 printed 1 or
+more. First check, as step 3a did at the upload, that the six older gate units still hide this gate's folder and GO.
+This only reads. It must print `1` six times; if a line shows `0`, stop: do not put the key in.
 
 ```sh
 for U in provider-budget gate-halt-watch anthropic-budget anthropic-halt-watch perplexity-budget perplexity-halt-watch; do systemctl show -p InaccessiblePaths debateai-preview-$U.service | grep -c 'provider-bedrock-authority-v1.*provider-bedrock-go-v1.json'; done
@@ -477,8 +478,17 @@ the drop-in is not in place. Set `R` with the first block, then run the second b
 
 **3. The key and the probe, at a quiet hour, in one sitting.** First `status` (Daily operations): if `window_open` is
 `false` (more than 31 days since the upload's `activate`), run this gate's `stop` ("Emergency off", level 1), then its
-`activate` ("Re-open after a halt", step 4). Then install step 0 in the AWS console, if it is not done yet. Then
-install step 4 (the key), and right after it install step 8 (the probe, twice). Every field must show its "Good"
+`activate` ("Re-open after a halt", step 4). Then install step 0 in the AWS console, if it is not done yet. Then,
+before the key: the key goes in only when the current release's `apps/api/src/provider-discovery.ts` contains
+`probeModelIds`, that is, when this line, with the newest upload's names file, prints 1 or more (after a way back, put
+`$OCAPI` in place of `$CAPI`). A 0, or an error, means a release from before the rule that an ask checks only its
+line-up's models ("Decisions you should know about"): keep the key out, and stop here.
+
+```sh
+. /root/preview-archive/rNN-names.sh; grep -c probeModelIds "$CAPI/dialectical-engine/apps/api/src/provider-discovery.ts"
+```
+
+Then install step 4 (the key), and right after it install step 8 (the probe, twice). Every field must show its "Good"
 value. The day after, compare the probe day's spend with the AWS Billing page (the end of step 8).
 
 **4. The runner.** It reads each gate's number of calls at once only at its start, and runs a gate it could not read
