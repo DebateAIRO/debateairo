@@ -1,7 +1,7 @@
 {
   "schema": "debateai-n1-baseline-v1",
-  "commit": "0a3e623a9f74da50c3fcb4d58677a3cff406bb3e",
-  "reason": "0a3e623a9-r29-v1",
+  "commit": "3226cf2aea83325de5dac8f95eff5b729f14942f",
+  "reason": "3226cf2ae-r30-v1",
   "suites": [
     "tests/integration/b3-holds-waiting-line.test.ts",
     "tests/integration/b7b-waiting-line.test.ts",
