@@ -10,37 +10,34 @@ export type PricingPlan = Readonly<{
 }>;
 
 /**
- * A priced paid plan's two lines, as price + VAT. Where the place adds tax: our price and its tax apart
- * ("€20.00 + €3.80 MwSt."), then the total a month with the rate, so the price paid is always right under them
- * (`total` true: the second line is that total, shown as plainly as the first). Where the place adds none: the price a
- * month, and that no tax is added there.
+ * The small line under a priced paid plan's total a month. Where the place adds tax: our price and that tax apart, with
+ * the rate and the country ("€20.00 + €3.80 MwSt. (19%, Germany)"). Where the place adds none: that no tax is added
+ * there. null for a total that cannot be split (never one the API sends): the card then shows the total alone, and
+ * never a price before tax.
  */
-function pricedLines(
+function taxNote(
   catalog: MessageCatalog, locale: string, currency: BillingCurrency, tax: BillingPlansTax, included: boolean,
   total: string, net: string
-): Readonly<{ price: string; note: string; total: boolean }> {
+): string | null {
   const country = countryName(locale, tax.country);
-  const totalPerMonth = t(catalog, "billing.pricing.perMonth", { price: formatMoney(locale, total, currency) });
-  if (!included) return { price: totalPerMonth, note: t(catalog, "billing.pricing.noTaxAdded", { country }), total: false };
+  if (!included) return t(catalog, "billing.pricing.noTaxAdded", { country });
+  const taxAmount = taxInPrice(total, net);
+  if (taxAmount === null) return null;
   // Basis points may carry a half (887.5 = 8.875 %), so three decimals are kept, as the checkout's tax label does.
   const rate = formatNumber(locale, tax.tax_rate_bp / 100, { maximumFractionDigits: 3 });
-  const taxAmount = taxInPrice(total, net);
-  return {
-    // A total that cannot be split (never one the API sends) is still shown whole, never a price before tax alone.
-    price: taxAmount === null ? totalPerMonth : t(catalog, "billing.pricing.priceWithTax", {
-      price: formatMoney(locale, net, currency), tax: formatMoney(locale, taxAmount, currency), taxName: tax.tax_name
-    }),
-    note: t(catalog, "billing.pricing.totalPerMonth", { total: formatMoney(locale, total, currency), rate, country }),
-    total: true
-  };
+  return t(catalog, "billing.pricing.priceWithTax", {
+    price: formatMoney(locale, net, currency), tax: formatMoney(locale, taxAmount, currency), taxName: tax.tax_name,
+    rate, country
+  });
 }
 
 /**
  * The plan cards (spec 2026-09-29 §2.10): the price, the allowance as a multiple, the next step. The prices are in
- * `currency`, the one the place pays in (spec 2026-10-05 §2.16.1). A paid card of a PRICED place shows our price and
- * the place's tax apart, as price + VAT, and under them the total with that tax in it (Terms §12: "Prices include VAT,
- * GST or sales tax, which depends on where you live"; the price paid is always on the card). Otherwise it says what the
- * price still needs (a country, a postal code, a moment), never a price before tax alone. Free costs nothing anywhere.
+ * `currency`, the one the place pays in (spec 2026-10-05 §2.16.1). A paid card of a PRICED place shows first, in large
+ * type, its `total_price` a month: the price the buyer pays, with the place's tax in it (Terms §12: "Prices include VAT,
+ * GST or sales tax, which depends on where you live"). Under it, smaller, our price and that tax apart, or that the place
+ * adds no tax. Otherwise the card says what the price still needs (a country, a postal code, a moment), never a price
+ * before tax. Free costs nothing anywhere.
  */
 export function PricingCards({
   catalog = billingEnglish,
@@ -63,9 +60,9 @@ export function PricingCards({
       {plans.map((plan) => {
         const name = planName(catalog, plan.plan_id);
         const free = plan.plan_id === "FREE";
-        const total = priced === "UNPRICED" || tax == null ? null : plan.total_price ?? null;
-        const lines = free || total === null || tax == null ? null
-          : pricedLines(catalog, locale, currency, tax, priced === "INCLUDED", total, plan.net_prices[currency]);
+        const total = free || priced === "UNPRICED" || tax == null ? null : plan.total_price ?? null;
+        const note = total === null || tax == null ? null
+          : taxNote(catalog, locale, currency, tax, priced === "INCLUDED", total, plan.net_prices[currency]);
         return (
           <article
             key={plan.plan_id}
@@ -74,14 +71,14 @@ export function PricingCards({
             aria-labelledby={`pricing-plan-${plan.plan_id}`}
           >
             <PlanHeading id={`pricing-plan-${plan.plan_id}`}>{name}</PlanHeading>
-            {free || lines !== null ? (
+            {free || total !== null ? (
               <p className="pricingPrice">
-                {lines?.price ?? t(catalog, "billing.pricing.perMonth", {
-                  price: formatMoney(locale, plan.net_prices[currency], currency)
+                {t(catalog, "billing.pricing.perMonth", {
+                  price: formatMoney(locale, total ?? plan.net_prices[currency], currency)
                 })}
               </p>
             ) : <p className="pricingPrice pricingUnpriced">{t(catalog, unpricedReason(place.status))}</p>}
-            {lines === null ? null : <p className={lines.total ? "pricingTotal" : "pricingNote"}>{lines.note}</p>}
+            {note === null ? null : <p className="pricingNote">{note}</p>}
             <p>{allowanceText(catalog, locale, plan.plan_id, plan.allowance_vs_plus)}</p>
             <p className="pricingNote">
               {t(catalog, free ? "billing.pricing.freeFeatures" : "billing.pricing.paidFeatures")}

@@ -433,7 +433,7 @@ describe("T9-C4 landing content", () => {
     expect(pricing?.querySelector('a[href="/pricing"]')).toBeNull();
   });
 
-  it("names the lowest paid price as price + VAT with its total, and links to the pricing page (Terms §12)", async () => {
+  it("names the lowest paid price, with the visitor's country's tax in it, and links to the pricing page (Terms §12)", async () => {
     routeMocks.getBillingPlans.mockResolvedValueOnce({
       currency: "EUR",
       place: { country: "DE", postal_code: null, status: "PRICED" },
@@ -446,11 +446,12 @@ describe("T9-C4 landing content", () => {
     });
     const pricing = (await renderRoute(null)).querySelector('[data-landing-section="pricing"]');
     // Spec 2026-10-05 §2.16.1: in the currency the visitor's connection pays in.
-    // Our price and the tax apart, then the total with the tax in it: never the price before tax alone.
-    expect(pricing?.textContent)
-      .toContain("Start free. Paid plans start at €20.00 + €3.80 MwSt. = €23.80 a month, tax included. Cancel whenever.");
+    expect(pricing?.textContent).toContain("Start free. Paid plans start at €23.80 a month, tax included. Cancel whenever.");
     expect(pricing?.querySelector('a[href="/pricing"]')?.textContent).toBe("See the plans");
-    expect(pricing?.textContent).not.toMatch(/plus tax/u);
+    // The sentence names the total alone: never the price before tax, and no split (the cards above show that).
+    const sentence = pricing?.querySelector("#pricing");
+    expect(sentence?.textContent).toContain("€23.80 a month");
+    expect(sentence?.textContent).not.toMatch(/plus tax|€20\.00|\+|MwSt\./u);
   });
 
   it("says no tax is added, never \"tax included\", where the visitor's country adds none", async () => {
@@ -512,23 +513,24 @@ describe("T9-C4 landing content", () => {
     first != null && second != null
     && (first.compareDocumentPosition(second) & 4 /* DOCUMENT_POSITION_FOLLOWING */) !== 0;
 
-  it("shows every plan's price as price + VAT with its total, between the closing title and its CTA (Terms §12)", async () => {
+  it("shows every plan's price, tax included, with the split under it, between the closing title and its CTA (Terms §12)", async () => {
     // PROPERTY: a visitor sees the prices on the landing itself: the pricing page's own cards, one per plan,
-    // each paid price as our price and the visitor's country's tax apart, with the total right under it, placed
-    // after the closing title and lede and before the "Ask a question" button.
+    // each paid price first as the total with the visitor's country's tax in it, then under it, smaller, our price
+    // and that tax apart, placed after the closing title and lede and before the "Ask a question" button.
     routeMocks.getBillingPlans.mockClear();
     routeMocks.getBillingPlans.mockResolvedValueOnce(GERMANY_PLANS);
     const pricing = (await renderRoute(null)).querySelector('[data-landing-section="pricing"]');
     const plans = pricing?.querySelector("[data-landing-plans]");
     const cards = [...(plans?.querySelectorAll("[data-pricing-cards] > article") ?? [])];
     expect(cards.map((card) => card.getAttribute("data-plan"))).toEqual(["FREE", "PLUS", "PRO", "MAX"]);
+    // The large price line is the total a month, the price the buyer pays.
     expect(cards.map((card) => card.querySelector(".pricingPrice")?.textContent)).toEqual([
-      "€0.00 a month", "€20.00 + €3.80 MwSt.", "€50.00 + €9.50 MwSt.", "€200.00 + €38.00 MwSt."
+      "€0.00 a month", "€23.80 a month", "€59.50 a month", "€238.00 a month"
     ]);
-    // Never a price before tax alone: every paid card carries its total, tax in it.
-    expect(cards.map((card) => card.querySelector(".pricingTotal")?.textContent ?? null)).toEqual([
-      null, "€23.80 a month in total (19%, Germany)", "€59.50 a month in total (19%, Germany)",
-      "€238.00 a month in total (19%, Germany)"
+    // Right under it, in the small note style: our price and the tax apart, with the rate and the country.
+    expect(cards.map((card) => card.querySelector(".pricingPrice + .pricingNote")?.textContent ?? null)).toEqual([
+      null, "€20.00 + €3.80 MwSt. (19%, Germany)", "€50.00 + €9.50 MwSt. (19%, Germany)",
+      "€200.00 + €38.00 MwSt. (19%, Germany)"
     ]);
     expect(plans?.textContent).not.toMatch(/plus tax/u);
     // The plan names are level 3 under the closing's level 2 title.
@@ -569,9 +571,9 @@ describe("T9-C4 landing content", () => {
     routeMocks.getBillingPlans.mockResolvedValueOnce(GERMANY_PLANS);
     const chosen = (await renderRoute(null, { country: "DE" })).querySelector("[data-landing-plans]");
     expect(routeMocks.getBillingPlans).toHaveBeenCalledWith({ country: "DE" });
-    expect(chosen?.querySelector('article[data-plan="PLUS"] .pricingPrice')?.textContent).toBe("€20.00 + €3.80 MwSt.");
-    expect(chosen?.querySelector('article[data-plan="PLUS"] .pricingTotal')?.textContent)
-      .toBe("€23.80 a month in total (19%, Germany)");
+    expect(chosen?.querySelector('article[data-plan="PLUS"] .pricingPrice')?.textContent).toBe("€23.80 a month");
+    expect(chosen?.querySelector('article[data-plan="PLUS"] .pricingPrice + .pricingNote')?.textContent)
+      .toBe("€20.00 + €3.80 MwSt. (19%, Germany)");
     expect(chosen?.querySelector("form[data-pricing-place]")?.getAttribute("action")).toBe("/#plans");
     routeMocks.getBillingPlans.mockClear();
     routeMocks.getBillingPlans.mockResolvedValueOnce(GERMANY_PLANS);

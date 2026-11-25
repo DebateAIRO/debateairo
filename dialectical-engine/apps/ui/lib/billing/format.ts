@@ -26,11 +26,11 @@ export function taxInPrice(total: string, net: string): string | null {
 }
 
 /**
- * Terms §12: how a plans list's prices stand toward tax. INCLUDED: the place's tax is in the total (a card shows our
- * price and that tax apart, as price + VAT, with the total under them); NONE: that place adds none, so they are final;
- * UNPRICED: no place's tax is known yet (no country, a US or Canadian postal code still needed, or the tax service not
- * answering), so no price is shown at all, never one before tax alone. `== null`: an answer
- * without the fields (only a hand-made one: the contract client requires them) is UNPRICED.
+ * Terms §12: how a plans list's prices stand toward tax. INCLUDED: the place's tax is in the total (a card shows that
+ * total, and under it our price and that tax apart); NONE: that place adds none, so they are final; UNPRICED: no place's
+ * tax is known yet (no country, a US or Canadian postal code still needed, or the tax service not answering), so no
+ * price is shown at all, never one before tax. `== null`: an answer without the fields (only a hand-made one: the
+ * contract client requires them) is UNPRICED.
  */
 export type PricedTax = "INCLUDED" | "NONE" | "UNPRICED";
 
@@ -40,23 +40,6 @@ export function pricedTax(
   const tax = answer?.tax;
   if (answer?.place?.status !== "PRICED" || tax == null) return "UNPRICED";
   return tax.tax_status === "TAXABLE" && tax.tax_rate_bp > 0 ? "INCLUDED" : "NONE";
-}
-
-/**
- * A price for a sentence that names one, as price + VAT: "€20.00 + €3.80 MwSt. = €23.80", our price, the place's tax
- * apart and the total with that tax in it (Terms §12: the price paid is always named). A total that cannot be split,
- * or holds no tax, is named whole.
- */
-export function priceWithTaxTotal(
-  catalog: MessageCatalog, locale: string, currency: BillingCurrency,
-  price: Readonly<{ net: string; total: string; taxName: string }>
-): string {
-  const total = formatMoney(locale, price.total, currency);
-  const tax = taxInPrice(price.total, price.net);
-  if (tax === null || Number(tax) === 0) return total;
-  return `${t(catalog, "billing.pricing.priceWithTax", {
-    price: formatMoney(locale, price.net, currency), tax: formatMoney(locale, tax, currency), taxName: price.taxName
-  })} = ${total}`;
 }
 
 /** The sentence a card shows in place of a price its place cannot be given yet (Terms §12: never a price before tax). */

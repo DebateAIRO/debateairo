@@ -7,10 +7,10 @@ import type { PricedTax } from "@/lib/billing/format";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /* The document's closing CTA: centred, with the pro/rule/con motif above it.
-   The pricing line carries the id the nav points at. It names a price as price +
-   VAT: our price, the visitor's country's tax apart and the total with it (or the
-   price alone where none is added); Terms §12: with no priced place it says the
-   plans are priced with your tax, never a price before tax alone. */
+   The pricing line carries the id the nav points at. Terms §12: it names a price
+   only as the total with the visitor's country's tax in it (or none to add); with
+   no priced place it says the plans are priced with your tax, never a price before
+   tax. The cards above it show our price and the tax apart, under that total. */
 const PRICING_COPY: Readonly<Record<Exclude<PricedTax, "UNPRICED">, string>> = Object.freeze({
   INCLUDED: "home.pricingCopyTaxIncluded", NONE: "home.pricingCopyNoTax"
 });
