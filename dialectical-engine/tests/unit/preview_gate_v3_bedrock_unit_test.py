@@ -261,9 +261,12 @@ class ReadmeTests(unittest.TestCase):
 
     def test_the_key_waits_for_the_probe_and_switch_on_starts_the_gate_first(self):
         flat = ' '.join(self.readme.split())
-        # Once the key and Luna's address are both in, the API checks Luna at every ask: the key goes in right before
-        # the owner's first probe, never at the upload.
+        # The first real Amazon call is the owner's probe, with the halt watcher on: the key goes in right before it,
+        # never at the upload. A release from before the rule that an ask checks only its line-up's models checks Luna
+        # at every ask once the key is in, so the guide says how to tell one and to keep the key out while it runs.
         self.assertIn('**The key goes in right before the first probe, never at the upload.**', flat)
+        self.assertIn('**A release from before that rule checks every declared model at every ask.**', flat)
+        self.assertIn('So while such a release runs, keep the key out.', flat)
         step4, step5 = self.readme.index('**4. The Amazon key.'), self.readme.index('**5. The GO')
         self.assertIn('Not at the upload: on the day of the probe, right before step 8', ' '.join(self.readme[step4:step5].split()))
         # R is the upload's own release folder, read from its names file, never a typed placeholder.
@@ -301,6 +304,15 @@ class ReadmeTests(unittest.TestCase):
         key = self.readme[step4:step5]
         self.assertLess(key.index('systemctl show -p InaccessiblePaths debateai-preview-$U.service'), key.index('preview_key.py install bedrock'))
         self.assertIn('after "Switch it on" steps 1 and 2', ' '.join(key.split()))
+        # A release from before the rule that an ask checks only its line-up's models checks Luna at every ask once the
+        # key is in. So step 3 reads the current release's code before the key, and the key step waits for that check.
+        line = '. /root/preview-archive/rNN-names.sh; grep -c probeModelIds "$CAPI/dialectical-engine/apps/api/src/provider-discovery.ts"'
+        self.assertIn('\n```sh\n' + line + '\n```\n', switch_on)
+        self.assertLess(steps[2], switch_on.index(line))
+        self.assertLess(switch_on.index(line), switch_on.index('Then install step 4 (the key)'))
+        self.assertLess(switch_on.index(line), steps[3])
+        self.assertIn('A 0, or an error, means a release from before the rule', ' '.join(switch_on.split()))
+        self.assertIn('and only when the `probeModelIds` line of "Switch it on" step 3 printed 1 or more.', ' '.join(key.split()))
 
     def test_the_pot_range_block_prints_what_activate_accepts(self):
         # Step 5's first block, run on made-up caps and GO files; the gate's own test seams stand in for root's custody.

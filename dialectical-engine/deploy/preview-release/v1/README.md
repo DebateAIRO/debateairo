@@ -3082,7 +3082,10 @@ show as before, and a debate admitted on an older version still finishes on it. 
 2. **Then the upload** that carries the new texts. QWENOUT (below) is what that upload runs first, before its SB1: it
    prints `QWENOUT_DONE` only when the active version seats no Qwen and no open debate runs on a version that does, so
    the texts are true from the moment the upload switches the site.
-3. **Last, the gate**: Qwen out of the DeepInfra gate's `enabled_models`, once nothing can still call it.
+3. **Last, the gate**: Qwen out of the DeepInfra gate's `enabled_models`, once nothing can still call it. An ask checks
+   only the models its line-up seats, so once no version seats Qwen, no ask sends it anything. A release from before
+   that rule ("Before this rule, an ask checked every declared model", in the Amazon gate's section) still checks Qwen
+   at every ask, with the fixed check question and no one's text, until this step.
 
 **If the order is wrong.** Nothing goes down and nothing is half-uploaded: the new code stops before anything is written
 whenever the active version still seats Qwen. The practice (SB2, on the Mac) stops when it composes the next version,
@@ -3334,9 +3337,10 @@ echo "the new release passes its own site version $V"
 **In plain words.** From this release on the site can use OpenAI's GPT-6 Luna, which Amazon serves through its own
 spending gate (`deploy/preview-gate/v3/README-bedrock.md`). The upload that first carries this code has three pieces of
 server work, and a fourth piece comes later, on a day of its own. None of the three makes anyone's debate use Luna, and
-none sends Amazon anything: Luna joins the debates only at piece 4, by a settings activation, after the owner's probe
-has passed and, when anyone outside the team has an account by then, after the Privacy Policy notice ("What Amazon
-receives, and the notice", below).
+none sends Amazon anything: an ask checks only the models its line-up seats, and Luna joins the debates only at piece
+4, by a settings activation, after the owner's probe has passed and, when anyone outside the team has an account by
+then, after the Privacy Policy notice ("What Amazon receives, and the notice", below). A release from before that rule
+checked every declared model at every ask ("Before this rule, an ask checked every declared model", below).
 
 In the order the upload meets them:
 
@@ -3738,8 +3742,8 @@ redeploy, restart or `activate` a gate now.
 only the page's fallback, and the page reads the live line-up from the API. The AI providers page lists Amazon Web
 Services from this upload on (from the switch), with its checked Register row, because the API reaches its address. The
 Privacy Policy and the Terms of this release (version 1.0) already name Amazon; they go live with this upload. Amazon
-receives nothing before piece 4: no line-up seats Luna, and without the key the gate refuses the API's checks of Luna
-before anything is sent.
+receives nothing before piece 4: no line-up seats Luna, and an ask checks only the models its line-up seats, so no ask
+reaches the Amazon gate. The first call Amazon receives is the owner's probe in piece 4.
 - **No Privacy Policy §14 notice is owed at this upload**: Amazon receives nothing until Luna is switched on, and only
   the owner's and the team's accounts exist. The owner's yes before the switch (SB6; on the drained path, the yes before
   DR2) says so ("The providers page", "A company listed before it receives anything", which also says what counts as
@@ -3748,14 +3752,22 @@ before anything is sent.
   product, naming Amazon and what it will receive. The rest of piece 4, the key included, waits until the time to
   object has passed.
 
-**Why the key waits for piece 4.** Once the key and Luna's row are both in, the API checks Luna through the gate at
-every ask: it probes every declared model whose last check is old, not only the line-up's. The first real Amazon call
-would then come from someone's ask, before the owner's own probe, and with the halt watcher not yet started, so a halt
-would e-mail nobody. Without the key the gate refuses that check before anything is set aside: nothing is sent, nothing
-is charged, the gate does not halt, and Luna is simply left out. Debates run on the other models exactly as before, and
-visitors see nothing. So the key goes in on piece 4's day, right before the owner's first probe. On that day it also
-comes after the notice's time to object, when the notice is owed, and after the halt watcher and the address timer have
-started: from the key on, every ask makes a paid check of Luna, so the activation follows the next day.
+**Why the key waits for piece 4.** An ask checks only the models its line-up seats: while no line-up seats Luna, no ask
+reaches the Amazon gate, key or no key. The first real Amazon call is then the owner's own probe, and it must come with
+the halt watcher running, so that a halt e-mails the owner. So the key goes in on piece 4's day, right before the
+owner's first probe. On that day it also comes after the notice's time to object, when the notice is owed, and after
+the halt watcher and the address timer have started. The activation follows the next day, after the bill check.
+
+**Before this rule, an ask checked every declared model.** A release from before this rule (its
+`apps/api/src/provider-discovery.ts` has no `probeModelIds`; piece 4, step 3, checks this before the key) checks at
+every ask every model whose address it declares and whose last check is old, not only the line-up's. With such a
+release running and the key in, every ask sends Luna a paid check, the first one from someone's ask, before the
+owner's own probe. While Amazon refuses the key (401 or 403), that first ask halts the Amazon gate
+(`provider_key_refused`). A halted gate is not `active`, so the
+release check, a settings activation, the switch, GATEREADY and GATELIVE all refuse until it is opened again: read its
+`reason`, put a key Amazon accepts in first ("A new key"), then `activate` (`README-bedrock.md`, "Re-open after a
+halt"). Without the key nothing is sent or charged, and the gate does not halt. So while such a release runs, keep the
+key out of the Amazon gate.
 
 **Until piece 4: what the unused Amazon gate does.**
 - **It closes itself after 31 days.** Piece 2's `activate` opens its window for 31 days (`open_days`). With no key no
@@ -3765,9 +3777,9 @@ started: from the key on, every ask makes a paid check of Luna, so the activatio
   state is still `active`. Once the key is in, the first call after the 31 days halts the gate
   (`open_window_expired`), and its `activate` opens it again.
 - **After a reboot it is not running.** Its unit has no `[Install]`, and the boot drop-in that starts it with the site
-  comes only at "Switch it on". Its `state` on disk stays `active`, so the tools and ASKS_OPEN are satisfied, and Luna's
-  checks at ask time fail at once (Luna is left out). `systemctl start debateai-preview-bedrock-budget` starts it;
-  "Switch it on" step 2 does.
+  comes only at "Switch it on". Its `state` on disk stays `active`, so the tools and ASKS_OPEN are satisfied. No ask
+  calls it: no line-up seats Luna before "Switch it on", whose step 2 starts the gate at boot.
+  `systemctl start debateai-preview-bedrock-budget` starts it; "Switch it on" step 2 does.
 
 **Piece 4, any day after the upload: Luna in the line-up.** Not part of the upload, and never during one.
 `README-bedrock.md`, "Switch it on", carries each step. In this order:
@@ -3779,7 +3791,12 @@ started: from the key on, every ask makes a paid check of Luna, so the activatio
 3. At a quiet hour, in one sitting ("Switch it on", step 3): the AWS console (install step 0), if not done yet; the key
    at the hidden prompt (install step 4, which first checks that the older units still hide the Amazon folder); and
    right after it the probe, twice (install step 8). Every field must show its "Good" value. The day after, the
-   gate's `today_spend_usd` of the probe's day against the AWS Billing page.
+   gate's `today_spend_usd` of the probe's day against the AWS Billing page. Before the key: the key goes in only when
+   the current release's `apps/api/src/provider-discovery.ts` contains `probeModelIds`, that is, when this line, with
+   the newest upload's names file, prints 1 or more (after a way back, `$OCAPI` in place of `$CAPI`):
+   `. /root/preview-archive/rNN-names.sh; grep -c probeModelIds "$CAPI/dialectical-engine/apps/api/src/provider-discovery.ts"`.
+   A 0, or an error, means a release from before this rule ("Before this rule, an ask checked every declared model",
+   above): keep the key out.
 4. The runner restarted, when it could not read the gate at its start ("Switch it on", step 4).
 5. The activation ("Switch it on", step 6; the Privacy Policy and the Terms that name Amazon are live on the site from
    this upload on): "The line-up, the thinking levels and the answer seats" above, with a line-up file that adds

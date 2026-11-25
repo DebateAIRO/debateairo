@@ -587,7 +587,9 @@ with GLM only, and before the app is pointed at it.
 (`docs/legal/2026-11-24-partner-model-out.md`), so the app's line-up no longer seats it, and once the debates admitted
 before that have finished it leaves `enabled_models` (`deploy/preview-release/v1/README.md`, "Taking Qwen out of the live
 line-up"). Its row stays in this gate's table, as it does in the app, so the debates recorded with it keep their model row.
-The steps below still hold for DeepSeek and MiMo; leave Qwen out of the probe and of `enabled_models`.
+An ask checks only the models its line-up seats, so once no line-up seats Qwen, no ask sends it anything; a release
+from before that rule still checks Qwen at every ask (the fixed check question, no one's text) until it leaves
+`enabled_models`. The steps below still hold for DeepSeek and MiMo; leave Qwen out of the probe and of `enabled_models`.
 
 **1. Probe the model (one paid call, a small fraction of a cent).** Probe when nobody is using the
 preview: an error answer halts the gate. The command runs the probe inside the same network fence

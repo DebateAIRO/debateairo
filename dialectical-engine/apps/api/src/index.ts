@@ -6344,8 +6344,10 @@ export interface RunCreationSettings {
    * `busyModelIds` (preview only, spec 2026-10-11 busy model §3/§3a): the models whose probe this round
    * was a gate-proven unbilled refusal, none of them in the panel (`createProviderDiscoveryResolver`'s
    * preview round, which never resends at ask time).
+   * `probeModelIds`: the models this ask may seat. The preview round probes only their targets; absent means every
+   * declared target (`DiscoverProviderPanel`).
    */
-  readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[] & Readonly<{ busyModelIds?: readonly string[] }>>;
+  readonly resolveDiscoveredPanel: (probeModelIds?: readonly string[]) => Promise<readonly DiscoveredPanelMember[] & Readonly<{ busyModelIds?: readonly string[] }>>;
   readonly resolveEnvelopeBasis: (input: {
     readonly depthParams: Readonly<Record<string, unknown>>;
     readonly riskTier: RiskTier;
@@ -6921,8 +6923,9 @@ export async function evaluateAskAdmission(
   /**
    * V-28(2) — FIRST, before anything is discovered or probed.
    *
-   * Panel discovery probes every configured vendor, and a probe is itself a
-   * request to a paid gateway. Taking the money decision after it would spend
+   * On the preview, panel discovery probes the models this ask may seat; hosted
+   * and local probe every declared vendor. A probe is itself a request to a paid
+   * gateway. Taking the money decision after it would spend
    * money to find out that no money may be spent, so the day's ceiling is the
    * first question this function asks.
    *
@@ -6956,8 +6959,12 @@ export async function evaluateAskAdmission(
   if (modelPicker !== undefined && modelPicker.scorecard.state === "VALID") {
     assertHostedPickerCeiling(modelPicker);
   }
-  const discoveredPanel = await settings.resolveDiscoveredPanel();
   const roster = previewPlanTierRosters(previewConfig,PLAN_TIER_ROSTERS)[planTier as keyof typeof PLAN_TIER_ROSTERS];
+  // The roster path seats only the roster's models, so only those are probed (a declared model no line-up seats is sent
+  // nothing). A VALID scorecard may seat any discovered model, so its path discovers every target.
+  const discoveredPanel = await settings.resolveDiscoveredPanel(
+    modelPicker !== undefined && modelPicker.scorecard.state === "VALID" ? undefined : roster
+  );
   if (modelPicker !== undefined && modelPicker.scorecard.state === "VALID") {
     return admitWithScorecard({
       settings, ask, risk, discoveredPanel, rosterModelIds: roster,

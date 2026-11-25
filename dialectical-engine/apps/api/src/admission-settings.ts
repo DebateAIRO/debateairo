@@ -386,7 +386,8 @@ export async function loadAdmissionSettings(pool: Pool, version: number, site: A
   }
   // Contract A §5: the preview's start-of-debate estimate asks the gate what is left today (read-only).
   const previewBudgetGate = previewConfig === undefined ? undefined : await run("preview-budget-gate", async () => {
-    // Every declared target is health-checked at ask time, paid through the gate even when the ask is refused.
+    // The estimate counts one ask-time health check for every declared target. An ask checks only the models it may
+    // seat, so this counts more checks than are sent: the careful side.
     const settings = await readers.readPreviewBudgetGateSettings(pool, version, previewConfig,
       declaredProviderTargets.map((target) => target.model));
     // Every role the register names must be a declared target, or its debates would fail at claim.

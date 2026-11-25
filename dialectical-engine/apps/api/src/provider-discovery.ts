@@ -55,6 +55,14 @@ export function parseDeclaredProviderTargets(input: Readonly<{
  */
 export type DiscoveredProviderPanel = readonly DiscoveredPanelMember[] & Readonly<{ busyModelIds?: readonly string[] }>;
 
+/**
+ * One ask's discovery round. `probeModelIds` are the models the ask may seat: on the preview, only the declared targets
+ * of those models are probed and can be in the panel. Another declared target (a model no line-up seats, such as one
+ * not switched on yet or one taken out) is not probed, nothing is recorded for it, and it is not in the panel, as after
+ * a failed probe. Absent means every declared target. Hosted and local probe every declared target either way.
+ */
+export type DiscoverProviderPanel = (probeModelIds?: readonly string[]) => Promise<DiscoveredProviderPanel>;
+
 export type ProviderDiscoveryProbeStore = Readonly<{
   readLatest(providerRefs: readonly string[]): Promise<readonly ProviderProbeRecord[]>;
   record(observation: ProviderProbeRecord): Promise<void>;
@@ -114,9 +122,10 @@ export function createProviderDiscoveryResolver(input: Readonly<{
    * probe id; and the round reports its busy models (a gate-proven unbilled refusal). Amendment §3a
    * (2026-10-11 review): NO resend at ask time, so the round sends exactly one request per model, and a
    * busy model is left out of the panel even where another of its refs has a fresh HEALTHY record.
+   * The preview round also takes the models the ask may seat (the returned function's `probeModelIds`).
    */
   previewRound?: true;
-}>): () => Promise<DiscoveredProviderPanel> {
+}>): DiscoverProviderPanel {
   if (!Number.isInteger(input.probeFreshnessMs) || input.probeFreshnessMs < 1) {
     throw new TypeError("PROVIDER_PROBE_FRESHNESS_INVALID");
   }
@@ -132,6 +141,12 @@ export function createProviderDiscoveryResolver(input: Readonly<{
   const fetchImplementation = input.fetchImplementation ?? fetch;
   const clock = input.clock ?? (() => new Date());
   const previewRound = input.previewRound;
+  type PreviewGroupResult = Readonly<{ rows: readonly ProviderProbeRecord[]; busy: boolean }>;
+  /**
+   * The preview's probe groups in flight, by group key. Two asks at the same moment may probe different line-ups; a
+   * model both need is still sent one request, and both rounds use that one observation.
+   */
+  const previewGroupsInFlight = new Map<string, Promise<PreviewGroupResult>>();
   /**
    * Spec 2026-10-11 busy model §1: the preview's round. GLM is reviewed under two refs
    * (`preview:fixture-a`, `preview:fixture-b`), and probing both at the same moment sent the busy model
@@ -160,9 +175,7 @@ export function createProviderDiscoveryResolver(input: Readonly<{
       for (const row of rows) await input.probes.record(row);
       return rows;
     };
-    const byRef = new Map<string, ProviderProbeRecord>();
-    const busyModelIds: string[] = [];
-    await Promise.all([...groups.values()].map(async (group) => {
+    const probeGroup = async (group: readonly ProviderDiscoveryTarget[]): Promise<PreviewGroupResult> => {
       const target = group[0]!;
       const controls = input.probeControlsFor?.(target)
         ?? { thinkingLevel: input.thinkingLevel, tokenCeiling: input.probeTokenCeiling };
@@ -177,20 +190,46 @@ export function createProviderDiscoveryResolver(input: Readonly<{
         fetchImplementation,
         clock
       });
-      const rows = await recordAll(observation, group);
-      group.forEach((member, index) => byRef.set(member.providerRef, rows[index]!));
-      if (previewProbeRoundBusy([observation])) busyModelIds.push(target.model);
+      return Object.freeze({ rows: await recordAll(observation, group), busy: previewProbeRoundBusy([observation]) });
+    };
+    const byRef = new Map<string, ProviderProbeRecord>();
+    const busyModelIds: string[] = [];
+    await Promise.all([...groups].map(async ([key, group]) => {
+      let pending = previewGroupsInFlight.get(key);
+      if (pending === undefined) {
+        let shared!: Promise<PreviewGroupResult>;
+        shared = probeGroup(group).finally(() => {
+          if (previewGroupsInFlight.get(key) === shared) previewGroupsInFlight.delete(key);
+        });
+        previewGroupsInFlight.set(key, shared);
+        pending = shared;
+      }
+      const result = await pending;
+      for (const row of result.rows) byRef.set(row.providerRef, row);
+      if (result.busy) busyModelIds.push(group[0]!.model);
     }));
     return Object.freeze({ byRef, busyModelIds: Object.freeze([...new Set(busyModelIds)]) });
   };
-  const resolve = async (): Promise<DiscoveredProviderPanel> => {
+  const resolve = async (probeModelIds: readonly string[] | undefined): Promise<DiscoveredProviderPanel> => {
     const now = clock();
     const latest = await input.probes.readLatest(expectedRefs);
     const latestByRef = new Map(latest.map((record) => [record.providerRef, record] as const));
     if (previewRound !== undefined) {
-      const stale = input.targets.filter((target) => !isFreshMatchingRecord(latestByRef.get(target.providerRef), target, now, input.probeFreshnessMs));
-      const round = await resolvePreviewObservations(stale);
-      const records = input.targets.map((target) => round.byRef.get(target.providerRef) ?? latestByRef.get(target.providerRef)!);
+      // Only the targets of the models this ask may seat are probed or put in its panel: a declared model that no
+      // line-up seats receives nothing at an ask.
+      const usable = probeModelIds === undefined ? input.targets
+        : input.targets.filter((target) => probeModelIds.includes(target.model));
+      const fresh = (target: ProviderDiscoveryTarget) =>
+        isFreshMatchingRecord(latestByRef.get(target.providerRef), target, now, input.probeFreshnessMs);
+      const round = await resolvePreviewObservations(usable.filter((target) => !fresh(target)));
+      // Each target's observation from this round, else its fresh record. A target with neither is left out, as after a
+      // failed probe, and an old record never counts as a check. (Neither can only happen when another ask, at the same
+      // moment, probed the same model for its other ref alone.)
+      const records = usable.flatMap((target) => {
+        const probed = round.byRef.get(target.providerRef);
+        if (probed !== undefined) return [probed];
+        return fresh(target) ? [latestByRef.get(target.providerRef)!] : [];
+      });
       // §3a: busy is per MODEL. A ref of a busy model whose own record is fresh and HEALTHY (freshness is
       // per ref) was not probed this round, but the model's probe this round was refused: it sits out too,
       // so the busy list and the panel always agree.
@@ -225,15 +264,20 @@ export function createProviderDiscoveryResolver(input: Readonly<{
     }));
     return Object.freeze(panelOf(observations));
   };
-  let inFlight: Promise<DiscoveredProviderPanel> | undefined;
-  return () => {
-    if (inFlight !== undefined) return inFlight;
-    const current = resolve();
+  // One round in flight per set of models asked for, shared by every ask that asks for the same set while it runs.
+  // Hosted and local probe every target whatever the set, so all their asks share one round, as before.
+  const inFlight = new Map<string, Promise<DiscoveredProviderPanel>>();
+  return (probeModelIds) => {
+    const asked = previewRound === undefined || probeModelIds === undefined ? undefined
+      : Object.freeze([...new Set(probeModelIds)].sort());
+    const key = asked === undefined ? "every target" : JSON.stringify(asked);
+    const pending = inFlight.get(key);
+    if (pending !== undefined) return pending;
     let shared!: Promise<DiscoveredProviderPanel>;
-    shared = current.finally(() => {
-      if (inFlight === shared) inFlight = undefined;
+    shared = resolve(asked).finally(() => {
+      if (inFlight.get(key) === shared) inFlight.delete(key);
     });
-    inFlight = shared;
+    inFlight.set(key, shared);
     return shared;
   };
 }

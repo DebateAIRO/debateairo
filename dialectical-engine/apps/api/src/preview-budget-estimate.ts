@@ -367,7 +367,10 @@ export type PreviewBudgetGateSettings = Readonly<{
   storyRounds: number;
   /** The max_tokens of each kind of call (see PreviewCallOutputTokens). */
   callOutputTokens: PreviewCallOutputTokens;
-  /** The models of the targets the API health-checks at ask time, paid through the gate even when the ask is refused. */
+  /**
+   * The models the estimate counts one ask-time health check for (each paid through the gate even when the ask is
+   * refused): every declared target, though an ask checks only the models it may seat, the careful side.
+   */
   askProbeModelIds: readonly string[];
   /**
    * LG-A (L32; INTERFACE §2.4): the structure-repair model when the declared targets name it (the rule the runner's route
@@ -626,7 +629,8 @@ function offPanelRoleRefs(panel: readonly PreviewPanelMember[], roleProviderRefs
  * - probes: the runner's paid health checks at every pickup, one per panel member plus one per role
  *   ref not on the panel, times (1 + the hold cap: `hold_cap` on the basis, else the register's,
  *   + PREVIEW_ESTIMATE_RESTART_PICKUPS);
- * - askProbes: the API's health checks of this ask (one per target, the careful side);
+ * - askProbes: the API's health checks of this ask (one per declared target, the careful side: an ask checks only the
+ *   models it may seat);
  * - unbilledRetries: owner ruling 5's one retry of a call the gate proved unbilled, at most one per
  *   one-attempt call (every debate call; the story's two calls have their own second try instead). It is
  *   counted against the gate's calls; it costs no money (the gate released that call's hold).
@@ -1763,8 +1767,9 @@ async function readPreviewVersionTerms(pool: Pool, registerVersion: number, conf
 
 /**
  * Boot: the admission settings for the preview, from its config and the register version in force (its terms, read by
- * `readPreviewVersionTerms`; a version the boot cannot read refuses the boot). `askProbeModelIds` are the models of the
- * declared targets the API health-checks at ask time.
+ * `readPreviewVersionTerms`; a version the boot cannot read refuses the boot). `askProbeModelIds` are the models of
+ * every declared target: the estimate counts one ask-time health check for each, though an ask checks only the models
+ * it may seat.
  *
  * Side-by-side spec §4 (plan C16): `termsForVersion` reads another version's terms for an unfinished debate admitted
  * under it, once per version: a sealed version never changes, so the kept terms need no expiry (at most

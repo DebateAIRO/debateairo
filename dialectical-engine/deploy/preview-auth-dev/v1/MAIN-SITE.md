@@ -1052,9 +1052,11 @@ Then, in one root shell (`sudo -i`), as the release guide's pieces 1 and 2 say:
   stop and ask;
 - then the Amazon gate: README-bedrock's install steps 1 to 3, 5, 6 and 7. **Do not put the Amazon key in now**
   (install step 4): it goes in on Luna's own day, after the notice when it is owed and after the gate's watchers start,
-  right before your first probe (README-bedrock's "Switch it on"). Once the key and Luna's address are both in, the
-  site checks Luna through the gate at every question someone asks, which is a real paid call; without the key nothing
-  is sent to Amazon or charged, and debates run as before.
+  right before your first probe (README-bedrock's "Switch it on"). The site checks only the AIs a question's line-up
+  seats, so no question reaches Amazon before Luna is switched on. A release from before that rule checks Luna at
+  every question once the key and Luna's address are both in, a real paid call, and while Amazon refuses the key the
+  first question halts the Amazon gate (README-bedrock's "Decisions you should know about"); without the key nothing is
+  sent to Amazon or charged, and debates run as before.
 
 Each gate's `activate` (Redeploy step 6; the Amazon gate's install step 6) must show, in its own output,
 `"provider": "<that gate>"`, `"state": "active"` and `"window_open": true`. A line with `"status": "refused"` means
