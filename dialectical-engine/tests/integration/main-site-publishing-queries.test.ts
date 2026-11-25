@@ -96,6 +96,12 @@ describe("5.9's queries on the real schema", () => {
 
   it("pubcounts counts what was ever published, what is public now, the keys that should be in the store, the Free debates and the clean-ups", async () => {
     const [counts] = asked([helper("pubcounts"), "pubcounts"]);
+    // The registry of used refs also takes a row when a debate starts, and four when a private debate is deleted, by its
+    // owner or by the end-of-debate check. None of them is a sign of publishing.
+    const used = (kind: string) => [`INSERT INTO core.publication_ref_tombstone (ref, ref_kind, created_at) VALUES ($1, $2, now())`, [randomUUID(), kind]] as const;
+    await seeded(["run_execution_ref", "run_execution_ref",
+      "private_erasure_request", "private_erasure_audit_id", "private_erasure_audit_actor", "private_erasure_audit_target",
+      "synthesis_check_erasure_request", "synthesis_check_erasure_audit_id", "synthesis_check_erasure_audit_actor", "synthesis_check_erasure_audit_target"].map(used));
     expect(await one(counts!)).toBe("0 0 0 0 0 0 0 0 0");
     const [a, b, c] = [randomUUID(), randomUUID(), randomUUID()];
     const snapshot = (ref: string) => [`INSERT INTO serve.publication_snapshot (publication_ref, run_id, format_version, content_ciphertext, created_at)
@@ -110,10 +116,20 @@ describe("5.9's queries on the real schema", () => {
       [`INSERT INTO serve.publication_key_cleanup_intent (publication_ref, requested_at, completed_at, cleanup_state, cleanup_claim_token, destroy_result)
         VALUES ($1, now(), now(), 'CLEANED', $2, 'DESTROYED')`, [b, randomUUID()]],
       [`INSERT INTO serve.publication_key_cleanup_intent (publication_ref, requested_at, completed_at) VALUES ($1, now(), NULL)`, [c]],
-      free(null), free("PUBLISHED"), free("REFUSED")]);
+      free(null), free("PUBLISHED"), free("REFUSED"),
+      ...["publication_ref", "reservation", "visibility_event", "visibility_actor", "allow_audit_id", "allow_audit_actor", "allow_audit_target",
+        "denied_audit_id", "denied_audit_actor", "denied_audit_target"].map(used)]);
     // Ever made 3; public now 1 (b came down); keys that should still be in the store 2 (b's was destroyed);
-    // Free debates waiting 1, public 1, kept private 1; clean-ups waiting 1; provisions 0; visibility events and tombstones 3.
-    expect(await one(counts!)).toBe("3 1 2 1 1 1 1 0 3");
+    // Free debates waiting 1, public 1, kept private 1; clean-ups waiting 1; provisions 0;
+    // visibility events 3 and the ten kinds of ref only publishing writes, with the rows above left out: 13.
+    expect(await one(counts!)).toBe("3 1 2 1 1 1 1 0 13");
+    // A kind the table comes to allow later is counted until this guide says what it is: the steps then stop and ask.
+    const allowed = await one(`SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'publication_ref_tombstone_ref_kind_check'`);
+    expect([...allowed.matchAll(/'([a-z_]+)'/gu)].map(match => match[1]).sort()).toEqual(["run_execution_ref",
+      "private_erasure_request", "private_erasure_audit_id", "private_erasure_audit_actor", "private_erasure_audit_target",
+      "synthesis_check_erasure_request", "synthesis_check_erasure_audit_id", "synthesis_check_erasure_audit_actor", "synthesis_check_erasure_audit_target",
+      "publication_ref", "reservation", "visibility_event", "visibility_actor", "allow_audit_id", "allow_audit_actor", "allow_audit_target",
+      "denied_audit_id", "denied_audit_actor", "denied_audit_target"].sort());
   });
 });
 
