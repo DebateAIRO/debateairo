@@ -160,6 +160,8 @@ function run(server: Server, step: typeof STEPS[number]) {
   return { status: out.status, out: out.stdout, lines: out.stdout.trim().split('\n'), last: out.stdout.trim().split('\n').at(-1) };
 }
 const apiFile = (server: Server) => readFileSync(server.api, 'utf8');
+// The stand-in API's start, set to after its file's last change: as when the API restarted on the file as it is now.
+const restarted = (server: Server) => writeFileSync(join(server.dir, 'started'), `@${Math.floor(statSync(server.api).mtimeMs / 1000) + 1}\n`);
 const sorted = (text: string) => text.split('\n').filter(Boolean).sort();
 
 describe('the steps of 5.9 as text', () => {
@@ -541,7 +543,7 @@ describe('5.9 on a throwaway server, from today\'s state to publishing on and of
     writeFileSync(join(server.dir, 'started'), '@1000\n');
     const stopped = `PUBOFF_NOT_DONE: the API file says publishing is off, but the running API did not start on the file as it is now (an earlier PUBOFF stopped before its restart ended; the file before is the newest ${server.pub}/api-cur.env.before-puboff-… copy): it may still serve the public pages, or be down; nothing changed: ask at once`;
     expect(run(server, 'PUBOFF').last).toBe(stopped);
-    writeFileSync(join(server.dir, 'started'), started);
+    restarted(server);
     expect(run(server, 'PUBON').last).toBe('PUBON_DONE');
     mkdirSync(join(server.ps, 'publications/11111111-1111-4111-8111-111111111111'), { recursive: true });
     writeFileSync(join(server.ps, 'publications/11111111-1111-4111-8111-111111111111/publication-key.v1.json'), '{}');
@@ -549,6 +551,22 @@ describe('5.9 on a throwaway server, from today\'s state to publishing on and of
     expect(run(server, 'PUBOFF').last).toBe('PUBOFF_DONE');
     writeFileSync(join(server.dir, 'started'), '@1000\n');
     expect(run(server, 'PUBOFF').last).toBe(stopped);
+  }));
+
+  it('PUBON and PUBOFF change nothing when another step left the API file newer than the running API', () => withServer(server => {
+    for (const step of ['PUBKEYS', 'PUBLOGIN', 'PUBBACKUP'] as const) expect(run(server, step).last).toBe(`${step}_DONE`);
+    const started = readFileSync(join(server.dir, 'started'), 'utf8');
+    // Another step changed the file and stopped before its restart: PUBON would start the API on that change too.
+    writeFileSync(join(server.dir, 'started'), '@1000\n');
+    const off = apiFile(server);
+    expect(run(server, 'PUBON').last).toBe('PUBON_NOT_DONE: the running API did not start on the API file as it is now (a step that changes the file stopped before its restart ended); nothing changed: ask at once');
+    expect(apiFile(server)).toBe(off);
+    writeFileSync(join(server.dir, 'started'), started);
+    expect(run(server, 'PUBON').last).toBe('PUBON_DONE');
+    writeFileSync(join(server.dir, 'started'), '@1000\n');
+    const on = apiFile(server);
+    expect(run(server, 'PUBOFF').last).toBe('PUBOFF_NOT_DONE: the running API did not start on the API file as it is now (a step that changes the file stopped before its restart ended); nothing changed: ask at once');
+    expect(apiFile(server)).toBe(on);
   }));
 
   it('a clean PUBOFF says how many Free debates still wait, and stops when a debate went public during its restart', () => withServer(server => {
@@ -566,14 +584,17 @@ describe('5.9 on a throwaway server, from today\'s state to publishing on and of
     for (const step of ['PUBKEYS', 'PUBLOGIN', 'PUBBACKUP'] as const) expect(run(server, step).last).toBe(`${step}_DONE`);
     const before = apiFile(server);
     writeFileSync(server.api, `${before}NODE_ENV=production\n`);
+    restarted(server);
     const twice = apiFile(server);
     expect(run(server, 'PUBON').last).toBe('PUBON_NOT_DONE: the new file is not the publishing lines added and, at most, the line PUBLICATION_ENABLED=false taken out; nothing changed: ask');
     expect(apiFile(server)).toBe(twice);
     expect(readdirSync(server.pub).filter(name => name.includes('.before-pubon-') || name.endsWith('.new'))).toEqual([]);
     writeFileSync(server.api, before);
+    restarted(server);
     expect(run(server, 'PUBON').last).toBe('PUBON_DONE');
     const on = apiFile(server);
     writeFileSync(server.api, `${on}NODE_ENV=production\n`);
+    restarted(server);
     const onTwice = apiFile(server);
     expect(run(server, 'PUBOFF').last).toBe('PUBOFF_NOT_DONE: the new file is not only the publication lines changed; nothing changed: ask');
     expect(apiFile(server)).toBe(onTwice);

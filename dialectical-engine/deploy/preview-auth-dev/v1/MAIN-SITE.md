@@ -3477,7 +3477,8 @@ public page (above).
   end-of-debate check may delete it (5.1b).
 - Anyone who read it may have kept a copy.
 - Deleting its owner's account keeps it public, without the pseudonym.
-- Its key stays in the key store and in every backup made after it.
+- Its key stays in every PUBBACKUP made while it was public; the key store itself keeps it until the debate is
+  deleted.
 - Switching publishing off (5.9b) only stops the public pages: every public debate stays recorded as public, and
   switching on again shows them again.
 
@@ -3509,7 +3510,8 @@ become public. Claude runs nothing on the server.
    pseudonym, for good, once the dig's check allows it.
 3. Mail: statements of reasons and answers to reports reach a friend only in open mode (4.3), or when the friend's
    address is one of the four allow-listed ones.
-4. How often to run PUBBACKUP again (step 4): each public debate's key is only on the server until the next one.
+4. How often to run PUBBACKUP again (step 4): a debate that went public since the last PUBBACKUP has its key only in
+   the live key store, in no backup, until PUBBACKUP runs again.
 5. Whether a copy of those backups should also be kept off the server. They hold every key of the site, so that is a
    decision of its own: ask.
 6. Before an upload while publishing is off with the keys kept (state B, 5.9b): PUBON first, which the upload's
@@ -3863,6 +3865,7 @@ AP=$(pubapart); [ -z "$AP" ] || { echo "PUBON_NOT_DONE: the corpus key or the ke
 W=$(pubprobe "$LF" || true); [ "$W" = accepted ] || { echo "PUBON_NOT_DONE: the clean-up line is not accepted ($W): PUBLOGIN again; nothing changed"; exit 1; }
 pubbackup "$(cat "$BF" 2>/dev/null || true)" || { echo "PUBON_NOT_DONE: no PUBBACKUP holds this corpus key and the key store (PUBBACKUP first); nothing changed"; exit 1; }
 [ "$(stat -c '%a %U' "$A")" = "640 root" ] && [ -z "$(tail -c1 "$A")" ] || { echo "PUBON_NOT_DONE: $A is not root's 0640 file ending in a newline; nothing changed: ask"; exit 1; }
+apinew || { echo "PUBON_NOT_DONE: the running API did not start on the API file as it is now (a step that changes the file stopped before its restart ended); nothing changed: ask at once"; exit 1; }
 cp -p "$A" "$K" || { rm -f "$K"; echo "PUBON_NOT_DONE: the copy $K was not kept; nothing changed: ask"; exit 1; }
 { ( umask 077; { grep -v '^PUBLICATION_ENABLED=' "$A"; printf 'PUBLICATION_ENABLED=true\n'; [ "$MODE" = again ] || cat "$KF" "$LF"; } > "$A.new" ) && chown --reference="$A" "$A.new" && chmod --reference="$A" "$A.new"; } || { rm -f "$A.new" "$K"; echo "PUBON_NOT_DONE: the new file was not written; nothing changed: ask"; exit 1; }
 WANT='PUBLICATION_ENABLED '; [ "$MODE" = again ] || WANT='CORPUS_KEK_PATH PUBLICATION_CLEANUP_DATABASE_URL PUBLICATION_ENABLED PUBLICATION_KEY_STORE_PATH '
@@ -4043,6 +4046,7 @@ C=$(pubcounts) || { echo "PUBOFF_NOT_DONE: the database is unreadable; nothing c
 read -r NS NP NE FW FP FR CO PO EV <<<"$C"
 KC=$(keyfiles)
 [ "$(stat -c '%a %U' "$A")" = "640 root" ] && [ -z "$(tail -c1 "$A")" ] || { echo "PUBOFF_NOT_DONE: $A is not root's 0640 file ending in a newline; nothing changed: ask"; exit 1; }
+apinew || { echo "PUBOFF_NOT_DONE: the running API did not start on the API file as it is now (a step that changes the file stopped before its restart ended); nothing changed: ask at once"; exit 1; }
 cp -p "$A" "$K" || { rm -f "$K"; echo "PUBOFF_NOT_DONE: the copy $K was not kept; nothing changed: ask"; exit 1; }
 if [ "$NS/$PO/$EV/$KC" = 0/0/0/0 ]; then
   MODE=clean; WANT='PUBLICATION_ENABLED=false'; GONE=4
