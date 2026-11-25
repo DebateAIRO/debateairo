@@ -81,9 +81,12 @@ export class SocialAuthService implements SocialAuthApplication {
         const p = input as Record<string, unknown>;
         // Response metadata is display/protocol context only. Mailbox trust
         // always comes from the independently verified signed token.
-        const allowedFields=['state','code','error','error_description',...(provider==='google'?['scope','authuser','prompt','hd']:provider==='apple'?['user']:[])];
+        // Google names itself on the way back (`iss`, RFC 9207). It is accepted only as Google's own issuer; a return
+        // that names anyone else is refused before the flow is claimed.
+        const allowedFields=['state','code','error','error_description',...(provider==='google'?['scope','authuser','prompt','hd','iss']:provider==='apple'?['user']:[])];
         if (typeof p.state !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(p.state) || !flowCookie || !/^[A-Za-z0-9_-]{43}$/.test(flowCookie)
-            || Object.keys(p).some(k => !allowedFields.includes(k)) || JSON.stringify(p).length > 8192)
+            || Object.keys(p).some(k => !allowedFields.includes(k)) || JSON.stringify(p).length > 8192
+            || (p.iss !== undefined && p.iss !== 'https://accounts.google.com'))
             throw new SocialAuthError('SOCIAL_PROOF_INVALID');
         await this.sessions.admit('SOCIAL_CALLBACK', p.state, source);
         const config = await this.configured(provider);
