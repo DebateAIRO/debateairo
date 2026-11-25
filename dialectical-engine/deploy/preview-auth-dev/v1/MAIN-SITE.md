@@ -3652,8 +3652,11 @@ So PUBLOGIN does it the way 5.7 does:
 4. tries the line as the API will use it: as the API's user, with the release's own role check (`pubprobe`).
 
 It changes nothing else on the login: no grant, no role. Nothing restarts, and nothing on the site changes: the API
-uses the line only from PUBON on. Run again, it changes nothing while its kept line still signs in; once the API file
-names the line (after PUBON), it only tries it and never changes the password.
+uses the line only from PUBON on. Run again, it changes nothing while its kept line still signs in. Before it makes a
+new password, it stops while anything is signed in as the login; a kept line it replaces is set aside, root-only.
+Once the API file names the line (after PUBON), it only tries it and never changes the password; when the kept line is
+missing or is not the API file's, it keeps the API file's line in its place, as PUBON reads the kept line after a
+PUBOFF.
 
 ```sh
 set -euo pipefail
@@ -3668,34 +3671,52 @@ HB=$(pubhba "$CLN" || echo unread); HR=$(pubhba debateai_prod_api_runtime || ech
 if grep -q '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A"; then
   W=$(pubprobe <(grep '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A") || true)
   [ "$W" = accepted ] || { echo "PUBLOGIN_NOT_DONE: the API file names the clean-up login already, and its line is not accepted ($W); nothing changed: ask"; exit 1; }
-  echo "the API file names the clean-up login already, and its line signs in and passes the API's role check: nothing changed"; echo PUBLOGIN_DONE; exit 0
+  echo "the API file names the clean-up login already, and its line signs in and passes the API's role check: the password stays"
+  if [ -e "$LF" ] && [ "$(stat -c '%a %U %h' "$LF")" = "600 root 1" ] && cmp -s <(grep '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A") "$LF"; then echo "the kept clean-up line is the API file's: nothing changed"; echo PUBLOGIN_DONE; exit 0; fi
+  install -d -o root -g root -m 0700 "$PUB"
+  SA=''
+  if [ -e "$LF" ]; then
+    SA=$LF.set-aside-$(date -u +%Y%m%dT%H%M%SZ); [ ! -e "$SA" ] || { echo "PUBLOGIN_NOT_DONE: $SA exists: run PUBLOGIN again a second later; nothing changed"; exit 1; }
+    { mv "$LF" "$SA" && chown root:root "$SA" && chmod 600 "$SA"; } || { echo "PUBLOGIN_NOT_DONE: the kept clean-up line was not set aside as $SA: ask"; exit 1; }
+  fi
+  { rm -f "$LF.new" && ( umask 077; grep '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A" > "$LF.new" ) && mv -n "$LF.new" "$LF"; } && [ ! -e "$LF.new" ] && [ "$(stat -c '%a %U %h' "$LF")" = "600 root 1" ] && cmp -s <(grep '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A") "$LF" || { rm -f "$LF.new"; echo "PUBLOGIN_NOT_DONE: the API file's clean-up line was not kept as $LF${SA:+ (the one before is set aside as $SA)}: ask"; exit 1; }
+  echo "the kept clean-up line was missing, or not the API file's, or kept with the wrong mode, owner or links: the API file's line is kept in $LF now (root, 0600)${SA:+; the one before is set aside as $SA (root, 0600)}"
+  echo PUBLOGIN_DONE; exit 0
 fi
-install -d -o root -g root -m 0700 "$PUB"
 if [ -e "$LF" ]; then
-  W=$(pubprobe "$LF" || true)
-  if [ "$W" = accepted ] && [ "$(stat -c '%a %U %h' "$LF")" = "600 root 1" ]; then echo "the clean-up line is kept already, and it signs in and passes the API's role check: nothing changed"; echo PUBLOGIN_DONE; exit 0; fi
-  mv "$LF" "$LF.not-accepted-$(date -u +%Y%m%dT%H%M%SZ)"; echo "the clean-up line kept before is not accepted ($W): it is set aside, and a new password is made"
+  W=$(pubprobe "$LF" || true); KM=$(stat -c '%a %U %h' "$LF")
+  if [ "$W" = accepted ] && [ "$KM" = "600 root 1" ]; then echo "the clean-up line is kept already, and it signs in and passes the API's role check: nothing changed"; echo PUBLOGIN_DONE; exit 0; fi
 fi
 [ "$(psqlq "SELECT count(*) FROM pg_stat_activity WHERE usename = '$CLN'" || true)" = 0 ] || { echo "PUBLOGIN_NOT_DONE: something is signed in as the clean-up login now; nothing changed: ask"; exit 1; }
+install -d -o root -g root -m 0700 "$PUB"
+if [ -e "$LF" ]; then
+  SA=$LF.set-aside-$(date -u +%Y%m%dT%H%M%SZ); [ ! -e "$SA" ] || { echo "PUBLOGIN_NOT_DONE: $SA exists: run PUBLOGIN again a second later; nothing changed"; exit 1; }
+  { mv "$LF" "$SA" && chown root:root "$SA" && chmod 600 "$SA"; } || { echo "PUBLOGIN_NOT_DONE: the kept clean-up line was not set aside as $SA: ask"; exit 1; }
+  if [ "$W" = accepted ]; then echo "the clean-up line kept before signs in, but is kept with the wrong mode, owner or links ($KM): it is set aside as $SA (root, 0600), and a new password is made"
+  else echo "the clean-up line kept before is not accepted ($W): it is set aside as $SA (root, 0600), and a new password is made"; fi
+fi
 rm -f "$LF.new"
-( umask 077; "$N" --input-type=module - "$A" "$LF.new" "$L/jit-creator-actor.mjs" <<'JS' | runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAtq -v ON_ERROR_STOP=1 -f - > /dev/null ) || { rm -f "$LF.new"; echo "PUBLOGIN_NOT_DONE: the password was not set (the API file's DATABASE_URL is not one line for the API's own login, or the database refused): ask"; exit 1; }
+( umask 077; "$N" --input-type=module - "$A" "$LF.new" "$L/jit-creator-actor.mjs" 2>/dev/null <<'JS' | runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAtq -v ON_ERROR_STOP=1 -f - > /dev/null ) || { rm -f "$LF.new"; echo "PUBLOGIN_NOT_DONE: the password was not set (the API file's DATABASE_URL is not one readable line for the API's own login, or the database refused): ask"; exit 1; }
 import { closeSync, fsyncSync, openSync, readFileSync, writeSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-const [api, out, actor] = process.argv.slice(-3);
-const { scramSha256Verifier } = await import(pathToFileURL(actor).href);
-const lines = readFileSync(api, 'utf8').split('\n').filter(line => line.startsWith('DATABASE_URL='));
-if (lines.length !== 1) process.exit(2);
-const url = new URL(lines[0].slice('DATABASE_URL='.length));
-if (url.username !== 'debateai_prod_api_runtime') process.exit(3);
-const password = randomBytes(32).toString('hex');
-url.username = 'debateai_prod_api_publication_cleanup';
-url.password = password;
-const fd = openSync(out, 'wx', 0o600);
-try { writeSync(fd, `PUBLICATION_CLEANUP_DATABASE_URL=${url.href}\n`); fsyncSync(fd); } finally { closeSync(fd); }
-const verifier = scramSha256Verifier(Buffer.from(password, 'utf8'));
-process.stdout.write(["SET log_statement = 'none';", 'SET log_min_duration_statement = -1;', "SET log_min_error_statement = 'panic';", "SET password_encryption = 'scram-sha-256';",
-  `ALTER ROLE debateai_prod_api_publication_cleanup PASSWORD '${verifier}' VALID UNTIL 'infinity';`, ''].join('\n'));
+// Every failure ends with a code and no words: the text of an error could hold the API's own database line.
+try {
+  const [api, out, actor] = process.argv.slice(-3);
+  const { scramSha256Verifier } = await import(pathToFileURL(actor).href);
+  const lines = readFileSync(api, 'utf8').split('\n').filter(line => line.startsWith('DATABASE_URL='));
+  if (lines.length !== 1) process.exit(2);
+  const url = new URL(lines[0].slice('DATABASE_URL='.length));
+  if (url.username !== 'debateai_prod_api_runtime') process.exit(3);
+  const password = randomBytes(32).toString('hex');
+  url.username = 'debateai_prod_api_publication_cleanup';
+  url.password = password;
+  const fd = openSync(out, 'wx', 0o600);
+  try { writeSync(fd, `PUBLICATION_CLEANUP_DATABASE_URL=${url.href}\n`); fsyncSync(fd); } finally { closeSync(fd); }
+  const verifier = scramSha256Verifier(Buffer.from(password, 'utf8'));
+  process.stdout.write(["SET log_statement = 'none';", 'SET log_min_duration_statement = -1;', "SET log_min_error_statement = 'panic';", "SET password_encryption = 'scram-sha-256';",
+    `ALTER ROLE debateai_prod_api_publication_cleanup PASSWORD '${verifier}' VALID UNTIL 'infinity';`, ''].join('\n'));
+} catch { process.exit(9); }
 JS
 mv -n "$LF.new" "$LF"
 [ ! -e "$LF.new" ] && [ "$(stat -c '%a %U %h' "$LF")" = "600 root 1" ] && [ "$(grep -c '' "$LF")" = 1 ] && grep -qE '^PUBLICATION_CLEANUP_DATABASE_URL=postgres(ql)?://' "$LF" || { echo "PUBLOGIN_NOT_DONE: the new password is set, but its line was not kept as $LF: run PUBLOGIN again (it makes another one)"; exit 1; }
@@ -3706,7 +3727,9 @@ echo PUBLOGIN_DONE
 exit 0
 ```
 
-Expect the `the clean-up login: a new password …` line, then `PUBLOGIN_DONE`. The answers its try can give:
+Expect the `the clean-up login: a new password …` line, then `PUBLOGIN_DONE`. A `PUBLOGIN_NOT_DONE: the password was
+not set` prints nothing more, by design: the error's own words could hold the API's database line. The answers its
+try can give:
 `accepted`; `the database refuses its password`; `pg_hba.conf does not let it in`; `it signs in, but the API role
 check refuses it` (with a code when the check could not even read what it reads, for example `42501` for a login
 without the clean-up role); `it does not connect (<code>)`. Anything but `accepted`: ask, and give the line. The password is

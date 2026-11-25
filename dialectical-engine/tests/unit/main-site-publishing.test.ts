@@ -7,7 +7,7 @@
 // address. Data is made up.
 import { spawnSync } from 'node:child_process';
 import { createHash, createHmac, pbkdf2Sync, randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -69,8 +69,8 @@ const STUBS = [
   'systemctl() { case "$1" in show) cat "$D/rw" 2>/dev/null || true;; daemon-reload) [ ! -e "$PDROP" ] || sed -n \'s/^ReadWritePaths=//p\' "$PDROP" >> "$D/rw";; is-active) echo active;; esac; }',
   'psqlq() { printf \'%s\\n\' "$1" >> "$D/queries"; case "$1" in',
   "  *cannot-sign-in*) cat \"$D/role\" 2>/dev/null || true;;",
-  "  *pg_hba_file_rules*) echo 'scram-sha-256 127.0.0.1 255.255.255.255';;",
-  "  *pg_authid*) echo no;; *rolvaliduntil*) echo never;; *pg_stat_activity*) echo 0;;",
+  "  *pg_hba_file_rules*publication_cleanup*) cat \"$D/hba\" 2>/dev/null || echo 'scram-sha-256 127.0.0.1 255.255.255.255';; *pg_hba_file_rules*) echo 'scram-sha-256 127.0.0.1 255.255.255.255';;",
+  "  *pg_authid*) echo no;; *rolvaliduntil*) echo never;; *pg_stat_activity*) cat \"$D/sessions\" 2>/dev/null || echo 0;;",
   '  *owner_designation*) cat "$D/staffkeys";; *publication_snapshot*) cat "$D/counts";; *pg_database*) echo 1;;',
   '  *) echo "unexpected query" >&2; return 1;; esac; }',
   `gs() { echo '{"state":"active","window_open":true,"today_spend_usd":"amount-mark"}'; }`,
@@ -439,7 +439,7 @@ describe('5.9 on a throwaway server, from today\'s state to publishing on and of
     rmSync(join(server.pub, 'cleanup.line'));
     rmSync(join(server.dir, 'sql'));
     writeFileSync(server.api, before.replace(`DATABASE_URL=${RUNTIME_URL}`, `DATABASE_URL=${RUNTIME_URL.replace('api_runtime', 'api_system')}`));
-    expect(run(server, 'PUBLOGIN').last).toBe('PUBLOGIN_NOT_DONE: the password was not set (the API file\'s DATABASE_URL is not one line for the API\'s own login, or the database refused): ask');
+    expect(run(server, 'PUBLOGIN').last).toBe('PUBLOGIN_NOT_DONE: the password was not set (the API file\'s DATABASE_URL is not one readable line for the API\'s own login, or the database refused): ask');
     expect(existsSync(join(server.pub, 'cleanup.line')) || existsSync(join(server.pub, 'cleanup.line.new'))).toBe(false);
     expect(readFileSync(join(server.dir, 'sql'), 'utf8')).toBe('');
   }));
@@ -450,6 +450,73 @@ describe('5.9 on a throwaway server, from today\'s state to publishing on and of
     writeFileSync(join(server.dir, 'backup-fails'), '');
     expect(run(server, 'PUBBACKUP').last).toMatch(/^PUBBACKUP_NOT_DONE: the online backup failed \(KEYS_FAILED: a key changed while it was read: run PUBBACKUP again\); what it wrote stays in .*, unused$/u);
     expect(existsSync(join(server.pub, 'backup-folder'))).toBe(false);
+  }));
+
+  it('PUBLOGIN prints nothing of an API line it cannot read, and sets no password while the login is signed in or its pg_hba.conf line differs', () => withServer(server => {
+    const before = apiFile(server);
+    // A socket form with no host is no URL for node: its error would print the line, password and all.
+    writeFileSync(server.api, before.replace(`DATABASE_URL=${RUNTIME_URL}`, `DATABASE_URL=postgresql://debateai_prod_api_runtime:${RUNTIME_PASSWORD}@/debateai?host=/run/debateai-v3-preview/postgresql`));
+    const out = run(server, 'PUBLOGIN');
+    expect(out.last).toBe('PUBLOGIN_NOT_DONE: the password was not set (the API file\'s DATABASE_URL is not one readable line for the API\'s own login, or the database refused): ask');
+    expect(printed.slice(-2).join('\n')).not.toContain(RUNTIME_PASSWORD);
+    expect(existsSync(join(server.pub, 'cleanup.line')) || existsSync(join(server.pub, 'cleanup.line.new'))).toBe(false);
+    expect(readFileSync(join(server.dir, 'sql'), 'utf8')).toBe('');
+    rmSync(join(server.dir, 'sql'));
+    writeFileSync(server.api, before);
+    // Something is signed in as the login: no SQL, nothing set aside.
+    writeFileSync(join(server.dir, 'sessions'), '1\n');
+    expect(run(server, 'PUBLOGIN').last).toBe('PUBLOGIN_NOT_DONE: something is signed in as the clean-up login now; nothing changed: ask');
+    expect(existsSync(join(server.dir, 'sql')) || existsSync(join(server.pub, 'cleanup.line'))).toBe(false);
+    rmSync(join(server.dir, 'sessions'));
+    expect(run(server, 'PUBLOGIN').last).toBe('PUBLOGIN_DONE');
+    rmSync(join(server.dir, 'sql'));
+    const line = readFileSync(join(server.pub, 'cleanup.line'), 'utf8');
+    writeFileSync(join(server.dir, 'probe'), 'the database refuses its password\n');
+    writeFileSync(join(server.dir, 'sessions'), '1\n');
+    expect(run(server, 'PUBLOGIN').last).toBe('PUBLOGIN_NOT_DONE: something is signed in as the clean-up login now; nothing changed: ask');
+    expect(readFileSync(join(server.pub, 'cleanup.line'), 'utf8')).toBe(line);
+    expect(readdirSync(server.pub).filter(name => name.includes('.set-aside-'))).toEqual([]);
+    expect(existsSync(join(server.dir, 'sql'))).toBe(false);
+    rmSync(join(server.dir, 'sessions'));
+    writeFileSync(join(server.dir, 'probe'), 'accepted\n');
+    // pg_hba.conf lets the clean-up login in otherwise than the API's own login.
+    writeFileSync(join(server.dir, 'hba'), 'none\n');
+    rmSync(join(server.pub, 'cleanup.line'));
+    expect(run(server, 'PUBLOGIN').last).toBe('PUBLOGIN_NOT_DONE: pg_hba.conf does not let the clean-up login in as it lets the API\'s own login in; nothing changed: ask');
+    expect(existsSync(join(server.dir, 'sql')) || existsSync(join(server.pub, 'cleanup.line'))).toBe(false);
+    expect(run(server, 'PUBCHECK').lines).toContain('NOT AS THE CODE NEEDS: pg_hba.conf does not let the clean-up login in as it lets the API\'s own login in');
+  }));
+
+  it('PUBLOGIN sets aside a kept line with a loose mode, root-only, and keeps the API file\'s line again when the kept one is lost', () => withServer(server => {
+    for (const step of ['PUBKEYS', 'PUBLOGIN'] as const) expect(run(server, step).last).toBe(`${step}_DONE`);
+    const lf = join(server.pub, 'cleanup.line');
+    chmodSync(lf, 0o644);
+    const loose = run(server, 'PUBLOGIN');
+    expect(loose.last).toBe('PUBLOGIN_DONE');
+    const aside = readdirSync(server.pub).filter(name => name.startsWith('cleanup.line.set-aside-'));
+    expect(aside).toHaveLength(1);
+    expect(loose.lines).toContain(`the clean-up line kept before signs in, but is kept with the wrong mode, owner or links (644 root 1): it is set aside as ${join(server.pub, aside[0]!)} (root, 0600), and a new password is made`);
+    expect(statSync(join(server.pub, aside[0]!)).mode & 0o777).toBe(0o600);
+    expect(statSync(lf).mode & 0o777).toBe(0o600);
+    // Named apart, so that a second setting aside within the same second has a free name.
+    renameSync(join(server.pub, aside[0]!), join(server.pub, 'cleanup.line.set-aside-first'));
+    for (const step of ['PUBBACKUP', 'PUBON'] as const) expect(run(server, step).last).toBe(`${step}_DONE`);
+    const inFile = apiFile(server).split('\n').find(text => text.startsWith('PUBLICATION_CLEANUP_DATABASE_URL='))!;
+    // The kept line lost after PUBON: PUBLOGIN keeps the API file's line again, and the password stays.
+    rmSync(lf);
+    rmSync(join(server.dir, 'sql'), { force: true });
+    const again = run(server, 'PUBLOGIN');
+    expect(again.lines.slice(-2)).toEqual(['the kept clean-up line was missing, or not the API file\'s, or kept with the wrong mode, owner or links: the API file\'s line is kept in ' + lf + ' now (root, 0600)', 'PUBLOGIN_DONE']);
+    expect(readFileSync(lf, 'utf8')).toBe(`${inFile}\n`);
+    expect(statSync(lf).mode & 0o777).toBe(0o600);
+    expect(existsSync(join(server.dir, 'sql'))).toBe(false);
+    expect(run(server, 'PUBLOGIN').lines.slice(-2)).toEqual(['the kept clean-up line is the API file\'s: nothing changed', 'PUBLOGIN_DONE']);
+    // A kept line that is not the API file's is set aside, and the API file's is kept in its place.
+    writeFileSync(lf, inFile.replace(/:[0-9a-f]{64}@/u, `:${'0'.repeat(64)}@`) + '\n', { mode: 0o600 });
+    const differs = run(server, 'PUBLOGIN');
+    expect(differs.last).toBe('PUBLOGIN_DONE');
+    expect(readFileSync(lf, 'utf8')).toBe(`${inFile}\n`);
+    expect(readdirSync(server.pub).filter(name => name.startsWith('cleanup.line.set-aside-')).length).toBeGreaterThanOrEqual(1);
   }));
 
   it('no step printed a key, a password, the clean-up line or an amount', () => withServer(server => {
