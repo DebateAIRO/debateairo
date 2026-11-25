@@ -82,8 +82,8 @@ describe("NETOPIA's check: billing on with every country closed for payment, on 
     const document = await page(() => PricingPage({}));
     expect([...document.querySelectorAll("[data-plan]")].map((card) => card.getAttribute("data-plan"))).toEqual(["FREE", "PLUS", "PRO", "MAX"]);
     const plus = document.querySelector('[data-plan="PLUS"]')!;
-    expect(plus.textContent).toContain("$20.00 + $3.80 MwSt.");
-    expect(plus.textContent).toContain("$23.80 a month in total (19%, Germany)");
+    expect(plus.querySelector(".pricingPrice")?.textContent).toBe("$23.80 a month");
+    expect(plus.querySelector(".pricingPrice + .pricingNote")?.textContent).toBe("$20.00 + $3.80 MwSt. (19%, Germany)");
     expect(plus.querySelector("a")?.getAttribute("href")).toBe("/checkout?plan=PLUS");
     expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain("$59.50 a month");
     expect(document.querySelector('[data-plan="MAX"]')?.textContent).toContain("$238.00 a month");

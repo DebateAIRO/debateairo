@@ -6,7 +6,6 @@ import {
   formatLongDate,
   formatMoney,
   planName,
-  priceWithTaxTotal,
   renewDayLabel,
   taxInPrice,
   taxLabel
@@ -30,16 +29,6 @@ describe("P18 billing formatting helpers", () => {
     expect(taxInPrice("19.99", "20.00")).toBeNull();
     expect(taxInPrice("24.2", "20.00")).toBeNull();
     expect(taxInPrice("24.20", "twenty")).toBeNull();
-  });
-
-  it("writes a price as price + VAT = total, and whole where there is no tax to show apart", () => {
-    expect(priceWithTaxTotal(billingEnglish, "en", "EUR", { net: "20.00", total: "23.80", taxName: "MwSt." }))
-      .toBe("€20.00 + €3.80 MwSt. = €23.80");
-    expect(priceWithTaxTotal(billingEnglish, "en", "RON", { net: "100.00", total: "121.00", taxName: "TVA" }))
-      .toBe(`${formatMoney("en", "100.00", "RON")} + ${formatMoney("en", "21.00", "RON")} TVA = ${formatMoney("en", "121.00", "RON")}`);
-    // Never a price before tax alone: a total that holds no tax, or cannot be split, is named whole.
-    expect(priceWithTaxTotal(billingEnglish, "en", "USD", { net: "20.00", total: "20.00", taxName: "VAT" })).toBe("$20.00");
-    expect(priceWithTaxTotal(billingEnglish, "en", "USD", { net: "20.00", total: "19.00", taxName: "VAT" })).toBe("$19.00");
   });
 
   it("names plans from the catalogue and words the quota as a multiple, never as credit", () => {
