@@ -148,11 +148,13 @@ describe("the Beta sentence", () => {
     expect(mailOf(link.getAttribute("href")!).to).toBe("support@dezbatere.ro");
   });
 
-  it("is on the public home page, once, after the AI line", async () => {
+  it("is not on the public home page, whose top bar carries the Beta mark beside the wordmark instead", async () => {
+    // The simpler landing (2026-11-25): the hero holds no Beta sentence; the mark is in the landing's top bar
+    // (its rendered place: t9-landing.test.tsx) and "Report a problem" is in the footer under it.
     const page = await mount(<LandingHero catalog={LANDING} />);
-    const notes = page.querySelectorAll(".betaNote");
-    expect(notes).toHaveLength(1);
-    expect(notes[0]!.previousElementSibling?.className).toBe("lpAiDisclosure");
+    expect(page.querySelectorAll(".betaNote")).toHaveLength(0);
+    const chrome = readFileSync(resolve(import.meta.dirname, "../../apps/ui/components/landing/LandingChrome.tsx"), "utf8");
+    expect(chrome.split("<BetaBadge />")).toHaveLength(2);
   });
 
   it("is on the ask page, once, right under the header and above both steps", () => {

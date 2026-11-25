@@ -16,7 +16,7 @@ const PRICING_COPY: Readonly<Record<Exclude<PricedTax, "UNPRICED">, string>> = O
 });
 
 /**
- * The plans the landing shows between its closing lede and its CTA: the pricing page's own cards, from the same
+ * The plans the landing shows between its closing title and its CTA: the pricing page's own cards, from the same
  * answer, so Terms §12 holds here as it does there (a paid price only with the place's tax in it, never one before
  * tax). `catalog` is the whole billing catalogue: the cards are rendered on the server.
  */
@@ -64,9 +64,6 @@ export function LandingPricing({
       <h2 id="landing-pricing-title" className="lpDisplay lpClosingTitle">
         {t(catalog, "home.closingTitle")}
       </h2>
-      <p className="lpClosingLede">
-        {t(catalog, "home.closingLede")}
-      </p>
       {billingOn && plans !== null && plans.plans.length > 0 ? (
         <div id={PLANS_ID} className="lpPlans" data-landing-plans>
           {plans.placeForm === null ? null : (
@@ -103,8 +100,11 @@ export function LandingPricing({
         )}
       </p>
       {billingOn && testModeNote !== null ? <p className="lpPricing" role="note">{testModeNote}</p> : null}
+      {/* Shown with the plans: while billing is off no question is published, so the line would say nothing true. */}
+      {billingOn ? <p className="lpPricing lpPublicNote">{t(catalog, "home.noAudience")}</p> : null}
+      {/* The short AI notice, with the link to the full text on /ai-transparency. */}
       <footer id="ai-transparency" className="lpAiTransparency">
-        <AiNotice catalog={catalog} variant="block" body={t(catalog, "home.aiLandingBlock")} />
+        <AiNotice catalog={catalog} variant="strip" />
       </footer>
     </section>
   );

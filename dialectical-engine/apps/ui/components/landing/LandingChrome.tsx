@@ -1,4 +1,5 @@
 import { AccountMenu } from "@/components/AccountMenu";
+import { BetaBadge } from "@/components/BetaNotice";
 import type { JSX } from "react";
 import { ModeToggle } from "@/components/ModeToggle";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -25,9 +26,13 @@ export function LandingChrome({ catalog, billingOn = false }: { catalog: Message
     >
       <div className="lpNav">
         {/* Design Document v2: the wordmark of the public top bar, "Engine" in the brand colour. */}
-        <a href="/" className="lpWordmark">
-          Dialectical <span className="lpWordmarkAccent">Engine</span>
-        </a>
+        <span className="lpBrand">
+          <a href="/" className="lpWordmark">
+            Dialectical <span className="lpWordmarkAccent">Engine</span>
+          </a>
+          {/* A visitor learns before signing up that the site is in Beta; "Report a problem" is in the footer. */}
+          <BetaBadge />
+        </span>
         <nav aria-label={t(catalog, "chrome.landingNavigation")} className="lpNavLinks">
           <a href="#method">{t(catalog, "chrome.method")}</a>
           <a href={billingOn ? "/pricing" : "#pricing"}>{t(catalog, "chrome.pricing")}</a>
