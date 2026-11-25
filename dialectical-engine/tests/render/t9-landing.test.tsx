@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
@@ -94,7 +94,7 @@ describe("T9-C1 route split & chrome", () => {
     const document = await renderRoute(null);
     const hero = document.querySelector('[data-landing-section="hero"]');
 
-    expect(hero?.textContent).toContain("See what holds up, and what is still open.");
+    expect(hero?.textContent).toContain("See what holds up.");
     expect(document.querySelector('.sectionHead[aria-label="Debate library"]')).toBeNull();
   });
 
@@ -107,7 +107,7 @@ describe("T9-C1 route split & chrome", () => {
       document.querySelector('.sectionHead[aria-label="Debate library"]'),
       "signed-in library discriminator"
     ).not.toBeNull();
-    expect(document.body.textContent).not.toContain("See what holds up, and what is still open.");
+    expect(document.body.textContent).not.toContain("See what holds up.");
   });
 
   it("renders an accessibly named mode control on the anonymous document", async () => {
@@ -239,6 +239,10 @@ describe("T9-C2 chrome labels & CTAs", () => {
     // Design Document v2: the wordmark is the public top bar's, drawn by a class, with "Engine" in its own span.
     expect(wordmark?.classList.contains("lpWordmark")).toBe(true);
     expect(wordmark?.querySelector(".lpWordmarkAccent")?.textContent).toBe("Engine");
+    // A visitor learns before signing up that the site is in Beta: the mark sits beside the wordmark, not in it.
+    expect(wordmark?.nextElementSibling?.classList.contains("betaBadge")).toBe(true);
+    expect(wordmark?.nextElementSibling?.textContent).toBe("Beta");
+    expect(chrome!.querySelectorAll(".betaBadge")).toHaveLength(1);
   });
 
   it("with billing on, the chrome's Pricing link leads to the pricing page, not to the landing's own pricing line", async () => {
@@ -357,46 +361,63 @@ describe("T9-C2 chrome labels & CTAs", () => {
 });
 
 describe("T9-C4 landing content", () => {
-  it("renders the numbered method titles inside the method ledger", async () => {
-    // PROPERTY: the real anonymous method subtree owns all four numbered
-    // method steps, so matching copy elsewhere cannot satisfy the ledger.
+  it("renders the four method steps in order, each a title and one short line", async () => {
+    // PROPERTY: the real anonymous method subtree owns all four steps, in the
+    // order a question takes, so matching copy elsewhere cannot satisfy it.
     const document = await renderRoute(null);
     const method = document.querySelector('[data-landing-section="method"]');
-    const steps = [...(method?.querySelectorAll("li") ?? [])];
-    // The four steps are the V4 ask page's own four steps, in its words.
+    const steps = [...(method?.querySelectorAll("ol.lpSteps > li") ?? [])];
+    // The four steps are the V4 ask page's own four steps, in its words. The report step says what the
+    // product does: the report is read on the site and can be downloaded as a PDF (it is not sent by e-mail).
     const expectedSteps = [
-      [
-        "01",
-        "Your question",
-        "Ask in your own words. We show how we read your question, and you can change our assumptions."
-      ],
-      [
-        "02",
-        "What we'll look into",
-        "The AIs suggest paths: different ways to answer it. You pick the ones to look into, or let the AIs choose."
-      ],
-      [
-        "03",
-        "The map",
-        "Each point carries a word for how sure it is, such as Sure or Still argued. Dig into any point to look closer."
-      ],
-      [
-        "04",
-        "Your report",
-        "A plain answer, what would change it, the objections still standing, and how each point was checked."
-      ]
+      ["Your question", "Ask in your own words."],
+      ["What we'll look into", "Pick the paths to look into, or let the AIs choose."],
+      ["The map", "Each point carries a word for how sure it is, such as Sure or Still argued."],
+      ["Your report", "Read it on the site, or download it as a PDF."]
     ] as const;
 
     expect(method).not.toBeNull();
-    expect(steps).toHaveLength(expectedSteps.length);
-    expectedSteps.forEach(([number, title, body], index) => {
-      expect(steps[index]?.textContent).toContain(number);
-      expect(steps[index]?.textContent).toContain(title);
-      expect(steps[index]?.textContent).toContain(body);
-    });
+    expect(steps.map((step) => [step.querySelector("h3")?.textContent, step.querySelector("p")?.textContent]))
+      .toEqual(expectedSteps);
+    expect(method?.textContent).not.toMatch(/e-?mail/iu);
   });
 
-  it("shows no sample exchange: no scores, turns or model codes anywhere on the landing", async () => {
+  it("shows one example of an answer in the hero, labelled as an example, with the map's trust words", async () => {
+    // PROPERTY: the hero's example is marked "Example", shows a question, the answer and three points, and
+    // each point carries one of the map's own trust words; it shows no scores, turns or model codes.
+    const document = await renderRoute(null);
+    const examples = document.querySelectorAll('[data-landing-section="hero"] figure[data-landing-example]');
+    expect(examples).toHaveLength(1);
+    const example = examples[0]!;
+    expect(example.querySelector("figcaption")?.textContent).toBe("Example");
+    expect(example.querySelector(".lpExampleQuestion")?.textContent)
+      .toBe("Should remote-first companies pay engineers the same salary regardless of where they live?");
+    expect(example.querySelector(".lpExampleAnswerLabel")?.textContent).toBe("The answer");
+    expect(example.querySelector(".lpExampleAnswerText")?.textContent).toMatch(/^Mostly yes\./u);
+    const points = [...example.querySelectorAll(".lpExamplePoints > li")];
+    expect(points.map((point) => [point.getAttribute("data-trust"), point.querySelector(".lpExampleWord")?.textContent]))
+      .toEqual([["SURE", "Sure"], ["SURE", "Sure"], ["STILL_ARGUED", "Still argued"]]);
+    expect(example.textContent).not.toMatch(/%|BASE|FINAL|claude|gpt|gemini/iu);
+  });
+
+  it("the example's trust words and answer heading are the map's and the report's own, in every language", () => {
+    // PROPERTY: the landing reads only the home and chrome catalogues, so home repeats three of v4's words;
+    // they stay the same words in each language.
+    const messages = resolve(process.cwd(), "apps/ui/messages");
+    const read = (locale: string, namespace: string): Record<string, string> =>
+      JSON.parse(readFileSync(resolve(messages, locale, `${namespace}.json`), "utf8")) as Record<string, string>;
+    const locales = readdirSync(messages, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+    expect(locales.length).toBeGreaterThan(30);
+    for (const locale of locales) {
+      const home = read(locale, "home");
+      const v4 = read(locale, "v4");
+      expect(home["home.trustSure"], locale).toBe(v4["v4.trust.SURE"]);
+      expect(home["home.trustStillArgued"], locale).toBe(v4["v4.trust.STILL_ARGUED"]);
+      expect(home["home.exampleAnswerLabel"], locale).toBe(v4["v4.report.answerHeading"]);
+    }
+  });
+
+  it("shows no sample debate: no scores, turns or model codes anywhere on the landing", async () => {
     // PROPERTY: the hand-made sample of an older debate (BASE/FINAL scores, Pro/Con turns,
     // model codes) is not on the page, and no link points at where it was.
     const document = await renderRoute(null);
@@ -416,7 +437,7 @@ describe("T9-C4 landing content", () => {
 
   it("shows no placeholder counter in the hero and states the pricing plainly when billing is off", async () => {
     // PROPERTY: the "[PLACEHOLDER] rounds argued this week" counter is gone (auth UI repair,
-    // 2026-10-09: no invented numbers), leaving the two real facts and one rule between them; the
+    // 2026-10-09: no invented numbers), and so is the facts bar that followed it; the
     // pricing line is real copy (spec 2026-09-29 §2.10) and, with no plans to read, promises
     // nothing about paid plans.
     const document = await renderRoute(null);
@@ -424,11 +445,11 @@ describe("T9-C4 landing content", () => {
     const pricing = document.querySelector('[data-landing-section="pricing"]');
     expect(hero?.textContent).not.toContain("[PLACEHOLDER]");
     expect(hero?.textContent).not.toContain("rounds argued this week");
-    const facts = [...(hero?.querySelectorAll(".lpStatBar > li") ?? [])];
-    expect(facts.map((item) => item.classList.contains("lpStatRule") ? "rule" : "fact")).toEqual(["fact", "rule", "fact"]);
+    expect(hero?.querySelector(".lpStatBar")).toBeNull();
     expect(pricing?.textContent).toContain("Start free. No card needed.");
-    // This line shows only while billing is off, where no question is published, so it says nothing about public questions.
-    expect(pricing?.textContent).not.toContain("questions are public");
+    // While billing is off no question is published, so nothing on the landing says questions are public.
+    expect(document.querySelector(".lpRoot")?.textContent).not.toContain("questions are public");
+    expect(pricing?.querySelector(".lpPublicNote")).toBeNull();
     expect(pricing?.textContent).not.toContain("[PLACEHOLDER]");
     expect(pricing?.querySelector('a[href="/pricing"]')).toBeNull();
   });
@@ -534,10 +555,14 @@ describe("T9-C4 landing content", () => {
     // The plan names are level 3 under the closing's level 2 title.
     expect(cards.map((card) => card.querySelector("h3")?.textContent)).toEqual(["Free", "Plus", "Pro", "Max"]);
     expect(plans?.querySelector("h2")).toBeNull();
-    // Title and lede, then the plans, then the CTA.
+    // The title, then the plans, then the CTA.
     expect(precedes(pricing?.querySelector("#landing-pricing-title"), plans)).toBe(true);
-    expect(precedes(pricing?.querySelector(".lpClosingLede"), plans)).toBe(true);
+    expect(pricing?.querySelector(".lpClosingLede")).toBeNull();
     expect(precedes(plans, pricing?.querySelector("a.lpCtaClosing"))).toBe(true);
+    // With plans on sale, free questions are published: the closing says so, once, under the price line.
+    const publicNotes = [...(pricing?.querySelectorAll(".lpPublicNote") ?? [])];
+    expect(publicNotes.map((note) => note.textContent)).toEqual(["Free questions are public"]);
+    expect(precedes(pricing?.querySelector("#pricing"), publicNotes[0])).toBe(true);
     expect(plans?.textContent).toContain(billingEnglish["billing.pricing.currencyNote"]);
     // A visitor priced by their connection is asked for no place here, and the read names none.
     expect(plans?.querySelector("[data-pricing-place]")).toBeNull();
@@ -580,7 +605,7 @@ describe("T9-C4 landing content", () => {
   });
 
   it("shows no plan cards while billing is off or the plans cannot be read", async () => {
-    // PROPERTY: with nothing to sell (the route's 404) or no answer, the closing keeps its title, lede, CTA
+    // PROPERTY: with nothing to sell (the route's 404) or no answer, the closing keeps its title, CTA
     // and price line, and invents no plan.
     const off = (await renderRoute(null)).querySelector('[data-landing-section="pricing"]');
     expect(off?.querySelector("[data-landing-plans]")).toBeNull();
@@ -600,25 +625,25 @@ describe("T9-C4 landing content", () => {
     const method = document.querySelector('[data-landing-section="method"]');
     const pricing = document.querySelector('[data-landing-section="pricing"]');
 
-    // The hero lede is the V4 ask page's promise (v4.ask.promise) with "Ask a question." in front.
-    expect(hero?.textContent).toContain(
-      "Ask a question. Several AIs from different companies argue it from all sides. You choose what they look into. You get a plain answer and see what holds up and what doesn't."
+    // The hero lede is the first two sentences of the V4 ask page's promise (v4.ask.promise) with
+    // "Ask a question." in front, and what the visitor gets. It is the hero's only paragraph beside the example.
+    expect(hero?.querySelector(".lpLede")?.textContent).toBe(
+      "Ask a question. Several AIs from different companies argue it from all sides. You get a plain answer."
     );
-    expect(hero?.textContent).toContain("Several AIs, one plain answer");
-    expect([...(hero?.querySelectorAll(".lpStatBar > li:not(.lpStatRule)") ?? [])].map((item) => item.textContent)).toEqual([
-      "Each point shows whether a second AI agreed",
-      "Free questions are public"
-    ]);
-    expect(method?.textContent).toContain("Four steps, from your question to your report.");
-    expect(method?.textContent).toContain(
-      "You choose what the AIs look into, and you can dig into any point."
-    );
-    expect(pricing?.textContent).toContain("Good questions deserve more than one answer.");
-    // The closing line names no time.
-    expect(pricing?.textContent).toContain(
-      "Ask one question. You get a plain answer, the points it rests on, and what is still open."
-    );
+    expect(hero?.querySelector("h1")?.textContent).toBe("See what holds up.");
+    // The simpler landing (2026-11-25): no eyebrow, no facts bar, no method lede, no closing lede.
+    for (const gone of ["Several AIs, one plain answer", "Each point shows whether a second AI agreed"]) {
+      expect(hero?.textContent, gone).not.toContain(gone);
+    }
+    expect(method?.querySelector("h2")?.textContent).toBe("Four steps, from your question to your report.");
+    expect(method?.textContent).not.toContain("You choose what the AIs look into, and you can dig into any point.");
+    expect(pricing?.querySelector("h2")?.textContent).toBe("Good questions deserve more than one answer.");
+    expect(pricing?.textContent).not.toContain("Ask one question.");
     expect(pricing?.textContent).not.toMatch(/minute/iu);
+    // The closing keeps the short AI notice and its link to the full text.
+    const aiNotice = pricing?.querySelector("#ai-transparency");
+    expect(aiNotice?.textContent).toContain("Dialectical Engine is an AI system.");
+    expect(aiNotice?.querySelector('a[href="/ai-transparency"]')?.textContent).toBe("How we label AI content");
     // None of the older product's promises is left on the landing.
     const landing = document.querySelector(".lpRoot")?.textContent ?? "";
     for (const retired of ["You argue", "Four turns", "turn is scored", "Five frontier models", "Verdict with receipts",

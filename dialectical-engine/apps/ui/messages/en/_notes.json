@@ -1,5 +1,10 @@
 {
   "home.method3Body": "Sure and Still argued are the map's trust words: use the words of v4.trust.SURE and v4.trust.STILL_ARGUED.",
+  "home.method4Body": "'It' is the report (home.method4Title). Say only what the product does: the report is read on the site and can be downloaded as a PDF. Never say it is sent by e-mail.",
+  "home.exampleLabel": "The label on the landing's example of an answer, which is written by hand. One word.",
+  "home.exampleAnswerLabel": "Must be exactly the words of v4.report.answerHeading.",
+  "home.exampleAnswer": "The answer of the landing's example, to the question in home.resolution. Short and plain.",
+  "home.trustSure": "Must be exactly the words of v4.trust.SURE; home.trustStillArgued exactly those of v4.trust.STILL_ARGUED.",
   "newDebate.asOfProvenance": "As-of is the point in time whose known facts the debate should use.",
   "billing.checkout.subscribeAndPay": "Romanian must read exactly 'Comandă cu obligație de plată' (Terms §12). Elsewhere use the local legal wording for an order with an obligation to pay.",
   "billing.plans.PLUS.name": "Plus, Pro and Max are product names: keep them. Translate only 'Free'.",

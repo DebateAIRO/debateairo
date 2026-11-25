@@ -1685,8 +1685,6 @@ html:has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scrol
   outline-offset: 2px;
 }
 
-/* On the public home page it follows the hero's AI line. */
-.lpBetaNote { margin-top: 18px; }
 
 .newVersionNotePage {
   margin: 48px auto;
@@ -6320,6 +6318,8 @@ a:focus-visible {
   white-space: nowrap;
 }
 .lpWordmarkAccent { color: var(--pro); }
+/* The wordmark with the Beta mark beside it. */
+.lpBrand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 
 /* Section rhythm. The document authors a fixed 1280px artboard; the vw terms
    below reach its exact padding at 1280 and shrink proportionally under it. */
@@ -6327,7 +6327,7 @@ a:focus-visible {
   padding-left: clamp(24px, 7.5vw, 96px);
   padding-right: clamp(24px, 7.5vw, 96px);
 }
-.lpHero { padding-top: clamp(150px, 19.53vw, 250px); padding-bottom: clamp(80px, 11.72vw, 150px); }
+.lpHero { padding-top: clamp(150px, 14vw, 190px); padding-bottom: clamp(72px, 9.4vw, 120px); }
 .lpExchange { padding-top: clamp(72px, 10.16vw, 130px); padding-bottom: clamp(96px, 14.84vw, 190px); }
 .lpMethod {
   padding-top: clamp(76px, 10.94vw, 140px);
@@ -6350,9 +6350,10 @@ a:focus-visible {
   text-wrap: pretty;
   margin: 0;
 }
-.lpHeroTitle { font-size: var(--t-hero); line-height: 0.92; max-width: 15ch; }
+/* Sized for the hero's half column: the longest word of any language's title stays on one line. */
+.lpHeroTitle { font-size: clamp(42px, 9vw, 76px); line-height: 0.98; max-width: 15ch; overflow-wrap: break-word; text-wrap: balance; }
 .lpExchangeTitle { font-size: clamp(28px, 4.84vw, 62px); line-height: 1.02; max-width: 22ch; margin-top: 22px; }
-.lpMethodTitle { font-size: var(--t-display); line-height: 1.02; margin-top: 22px; }
+.lpMethodTitle { font-size: var(--t-display); line-height: 1.02; max-width: 18ch; text-wrap: balance; }
 .lpClosingTitle { font-size: clamp(34px, 6.25vw, 80px); line-height: 0.98; max-width: 20ch; margin: 0 auto; }
 
 .lpEyebrow {
@@ -6367,8 +6368,8 @@ a:focus-visible {
 .lpEyebrowTight { font-size: 11px; letter-spacing: 0.14em; margin-bottom: 10px; }
 
 .lpLede {
-  margin: 44px 0 0;
-  max-width: 56ch;
+  margin: 28px 0 0;
+  max-width: 44ch;
   font-size: var(--t-lede);
   line-height: 1.65;
   color: var(--muted);
@@ -6466,23 +6467,64 @@ html:has(.lpRoot) { scroll-padding-top: 104px; }
 @media (max-width: 753.98px) {
   .lpNav { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 10px; row-gap: 6px; padding-left: 14px; max-width: calc(100% - 24px); }
   .lpNavLinks { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
+  /* The Beta mark goes under the wordmark, so the controls keep the width they had beside the wordmark alone. */
+  .lpBrand { flex-direction: column; align-items: flex-start; gap: 4px; }
   .lpCtaNav { min-width: 0; }
   .lpCtaNav .lpArrow { display: none; }
 }
 
-/* Hero stat bar */
-.lpStatBar {
+/* Hero: the promise on one side, an example of an answer on the other; one column on narrow screens. */
+.lpHeroGrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(40px, 6vw, 72px); align-items: center; }
+.lpHeroCopy { min-width: 0; }
+.lpHeroActions { display: flex; flex-wrap: wrap; margin-top: 40px; }
+@media (min-width: 1000px) {
+  .lpHeroGrid { grid-template-columns: minmax(0, 1.04fr) minmax(0, 1fr); }
+  .lpHeroTitle { font-size: clamp(54px, 5.6vw, 76px); }
+}
+
+/* The example of an answer. Its marks are the report's own: a solid bar for "Sure", a striped one for "Still argued". */
+.lpExample {
   display: flex;
-  align-items: center;
-  gap: 30px;
-  margin: 76px 0 0;
-  padding: 26px 0 0;
-  border-top: 1px solid var(--line);
-  list-style: none;
-  font-size: 13px;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  margin: 0;
+  padding: clamp(22px, 3vw, 34px);
+  border: 1px solid var(--line);
+  border-radius: var(--lp-r-shell);
+  background: var(--surface);
+  box-shadow: var(--lp-card-shadow);
+}
+.lpExampleLabel {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 600;
   color: var(--muted);
 }
-.lpStatRule { width: 1px; height: 13px; background: var(--line-strong); }
+.lpExampleQuestion {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(19px, 1.9vw, 23px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+.lpExampleAnswer { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; border-radius: var(--lp-r-core); background: var(--lp-raised); }
+.lpExampleAnswerLabel { margin: 0; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.lpExampleAnswerText { margin: 0; font-size: 16px; line-height: 1.5; }
+.lpExamplePoints { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.lpExamplePoint { display: flex; gap: 12px; font-size: 15px; line-height: 1.5; }
+.lpExampleMark { flex: none; width: 5px; border-radius: 2px; background: var(--ink); }
+.lpExamplePoint[data-trust="STILL_ARGUED"] .lpExampleMark {
+  background: repeating-linear-gradient(180deg, var(--gold) 0 4px, var(--gold-bg) 4px 7px);
+}
+.lpExampleBody { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lpExampleWord { font-size: 12px; font-weight: 600; color: var(--text-2); }
+.lpExamplePoint[data-trust="STILL_ARGUED"] .lpExampleWord { color: var(--gold-text); }
 
 /* Exchange head */
 .lpExchangeHead {
@@ -6638,48 +6680,27 @@ html:has(.lpRoot) { scroll-padding-top: 104px; }
   color: var(--muted);
 }
 
-/* Method — editorial split */
-.lpMethodGrid { display: flex; gap: clamp(40px, 8.6vw, 110px); align-items: flex-start; }
-.lpMethodRail { flex: 0 0 340px; position: sticky; top: 60px; }
-.lpMethodLede { margin: 26px 0 0; font-size: var(--t-body); line-height: 1.7; color: var(--muted); }
-.lpMethodLedgerWrap { flex: 1; min-width: 0; }
-.lpLedgerLabel {
-  margin: 0 0 12px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  color: var(--muted);
+/* Method: four steps in a row, each a title and one short line; two columns, then one, on narrower screens. */
+.lpSteps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 36px clamp(24px, 3vw, 40px);
+  margin: clamp(40px, 5vw, 64px) 0 0;
+  padding: 0;
+  list-style: none;
 }
-.lpLedger { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line-strong); }
-.lpLedgerRow {
-  display: flex;
-  align-items: baseline;
-  gap: 26px;
-  padding: 19px 2px;
-  border-bottom: 1px solid var(--line);
-}
-.lpLedgerNo { flex: 0 0 38px; font-family: var(--font-mono); font-size: 13px; font-weight: 700; }
-.lpLedgerNo[data-stance="pro"] { color: var(--pro); }
-.lpLedgerNo[data-stance="con"] { color: var(--con-text); }
-.lpLedgerNo[data-stance="reasoning"] { color: var(--reasoning); }
-.lpLedgerNo[data-stance="gold"] { color: var(--gold); }
-.lpLedgerTitle {
-  flex: 0 0 250px;
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-.lpLedgerBody { flex: 1; min-width: 220px; margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--muted); text-wrap: pretty; }
+.lpStep { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-top: 18px; border-top: 3px solid var(--pro); }
+.lpStepTitle { margin: 0; font-family: var(--font-display); font-size: 21px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.lpStepBody { margin: 0; font-size: var(--t-body); line-height: 1.55; color: var(--muted); text-wrap: pretty; }
+@media (max-width: 1000px) { .lpSteps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .lpSteps { grid-template-columns: minmax(0, 1fr); } }
 
 /* Closing */
 .lpMotif { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 38px; }
 .lpMotifRule { width: 34px; height: 1px; background: var(--line-strong); }
-.lpClosingLede { margin: 36px auto 0; max-width: 46ch; font-size: 18px; line-height: 1.65; color: var(--muted); }
 .lpPricing { margin: 30px 0 0; font-size: 13px; color: var(--muted); }
-/* The plans between the closing lede and its CTA: the pricing page's own cards and place form (billing.css), set
+.lpPricing.lpPublicNote { margin-top: 8px; }
+/* The plans between the closing title and its CTA: the pricing page's own cards and place form (billing.css), set
    left-aligned in the centred closing, at the pricing page's column width. The place form sends the visitor back
    here (#plans). */
 .lpPlans { max-width: 1084px; margin: 56px auto 0; text-align: start; line-height: normal; scroll-margin-top: 24px; }
@@ -6695,12 +6716,7 @@ html:has(.lpRoot) { scroll-padding-top: 104px; }
 /* Below the document's 1280px artboard these rows may stack; at and above it
    they hold the document's single-row composition. */
 @media (max-width: 1100px) {
-  .lpExchangeHead,
-  .lpMethodGrid,
-  .lpLedgerRow,
-  .lpStatBar { flex-wrap: wrap; }
-  .lpMethodRail { position: static; flex-basis: 100%; }
-  .lpLedgerTitle { flex-basis: auto; }
+  .lpExchangeHead { flex-wrap: wrap; }
 }
 
 /* ============================================================
@@ -9670,11 +9686,10 @@ html:has(.lpRoot) { scroll-padding-top: 104px; }
 .aiNotice--block { display: block; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .aiNotice--block h2 { margin: 0 0 7px; font: 700 10px var(--font-mono); letter-spacing: .18em; color: var(--ink); }
 .aiNotice--block p { max-width: 84ch; font-size: 11px; line-height: 1.65; }
-.lpAiDisclosure { margin-top: 44px; }
-.lpAiDisclosure .aiNotice { padding: 9px 16px 9px 12px; background: var(--lp-raised); }
-.lpAiDisclosure .aiNotice p { font-size: 13px; }
-.lpAiTransparency { max-width: 70ch; margin: 56px auto 0; padding-top: 26px; border-top: 1px solid var(--line); font-size: 12.5px; text-align: left; }
-.lpAiTransparency .aiNotice p { font-size: 12.5px; line-height: 1.7; }
+/* The landing's closing AI notice: the short strip, centred under the price line. */
+.lpAiTransparency { display: flex; justify-content: center; max-width: 76ch; margin: 44px auto 0; text-align: start; }
+.lpAiTransparency .aiNotice { padding: 10px 16px 10px 12px; background: var(--lp-raised); }
+.lpAiTransparency .aiNotice p { font-size: 12.5px; line-height: 1.6; }
 .libAiDisclosure { margin-top: 14px; }
 .ndAiDisclosure { margin-top: 16px; margin-bottom: 20px; }
 .debateAiDisclosure { flex: 0 0 auto; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--header-bg); }

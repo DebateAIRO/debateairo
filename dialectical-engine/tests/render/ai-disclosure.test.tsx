@@ -89,17 +89,23 @@ describe("AI disclosure at the point of use", () => {
     expect(container.querySelector(".libRowClaim")?.closest('[data-ai-generated="true"]')).toBeNull();
   });
 
-  it("identifies AI output before the landing samples and exposes the full transparency notice", () => {
+  it("the landing carries the short AI notice with the link to the full transparency text", () => {
     const container = document.createElement("div");
     // The props app/page.tsx gives it: the home and chrome catalogues, no price read, billing off.
     container.innerHTML = renderToStaticMarkup(<LandingPage catalog={{ ...homeEnglish, ...chromeEnglish }} lowestPaidPrice={null}
       footerBilling={{ billingOn: false, marks: availablePaymentMarks() }} />);
-    const hero = container.querySelector('[data-landing-section="hero"]')!;
-    expect(hero.textContent).toContain("AI-generated content.");
+    // The simpler landing (2026-11-25): one notice, in the closing. It says the service is an AI system, that
+    // its text is machine-readably marked and may be inaccurate, and links the full text. The hero's example
+    // of an answer is written by hand and labelled "Example", so it is not marked as generated.
     const transparency = container.querySelector("#ai-transparency");
-    expect(transparency?.textContent).toContain("No human editorial review");
-    expect(transparency?.textContent).toContain("may be inaccurate or incomplete");
+    expect(transparency?.textContent).toContain("Dialectical Engine is an AI system.");
+    expect(transparency?.textContent).toContain("machine-readably marked");
+    expect(transparency?.textContent).toContain("may be inaccurate");
     expect(transparency?.querySelector('a[href="/ai-transparency"]')).not.toBeNull();
+    expect(container.querySelectorAll(".lpRoot .aiNotice")).toHaveLength(1);
+    const example = container.querySelector('[data-landing-section="hero"] figure[data-landing-example]');
+    expect(example?.querySelector("figcaption")?.textContent).toBe("Example");
+    expect(example?.closest('[data-ai-generated="true"]')).toBeNull();
   });
 
   it("marks generated arguments without marking the user's root claim", () => {

@@ -133,3 +133,14 @@ export function methodSteps(catalog?: MessageCatalog) {
 }
 
 export const resolution = (catalog?: MessageCatalog) => t(catalog, "home.resolution");
+
+/* The hero's example of an answer: three points, each with one of the map's trust words (home.trustSure and
+   home.trustStillArgued repeat v4.trust.SURE and v4.trust.STILL_ARGUED, because the landing reads only the home
+   and chrome catalogues). Written by hand, and labelled "Example" on the page. */
+export function examplePoints(catalog?: MessageCatalog) {
+  return [
+    { id: "1", trust: "SURE", word: t(catalog, "home.trustSure"), text: t(catalog, "home.examplePoint1") },
+    { id: "2", trust: "SURE", word: t(catalog, "home.trustSure"), text: t(catalog, "home.examplePoint2") },
+    { id: "3", trust: "STILL_ARGUED", word: t(catalog, "home.trustStillArgued"), text: t(catalog, "home.examplePoint3") }
+  ] as const;
+}
