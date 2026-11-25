@@ -88,7 +88,7 @@ const catalogue = (locale) => JSON.parse(source(`messages/${locale}/billing.json
 const REQUIRED = [
   "billing.plans.FREE.name", "billing.plans.PLUS.name", "billing.plans.PRO.name", "billing.plans.MAX.name",
   "billing.pricing.eyebrow", "billing.pricing.title", "billing.pricing.lede", "billing.pricing.perMonth",
-  "billing.pricing.taxIncluded", "billing.pricing.noTaxAdded", "billing.pricing.chooseCountry", "billing.pricing.enterPostalCode",
+  "billing.pricing.priceWithTax", "billing.pricing.totalPerMonth", "billing.pricing.noTaxAdded", "billing.pricing.chooseCountry", "billing.pricing.enterPostalCode",
   "billing.pricing.showPrices", "billing.pricing.currencyNote", "billing.pricing.allowanceFree", "billing.pricing.allowancePlus", "billing.pricing.allowance",
   "billing.pricing.freeFeatures", "billing.pricing.paidFeatures", "billing.pricing.startFree", "billing.pricing.choose",
   "billing.pricing.unavailable", "billing.pricing.faqTitle", "billing.pricing.faqLimitsQuestion",

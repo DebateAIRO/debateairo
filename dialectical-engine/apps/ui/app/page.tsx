@@ -23,7 +23,7 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { isBillingPlanId } from "@/lib/billing/plans";
 import { dailyLimitMessageCatalog, legalGateMessageCatalog } from "@/lib/v3/requestFailure";
 import { composerRoomCatalog } from "@/lib/billing/roomCatalog";
-import { formatMoney, pricedTax, type PricedTax } from "@/lib/billing/format";
+import { formatMoney, pricedTax, priceWithTaxTotal, type PricedTax } from "@/lib/billing/format";
 import { availablePaymentMarks, netopiaLogoAddress } from "@/lib/billing/paymentMarks";
 import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
 
@@ -56,12 +56,13 @@ function pickMessages(catalog: MessageCatalog, keep: (key: string) => boolean): 
 }
 
 /**
- * The landing's one plans read: the lowest paid price for the price line (with the connection country's tax, Terms
- * §12; with no priced place, no price at all), and whether billing is on for the footer. Only the route's 404 means
- * off (local mode, or hosted before the switch), exactly as billingIsOn() decides. The same answer says whether card
- * payments run on NETOPIA's sandbox: then the price line carries the test-mode note, which goes away by itself once
- * the server is switched to live payments. The same answer also fills the plan cards above the closing CTA, for the
- * connection's country or, once the visitor chose one in the cards' place form, for that place (`params`).
+ * The landing's one plans read: the lowest paid price for the price line (as price + VAT: our price, the connection
+ * country's tax apart and the total with it, Terms §12; with no priced place, no price at all), and whether billing is
+ * on for the footer. Only the route's 404 means off (local mode, or hosted before the switch), exactly as
+ * billingIsOn() decides. The same answer says whether card payments run on NETOPIA's sandbox: then the price line
+ * carries the test-mode note, which goes away by itself once the server is switched to live payments. The same answer
+ * also fills the plan cards above the closing CTA, for the connection's country or, once the visitor chose one in the
+ * cards' place form, for that place (`params`).
  */
 async function landingPlans(locale: string, headerStore: Headers, params: PlaceParams = {}): Promise<LandingPlans> {
   const footer = (billingOn: boolean): SiteFooterBilling =>
@@ -81,8 +82,8 @@ async function landingPlans(locale: string, headerStore: Headers, params: PlaceP
     const tax = paid.every((plan) => plan.total_price != null) ? pricedTax(answer) : "UNPRICED";
     const lowest = tax === "UNPRICED" ? undefined : paid
       // Spec 2026-10-05 §2.16.1: in the currency the visitor's connection pays in.
-      .flatMap((plan) => plan.total_price ?? [])
-      .sort((left, right) => Number(left) - Number(right))[0];
+      .flatMap((plan) => plan.total_price == null ? [] : [{ total: plan.total_price, net: plan.net_prices[answer.currency] }])
+      .sort((left, right) => Number(left.total) - Number(right.total))[0];
     const billingCatalog = await loadNamespace(locale, "billing");
     const testModeNote = answer.environment === "sandbox" ? t(billingCatalog, "billing.testMode.notice") : null;
     const place = answer.place ?? NO_PLACE;
@@ -94,7 +95,10 @@ async function landingPlans(locale: string, headerStore: Headers, params: PlaceP
       typedPostalCode: postalCode
     });
     return Object.freeze({
-      lowestPaidPrice: lowest === undefined ? null : formatMoney(locale, lowest, answer.currency),
+      lowestPaidPrice: lowest === undefined ? null
+        : tax === "INCLUDED" && answer.tax != null
+          ? priceWithTaxTotal(billingCatalog, locale, answer.currency, { ...lowest, taxName: answer.tax.tax_name })
+          : formatMoney(locale, lowest.total, answer.currency),
       tax: paid.length === 0 ? "UNPRICED" : tax, footer: footer(true), testModeNote,
       cards: Object.freeze({
         catalog: billingCatalog, locale, currency: answer.currency, place,
