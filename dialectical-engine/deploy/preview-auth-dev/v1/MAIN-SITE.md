@@ -3582,7 +3582,6 @@ for KV in "CORPUS_KEK_PATH=$KP" "PUBLICATION_KEY_STORE_PATH=$PS"; do [ "$(grep -
 AP=$(pubapart); [ -z "$AP" ] || { echo "PUBKEYS_NOT_DONE: the corpus key or the key store would not be apart from: $AP(the code refuses that); nothing changed: ask"; exit 1; }
 [ -d "${PDROP%/*}" ] || { echo "PUBKEYS_NOT_DONE: the API's template drop-in folder is missing (this is not the template layout); nothing changed: ask"; exit 1; }
 [ ! -e "$KP.new" ] || { echo "PUBKEYS_NOT_DONE: $KP.new exists (an earlier run stopped half-way); nothing changed: ask"; exit 1; }
-install -d -o root -g root -m 0700 "$PUB"
 if [ -e "$KP" ]; then
   keyok || { echo "PUBKEYS_NOT_DONE: $KP is there, but is not the API user's 0600 file of 32 bytes with one link; nothing changed: ask"; exit 1; }
   echo "corpus key: there already, as the code needs; it is never made again"
@@ -3605,7 +3604,7 @@ else
   storewrite || { echo "PUBKEYS_NOT_DONE: after the drop-in and the reload, the API's unit still does not list $PS as a write path: ask"; exit 1; }
   echo "the API may write the key store from its next start (the drop-in $PDROP; the running API is unchanged)"
 fi
-{ ( umask 077; printf 'CORPUS_KEK_PATH=%s\nPUBLICATION_KEY_STORE_PATH=%s\n' "$KP" "$PS" > "$KF.new" ) && mv -f "$KF.new" "$KF"; } || { echo "PUBKEYS_NOT_DONE: the two lines were not kept in $KF: ask"; exit 1; }
+{ install -d -o root -g root -m 0700 "$PUB" && ( umask 077; printf 'CORPUS_KEK_PATH=%s\nPUBLICATION_KEY_STORE_PATH=%s\n' "$KP" "$PS" > "$KF.new" ) && mv -f "$KF.new" "$KF"; } || { echo "PUBKEYS_NOT_DONE: the two lines were not kept in $KF: ask"; exit 1; }
 echo "the two lines for the API file are kept in $KF (PUBBACKUP and PUBON read them)"
 echo PUBKEYS_DONE
 exit 0
@@ -3680,7 +3679,7 @@ process.stdout.write(["SET log_statement = 'none';", 'SET log_min_duration_state
   `ALTER ROLE debateai_prod_api_publication_cleanup PASSWORD '${verifier}' VALID UNTIL 'infinity';`, ''].join('\n'));
 JS
 mv -n "$LF.new" "$LF"
-[ ! -e "$LF.new" ] && [ "$(stat -c '%a %U %h' "$LF")" = "600 root 1" ] && [ "$(grep -c '' "$LF")" = 1 ] && grep -q '^PUBLICATION_CLEANUP_DATABASE_URL=postgresql' "$LF" || { echo "PUBLOGIN_NOT_DONE: the new password is set, but its line was not kept as $LF: run PUBLOGIN again (it makes another one)"; exit 1; }
+[ ! -e "$LF.new" ] && [ "$(stat -c '%a %U %h' "$LF")" = "600 root 1" ] && [ "$(grep -c '' "$LF")" = 1 ] && grep -qE '^PUBLICATION_CLEANUP_DATABASE_URL=postgres(ql)?://' "$LF" || { echo "PUBLOGIN_NOT_DONE: the new password is set, but its line was not kept as $LF: run PUBLOGIN again (it makes another one)"; exit 1; }
 W=$(pubprobe "$LF" || true)
 [ "$W" = accepted ] || { echo "PUBLOGIN_NOT_DONE: the new password is set and its line kept, but the line is not accepted ($W): ask"; exit 1; }
 echo "the clean-up login: a new password, never shown; its line is kept in $LF (root, 0600); it signs in as the API will, and passes the API's role check"
@@ -3767,7 +3766,7 @@ grep -q PUBLICATION_CLEANUP_DATABASE_URL "$CAPI/dialectical-engine/packages/regi
 [ "$(grep -c '^PUBLICATION_ENABLED=' "$A" || true)" = "$(grep -cx 'PUBLICATION_ENABLED=false' "$A" || true)" ] && [ "$(grep -c '^PUBLICATION_ENABLED=' "$A" || true)" -le 1 ] || { echo "PUBON_NOT_DONE: the API file's PUBLICATION_ENABLED line is not one line PUBLICATION_ENABLED=false; nothing changed: ask"; exit 1; }
 [ "$(grep -c '^CORPUS_KEK_PREVIOUS_PATH=' "$A" || true)" = 0 ] || { echo "PUBON_NOT_DONE: the API file holds CORPUS_KEK_PREVIOUS_PATH; nothing changed: ask"; exit 1; }
 [ -s "$KF" ] && [ "$(grep -c '' "$KF")" = 2 ] && grep -qxF "CORPUS_KEK_PATH=$KP" "$KF" && grep -qxF "PUBLICATION_KEY_STORE_PATH=$PS" "$KF" || { echo "PUBON_NOT_DONE: $KF is not the two lines PUBKEYS keeps (PUBKEYS first); nothing changed"; exit 1; }
-[ -s "$LF" ] && [ "$(stat -c '%a %U %h' "$LF")" = "600 root 1" ] && [ "$(grep -c '' "$LF")" = 1 ] && grep -q '^PUBLICATION_CLEANUP_DATABASE_URL=postgresql' "$LF" || { echo "PUBON_NOT_DONE: the clean-up line is not kept as PUBLOGIN keeps it (PUBLOGIN first); nothing changed"; exit 1; }
+[ -s "$LF" ] && [ "$(stat -c '%a %U %h' "$LF")" = "600 root 1" ] && [ "$(grep -c '' "$LF")" = 1 ] && grep -qE '^PUBLICATION_CLEANUP_DATABASE_URL=postgres(ql)?://' "$LF" || { echo "PUBON_NOT_DONE: the clean-up line is not kept as PUBLOGIN keeps it (PUBLOGIN first); nothing changed"; exit 1; }
 if [ "$ST" = B ]; then
   for P in CORPUS_KEK_PATH PUBLICATION_KEY_STORE_PATH PUBLICATION_CLEANUP_DATABASE_URL; do [ "$(grep -c "^$P=" "$A" || true)" = 1 ] || { echo "PUBON_NOT_DONE: the API file keeps the keys' lines, but $P is not there exactly once; nothing changed: ask"; exit 1; }; done
   cmp -s <(grep -E '^(CORPUS_KEK_PATH|PUBLICATION_KEY_STORE_PATH)=' "$A" | LC_ALL=C sort) <(LC_ALL=C sort "$KF") && cmp -s <(grep '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A") "$LF" || { echo "PUBON_NOT_DONE: the publication lines the API file keeps are not the ones PUBKEYS and PUBLOGIN kept; nothing changed: ask"; exit 1; }
