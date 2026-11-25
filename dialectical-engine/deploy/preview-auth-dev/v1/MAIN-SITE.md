@@ -3348,8 +3348,8 @@ in a private window that never had the site password, from a Romanian connection
 
 | NETOPIA asks for | Where | What must be there |
 |---|---|---|
-| a description of the service | https://dezbatere.ro/ | what the site does and how, and the line "Abonamentele plătite pornesc de la … pe lună, cu taxe incluse" (English: "Paid plans start at … a month, tax included") |
-| the plans, with prices in RON and "Taxe incluse" | https://dezbatere.ro/pricing | in Romanian, each paid plan's price in RON, followed by "Taxe incluse (…%, …)" |
+| a description of the service | https://dezbatere.ro/ | what the site does and how, and the line "Abonamentele plătite pornesc de la … pe lună, cu taxe incluse" (English: "Paid plans start at … a month, tax included"), where … is one amount in RON: the total a month, with the VAT in it |
+| the plans, with prices in RON, VAT included | https://dezbatere.ro/pricing | in Romanian, each paid plan's card shows first, in large type, the total a month in RON, with the VAT in it ("… RON pe lună"); right under it, in smaller type, our price and the VAT apart, with the tax's name, the rate and the country (for example "… RON + … RON TVA (…%, România)") |
 | company details and contact | the footer of every page above, and https://dezbatere.ro/legal (footer: "Datele firmei și contact", Company details and contact) | the company's name, registered office, CUI, trade register number, telephone and e-mail |
 | the Terms | https://dezbatere.ro/terms (footer: "Termenii serviciului") | the whole text, version 1.0 |
 | who sells | https://dezbatere.ro/terms, section 1 | its first sentence names the company that runs the site |
