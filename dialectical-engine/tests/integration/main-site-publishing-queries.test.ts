@@ -96,6 +96,9 @@ describe("5.9's queries on the real schema", () => {
 
   it("pubcounts counts what was ever published, what is public now, the keys that should be in the store, the Free debates and the clean-ups", async () => {
     const [counts] = asked([helper("pubcounts"), "pubcounts"]);
+    // Every debate's start leaves a run_execution_ref row in the registry of used refs, published or not: it is no sign of publishing.
+    const used = (kind: string) => [`INSERT INTO core.publication_ref_tombstone (ref, ref_kind, created_at) VALUES ($1, $2, now())`, [randomUUID(), kind]] as const;
+    await seeded([used("run_execution_ref"), used("run_execution_ref")]);
     expect(await one(counts!)).toBe("0 0 0 0 0 0 0 0 0");
     const [a, b, c] = [randomUUID(), randomUUID(), randomUUID()];
     const snapshot = (ref: string) => [`INSERT INTO serve.publication_snapshot (publication_ref, run_id, format_version, content_ciphertext, created_at)
@@ -110,10 +113,11 @@ describe("5.9's queries on the real schema", () => {
       [`INSERT INTO serve.publication_key_cleanup_intent (publication_ref, requested_at, completed_at, cleanup_state, cleanup_claim_token, destroy_result)
         VALUES ($1, now(), now(), 'CLEANED', $2, 'DESTROYED')`, [b, randomUUID()]],
       [`INSERT INTO serve.publication_key_cleanup_intent (publication_ref, requested_at, completed_at) VALUES ($1, now(), NULL)`, [c]],
-      free(null), free("PUBLISHED"), free("REFUSED")]);
+      free(null), free("PUBLISHED"), free("REFUSED"), used("publication_ref")]);
     // Ever made 3; public now 1 (b came down); keys that should still be in the store 2 (b's was destroyed);
-    // Free debates waiting 1, public 1, kept private 1; clean-ups waiting 1; provisions 0; visibility events and tombstones 3.
-    expect(await one(counts!)).toBe("3 1 2 1 1 1 1 0 3");
+    // Free debates waiting 1, public 1, kept private 1; clean-ups waiting 1; provisions 0;
+    // visibility events 3 and one used publication ref, with the two debate starts above left out: 4.
+    expect(await one(counts!)).toBe("3 1 2 1 1 1 1 0 4");
   });
 });
 
