@@ -132,6 +132,7 @@ if the server shows something else.
 | 4 | mail: allow-list on the new path, then open | password on | MAIL_CLOSE |
 | 5 | the main name, and your staff key on it (5.7) | password on | NAME5 |
 | 5.8 | the NETOPIA review window: the public pages without the password (after NAME4), then NETOPIA's review (5.8b) | public pages open; sign-in, sign-up, debates and buying behind the password | REVIEW_CLOSE (or PWON) |
+| 5.9 | public debates: publishing switched on (after 5.7), still behind the site password | password on; public debates readable by those who know it | PUBOFF stops the public pages; what was public stays recorded (5.9b) |
 | 6 | friends' test with test payments (it may run while NETOPIA reviews) | password on | ASKS_CLOSE |
 | 6b | the whole site open while payments are NETOPIA's sandbox: anyone may sign up and ask on the Free plan, only the accounts you list may buy test plans (after part 5 and 5.7, on a release that carries it; before you enrol the point of sale, 5.8b step 3) | open | PWON, then ASKS_CLOSE |
 | 7 | real payments (only after NETOPIA's approval and the signed contract; 6b closed first; if anyone outside the team had the site password, a new one first) | password on | PAY_BACK |
@@ -191,7 +192,7 @@ team has had the site password. If NETOPIA's tester had it (5.8b), run PWNEW (7.
 while payments are real: run ASKS_OPEN
 (6.1) with the line `V=everyone`, and stop there, so the site password stays on. They use the Free plan. Tell them
 not to press **Abonați-vă și plătiți** (Subscribe and pay): payments are real, a plan one of them buys renews every
-month until they cancel it in Settings, and PAY_BACK waits for it. Tell them too that a finished Free debate can go
+month until they cancel it in Settings, and PAY_BACK waits for it. Tell them too that, once publishing is on (5.9), a finished Free debate can go
 public by itself, to everyone inside the site password, and that nobody can take it down by hand until your staff
 key works on dezbatere.ro (5.7). When your own refund and its credit note are
 recorded, run ASKS_CLOSE (6.3), then PAY_BACK (7.11), then part 6 as written, with test payments. Before real payments
@@ -231,6 +232,12 @@ go on a second time, that friends' test closes and the site password changes (7.
   there (5.7), with mail open (4.3), with the four spending gates active and with the review window closed. PWOFF1
   checks each. What still waits for real payments and part 8: buying for anyone signed in (`everyone`), real money,
   and invoices.
+- **Public debates only after 5.7, behind the password, and outside an upload.** PUBON (5.9) refuses while the staff
+  screens are off or no staff key of the Owner works under the name the site answers as (nobody could hide a public
+  debate by hand), while the site does not ask for the password, and while the AI check for publication and reports
+  is off. Never run PUBON or PUBOFF from an upload's preparation (1.8, SB1) to its end: PRECHECK holds the old
+  release's files to SB1's copies, and the way back starts the old release from them. Publishing is no lock: the
+  site password decides who can read a public debate, and closing everything (part 9) leaves publishing as it is.
 - **6b only on a release that carries it.** An older API refuses `everyone-with-listed-buyers` at start
   (`PREVIEW_ASKS_OPEN_TO_INVALID`), and an older API lets any signed-in account buy on the sandbox. So 6b opens only
   once the upload that brought it is over and you would no longer go back to the release before it; while 6b is
@@ -471,7 +478,7 @@ Never change `transportTimeoutMs`: it must stay 5000.
 ### 1.6 The old test debates, and the staff screens
 
 Debates cannot be deleted: the database refuses to delete a debate's rows, by design. What strangers and friends can
-see is only the list of **published** test debates. Hiding is the supported way to take one down. Only the staff
+see is only the list of **published** test debates (none on this server until publishing is switched on, 5.9). Hiding is the supported way to take one down. Only the staff
 screens (the Team page, `/admin/team`) can hide a debate by hand; the public Report button can also hide one by itself
 (5.1b). No menu links to the Team page: type its address after the name the site answers as, for example
 https://v3-preview.dezbatere.ro/admin/team (before the rename) or https://dezbatere.ro/admin/team (after it).
@@ -526,7 +533,7 @@ Read the lines just before `STAFFCHECK_DONE`:
   behind the site password; if one must not, ask.
 
 `the AI check for publication and reports` is the AI check that lets a finished Free debate go public and that reads
-each press of the public Report button (5.1b says why it matters). It is Claude Haiku 5.5 through the Anthropic gate:
+each press of the public Report button (5.1b says why it matters; both need publishing on, 5.9). It is Claude Haiku 5.5 through the Anthropic gate:
 the API holds no key for it, and the API file's `SUPPORT_MODEL_TARGET_JSON` plays no part on this server (it stays
 absent). The line says `on, through the Anthropic gate` when the running release sends the check that way and the API
 file names the gate's socket. Otherwise it says `off:` and why; before the upload of a release that sends the check
@@ -541,7 +548,10 @@ browser). **This is your last chance for staff work (Hide now, reports, publicat
 Do this **before DR2** of the upload, while the old release still runs on the test name:
 1. Sign in. Open the home page's **Public** tab. Read every published debate.
 2. If one should not be public: tell the team first (each hide e-mails the debate's author). Then open
-   https://v3-preview.dezbatere.ro/admin/team (the Team page; no menu links to it) → public review → **Hide now**. Each hide needs the staff hardware key, and the staff key you have now works only on the test name.
+   https://v3-preview.dezbatere.ro/admin/team (the Team page; no menu links to it) → **Public debates under review**
+   (Dezbateri publice în curs de verificare): paste the debate's public link into **The debate's public link** (Linkul
+   public al dezbaterii), press **Open** (Deschide), then **Hide now** (Ascunde acum). The panel lists only hidden
+   debates, so the link is the way to a public one. Each hide needs the staff hardware key, and the staff key you have now works only on the test name.
 3. If the Team page shows open reports, settle them now too. Publication reviews (**Publication reviews**, Cereri de
    publicare) open from the link on the Team page once your key is verified. Settling usually needs the team tools unlocked: if the page says
    `Team tools are locked…` (in step 2 or 3), run UNLOCK (5.7, step 3) as root. It unlocks them for one hour and ends
@@ -725,7 +735,8 @@ Every line `SAME`: leave `NEWNUM` and `LIMITS` empty; SB3 publishes the live num
 
 Everything here runs with the site up, and nothing on the site changes. It runs the day before the upload, or earlier
 on the upload day itself; do it in this order either way. Each step names its block and the last line it must print.
-On any other last line, run nothing more, and ask.
+On any other last line, run nothing more, and ask. With publishing on (5.9), run PUBBACKUP (5.9, step 4) first, before
+SB1: this upload's cold copy holds the database only, not the keys of the public debates (5.9a).
 
 The practice spends from the gates' daily pots (a day is a Bucharest day). On the same day, the practice and the test
 debate after the switch (part 2: it serves both SB13b and the proof of the step before Start) share the same pots.
@@ -1262,7 +1273,7 @@ show the next.
 | `ui-api-proof` | the proof line in the new API file, or its proof file (SB5c) | DR6AGAIN, then LATELINES, then DR6 |
 | `restore-fence-path` | the fence line in the new API file (H11 step 2), or a fence folder above a key store or key file | the line missing: DR6AGAIN, then LATELINES, then DR6; the overlap: ask |
 | `restore-fence` | the fence folder itself | DR6AGAIN, then FENCEDIR, then DR6 |
-| `corpus-kek`, `publication-secret-domains`, `database-roles` | publication's keys and its clean-up login | ask |
+| `corpus-kek`, `publication-secret-domains`, `database-roles`, `publication-key-store`, `publication-key-cleanup` | publication's keys and its clean-up login: with publishing on (5.9) the new release starts on the same corpus key, key store and clean-up login as the old one, whose lines DR1 copied unchanged (5.9a) | ask |
 | `outbound-mail-policy`, `outbound-mail-store`, or a `PREVIEW_MAIL_…` code | the mail plan (1.5) | ask |
 | `pre-start-writer` | the database step that records the charges before Start | ask |
 | `preview-live-payments`, `preview-asks-open`, `saved-question-key-store` | payments, asks, or the saved questions' keys | ask |
@@ -1511,6 +1522,25 @@ put_secret() { runuser -u "$AU" -- /bin/sh -c 'umask 077; f=$1; [ ! -e "$f" ] ||
 swap() { ( set -euo pipefail; umask 077; { grep -vE "$KEYS" "$A"; cat "$1"; } > "$A.new"; chown --reference="$A" "$A.new"; chmod --reference="$A" "$A.new"; mv "$A.new" "$A"; [ -z "$(grep -oE '^[A-Z_][A-Z0-9_]*=' "$A" | sort | uniq -d)" ] && echo swapped ); }
 livedrop() { install -d -o root -g root -m 0755 /etc/systemd/system/debateai-preview-egress.service.d; printf '[Service]\nExecStart=\nExecStart=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node %s/egress-proxy.mjs --quaderno-live-account %s\n' "$EG" "$1" > "$EDROP"; chmod 0644 "$EDROP"; systemctl daemon-reload; systemctl restart "$EGU" || echo 'systemctl restart of the egress proxy returned non-zero'; sleep 2; }
 sandboxdrop() { rm -f "$EDROP"; systemctl daemon-reload; systemctl restart "$EGU" || echo 'systemctl restart of the egress proxy returned non-zero'; sleep 2; }
+KP=/etc/debateai-v3-preview/api/corpus-kek.bin; PS=/var/lib/debateai-v3-preview/api/publication-keys; PUB=$M/pub; KF=$PUB/keys.env; LF=$PUB/cleanup.line; BF=$PUB/backup-folder
+CLN=debateai_prod_api_publication_cleanup; PDROP=/etc/systemd/system/debateai-preview-api@.service.d/zzzzzzzzzz-keys-publication.conf
+pubstate() { if [ "$(grep -c '^PUBLICATION_ENABLED=true$' "$1" || true)" = 1 ]; then echo A; elif [ "$(grep -c '^CORPUS_KEK_PATH=' "$1" || true)" -ge 1 ] && [ "$(grep -c '^PUBLICATION_KEY_STORE_PATH=' "$1" || true)" -ge 1 ]; then echo B; else echo C; fi; }
+keyok() { [ -f "$KP" ] && [ ! -L "$KP" ] && [ ! -L "${KP%/*}" ] && [ "$(stat -c '%a %U %h %s' "$KP")" = "600 $AU 1 32" ] && [ "$(stat -c '%a %U' "${KP%/*}")" = "700 $AU" ]; }
+storeok() { [ -d "$PS" ] && [ ! -L "$PS" ] && [ "$(stat -c '%a %U %G' "$PS")" = "700 $AU $AGRP" ]; }
+storewrite() { local p; for p in $(systemctl show -p ReadWritePaths --value "$API"); do p=${p#-}; p=${p#+}; case "$PS/" in "${p%/}/"*) return 0;; esac; done; return 1; }
+keyfiles() { find "$PS" -type f -name publication-key.v1.json 2>/dev/null | grep -c . || true; }
+povl() { case "$1/" in "$2/"*) return 0;; esac; case "$2/" in "$1/"*) return 0;; esac; return 1; }
+pubapart() { local k v f; for k in KEK_PATH BLIND_INDEX_KEY_PATH AUDIT_SOURCE_IP_SALT_PATH SUPPORT_KEK_PATH RECORDS_KEY_PATH KEK_PREVIOUS_PATH SUPPORT_KEK_PREVIOUS_PATH UI_API_PROOF_PATH NETOPIA_API_KEY_PATH NETOPIA_IPN_KEYS_PATH QUADERNO_API_KEY_PATH SMARTBILL_CREDENTIALS_PATH OWNER_REPORT_EMAIL_PATH USER_DEK_STORE_PATH AUDIT_KEY_STORE_PATH DATA_EXPORT_STORE_PATH BILLING_NOTICE_SPOOL_PATH; do v=$(sed -n "s/^$k=//p" "$A"); [ -n "$v" ] || continue; if povl "$v" "$KP" || povl "$v" "$PS"; then printf '%s ' "$k"; fi; done; f=$(sed -n 's/^RESTORE_FENCE_PATH=//p' "$A"); if [ -z "$f" ] || povl "${f%/*}" "$PS" || povl "${f%/*}" "${KP%/*}"; then printf '%s ' RESTORE_FENCE_PATH; fi; }
+pubrole() { psqlq "SELECT coalesce((SELECT concat_ws(' ', CASE WHEN NOT r.rolcanlogin THEN 'cannot-sign-in' END, CASE WHEN r.rolsuper OR r.rolcreaterole OR r.rolcreatedb OR r.rolreplication OR r.rolbypassrls THEN 'special-powers' END, CASE WHEN NOT pg_has_role(r.oid, 'debateai_publication_cleanup', 'USAGE') THEN 'no-cleanup-role' END, CASE WHEN pg_has_role(r.oid, 'debateai_runtime', 'MEMBER') OR pg_has_role(r.oid, 'debateai_authorization_runtime', 'MEMBER') THEN 'runtime-member' END, CASE WHEN NOT (has_function_privilege(r.oid, 'serve.claim_publication_key_cleanup(integer)', 'EXECUTE') AND has_function_privilege(r.oid, 'serve.complete_publication_key_cleanup(uuid,uuid,text)', 'EXECUTE') AND has_function_privilege(r.oid, 'serve.claim_publication_key_provision_cleanup(integer)', 'EXECUTE') AND has_function_privilege(r.oid, 'serve.complete_publication_key_provision_cleanup(uuid,uuid)', 'EXECUTE')) THEN 'no-cleanup-functions' END, CASE WHEN coalesce((SELECT bool_or(has_function_privilege(r.oid, p.oid, 'EXECUTE')) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'core' AND p.proname = 'transition_run_publication' AND pg_get_function_identity_arguments(p.oid) = 'uuid, uuid, uuid, uuid, uuid, text, text, uuid, text, jsonb, timestamp with time zone, uuid, uuid, uuid'), false) THEN 'may-publish' END, CASE WHEN has_table_privilege(r.oid, 'serve.publication_key_cleanup_intent', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE') THEN 'cleanup-table-rows' END) FROM pg_roles r WHERE r.rolname = '$CLN'), 'missing')"; }
+pubhba() { psqlq "SELECT coalesce((SELECT concat_ws(' ', auth_method, address, netmask) FROM pg_hba_file_rules WHERE error IS NULL AND type = 'hostssl' AND database && ARRAY['all', 'debateai'] AND user_name && ARRAY['all', '$1'] ORDER BY rule_number LIMIT 1), 'none')"; }
+pubcounts() { psqlq "SELECT concat_ws(' ', (SELECT count(*) FROM serve.publication_snapshot), (SELECT count(*) FROM (SELECT DISTINCT ON (run_id) state FROM core.run_visibility_event ORDER BY run_id, at_seq DESC) v WHERE v.state = 'PUBLISHED'), (SELECT count(*) FROM serve.publication_snapshot s WHERE NOT EXISTS (SELECT 1 FROM serve.publication_key_cleanup_intent c WHERE c.publication_ref = s.publication_ref AND c.completed_at IS NOT NULL)), (SELECT count(*) FROM identity.free_public_ask WHERE outcome IS NULL), (SELECT count(*) FROM identity.free_public_ask WHERE outcome = 'PUBLISHED'), (SELECT count(*) FROM identity.free_public_ask WHERE outcome = 'REFUSED'), (SELECT count(*) FROM serve.publication_key_cleanup_intent WHERE completed_at IS NULL), (SELECT count(*) FROM serve.publication_key_provision_intent), (SELECT count(*) FROM core.run_visibility_event) + (SELECT count(*) FROM core.publication_ref_tombstone))"; }
+pubused() { local c n po ev; c=$(pubcounts) || return 1; read -r n _ _ _ _ _ _ po ev <<<"$c"; ! grep -qE '^(CORPUS_KEK_PATH|PUBLICATION_KEY_STORE_PATH)=' "$A" || printf 'the API file names them; '; [ -z "$(find "$PUB" -maxdepth 1 -type d -name 'backup-*' 2>/dev/null)" ] || printf 'a PUBBACKUP holds them; '; [ "$(keyfiles)" = 0 ] || printf 'the store holds publication keys; '; [ "$n/$po/$ev" = 0/0/0 ] || printf 'the database holds publications; '; }
+staffkey() { psqlq "SELECT count(*) FROM staff.owner_designation d JOIN staff.subject s USING (staff_id) JOIN identity.mfa_factor f ON f.user_id = s.user_id JOIN identity.staff_webauthn_metadata m ON m.mfa_factor_id = f.mfa_factor_id WHERE d.active AND s.state = 'ACTIVE' AND m.user_id = f.user_id AND f.factor_type = 'passkey' AND f.state = 'active' AND f.verified_at IS NOT NULL AND f.backup_eligible = false AND f.backup_state = false AND f.user_verification_required AND f.relying_party_id = '$HOST' AND f.credential_origin = 'https://$HOST'"; }
+aion() { [ -f "$CAPI/dialectical-engine/apps/api/src/publication-check/gate-transport.ts" ] && [ -n "$(sed -n 's/^PREVIEW_PROVIDER_TEST_CONFIG_JSON=//p' "$A" | jq -r '.anthropic_budget_socket // empty' 2>/dev/null || true)" ]; }
+mailmode() { inv "$API" | sed -n 's/^PREVIEW_MAIL_MODE {"mode":"\([a-z-]*\)".*/\1/p' | tail -n 1; }
+pubbackup() { [ -n "$1" ] && [ -d "$1" ] && [ ! -L "$1" ] && [ "$(stat -c '%a %U' "$1")" = '700 root' ] && ( cd "$1" && sha256sum -c --quiet online.sha256 > /dev/null 2>&1 ) && [ "$(tar -tf "$1/online-keys.tar" 2>/dev/null | grep -cxF -e "${KP#/}" -e "${PS#/}/" || true)" = 2 ] && tar -xOf "$1/online-keys.tar" "${KP#/}" 2>/dev/null | cmp -s - "$KP"; }
+apinew() { local v s; [ "$(systemctl is-active "$API" || true)" = active ] || return 1; v=$(systemctl show -p ExecMainStartTimestamp --value "$API"); [ -n "$v" ] && [ "$v" != n/a ] || return 1; s=$(date -d "$v" +%s 2>/dev/null) || return 1; [ "$s" -gt "$(stat -c %Y "$A")" ]; }
+pubprobe() { ( cd "$CAPI/dialectical-engine" && runuser -u "$AU" -- /usr/bin/env -i PATH=/usr/bin:/bin "$N" --import tsx --input-type=module -e 'const { default: pg } = await import("pg"); const { assertPublicationCleanupDatabaseRole: check } = await import("./packages/db/src/publication.ts"); let t = ""; for await (const c of process.stdin) t += c; const m = /^PUBLICATION_CLEANUP_DATABASE_URL=(\S+)$/.exec(t.trim()); if (m === null) { console.log("no line to try"); process.exit(1); } const code = (e) => /^[A-Z0-9_]{1,40}$/.test(String(e?.code)) ? e.code : "no code"; const pool = new pg.Pool({ connectionString: m[1], max: 1, connectionTimeoutMillis: 5000 }); let out = "accepted"; try { (await pool.connect()).release(); } catch (e) { out = e?.code === "28P01" ? "the database refuses its password" : e?.code === "28000" ? "pg_hba.conf does not let it in" : "it does not connect (" + code(e) + ")"; } if (out === "accepted") { try { await check(pool); } catch (e) { out = "it signs in, but the API role check refuses it" + (e?.message === "PUBLICATION_CLEANUP_DATABASE_ROLE_INVALID" ? "" : " (" + code(e) + ")"); } } await pool.end().catch(() => {}); console.log(out); process.exitCode = out === "accepted" ? 0 : 1;' ) < "$1"; }
 EOF
 } > "$M/names.sh.new"
 chmod 0600 "$M/names.sh.new"
@@ -1530,9 +1560,11 @@ with that upload's `rNN` filled in. If any later script says `NAMES_NOT_DONE`, t
 the file had; with `rNN` filled in, it names that upload. Nothing live changes. Run it when a step says the names file
 is from an earlier version of this guide: NAME3 and NAME5 (5.3, 5.5) need its `apistart`, and stop before they stop
 anything when the file has none; every step that restarts only the API (MAIL_ALLOW, MAIL_OPEN, MAIL_CLOSE, STAFFOFF,
-STAFFON, STAFFMAIN, ASKS_OPEN, ASKS_CLOSE, BUYERS, PAY_SWITCH and PAY_BACK) needs its `upfail`, and stops, with nothing changed,
+STAFFON, STAFFMAIN, ASKS_OPEN, ASKS_CLOSE, BUYERS, PAY_SWITCH, PAY_BACK, PUBON and PUBOFF) needs its `upfail`, and stops, with nothing changed,
 when the file has none. On a server whose names file was written before `upfail` came, run LOCKS0 once, with `rNN`
-left as it is, before the next of those steps, NAME3 or NAME5.
+left as it is, before the next of those steps, NAME3 or NAME5. Every step of 5.9 (public debates) needs the names
+file's publishing helpers (`pubprobe` and the others below), and stops, with nothing changed, when the file has none:
+run LOCKS0 once more, with `rNN` left as it is, before the first of them.
 
 If LOCKS0's last line is `NAMES_NOT_DONE`, the file was written already. Fix what the line names (when it names the
 release: the first line of the file, with `nano`, or LOCKS0 again with the right `rNN`), then run CLOSED (3.1). A
@@ -1566,6 +1598,21 @@ What the helpers do, in short:
 - `RUNAPI` runs one of the API's billing tools as the API's user, with the API's settings.
 - `modecheck` asks the egress proxy which form it runs in; `swap` replaces the payment lines of the API file;
   `livedrop` and `sandboxdrop` put the egress proxy in its live or its sandbox form.
+- Publishing's (5.9), each only reading: `KP`, `PS`, `PUB`, `KF`, `LF`, `BF`, `CLN` and `PDROP` are its names (the
+  corpus key, the key store, its folder of copies, the two kept lines, the kept clean-up line, the newest backup's
+  name, the clean-up login and the store's drop-in). `pubstate` says A, B or C for an API file as the release guide's
+  PRECHECK does. `keyok` and `storeok` check the corpus key and the store as the code checks them; `storewrite` asks
+  whether the API's unit may write the store; `keyfiles` counts the publication keys in it; `pubapart` names any key,
+  store or the restore fence that the two would overlap (the code refuses each). `pubrole` names what the API's role
+  check would refuse in the clean-up login (nothing, when all is right); `pubhba` reads the first `pg_hba.conf` line
+  that would let a login in; `pubcounts` counts the database's publications; `pubused` names what has used a corpus
+  key and a store already (the API file, a PUBBACKUP, the store's keys, the database's publications), and prints
+  nothing when nothing has; `staffkey` counts the Owner's working staff keys under the name the site answers as
+  (PWOFF1's count); `aion` says whether the AI check for publication and reports is on (STAFFCHECK's rule);
+  `mailmode` reads the running API's mail mode; `pubbackup` checks one backup folder of PUBBACKUP; `apinew` says
+  whether the running API started after the API file's last change, so that it runs on the file as it is now;
+  `pubprobe` tries a clean-up line as the API will: as the API's user, with the release's own role check, printing one
+  plain answer and never the line.
 
 ### 3.1 Check that every lock is closed (read-only)
 
@@ -2040,6 +2087,8 @@ These wait in the database; nothing is lost. This holds on both names, during th
 payments are real (part 7). The site password keeps it small: only people who know it can see a published debate.
 
 **What still happens by itself:**
+On this server the first two points need publishing on (5.9): until PUBON, no debate is public, no Free debate goes
+public, and the Report button has nothing to act on.
 - **Free debates go public.** On the Free plan, a finished debate goes public by itself when two AI checks allow it,
   in this order: the end-of-debate check (below), then the AI check for publication. The page tells the person this
   before they ask. When STAFFCHECK (1.6) says `the AI check for publication and reports: off`, or a check cannot answer
@@ -2746,8 +2795,10 @@ the page says "Team tools are locked…" (Instrumentele echipei sunt blocate…)
 within the 15 minutes. If the browser refuses the key twice, ask.
 
 **6. Verify, and check.** On the Team page press **Verify security key for team access** (Verifică cheia de
-securitate pentru accesul echipei) and touch the key. The page now shows your access. Open public review and check
-that a published debate shows **Hide now** (do not press it unless you mean it). Then, as root, run STAFFDB (1.6)
+securitate pentru accesul echipei) and touch the key. The page now shows your access. In **Public debates under
+review** (Dezbateri publice în curs de verificare), paste a published debate's public link into **The debate's public
+link** (Linkul public al dezbaterii) and press **Open** (Deschide): check that it shows **Hide now** (Ascunde acum),
+and do not press it unless you mean it. While no debate is public (before 5.9), skip this check. Then, as root, run STAFFDB (1.6)
 again: expect a key line for the new name, like `dezbatere.ro https://dezbatere.ro 1`, beside the old one for the
 test name.
 
@@ -3378,6 +3429,659 @@ Then come the NETOPIA checks of 1.1 and part 7, on a later day. Every part-7 scr
 PAY_SWITCH the test-mode note leaves the open pages by itself. Close the window as 5.8 says ("Closing the window").
 With 6b open, close it before part 7 as 6b.6 says: PAY_SWITCH refuses while the site is open or asks are open.
 
+### 5.9 Public debates: publishing switched on, behind the site password
+
+**In plain words.** Today nothing on this server can become public. The API file's `PUBLICATION_ENABLED` line is not
+`true`, and the file names no key for public debates, so the API says `[PUBLICATION_CUSTODY_NOT_CONFIGURED]` in its
+journal at every start. The home page's **Public** tab (Dezbateri publice) stays empty, no finished Free debate goes
+public, nobody can press Publish, and the Report button has nothing to act on.
+
+Switching publishing on changes this for the people who know the site password:
+- A Free debate **started from then on** goes public by itself once it has finished, when the end-of-debate check and
+  then the AI check for publication allow it (5.1b says how each works). The line its asker already sees under the
+  question box, "On the Free plan your question and its debate are public. Don't include personal details." (În planul
+  Gratuit, întrebarea dvs. și dezbaterea ei sunt publice. Nu includeți date personale.), becomes true.
+- An owner can make any other debate of theirs public with **Publish…** (Publicați…) on its older page `/debate/<id>`,
+  after a tick box and a security check. No V4 page has this button.
+- Public debates are listed on the home page's **Public** tab and read at `/public/debate/<id>`. On one, a signed-in
+  person can dig, write a report on their own allowance, and press **Report a problem** (Raportați o problemă).
+- A dig on a public debate goes public too: once its AI check allows it, it changes that public page for everyone,
+  under the digger's pseudonym, and it cannot be taken back (the Terms say so). A dig of a private debate stays
+  private.
+- More mail goes out, through the same mail plan as other account mail: statements of reasons and answers to the
+  people who report (the EU's Digital Services Act asks for both), and notices to the staff. In allow-list mode (4.2)
+  they reach only the four allow-listed addresses; a refused one is tried again and given up after 20 tries.
+- Deleting an account keeps its public debates and takes its pseudonym off them, as the Terms say. A data export holds
+  the reports the person sent.
+
+For you, the Owner: on the Team page (`/admin/team`), **Public debates under review** (Dezbateri publice în curs de
+verificare) and the reports have something to act on, with your staff key (5.7). That panel lists only the hidden
+debates: to reach **Hide now** (Ascunde acum) for a public one, you paste its public link into the panel (step 7.5).
+The AI checks use more of the Anthropic gate's day, and the keys of public debates live in a new key store on the
+server, which a backup must hold (step 4).
+
+**What does not change.** The site password stays on: only people who know it can read a public debate. Someone with
+the password but no account sees no list on the home page, but can open a public debate whose address they have. The
+NETOPIA review window (5.8) never opens a debate. Asks, payments, the mail settings, the name, and the website's and
+the runner's files stay as they are. No upload is needed.
+
+**The debates that exist already.** None of them goes public by itself, not even a Free debate that finishes after the
+switch: a Free debate is marked to go public only when it is started while publishing is on. Free debates started
+before the switch showed the line above, but they stay private; only their owner's Publish makes one public. A dig of
+a private debate never goes public, the ones that exist already included: only a dig on a public debate changes a
+public page (above).
+
+**What cannot be undone once a debate has been public.**
+- Its owner cannot take it back: the site has no "unpublish", for one debate or for all. Only staff **Hide now** (5.7),
+  or the Report button's AI check when it agrees with a report (5.1b), takes it off the list and its page, and the
+  end-of-debate check may delete it (5.1b).
+- Anyone who read it may have kept a copy.
+- Deleting its owner's account keeps it public, without the pseudonym.
+- Its key stays in every PUBBACKUP made while it was public; the key store itself keeps it until the debate is
+  deleted.
+- Switching publishing off (5.9b) only stops the public pages: every public debate stays recorded as public, and
+  switching on again shows them again.
+
+**Who does what.** Every server step below is yours: you run it as root, the ordinary way ("How to run a server
+step"), because only you have the server. None asks you to type a key or a password: the scripts make the corpus key
+and the clean-up login's password on the server, and no script shows either of them, to you or to anyone. The tries
+in the browser (step 7) are yours too: they need your accounts behind the site password, and only you decide what may
+become public. Claude runs nothing on the server.
+
+**Before you start.**
+- No upload is under way or being prepared: not from an upload's preparation (1.8, where SB1 copies the API file) to
+  its end (part 2, step 33). PRECHECK holds the old release's files to SB1's copies, and the way back starts the old
+  release from them. This holds for the upload that brought the running release too: until its step 33, its rbD-B
+  can still start the release before, from that release's own file, which has none of publishing's lines. PUBON
+  refuses while a newer upload's names file is in `/root/preview-archive` (its preparation has begun); the rest of
+  this rule no script can see, so keep it yourself.
+- LOCKS0 (3.0) ran with this version of the guide, so the names file has publishing's helpers. Every step below stops,
+  with nothing changed, without them.
+- 5.7 is done: the staff screens are on, and your staff key works under the name the site answers as. Without it,
+  nobody can hide a public debate by hand. PUBON refuses.
+- STAFFCHECK (1.6) says `the AI check for publication and reports: on`, and AICHECK (6b.1) ends with `AICHECK_DONE`.
+  Without the check nothing can pass it. PUBON refuses while it is off.
+- The site password is on. PUBON refuses otherwise.
+
+**Your decisions, before you start.**
+1. Whether to switch on now at all. Once one debate has been public, the list above holds.
+2. What to tell people. Those whose Free debates were started before the switch saw the line that Free debates are
+   public, and theirs stay private. Anyone who digs on a public debate changes that page for everyone, under their
+   pseudonym, for good, once the dig's check allows it.
+3. Mail: statements of reasons and answers to reports reach a friend only in open mode (4.3), or when the friend's
+   address is one of the four allow-listed ones.
+4. How often to run PUBBACKUP again (step 4): a debate that went public since the last PUBBACKUP has its key only in
+   the live key store, in no backup, until PUBBACKUP runs again.
+5. Whether a copy of those backups should also be kept off the server. They hold every key of the site, so that is a
+   decision of its own: ask.
+6. Before an upload while publishing is off with the keys kept (state B, 5.9b): PUBON first, which the upload's
+   PRECHECK accepts and which shows the public debates again, or ask for the reviewed check that state B needs.
+7. Old PUBBACKUP folders: each holds every key and every database, and no step removes one. Keep at least the newest
+   one (the one PUBCHECK checks); ask before you remove any. PUBBACKUP says when the free space falls below what an
+   upload's PRECHECK needs.
+
+**1. Where the server stands (PUBCHECK).** It only reads. Run it first, and again whenever you want to know where
+publishing stands.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# PUBCHECK: where the server stands for public debates (read-only): the API file's publication lines, the corpus key, the key store and the API's permission to write it, the clean-up login and its line, the backup, the staff screens, the AI check, mail, the site password and what the database holds. Prints names, states, counts and yes or no, never a key, a password or an address.
+declare -F pubprobe >/dev/null || { echo "PUBCHECK_NOT_DONE: the names file is from an earlier version of this guide (no pubprobe); nothing changed: run LOCKS0 (3.0) again, then PUBCHECK"; exit 1; }
+TODO=''; todo() { case " $TODO " in *" $1 "*) ;; *) TODO="$TODO $1";; esac; }
+first() { echo "first, elsewhere in this guide: $1"; }
+BAD=''; bad() { echo "NOT AS THE CODE NEEDS: $1"; BAD=yes; }
+ST=$(pubstate "$A")
+case "$ST" in A) W='on';; B) W='off, with the keys kept (5.9b)';; *) W='off, nothing of it set up';; esac
+echo "release $LABEL; publishing in the API file: $W (state $ST; lines: PUBLICATION_ENABLED $(grep -c '^PUBLICATION_ENABLED=' "$A" || true), CORPUS_KEK_PATH $(grep -c '^CORPUS_KEK_PATH=' "$A" || true), PUBLICATION_KEY_STORE_PATH $(grep -c '^PUBLICATION_KEY_STORE_PATH=' "$A" || true), PUBLICATION_CLEANUP_DATABASE_URL $(grep -c '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A" || true))"
+grep -q PUBLICATION_CLEANUP_DATABASE_URL "$CAPI/dialectical-engine/packages/register/src/runtime-environment.ts" || bad "this release does not know the publication settings"
+grep -q "'CORPUS_KEK_PATH'" "$L/backup.mjs" && grep -q '^export function scramSha256Verifier' "$L/jit-creator-actor.mjs" || bad "the tools folder lacks the backup of the corpus key or the password helper (the upload's tools-folder swap)"
+[ "$(grep -c '^CONTENT_ENCRYPTION_ENABLED=' "$A" || true)" = 1 ] && grep -qx 'CONTENT_ENCRYPTION_ENABLED=true' "$A" || bad "the API file does not hold CONTENT_ENCRYPTION_ENABLED=true once, and publishing needs it"
+[ "$(grep -c '^PUBLICATION_ENABLED=' "$A" || true)" -le 1 ] && [ "$(grep -c '^PUBLICATION_ENABLED=' "$A" || true)" = "$(grep -cxE 'PUBLICATION_ENABLED=(true|false)' "$A" || true)" ] || bad "the API file's PUBLICATION_ENABLED line is not one line =true or =false"
+[ "$(grep -c '^CORPUS_KEK_PREVIOUS_PATH=' "$A" || true)" = 0 ] || bad "the API file holds CORPUS_KEK_PREVIOUS_PATH (a change of the corpus key, which no step of this guide makes)"
+for KV in "CORPUS_KEK_PATH=$KP" "PUBLICATION_KEY_STORE_PATH=$PS"; do [ "$(grep -c "^${KV%%=*}=" "$A" || true)" = 0 ] || grep -qxF "$KV" "$A" || bad "the API file's ${KV%%=*} line names another path than this guide's"; done
+[ "$(dirname "$(sed -n 's/^KEK_PATH=//p' "$A")")" = "${KP%/*}" ] && [ ! -L "${KP%/*}" ] && [ "$(stat -c '%a %U' "${KP%/*}")" = "700 $AU" ] || bad "${KP%/*} is not the API's own 0700 key folder, the one its KEK_PATH names"
+U=$(pubused) || { echo "PUBCHECK_NOT_DONE: the database is unreadable: ask"; exit 1; }; U=${U%; }
+if [ ! -e "$KP" ] && [ -z "$U" ]; then echo "corpus key: not made yet"; todo PUBKEYS; elif [ ! -e "$KP" ]; then bad "the corpus key $KP is missing, although publishing used it already ($U): a new one would not open what the old one locked, and no step of 5.9 makes one then; the old one is in the newest PUBBACKUP"; elif keyok; then echo "corpus key: made, as the code needs (the API's user, 0600, 32 bytes, one link, in its 0700 folder)"; else bad "the corpus key $KP is there, but is not the API user's 0600 file of 32 bytes with one link"; fi
+for K in KEK_PATH BLIND_INDEX_KEY_PATH AUDIT_SOURCE_IP_SALT_PATH SUPPORT_KEK_PATH RECORDS_KEY_PATH; do V=$(sed -n "s/^$K=//p" "$A"); [ -z "$V" ] || [ ! -e "$KP" ] || ! cmp -s "$V" "$KP" || bad "the corpus key holds the same bytes as the key $K names"; done
+[ -d "${PS%/*}" ] && [ ! -L "${PS%/*}" ] || bad "${PS%/*} is not a folder"
+if [ ! -e "$PS" ] && [ -z "$U" ]; then echo "key store: not made yet"; todo PUBKEYS; elif [ ! -e "$PS" ]; then bad "the key store $PS is missing, although publishing used it already ($U): no step of 5.9 makes a new one then; the old one is in the newest PUBBACKUP"; elif storeok; then echo "key store: made, as the code needs (the API's user and group, 0700), with $(keyfiles) publication keys in it"; else bad "the key store $PS is there, but is not the API's 0700 folder"; fi
+AP=$(pubapart); [ -z "$AP" ] || bad "the corpus key or the key store is not apart from: $AP(the code refuses that)"
+if storewrite; then echo "the API may write the key store: yes"; else echo "the API may write the key store: no"; todo PUBKEYS; fi
+[ -s "$KF" ] && [ "$(grep -c '' "$KF")" = 2 ] && grep -qxF "CORPUS_KEK_PATH=$KP" "$KF" && grep -qxF "PUBLICATION_KEY_STORE_PATH=$PS" "$KF" || todo PUBKEYS
+RB=$(pubrole) || { echo "PUBCHECK_NOT_DONE: the database is unreadable: ask"; exit 1; }
+if [ -z "$RB" ]; then echo "the clean-up login: there, and the API's role check would accept its roles and grants"; else bad "the clean-up login $CLN is not as the API's role check needs ($RB): changing its grants is a reviewed step"; fi
+HB=$(pubhba "$CLN" || echo unread); HR=$(pubhba debateai_prod_api_runtime || echo unread)
+if [ "$HB" = "$HR" ] && [ "${HB%% *}" = scram-sha-256 ]; then echo "pg_hba.conf lets the clean-up login in as it lets the API's own login in: yes"; else bad "pg_hba.conf does not let the clean-up login in as it lets the API's own login in"; fi
+echo "the clean-up login: password set $(psqlq "SELECT CASE WHEN rolpassword IS NULL THEN 'no' ELSE 'yes' END FROM pg_authid WHERE rolname = '$CLN'" || echo unread); its password ends $(psqlq "SELECT CASE WHEN rolvaliduntil IS NULL OR rolvaliduntil = 'infinity' THEN 'never' WHEN rolvaliduntil <= clock_timestamp() THEN 'already' ELSE 'at a later date' END FROM pg_roles WHERE rolname = '$CLN'" || echo unread); signed in now $(psqlq "SELECT count(*) FROM pg_stat_activity WHERE usename = '$CLN'" || echo unread)"
+if grep -q '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A"; then W=$(pubprobe <(grep '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A") || true); echo "the API file's clean-up line, tried as the API uses it: $W"; [ "$W" = accepted ] || bad "the API file's clean-up line is not accepted"
+elif [ -s "$LF" ]; then W=$(pubprobe "$LF" || true); echo "the clean-up line PUBLOGIN kept, tried as the API will use it: $W"; [ "$W" = accepted ] || todo PUBLOGIN
+else echo "the clean-up line: not made yet"; todo PUBLOGIN; fi
+OB=$(cat "$BF" 2>/dev/null || true)
+if pubbackup "$OB"; then echo "the newest PUBBACKUP holds this corpus key and the key store: yes; publication keys made since then: $(find "$PS" -type f -name publication-key.v1.json -newer "$OB/online.sha256" 2>/dev/null | grep -c . || true)"; else echo "a PUBBACKUP that holds this corpus key and the key store: no"; todo PUBBACKUP; fi
+if grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" && [ "$(staffkey || echo 0)" -ge 1 ] 2>/dev/null; then echo "the staff screens, and a working staff key of the Owner under $HOST: yes"; else first "5.7: the staff screens on, and your staff key working under $HOST (until then nobody can hide a public debate by hand)"; fi
+GST=$(gs "$GAN" "$PAN" 2>/dev/null | jq -r '"\(.state), window open \(.window_open)"' 2>/dev/null || true)
+if aion; then echo "the AI check for publication and reports: on, through the Anthropic gate (the gate: ${GST:-did not read}; AICHECK, 6b.1, reads more)"; else first "STAFFCHECK (1.6): the AI check for publication and reports is off, so nothing could pass it"; fi
+MM=$(mailmode || true); echo "mail: ${MM:-did not read} (statements of reasons and answers to reports go out like other account mail)"
+PW=$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login" || true)
+if [ "$PW" = 401 ]; then echo "the site password: on"; else first "PWON (8.4): the site does not ask for the password (its Log in page answered $PW), and publishing goes on only behind it"; fi
+if apinew; then echo "the running API started on the API file as it is now: yes"; else bad "the running API did not start on the API file as it is now: a step that changes the file stopped before its restart ended (PUBON, PUBOFF or another one), so the API may serve another state than the file says"; fi
+C=$(pubcounts) || { echo "PUBCHECK_NOT_DONE: the database is unreadable: ask"; exit 1; }
+read -r NS NP NE FW FP FR CO PO EV <<<"$C"
+echo "the database: publications ever made $NS (public now, hidden ones included, $NP); Free debates waiting to go public $FW, gone public $FP, kept private $FR; key clean-ups waiting $CO; publications being made $PO"
+KC=$(keyfiles); echo "publication keys in the store: $KC; the database expects $NE"
+[ "$KC" -ge "$NE" ] || echo "the store holds fewer keys than the database expects: a key is lost, or a clean-up is under way; run PUBCHECK again in a minute, and if it says this again, ask (PUBON refuses meanwhile)"
+T=''; for S in PUBKEYS PUBLOGIN PUBBACKUP; do case " $TODO " in *" $S "*) T="$T $S";; esac; done; [ "$ST" = A ] || T="$T PUBON"
+if [ -n "$T" ]; then echo "still to do, in this order:$T"; else echo "publishing is on, and nothing of 5.9 is left to do"; fi
+[ -z "$BAD" ] || { echo "PUBCHECK_NOT_DONE: something is not as the code needs (the NOT AS THE CODE NEEDS lines above); no step of 5.9 changes it: ask"; exit 1; }
+echo PUBCHECK_DONE
+exit 0
+```
+
+On this server today expect `publishing in the API file: off, nothing of it set up (state C; …)`, `corpus key: not made
+yet`, `key store: not made yet`, `the API may write the key store: no` (or `yes`), the clean-up login `there, and the
+API's role check would accept its roles and grants`, `the clean-up line: not made yet`, `still to do, in this order:
+PUBKEYS PUBLOGIN PUBBACKUP PUBON`, then `PUBCHECK_DONE`. Read the other lines:
+- `first, elsewhere in this guide: …` names what another part of this guide must do before PUBON: 5.7, STAFFCHECK
+  and AICHECK, or PWON. PUBKEYS, PUBLOGIN and PUBBACKUP may run before it: they change nothing on the site.
+- `NOT AS THE CODE NEEDS: …` means the server is not as this section expects, in a way no step here changes (for
+  example the clean-up login's grants, `pg_hba.conf`, or `CONTENT_ENCRYPTION_ENABLED`). The last line is then
+  `PUBCHECK_NOT_DONE`: ask, and give that line. Two such lines need you at once: `the corpus key … is missing,
+  although publishing used it already` (or the same for the key store), and `the running API did not start on the
+  API file as it is now`. For both, run no other step of 5.9 before you have asked.
+- `the clean-up login: password set …` says whether the login had a password before PUBLOGIN (no guide records one),
+  whether it ends, and how many sessions it has now (0 before PUBON; up to 4 after it).
+- `the database: …` and `publication keys in the store: …` are all 0 before the switch. After it, they count what
+  went public.
+
+**2. The corpus key and the key store (PUBKEYS).** The corpus key is the one key that locks the keys of every public
+debate. The script makes it as 32 random bytes, written as the API's user straight into its file, so nobody sees it:
+`/etc/debateai-v3-preview/api/corpus-kek.bin`, mode `0600`, beside the API's other keys in its own `0700` folder. The
+code refuses a corpus key with any other owner, mode, size or a second name (its support-keys check at start wants
+exactly `0600`, also with a custody group set), and one with the bytes of another key.
+The key store is an empty folder, `/var/lib/debateai-v3-preview/api/publication-keys`, the API's own, `0700`: the API
+writes one key file into it for each debate that goes public. Both lie apart from every other key and store, and
+outside the restore fence's folder (`…/api/restore-fence`), neither inside it nor above it: the code refuses
+otherwise, and the script checks the same rule first. The API may write only the folders its unit lists; when its
+unit does not list the store, the script adds a drop-in that lists it, `zzzzzzzzzz-keys-publication.conf`, and
+reloads systemd. The running API is unchanged until its next start (PUBON). Run it again at any time: it never makes a
+key that exists, and changes nothing that is already right. It makes the key and the store only while nothing has
+used one yet: once the API file names them, a PUBBACKUP holds them, or the store or the database holds a
+publication, a new key would not open what the old one locked. If the key or the store is missing then, PUBKEYS
+stops, makes nothing, and you ask: the old ones are in the newest PUBBACKUP.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# PUBKEYS: the corpus key and the publication key store, made on the server for the API's user (nobody sees the key), apart from every other key and outside the restore fence's folder, and the API's permission to write the store from its next start. Nothing restarts; nothing on the site changes.
+declare -F pubprobe >/dev/null || { echo "PUBKEYS_NOT_DONE: the names file is from an earlier version of this guide (no pubprobe); nothing changed: run LOCKS0 (3.0) again, then PUBKEYS"; exit 1; }
+[ -n "${AU:-}" ] && [ "$AU" != root ] && [ -n "${AGRP:-}" ] || { echo "PUBKEYS_NOT_DONE: the names file names no API user, or root; nothing changed: ask"; exit 1; }
+[ "$(dirname "$(sed -n 's/^KEK_PATH=//p' "$A")")" = "${KP%/*}" ] && [ ! -L "${KP%/*}" ] && [ "$(stat -c '%a %U' "${KP%/*}")" = "700 $AU" ] || { echo "PUBKEYS_NOT_DONE: ${KP%/*} is not the API's own 0700 key folder, the one its KEK_PATH names; nothing changed: ask"; exit 1; }
+[ -d "${PS%/*}" ] && [ ! -L "${PS%/*}" ] || { echo "PUBKEYS_NOT_DONE: ${PS%/*} is not a folder; nothing changed: ask"; exit 1; }
+for KV in "CORPUS_KEK_PATH=$KP" "PUBLICATION_KEY_STORE_PATH=$PS"; do [ "$(grep -c "^${KV%%=*}=" "$A" || true)" = 0 ] || grep -qxF "$KV" "$A" || { echo "PUBKEYS_NOT_DONE: the API file's ${KV%%=*} line names another path than this guide's; nothing changed: ask"; exit 1; }; done
+AP=$(pubapart); [ -z "$AP" ] || { echo "PUBKEYS_NOT_DONE: the corpus key or the key store would not be apart from: $AP(the code refuses that); nothing changed: ask"; exit 1; }
+[ -d "${PDROP%/*}" ] || { echo "PUBKEYS_NOT_DONE: the API's template drop-in folder is missing (this is not the template layout); nothing changed: ask"; exit 1; }
+[ ! -e "$KP.new" ] || { echo "PUBKEYS_NOT_DONE: $KP.new exists (an earlier run stopped half-way); nothing changed: ask"; exit 1; }
+MISS=''; [ -e "$KP" ] || MISS='the corpus key'; [ -e "$PS" ] || MISS="${MISS:+$MISS and }the key store"
+if [ -n "$MISS" ]; then
+  U=$(pubused) || { echo "PUBKEYS_NOT_DONE: the database is unreadable; nothing changed: ask"; exit 1; }
+  [ -z "$U" ] || { echo "PUBKEYS_NOT_DONE: $MISS is missing, although publishing used it already (${U%; }); nothing changed: a new one would not open what the old one locked, and the old one is in the newest PUBBACKUP: ask"; exit 1; }
+fi
+if [ -e "$KP" ]; then
+  keyok || { echo "PUBKEYS_NOT_DONE: $KP is there, but is not the API user's 0600 file of 32 bytes with one link; nothing changed: ask"; exit 1; }
+  echo "corpus key: there already, as the code needs; it is never made again"
+else
+  runuser -u "$AU" -- /bin/sh -c 'umask 0177; set -C; head -c 32 /dev/urandom > "$1.new" && mv -n "$1.new" "$1"' sh "$KP" || { rm -f "$KP.new"; echo "PUBKEYS_NOT_DONE: the corpus key was not made: ask"; exit 1; }
+  keyok || { echo "PUBKEYS_NOT_DONE: the corpus key was made, but is not the API user's 0600 file of 32 bytes with one link: ask"; exit 1; }
+  echo "corpus key: made in $KP (the API's user, 0600, 32 bytes, one link); nobody saw it"
+fi
+for K in KEK_PATH BLIND_INDEX_KEY_PATH AUDIT_SOURCE_IP_SALT_PATH SUPPORT_KEK_PATH RECORDS_KEY_PATH; do V=$(sed -n "s/^$K=//p" "$A"); [ -z "$V" ] || ! cmp -s "$V" "$KP" || { echo "PUBKEYS_NOT_DONE: the corpus key holds the same bytes as the key $K names: ask"; exit 1; }; done
+if [ -e "$PS" ]; then
+  storeok || { echo "PUBKEYS_NOT_DONE: $PS is there, but is not the API's 0700 folder: ask"; exit 1; }
+  echo "key store: there already, with $(keyfiles) publication keys in it"
+else
+  install -d -o "$AU" -g "$AGRP" -m 0700 "$PS" && storeok || { echo "PUBKEYS_NOT_DONE: the key store was not made as the API's 0700 folder: ask"; exit 1; }
+  echo "key store: made in $PS (the API's user and group, 0700, empty)"
+fi
+if storewrite; then echo "the API may write the key store already: no drop-in needed"
+else
+  { ( umask 022; printf '%s\n' '# The publication key store (MAIN-SITE.md 5.9, PUBKEYS): under ProtectSystem=strict the API writes only the folders its unit names. The leading "-" keeps the unit starting where the folder does not exist. It adds this one path and nothing else.' '[Service]' "ReadWritePaths=-$PS" > "$PDROP.new" ) && mv -f "$PDROP.new" "$PDROP" && systemctl daemon-reload; } || { rm -f "$PDROP.new"; echo "PUBKEYS_NOT_DONE: the drop-in was not put in place, or the reload failed: ask"; exit 1; }
+  storewrite || { echo "PUBKEYS_NOT_DONE: after the drop-in and the reload, the API's unit still does not list $PS as a write path: ask"; exit 1; }
+  echo "the API may write the key store from its next start (the drop-in $PDROP; the running API is unchanged)"
+fi
+{ install -d -o root -g root -m 0700 "$PUB" && ( umask 077; printf 'CORPUS_KEK_PATH=%s\nPUBLICATION_KEY_STORE_PATH=%s\n' "$KP" "$PS" > "$KF.new" ) && mv -f "$KF.new" "$KF"; } || { echo "PUBKEYS_NOT_DONE: the two lines were not kept in $KF: ask"; exit 1; }
+echo "the two lines for the API file are kept in $KF (PUBBACKUP and PUBON read them)"
+echo PUBKEYS_DONE
+exit 0
+```
+
+Expect the `corpus key: made …` and `key store: made …` lines, one line about the API's permission, the line about the
+two kept lines, then `PUBKEYS_DONE`. Run again, it says `there already` for both. A `PUBKEYS_NOT_DONE` that says `nothing
+changed` changed nothing; any other one: ask before anything else. `… is missing, although publishing used it
+already`: ask at once, and run no other step of 5.9 first. The way back, before PUBON: none is needed. The key and the
+empty store are read by nothing while the API file does not name them; to take the drop-in out again, ask.
+
+**3. The clean-up login's password and its line (PUBLOGIN).** The API uses a login of its own,
+`debateai_prod_api_publication_cleanup`, to destroy the key of a public debate that comes down or is deleted. The login
+exists, its line in `pg_hba.conf` exists, and PUBCHECK reads whether its roles and grants are as the API's start check
+needs them. No guide records that it was ever given a password, and none records how the API's other logins first got
+theirs. What is known:
+- each of the API's logins is one line in the API file, all of one form: the login, its password, and the server's own
+  database over TLS on the server's loopback (the runner's guide, `deploy/preview-auth-dev/v1/README.md`, gives the same
+  form for the runner's login);
+- the one password this guide's tools set on this server, the staff recovery login's (5.7), is made on the server and
+  reaches the database only as a SCRAM verifier, never as the password itself
+  (`deploy/preview-lifecycle/v1/jit-creator-actor.mjs`);
+- the production password tool (`pnpm db:provision-principals`) cannot run on this server, and it would change every
+  login's password (the release guide's H0).
+
+So PUBLOGIN does it the way 5.7 does:
+1. makes a new random password on the server, which nobody sees or types;
+2. writes the line `PUBLICATION_CLEANUP_DATABASE_URL=…`: the API's own `DATABASE_URL`, with only the login and the
+   password changed, into a root-only file beside this guide's other copies (`clean-up line` below);
+3. sends the database only the SCRAM verifier of that password (with the same helper as 5.7), with no end date, as
+   the database's `postgres` administrator, with statement logging off for that one statement;
+4. tries the line as the API will use it: as the API's user, with the release's own role check (`pubprobe`).
+
+It changes nothing else on the login: no grant, no role. Nothing restarts, and nothing on the site changes: the API
+uses the line only from PUBON on. Run again, it changes nothing while its kept line still signs in. Before it makes a
+new password, it stops while anything is signed in as the login; a kept line it replaces is set aside, root-only.
+Once the API file names the line (after PUBON), it only tries it and never changes the password; when the kept line is
+missing or is not the API file's, it keeps the API file's line in its place, as PUBON reads the kept line after a
+PUBOFF.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# PUBLOGIN: a new password for the clean-up login, made on the server and sent to the database only as a SCRAM verifier (nobody sees or types it), and its line for the API file, kept root-only; then the line is tried as the API will use it. Nothing restarts; nothing on the site changes.
+declare -F pubprobe >/dev/null || { echo "PUBLOGIN_NOT_DONE: the names file is from an earlier version of this guide (no pubprobe); nothing changed: run LOCKS0 (3.0) again, then PUBLOGIN"; exit 1; }
+[ -f "$CAPI/dialectical-engine/packages/db/src/publication.ts" ] && grep -q '^export function scramSha256Verifier' "$L/jit-creator-actor.mjs" || { echo "PUBLOGIN_NOT_DONE: this release or the tools folder lacks what this step uses (the upload, with its tools-folder swap); nothing changed: ask"; exit 1; }
+RB=$(pubrole) || { echo "PUBLOGIN_NOT_DONE: the database is unreadable; nothing changed: ask"; exit 1; }
+[ -z "$RB" ] || { echo "PUBLOGIN_NOT_DONE: the clean-up login is not as the API's role check needs ($RB); changing its grants is a reviewed step; nothing changed: ask"; exit 1; }
+HB=$(pubhba "$CLN" || echo unread); HR=$(pubhba debateai_prod_api_runtime || echo unread)
+[ "$HB" = "$HR" ] && [ "${HB%% *}" = scram-sha-256 ] || { echo "PUBLOGIN_NOT_DONE: pg_hba.conf does not let the clean-up login in as it lets the API's own login in; nothing changed: ask"; exit 1; }
+if grep -q '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A"; then
+  W=$(pubprobe <(grep '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A") || true)
+  [ "$W" = accepted ] || { echo "PUBLOGIN_NOT_DONE: the API file names the clean-up login already, and its line is not accepted ($W); nothing changed: ask"; exit 1; }
+  echo "the API file names the clean-up login already, and its line signs in and passes the API's role check: the password stays"
+  if [ -e "$LF" ] && [ "$(stat -c '%a %U %h' "$LF")" = "600 root 1" ] && cmp -s <(grep '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A") "$LF"; then echo "the kept clean-up line is the API file's: nothing changed"; echo PUBLOGIN_DONE; exit 0; fi
+  install -d -o root -g root -m 0700 "$PUB"
+  SA=''
+  if [ -e "$LF" ]; then
+    SA=$LF.set-aside-$(date -u +%Y%m%dT%H%M%SZ); [ ! -e "$SA" ] || { echo "PUBLOGIN_NOT_DONE: $SA exists: run PUBLOGIN again a second later; nothing changed"; exit 1; }
+    { mv "$LF" "$SA" && chown root:root "$SA" && chmod 600 "$SA"; } || { echo "PUBLOGIN_NOT_DONE: the kept clean-up line was not set aside as $SA: ask"; exit 1; }
+  fi
+  { rm -f "$LF.new" && ( umask 077; grep '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A" > "$LF.new" ) && mv -n "$LF.new" "$LF"; } && [ ! -e "$LF.new" ] && [ "$(stat -c '%a %U %h' "$LF")" = "600 root 1" ] && cmp -s <(grep '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A") "$LF" || { rm -f "$LF.new"; echo "PUBLOGIN_NOT_DONE: the API file's clean-up line was not kept as $LF${SA:+ (the one before is set aside as $SA)}: ask"; exit 1; }
+  echo "the kept clean-up line was missing, or not the API file's, or kept with the wrong mode, owner or links: the API file's line is kept in $LF now (root, 0600)${SA:+; the one before is set aside as $SA (root, 0600)}"
+  echo PUBLOGIN_DONE; exit 0
+fi
+if [ -e "$LF" ]; then
+  W=$(pubprobe "$LF" || true); KM=$(stat -c '%a %U %h' "$LF")
+  if [ "$W" = accepted ] && [ "$KM" = "600 root 1" ]; then echo "the clean-up line is kept already, and it signs in and passes the API's role check: nothing changed"; echo PUBLOGIN_DONE; exit 0; fi
+fi
+[ "$(psqlq "SELECT count(*) FROM pg_stat_activity WHERE usename = '$CLN'" || true)" = 0 ] || { echo "PUBLOGIN_NOT_DONE: something is signed in as the clean-up login now; nothing changed: ask"; exit 1; }
+install -d -o root -g root -m 0700 "$PUB"
+if [ -e "$LF" ]; then
+  SA=$LF.set-aside-$(date -u +%Y%m%dT%H%M%SZ); [ ! -e "$SA" ] || { echo "PUBLOGIN_NOT_DONE: $SA exists: run PUBLOGIN again a second later; nothing changed"; exit 1; }
+  { mv "$LF" "$SA" && chown root:root "$SA" && chmod 600 "$SA"; } || { echo "PUBLOGIN_NOT_DONE: the kept clean-up line was not set aside as $SA: ask"; exit 1; }
+  if [ "$W" = accepted ]; then echo "the clean-up line kept before signs in, but is kept with the wrong mode, owner or links ($KM): it is set aside as $SA (root, 0600), and a new password is made"
+  else echo "the clean-up line kept before is not accepted ($W): it is set aside as $SA (root, 0600), and a new password is made"; fi
+fi
+rm -f "$LF.new"
+( umask 077; "$N" --input-type=module - "$A" "$LF.new" "$L/jit-creator-actor.mjs" 2>/dev/null <<'JS' | runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAtq -v ON_ERROR_STOP=1 -f - > /dev/null ) || { rm -f "$LF.new"; echo "PUBLOGIN_NOT_DONE: the password was not set (the API file's DATABASE_URL is not one readable line for the API's own login, or the database refused): ask"; exit 1; }
+import { closeSync, fsyncSync, openSync, readFileSync, writeSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
+// Every failure ends with a code and no words: the text of an error could hold the API's own database line.
+try {
+  const [api, out, actor] = process.argv.slice(-3);
+  const { scramSha256Verifier } = await import(pathToFileURL(actor).href);
+  const lines = readFileSync(api, 'utf8').split('\n').filter(line => line.startsWith('DATABASE_URL='));
+  if (lines.length !== 1) process.exit(2);
+  const url = new URL(lines[0].slice('DATABASE_URL='.length));
+  if (url.username !== 'debateai_prod_api_runtime') process.exit(3);
+  const password = randomBytes(32).toString('hex');
+  url.username = 'debateai_prod_api_publication_cleanup';
+  url.password = password;
+  const fd = openSync(out, 'wx', 0o600);
+  try { writeSync(fd, `PUBLICATION_CLEANUP_DATABASE_URL=${url.href}\n`); fsyncSync(fd); } finally { closeSync(fd); }
+  const verifier = scramSha256Verifier(Buffer.from(password, 'utf8'));
+  process.stdout.write(["SET log_statement = 'none';", 'SET log_min_duration_statement = -1;', "SET log_min_error_statement = 'panic';", "SET password_encryption = 'scram-sha-256';",
+    `ALTER ROLE debateai_prod_api_publication_cleanup PASSWORD '${verifier}' VALID UNTIL 'infinity';`, ''].join('\n'));
+} catch { process.exit(9); }
+JS
+mv -n "$LF.new" "$LF"
+[ ! -e "$LF.new" ] && [ "$(stat -c '%a %U %h' "$LF")" = "600 root 1" ] && [ "$(grep -c '' "$LF")" = 1 ] && grep -qE '^PUBLICATION_CLEANUP_DATABASE_URL=postgres(ql)?://' "$LF" || { echo "PUBLOGIN_NOT_DONE: the new password is set, but its line was not kept as $LF: run PUBLOGIN again (it makes another one)"; exit 1; }
+W=$(pubprobe "$LF" || true)
+[ "$W" = accepted ] || { echo "PUBLOGIN_NOT_DONE: the new password is set and its line kept, but the line is not accepted ($W): ask"; exit 1; }
+echo "the clean-up login: a new password, never shown; its line is kept in $LF (root, 0600); it signs in as the API will, and passes the API's role check"
+echo PUBLOGIN_DONE
+exit 0
+```
+
+Expect the `the clean-up login: a new password …` line, then `PUBLOGIN_DONE`. A `PUBLOGIN_NOT_DONE: the password was
+not set` prints nothing more, by design: the error's own words could hold the API's database line. The answers its
+try can give:
+`accepted`; `the database refuses its password`; `pg_hba.conf does not let it in`; `it signs in, but the API role
+check refuses it` (with a code when the check could not even read what it reads, for example `42501` for a login
+without the clean-up role); `it does not connect (<code>)`. Anything but `accepted`: ask, and give the line. The password is
+in the kept line only, and from PUBON on in the API file; nobody needs to know it, and no step ever prints it. The
+way back, before PUBON: none is needed. Nothing uses the login until the API file names it.
+
+**4. A backup that holds the new key and store (PUBBACKUP).** The rule: **the corpus key and the key store are in a
+checked backup before the first debate goes public.** Without the corpus key, no public debate can be read again. The
+nightly backup and an upload's cold copy (DR3) hold the database only. The one existing step that also copies key
+stores is the online backup (`backup.mjs --online`, the release guide's SB7), which copies every database, the roles
+and every key store the API files name; it runs only in a side-by-side upload, and this guide's uploads are drained.
+PUBBACKUP runs that same tool, now, on the API file and the two lines PUBKEYS kept, into a new root-only folder under
+`/root/preview-archive/main-site/pub/`. Nothing stops. PUBON refuses until the newest PUBBACKUP holds this very corpus
+key and the store. How to check it at any time: PUBCHECK's line `the newest PUBBACKUP holds this corpus key and the key
+store: yes`.
+
+Each debate that goes public later gets its own key in the store, after this backup: PUBCHECK and PUBAFTER count the
+keys made since the newest PUBBACKUP. Run PUBBACKUP again whenever you want them in a backup too, and always in an
+upload's preparation (5.9a). Each run writes a new folder and deletes nothing. A backup holds every key of the site
+and every database: it stays root-only on this server, and it is no off-site copy. The folders add up: PUBBACKUP
+counts them, and says when the free space on `/` falls below what an upload's PRECHECK needs. Which older ones may go
+is your decision 7: ask before you remove any.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# PUBBACKUP: the online backup (every database, the roles, and the key stores the API file and PUBKEYS's two lines name, the corpus key and the publication key store among them), each file checked, into a new root-only folder. Nothing stops; nothing on the site changes.
+declare -F pubprobe >/dev/null || { echo "PUBBACKUP_NOT_DONE: the names file is from an earlier version of this guide (no pubprobe); nothing changed: run LOCKS0 (3.0) again, then PUBBACKUP"; exit 1; }
+[ -s "$KF" ] && [ "$(grep -c '' "$KF")" = 2 ] && grep -qxF "CORPUS_KEK_PATH=$KP" "$KF" && grep -qxF "PUBLICATION_KEY_STORE_PATH=$PS" "$KF" || { echo "PUBBACKUP_NOT_DONE: $KF is not the two lines PUBKEYS keeps (PUBKEYS first); nothing changed"; exit 1; }
+keyok && storeok || { echo "PUBBACKUP_NOT_DONE: the corpus key or the key store is not as PUBKEYS makes them (PUBKEYS first); nothing changed"; exit 1; }
+grep -q "'CORPUS_KEK_PATH'" "$L/backup.mjs" || { echo "PUBBACKUP_NOT_DONE: the tools folder's backup does not copy the corpus key (the upload's tools-folder swap); nothing changed: ask"; exit 1; }
+HC=$(psqlq "SELECT count(*) FROM pg_database WHERE datname = 'hatchet'") || { echo "PUBBACKUP_NOT_DONE: the database is unreadable; nothing changed"; exit 1; }
+if [ "$HC" = 1 ]; then runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d hatchet -XAt -c 'SELECT 1' >/dev/null || { echo "PUBBACKUP_NOT_DONE: the postgres administrator cannot connect to the hatchet database (the release guide's SB7 says why); nothing changed: ask"; exit 1; }; fi
+SIZE=$(du -sm /var/lib/postgresql/18/v3-preview 2>/dev/null | cut -f1 || true); AVAIL=$(df --output=avail -BM /root | tail -1 | tr -dc 0-9)
+[ -n "$SIZE" ] && [ -n "$AVAIL" ] && [ "$AVAIL" -gt $((SIZE + 2048)) ] || { echo "PUBBACKUP_NOT_DONE: not enough free space under /root for a backup ($AVAIL MB free; the database folder is ${SIZE:-unread} MB, and the backup needs that and 2 GB more at most); nothing changed: ask"; exit 1; }
+OB=$PUB/backup-$(date -u +%Y%m%dT%H%M%SZ)
+[ ! -e "$OB" ] || { echo "PUBBACKUP_NOT_DONE: $OB exists: run PUBBACKUP again a second later; nothing changed"; exit 1; }
+install -d -o root -g root -m 0700 "$PUB" "$OB"
+BK=$(lc backup.mjs --online "$OB" --env "$A" --env "$KF" 2>&1) || { printf '%s\n' "$BK" | cut -c1-300; echo "PUBBACKUP_NOT_DONE: the online backup failed (KEYS_FAILED: a key changed while it was read: run PUBBACKUP again); what it wrote stays in $OB, unused"; exit 1; }
+jq -c '{event, databases, keys, files: [.files[] | {name, bytes}]}' <<<"$BK"
+[ "$(jq -r .event <<<"$BK")" = PREVIEW_ONLINE_BACKUP_OK ] && [ "$(jq -r '[.keys[] | select(. == "CORPUS_KEK_PATH" or . == "PUBLICATION_KEY_STORE_PATH")] | length' <<<"$BK")" = 2 ] || { echo "PUBBACKUP_NOT_DONE: the backup did not report OK with the corpus key and the key store in it: ask"; exit 1; }
+pubbackup "$OB" || { echo "PUBBACKUP_NOT_DONE: the backup's files do not match its sums, or it does not hold this corpus key and the key store: ask"; exit 1; }
+{ ( umask 077; printf '%s\n' "$OB" > "$BF.new" ) && mv -f "$BF.new" "$BF"; } || { echo "PUBBACKUP_NOT_DONE: the backup is good, but its name was not kept in $BF: ask"; exit 1; }
+echo "the backup in $OB holds the corpus key and the key store ($(keyfiles) publication keys in the store now), every database and the roles"
+echo "PUBBACKUP folders kept: $(find "$PUB" -maxdepth 1 -type d -name 'backup-*' | grep -c . || true)"
+SIZE=$(du -sm /var/lib/postgresql/18/v3-preview 2>/dev/null | cut -f1 || true); AVAIL=$(df --output=avail -BM / | tail -1 | tr -dc 0-9)
+[ -n "$SIZE" ] && [ -n "$AVAIL" ] && [ "$AVAIL" -gt $((SIZE * 2 + 2048)) ] || echo "the free space on / is now below what an upload's PRECHECK needs (twice the database folder and 2 GB more): before the next upload, ask which older PUBBACKUP folders may go"
+echo PUBBACKUP_DONE
+exit 0
+```
+
+Expect one line with the backup's databases, the names of the keys it holds (`CORPUS_KEK_PATH` and
+`PUBLICATION_KEY_STORE_PATH` among them) and its files with their sizes in bytes, then `the backup in …`, the count
+of PUBBACKUP folders, then `PUBBACKUP_DONE`. A line `the free space on / is now below what an upload's PRECHECK
+needs` does not stop anything now: ask before the next upload. `KEYS_FAILED` means a key store changed while the tool read it (for example a new account's key, or a
+debate that went public at that moment): run PUBBACKUP again. Any other `PUBBACKUP_NOT_DONE`: ask. To restore from such a backup is a step of its own, which no
+guide has yet: ask.
+
+**5. The switch (PUBON).** It checks everything above once more, keeps a copy of the API file, and puts the four
+lines in it: `PUBLICATION_ENABLED=true` in place of the line that is there now, and the corpus key's, the key store's
+and the clean-up login's lines that PUBKEYS and PUBLOGIN kept. Then the API restarts (a minute or more of error pages;
+pick a quiet minute). If the API refuses, or the website does not come back, the file before comes back by itself,
+and the API and the website start on it again, with publishing off. After publishing was switched off by PUBOFF with
+the keys kept (5.9b), PUBON only puts `PUBLICATION_ENABLED=true` back.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# PUBON: publishing switched on in the running release's API file: PUBLICATION_ENABLED=true and, the first time, the corpus key's, the key store's and the clean-up login's lines (a copy kept), then the API restarts (a minute or more down). If the API refuses, the file before comes back.
+declare -F upfail >/dev/null || { echo "PUBON_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then PUBON"; exit 1; }
+declare -F pubprobe >/dev/null || { echo "PUBON_NOT_DONE: the names file is from an earlier version of this guide (no pubprobe); nothing changed: run LOCKS0 (3.0) again, then PUBON"; exit 1; }
+K=$PUB/api-$LABEL.env.before-pubon-$(date -u +%Y%m%dT%H%M%SZ)
+ST=$(pubstate "$A")
+if [ "$ST" = A ]; then
+  for P in PUBLICATION_ENABLED CORPUS_KEK_PATH PUBLICATION_KEY_STORE_PATH PUBLICATION_CLEANUP_DATABASE_URL; do [ "$(grep -c "^$P=" "$A" || true)" = 1 ] || { echo "PUBON_NOT_DONE: publishing is on in the API file, but $P is not there exactly once; nothing changed: ask"; exit 1; }; done
+  apinew || { echo "PUBON_NOT_DONE: the API file says publishing is on, but the running API did not start on the file as it is now (an earlier PUBON stopped before its restart ended; the file before is the newest $PUB/api-$LABEL.env.before-pubon-… copy); nothing changed: ask"; exit 1; }
+  echo "publishing is on already, and the running API started on the file as it is now; nothing changed"; echo PUBON_DONE; exit 0
+fi
+NF=$(sed -n '1s/^\. //p' "$M/names.sh"); [ -f "$NF" ] && [ -z "$(find "${NF%/*}" -maxdepth 1 -name 'r*-names.sh' -newer "$NF" 2>/dev/null)" ] || { echo "PUBON_NOT_DONE: ${NF%/*} holds an upload's names file newer than the one the names file reads (an upload is being prepared), or the names file's first line names no file: publishing goes on only outside an upload; nothing changed: ask"; exit 1; }
+C=$(pubcounts) || { echo "PUBON_NOT_DONE: the database is unreadable; nothing changed: ask"; exit 1; }
+read -r NS NP NE FW FP FR CO PO EV <<<"$C"
+[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login" || true)" = 401 ] || { echo "PUBON_NOT_DONE: the site does not ask for the password: publishing goes on only behind it (PWON, 8.4, first); nothing changed"; exit 1; }
+grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" && [ "$(staffkey || echo 0)" -ge 1 ] 2>/dev/null || { echo "PUBON_NOT_DONE: the staff screens are off, or the Owner has no working staff key under $HOST, so nobody could hide a public debate by hand: 5.7 first; nothing changed"; exit 1; }
+aion || { echo "PUBON_NOT_DONE: the AI check for publication and reports is off (STAFFCHECK, 1.6), so nothing could pass it; nothing changed: ask"; exit 1; }
+grep -q PUBLICATION_CLEANUP_DATABASE_URL "$CAPI/dialectical-engine/packages/register/src/runtime-environment.ts" || { echo "PUBON_NOT_DONE: this release does not know the publication settings; nothing changed: ask"; exit 1; }
+[ "$(grep -c '^CONTENT_ENCRYPTION_ENABLED=' "$A" || true)" = 1 ] && grep -qx 'CONTENT_ENCRYPTION_ENABLED=true' "$A" || { echo "PUBON_NOT_DONE: the API file does not hold CONTENT_ENCRYPTION_ENABLED=true once, which publishing needs; nothing changed: ask"; exit 1; }
+[ "$(grep -c '^PUBLICATION_ENABLED=' "$A" || true)" = "$(grep -cx 'PUBLICATION_ENABLED=false' "$A" || true)" ] && [ "$(grep -c '^PUBLICATION_ENABLED=' "$A" || true)" -le 1 ] || { echo "PUBON_NOT_DONE: the API file's PUBLICATION_ENABLED line is not one line PUBLICATION_ENABLED=false; nothing changed: ask"; exit 1; }
+[ "$(grep -c '^CORPUS_KEK_PREVIOUS_PATH=' "$A" || true)" = 0 ] || { echo "PUBON_NOT_DONE: the API file holds CORPUS_KEK_PREVIOUS_PATH; nothing changed: ask"; exit 1; }
+[ -s "$KF" ] && [ "$(grep -c '' "$KF")" = 2 ] && grep -qxF "CORPUS_KEK_PATH=$KP" "$KF" && grep -qxF "PUBLICATION_KEY_STORE_PATH=$PS" "$KF" || { echo "PUBON_NOT_DONE: $KF is not the two lines PUBKEYS keeps (PUBKEYS first); nothing changed"; exit 1; }
+[ -s "$LF" ] && [ "$(stat -c '%a %U %h' "$LF")" = "600 root 1" ] && [ "$(grep -c '' "$LF")" = 1 ] && grep -qE '^PUBLICATION_CLEANUP_DATABASE_URL=postgres(ql)?://' "$LF" || { echo "PUBON_NOT_DONE: the clean-up line is not kept as PUBLOGIN keeps it (PUBLOGIN first); nothing changed"; exit 1; }
+if [ "$ST" = B ]; then
+  for P in CORPUS_KEK_PATH PUBLICATION_KEY_STORE_PATH PUBLICATION_CLEANUP_DATABASE_URL; do [ "$(grep -c "^$P=" "$A" || true)" = 1 ] || { echo "PUBON_NOT_DONE: the API file keeps the keys' lines, but $P is not there exactly once; nothing changed: ask"; exit 1; }; done
+  cmp -s <(grep -E '^(CORPUS_KEK_PATH|PUBLICATION_KEY_STORE_PATH)=' "$A" | LC_ALL=C sort) <(LC_ALL=C sort "$KF") && cmp -s <(grep '^PUBLICATION_CLEANUP_DATABASE_URL=' "$A") "$LF" || { echo "PUBON_NOT_DONE: the publication lines the API file keeps are not the ones PUBKEYS and PUBLOGIN kept; nothing changed: ask"; exit 1; }
+  MODE=again
+elif [ "$(grep -cE '^(CORPUS_KEK_PATH|PUBLICATION_KEY_STORE_PATH|PUBLICATION_CLEANUP_DATABASE_URL)=' "$A" || true)" = 0 ]; then MODE=first
+else echo "PUBON_NOT_DONE: the API file holds some of the publication lines but not all of them; nothing changed: ask"; exit 1; fi
+keyok && storeok || { echo "PUBON_NOT_DONE: the corpus key or the key store is not as PUBKEYS makes them (PUBKEYS first); nothing changed"; exit 1; }
+KC=$(keyfiles); [ "$KC" -ge "$NE" ] || { echo "PUBON_NOT_DONE: the key store holds $KC publication keys, but the database expects $NE: a key is lost, or a clean-up is under way; nothing changed: run PUBCHECK in a minute, and if the two still differ, ask"; exit 1; }
+storewrite || { echo "PUBON_NOT_DONE: the API's unit does not list the key store as a write path (PUBKEYS first); nothing changed"; exit 1; }
+AP=$(pubapart); [ -z "$AP" ] || { echo "PUBON_NOT_DONE: the corpus key or the key store is not apart from: $AP(the code refuses that); nothing changed: ask"; exit 1; }
+W=$(pubprobe "$LF" || true); [ "$W" = accepted ] || { echo "PUBON_NOT_DONE: the clean-up line is not accepted ($W): PUBLOGIN again; nothing changed"; exit 1; }
+pubbackup "$(cat "$BF" 2>/dev/null || true)" || { echo "PUBON_NOT_DONE: no PUBBACKUP holds this corpus key and the key store (PUBBACKUP first); nothing changed"; exit 1; }
+[ "$(stat -c '%a %U' "$A")" = "640 root" ] && [ -z "$(tail -c1 "$A")" ] || { echo "PUBON_NOT_DONE: $A is not root's 0640 file ending in a newline; nothing changed: ask"; exit 1; }
+apinew || { echo "PUBON_NOT_DONE: the running API did not start on the API file as it is now (a step that changes the file stopped before its restart ended); nothing changed: ask at once"; exit 1; }
+cp -p "$A" "$K" || { rm -f "$K"; echo "PUBON_NOT_DONE: the copy $K was not kept; nothing changed: ask"; exit 1; }
+{ ( umask 077; { grep -v '^PUBLICATION_ENABLED=' "$A"; printf 'PUBLICATION_ENABLED=true\n'; [ "$MODE" = again ] || cat "$KF" "$LF"; } > "$A.new" ) && chown --reference="$A" "$A.new" && chmod --reference="$A" "$A.new"; } || { rm -f "$A.new" "$K"; echo "PUBON_NOT_DONE: the new file was not written; nothing changed: ask"; exit 1; }
+WANT='PUBLICATION_ENABLED '; [ "$MODE" = again ] || WANT='CORPUS_KEK_PATH PUBLICATION_CLEANUP_DATABASE_URL PUBLICATION_ENABLED PUBLICATION_KEY_STORE_PATH '
+[ "$(diff "$A" "$A.new" | sed -n 's/^> \([A-Z_]*\)=.*/\1/p' | LC_ALL=C sort | tr '\n' ' ')" = "$WANT" ] && [ "$(diff "$A" "$A.new" | grep '^<' | grep -cvx '< PUBLICATION_ENABLED=false' || true)" = 0 ] && [ "$(grep -cx 'PUBLICATION_ENABLED=true' "$A.new" || true)" = 1 ] && [ -z "$(grep -oE '^[A-Z_][A-Z0-9_]*=' "$A.new" | sort | uniq -d)" ] || { rm -f "$A.new" "$K"; echo "PUBON_NOT_DONE: the new file is not the publishing lines added and, at most, the line PUBLICATION_ENABLED=false taken out; nothing changed: ask"; exit 1; }
+mv "$A.new" "$A" || { rm -f "$A.new" "$K"; echo "PUBON_NOT_DONE: the new file was not put in place; nothing changed: ask"; exit 1; }
+echo "in the API file: publishing on ($([ "$MODE" = again ] && echo 'the kept lines stay' || echo 'with the corpus key, the key store and the clean-up login'); the file before is $K); the API restarts"
+R=0; apiup || R=$?
+if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the file with publishing on'); { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "PUBON_NOT_DONE: $WHY, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; { apistart && webup; } || { echo "PUBON_NOT_DONE: $WHY; the file before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "PUBON_NOT_DONE: $WHY; the file before is back, and the API and the website started on it, with publishing off: run PUBCHECK, then ask"; exit 1; fi
+echo PUBON_DONE
+exit 0
+```
+
+Expect the `in the API file: publishing on …` line, the API's start lines (`PREVIEW_API_STARTED …`), then `PUBON_DONE`.
+- Every `PUBON_NOT_DONE` that says `nothing changed` changed nothing: do what it names, or ask.
+- `the file before is back, and the API and the website started on it, with publishing off`: the site runs as before.
+  A refusal of the publication lines often shows only a bare `PREVIEW_API_STARTUP_REFUSED`, with a stage line before
+  it or none (part 10). Run PUBCHECK, which reads most of what the start checks, then ask, and give both last lines.
+- `the site is DOWN`: ask at once.
+- `the running API did not start on the file as it is now`: an earlier PUBON stopped after it changed the file and
+  before the API's restart ended (for example the ssh window closed). The site may be down, or may still run with
+  publishing off. Ask at once.
+- No last line at all (the window closed while PUBON ran): treat it as `PUBON_NOT_DONE` and ask. PUBCHECK shows
+  where it stopped: its line `the running API started on the API file as it is now: yes`, or the line that says it
+  did not.
+- From `PUBON_DONE` on, publishing is on. Run PUBAFTER next.
+
+**6. After the switch (PUBAFTER).** It only reads. Run it right after PUBON, again after the tries of step 7, and on
+any later day you want to know how publishing goes.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# PUBAFTER: publishing after the switch (read-only): the API's start and its clean-up passes since, the key and the store, the staff screens, the AI check, mail, and what the database and the key store hold, as counts. Prints names, states, counts and yes or no, never a key, a password or an address.
+declare -F pubprobe >/dev/null || { echo "PUBAFTER_NOT_DONE: the names file is from an earlier version of this guide (no pubprobe); nothing changed: run LOCKS0 (3.0) again, then PUBAFTER"; exit 1; }
+[ "$(pubstate "$A")" = A ] || { echo "PUBAFTER_NOT_DONE: the API file does not have publishing on (PUBON first)"; exit 1; }
+NO=''; nope() { echo "not as expected: $1"; NO=yes; }
+[ "$(systemctl is-active "$API" || true)" = active ] && said -F 'PREVIEW_API_STARTED ' || nope "the API is not running, or its journal has no start line since its last start"
+apinew || nope "the running API did not start on the API file as it is now: a step that changes the file stopped before its restart ended, so the API may run with publishing off"
+P=$(inv "$API" | grep -cF '[PUBLICATION_KEY_CLEANUP_PENDING]' || true); G=$(inv "$API" | grep -cF '[PUBLIC_PAGE_WORK_PENDING]' || true)
+echo "since the API's start: failed passes of the key clean-up $P (one every 30 seconds), failed passes of the public pages $G (one every 15 seconds)"
+[ "$P" = 0 ] || nope "a pass of the key clean-up failed"
+keyok && storeok && storewrite || nope "the corpus key, the key store, or the API's permission to write it is not as PUBKEYS makes them"
+echo "the clean-up login: signed in now $(psqlq "SELECT count(*) FROM pg_stat_activity WHERE usename = '$CLN'" || echo unread) (at most 4)"
+if grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" && [ "$(staffkey || echo 0)" -ge 1 ] 2>/dev/null; then echo "the staff screens, and a working staff key of the Owner under $HOST: yes"; else nope "the staff screens are off, or the Owner has no working staff key under $HOST (5.7): nobody can hide a public debate by hand"; fi
+GST=$(gs "$GAN" "$PAN" 2>/dev/null | jq -r '"\(.state), window open \(.window_open)"' 2>/dev/null || true)
+if aion; then echo "the AI check for publication and reports: on (the Anthropic gate: ${GST:-did not read}; AICHECK, 6b.1, says what the checks did)"; else nope "the AI check for publication and reports is off (STAFFCHECK, 1.6): nothing can pass it"; fi
+MM=$(mailmode || true); echo "mail: ${MM:-did not read}"
+C=$(pubcounts) || { echo "PUBAFTER_NOT_DONE: the database is unreadable: ask"; exit 1; }
+read -r NS NP NE FW FP FR CO PO EV <<<"$C"
+echo "the database: publications ever made $NS (public now, hidden ones included, $NP); Free debates waiting to go public $FW, gone public $FP, kept private $FR; key clean-ups waiting $CO; publications being made $PO"
+KC=$(keyfiles); echo "publication keys in the store: $KC; the database expects $NE"
+[ "$KC" = "$NE" ] || echo "the two differ: a publication may be under way; run PUBAFTER again in a minute, and if they still differ, ask"
+OB=$(cat "$BF" 2>/dev/null || true)
+if pubbackup "$OB"; then echo "publication keys made since the newest PUBBACKUP: $(find "$PS" -type f -name publication-key.v1.json -newer "$OB/online.sha256" 2>/dev/null | grep -c . || true) (PUBBACKUP again puts them in a backup)"; else nope "no PUBBACKUP holds this corpus key and the key store"; fi
+[ -z "$NO" ] || { echo "PUBAFTER_NOT_DONE: something is not as expected (the lines above): ask"; exit 1; }
+echo PUBAFTER_DONE
+exit 0
+```
+
+Right after PUBON expect: no `not as expected` line (one of them is `the running API did not start on the API file as
+it is now`: ask at once), `failed passes of the key clean-up 0`, the counts all 0, `publication
+keys in the store: 0; the database expects 0`, `publication keys made since the newest PUBBACKUP: 0`, then
+`PUBAFTER_DONE`. Later the counts grow with what goes public. `failed passes of the public pages` above 0 now and then
+is the API's own retry; if it grows on every run, ask. `failed passes of the key clean-up` above 0: ask. Its journal
+line is `[PUBLICATION_KEY_CLEANUP_PENDING]`.
+
+**7. Try it by hand, behind the password.** In your browser, with the site password typed, signed in.
+1. **The Public tab.** The home page's **Public** tab (Dezbateri publice) shows its list, empty at first. It must not
+   say "Published debates are temporarily unavailable." (Dezbaterile publicate sunt temporar indisponibile.): if it
+   does, ask.
+2. **A Free debate goes public.** Use an account of yours or the team's that sees the Free line under the question box
+   ("On the Free plan your question and its debate are public. Don't include personal details."). If no account of
+   the team sees it, skip this try: an account with a team grant or a paid plan has no Free debate. Ask a short
+   question with nothing personal in it, and remember: it goes public for good. Let the debate finish. Then, usually
+   within a few minutes: the debate's page (`/v4/debate/<id>`) shows **Public** · **See its page** (Publică · Vedeți
+   pagina ei); the **Public** tab lists it; and **See its page** opens it at `/public/debate/<id>`. The API looks
+   every 15 seconds; it waits up to 30 minutes for the debate's short story; after a failed check it waits a minute,
+   then longer, up to an hour.
+   - "Kept private: it did not pass the check, so it has no public page." (A rămas privată: nu a trecut verificarea,
+     așa că nu are pagină publică.): the AI check for publication refused it, for good. That is the check working.
+   - Nothing after an hour: run PUBAFTER and AICHECK (6b.1). If AICHECK shows no `UNAVAILABLE` line, the end-of-debate
+     check may have flagged it: its owner sees the flag and **Cereți aprobarea** only on `/debate/<id>` (5.1b). Ask.
+3. **Publish** (only for a debate you want public for good). Open the older page `/debate/<id>` of a debate of yours
+   that is not public and not a dig (a paid plan's debate, or one from before the switch). Its box now shows
+   "Private — only your account can read this debate." (Privată — doar contul dumneavoastră poate citi această
+   dezbatere.) and **Publish…** (Publicați…); before the switch it showed neither. Seeing that is the try. Only if you
+   want that debate public for good: press **Publish…**, read the warning, tick "I understand and want to publish this
+   debate." (Înțeleg și doresc să public această dezbatere.), pass the security check, and press **Publish publicly**
+   (Publicați pentru toată lumea). Expect "Published. Anyone with the link can read it, and search engines may index
+   it." (search engines cannot reach it while the site password is on). "This debate needs our approval before it can
+   be published." means the end-of-debate check flagged it (5.1b).
+4. **The Report button.** On a public debate's page, **Report a problem** (Raportați o problemă) opens a small form.
+   Look at it, then press Cancel. Send a report only if something on a page must be looked at: its check may hide the
+   debate at once, and its answer is a mail. 6b.2 (step 4) has a test report with a claim that is plainly not on the
+   page, if you want one.
+5. **Staff.** Copy the address of a public debate's page (`/public/debate/<id>`). On the Team page (`/admin/team`), in
+   **Public debates under review** (Dezbateri publice în curs de verificare), paste it into **The debate's public
+   link** (Linkul public al dezbaterii) and press **Open** (Deschide). The panel lists only hidden debates, so this is
+   the way to a public one. The page shows "Public. Anyone can read it now." (Publică. Oricine o poate citi acum.) and
+   **Hide now** (Ascunde acum). Do not press it unless you mean it.
+
+Then run PUBAFTER again: its counts show what went public.
+
+**To confirm on the server.** These steps were tested on throwaway files, with stand-ins for the server's parts, not
+on this server. Only the server can show: that the API starts with the publication lines (PUBON puts the file before
+back if it does not); that the API's unit lists the store as a write path after PUBKEYS; that the clean-up login signs
+in with its new password through `pg_hba.conf`'s line (PUBLOGIN tries it); that systemd's start time of the API
+reads as later than the API file's last change (PUBCHECK's line `the running API started on the API file as it is now:
+yes`; a `no` on the first run, before any step of 5.9: ask); and the online backup's size and time.
+The first time, do each step slowly, and ask if a line differs from the ones above.
+
+### 5.9a Later uploads, and the way back, with publishing on
+
+- **The upload carries the lines by itself.** DR1's `derive` copies every line of the API file into the new release's
+  file byte for byte, except the release's own lines, so the new release starts with publishing on, with the same
+  corpus key, key store and clean-up login. No step of the upload adds or changes them, and none may: no SAME check
+  compares these lines between the two releases, so a hand change would go unseen. PRECHECK prints
+  `publication state A`.
+- **Before the upload: PUBBACKUP**, in the preparation (1.8), before SB1. The drained upload has no online backup, and
+  its cold copy (DR3) and the nightly backup hold the database only, not the key store. A side-by-side upload's SB7
+  copies the key store too.
+- **At DR6** the new API's first start reads the same key, store and login (the stages `corpus-kek`,
+  `publication-secret-domains`, `database-roles`, `publication-key-store`, `publication-key-cleanup` and
+  `support-keys`). A refusal there is in part 2's stage table: ask.
+- **rbD-A** starts the old release from its own file. As PUBON runs only outside an upload, that file holds the lines
+  (they went in while it ran, before the upload began), so the public debates are served as before.
+- **rbD-B** puts back DR3's copy of the database only. Everything about public debates written after DR3 is lost from
+  the database: a debate that went public, a hide, a report. The keys made since stay in the key store, and nothing
+  removes them. A debate taken down or deleted since DR3 comes back as public in the database, without its key, so
+  its page does not open. rbD-B also marks the restore fence: the public library stays held (the **Public** tab empty,
+  every public page closed) until you release the hold, after you have re-applied what happened since the copy (the
+  release guide's H11, step 4). If anything went public, or came down, since DR3: ask before rbD-B.
+- **A release older than the one before** is never a way back in this guide.
+
+### 5.9b Switching publishing off again (PUBOFF)
+
+**What is possible.** The site has no way to make every public debate private again. PUBOFF stops the public pages:
+the **Public** tab comes back empty, a public page answers "not found", nobody sees Publish, and the Report button has
+nothing to act on. It never touches the debates themselves. What it does with the lines depends
+on what the database holds:
+- **No debate was ever published** (the database has no publication and the key store no key): it takes the four
+  lines out and puts back `PUBLICATION_ENABLED=false`. Free debates started while publishing was on and not yet public
+  still wait, and go public at the next PUBON if the checks allow it, however old they are: PUBOFF prints how many.
+  The corpus key, the empty store, the drop-in, the kept lines and the clean-up login's password stay, unused: PUBON
+  can use them again.
+- **A debate was ever published**: it changes only `PUBLICATION_ENABLED=true` to `=false`, and keeps the corpus key's,
+  the store's and the clean-up login's lines. Taking them out too would leave the database with keys nothing can
+  destroy: every deletion of an account or a debate that ever had a public page would wait for ever.
+
+**What it leaves behind, once a debate was published.**
+- Every debate that was public stays recorded as public, with its key. PUBON shows them all again.
+- Every Free debate that was started while publishing was on and has not gone public yet still waits. When publishing
+  comes on again, it goes public then, however old it is, if the checks allow it.
+- While publishing is off: nobody can hide a debate (Hide now, the reports and the public review need it on); the
+  six-month removal of reports' words and sealed originals does not run; a person cannot read their full statements of
+  reasons; and a data export that holds a report the person sent fails.
+- The next upload's PRECHECK stops with `BAD (publication)`: its state B (both key lines, publishing not on) needs a
+  reviewed check before an upload. Ask before that upload.
+
+PUBOFF is no brake for one debate: Hide now (5.7) is. It restarts the API (a minute or more down). If the API refuses,
+the file before comes back, with publishing on.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# PUBOFF: publishing switched off again in the running release's API file (a copy kept), then the API restarts. With no debate ever published it takes the four lines out; once one was, it keeps the keys' and the clean-up login's lines, so deletions and the key clean-up go on. If the API refuses, the file before comes back.
+declare -F upfail >/dev/null || { echo "PUBOFF_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then PUBOFF"; exit 1; }
+declare -F pubprobe >/dev/null || { echo "PUBOFF_NOT_DONE: the names file is from an earlier version of this guide (no pubprobe); nothing changed: run LOCKS0 (3.0) again, then PUBOFF"; exit 1; }
+K=$PUB/api-$LABEL.env.before-puboff-$(date -u +%Y%m%dT%H%M%SZ)
+ST=$(pubstate "$A")
+if [ "$ST" != A ]; then
+  apinew || { echo "PUBOFF_NOT_DONE: the API file says publishing is off, but the running API did not start on the file as it is now (an earlier PUBOFF stopped before its restart ended; the file before is the newest $PUB/api-$LABEL.env.before-puboff-… copy): it may still serve the public pages, or be down; nothing changed: ask at once"; exit 1; }
+  [ "$ST" != C ] || { echo "publishing is off already, and the API file names none of its keys; the running API started on the file as it is now; nothing changed"; echo PUBOFF_DONE; exit 0; }
+  echo "publishing is off already; the API file keeps the keys' and the clean-up login's lines (5.9b); the running API started on the file as it is now; nothing changed"; echo PUBOFF_DONE; exit 0
+fi
+for P in PUBLICATION_ENABLED CORPUS_KEK_PATH PUBLICATION_KEY_STORE_PATH PUBLICATION_CLEANUP_DATABASE_URL; do [ "$(grep -c "^$P=" "$A" || true)" = 1 ] || { echo "PUBOFF_NOT_DONE: publishing is on, but $P is not in the API file exactly once; nothing changed: ask"; exit 1; }; done
+C=$(pubcounts) || { echo "PUBOFF_NOT_DONE: the database is unreadable; nothing changed: ask"; exit 1; }
+read -r NS NP NE FW FP FR CO PO EV <<<"$C"
+KC=$(keyfiles)
+[ "$(stat -c '%a %U' "$A")" = "640 root" ] && [ -z "$(tail -c1 "$A")" ] || { echo "PUBOFF_NOT_DONE: $A is not root's 0640 file ending in a newline; nothing changed: ask"; exit 1; }
+apinew || { echo "PUBOFF_NOT_DONE: the running API did not start on the API file as it is now (a step that changes the file stopped before its restart ended); nothing changed: ask at once"; exit 1; }
+cp -p "$A" "$K" || { rm -f "$K"; echo "PUBOFF_NOT_DONE: the copy $K was not kept; nothing changed: ask"; exit 1; }
+if [ "$NS/$PO/$EV/$KC" = 0/0/0/0 ]; then
+  MODE=clean; WANT='PUBLICATION_ENABLED=false'; GONE=4
+  { ( umask 077; { grep -vE '^(PUBLICATION_ENABLED|CORPUS_KEK_PATH|PUBLICATION_KEY_STORE_PATH|PUBLICATION_CLEANUP_DATABASE_URL)=' "$A"; printf 'PUBLICATION_ENABLED=false\n'; } > "$A.new" ) && chown --reference="$A" "$A.new" && chmod --reference="$A" "$A.new"; } || { rm -f "$A.new" "$K"; echo "PUBOFF_NOT_DONE: the new file was not written; nothing changed: ask"; exit 1; }
+else
+  MODE=keep; WANT='PUBLICATION_ENABLED=false'; GONE=1
+  { ( umask 077; sed 's/^PUBLICATION_ENABLED=true$/PUBLICATION_ENABLED=false/' "$A" > "$A.new" ) && chown --reference="$A" "$A.new" && chmod --reference="$A" "$A.new"; } || { rm -f "$A.new" "$K"; echo "PUBOFF_NOT_DONE: the new file was not written; nothing changed: ask"; exit 1; }
+fi
+[ "$(diff "$A" "$A.new" | sed -n 's/^> //p')" = "$WANT" ] && [ "$(diff "$A" "$A.new" | grep -c '^<' || true)" = "$GONE" ] && [ "$(diff "$A" "$A.new" | grep '^<' | grep -cvE '^< (PUBLICATION_ENABLED=true|CORPUS_KEK_PATH=|PUBLICATION_KEY_STORE_PATH=|PUBLICATION_CLEANUP_DATABASE_URL=)' || true)" = 0 ] && [ -z "$(grep -oE '^[A-Z_][A-Z0-9_]*=' "$A.new" | sort | uniq -d)" ] || { rm -f "$A.new" "$K"; echo "PUBOFF_NOT_DONE: the new file is not only the publication lines changed; nothing changed: ask"; exit 1; }
+mv "$A.new" "$A" || { rm -f "$A.new" "$K"; echo "PUBOFF_NOT_DONE: the new file was not put in place; nothing changed: ask"; exit 1; }
+if [ "$MODE" = clean ]; then echo "in the API file: publishing off, and its four lines out, as no debate was ever published (the file before is $K); the API restarts"; else echo "in the API file: publishing off; the keys' and the clean-up login's lines stay, as debates were published, $NS ever and $NP public now (the file before is $K); the API restarts"; fi
+R=0; apiup || R=$?
+if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the file with publishing off'); { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "PUBOFF_NOT_DONE: $WHY, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; { apistart && webup; } || { echo "PUBOFF_NOT_DONE: $WHY; the file before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "PUBOFF_NOT_DONE: $WHY; the file before is back, and the API and the website started on it, with publishing on: ask"; exit 1; fi
+if [ "$MODE" = clean ]; then
+  C=$(pubcounts) || { echo "PUBOFF_NOT_DONE: publishing is off, but the database is unreadable, so it is not known whether a debate went public meanwhile: ask"; exit 1; }
+  read -r NS NP NE FW FP FR CO PO EV <<<"$C"
+  [ "$NS/$PO/$EV/$(keyfiles)" = 0/0/0/0 ] || { echo "PUBOFF_NOT_DONE: a debate went public while publishing was being switched off, and the API file now names no key for it: ask at once"; exit 1; }
+  echo "kept: $FW Free debates waiting, started while publishing was on; they go public at the next PUBON if the checks allow it"
+else
+  ! said -F '[PUBLICATION_CUSTODY_NOT_CONFIGURED]' && ! said -F '[PUBLICATION_KEY_CLEANUP_NOT_CONFIGURED]' || { echo "PUBOFF_NOT_DONE: the API started with publishing off, but its journal says the keys are not set up: ask"; exit 1; }
+  echo "kept: $NP debates recorded as public, $FW Free debates waiting; the next upload's PRECHECK stops on state B: ask before it (5.9b)"
+fi
+echo PUBOFF_DONE
+exit 0
+```
+
+Expect the `in the API file: publishing off …` line, the API's start lines, a `kept:` line (the Free debates still
+waiting, and, when debates were published, those recorded as public), then `PUBOFF_DONE`. `publishing is off already`
+changed nothing. `the running API did not start on the file as it is now`: an earlier PUBOFF stopped after it changed
+the file and before the API's restart ended, so the API may still serve the public pages: ask at once. With no last
+line at all (the window closed while PUBOFF ran), ask too: PUBCHECK shows where it stopped. On `the file before is back, and the API
+and the website started on it, with publishing on`: publishing is still on; ask. `a debate went public while
+publishing was being switched off`: ask at once, before any other step. To switch on again: PUBON (step 5), which
+reads the kept lines.
+
 ---
 
 ## 6. Friends' test, with test payments
@@ -3391,8 +4095,8 @@ together (the files hold one asks line), and ASKS_OPEN (6.1) is the step for bot
 **Before you open:** mail is open (part 4.3; friends need the verification mail to sign up), payments are the sandbox
 with billing on, and you have read 6.4 (what bounds spending) and 6.5 (the brakes). Do 5.7 first if you can, so
 your staff key works on dezbatere.ro and you can hide a debate by hand during the test. If you have not, tell
-friends that on the Free plan a finished debate goes public by itself when the AI checks allow it (5.1b), and that
-nobody can take it down by hand for now.
+friends that on the Free plan a finished debate goes public by itself when the AI checks allow it (5.1b), once
+publishing is on (5.9), and that nobody can take it down by hand for now.
 
 **If friends buy test plans.** Every open sandbox plan blocks the live start (part 7), so decide this first:
 - Friends may buy test plans only if you withdraw each friend's sandbox plan with WITHDRAWOTHER (3.3) within 14 days
@@ -3763,7 +4467,10 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
 - The AI check for publication and reports can go through the Anthropic gate: AICHECK (end of 6b.1) ends with
   `AICHECK_DONE`, or you have decided to open without it (decision 1 below).
 - With your staff key working, you have read the **Public** tab and used Hide now on anything that must not stay
-  public (Free debates go public by themselves, 5.1b).
+  public (Free debates go public by themselves once publishing is on, 5.9 and 5.1b).
+- Public debates: publishing is on (5.9), or you have decided to open without it (decision 7 below). The Free line
+  under the question box and the Terms tell people that a finished Free debate is public; while publishing is off,
+  none is, and the Report button has nothing to act on.
 - NETOPIA's logo shows (LOGOCHECK, part 2).
 - The security review's host-side fixes (NV-51, NV-55's port reservation, NV-56, NV-57) are applied or recorded, as
   part 7's "Before you start" says: the site meets strangers as it will in part 8.
@@ -3839,6 +4546,9 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
    are in test mode only invited accounts can buy. Decide whether the Terms, the test-mode note, or both must say
    that buying is open only to invited accounts while payments are in test mode. Changing either needs an upload, so
    decide before you open.
+7. **Public debates.** Open with publishing on (5.9), or without it, knowing that the line under the question box and
+   the Terms say a finished Free debate is public while none becomes public, and that the Report button then has
+   nothing to act on.
 
 **The AI check, read at the server (AICHECK).** It only reads, and it prints names, states and counts, never an amount.
 It checks that the release sends the check through the Anthropic gate, that the API file names the gate's socket, and
@@ -3927,7 +4637,8 @@ quiet minutes.
      plătiți** the sentence shows; SANDBOXLIST (3.3) is unchanged;
    - only if you want a test plan: a listed account that is not the one you will pay with in part 7 (3.2's rules) buys
      with the test card, and finishes NETOPIA's page;
-   - the AI check (skip this if you open without it, decision 1): run AICHECK (6b.1) and note `calls_today`. A test
+   - the AI check (skip this if you open without it, decision 1, or with publishing off, 5.9): run AICHECK (6b.1)
+     and note `calls_today`. A test
      account of yours on the Free plan asks a short question. A few minutes after its story is written, the debate
      shows on the home page's **Public** tab: the end-of-debate check answers first (at most two minutes after the
      debate finished), then the AI check for publication. If AICHECK showed `UNAVAILABLE` lines just before, the API
@@ -4787,10 +5498,11 @@ holds no working staff key of the Owner account under the name the site answers 
 5.8; PWOFF1 refuses while it is open); mail is open there (4.3: PWOFF1 checks both the
 plan file and the API's mode line); real payments work (part 7); the staff screens are on and your staff key works
 on dezbatere.ro (5.7); with your staff key working, you have read the **Public** tab again and used Hide now on
-anything that went public while your staff key did not work and must not stay public (Free debates go public by themselves, 5.1b);
+anything that went public while your staff key did not work and must not stay public (Free debates go public by themselves once publishing is on, 5.9 and 5.1b);
 NETOPIA's logo shows in the home page's footer (LOGOCHECK, part 2; if it is missing, ask before you take the password
 off); the security review's host-side fixes are applied or recorded (part 7's "Before you start"); you have
-decided your numbers and gate pots (1.7, 6.4); and you have read the
+decided your numbers and gate pots (1.7, 6.4); you have decided whether to open with publishing on (5.9) or without
+it, as in 6b's decision 7; and you have read the
 warning in bold at the start of part 9: once strangers can buy, closing everything again needs help.
 
 **6b uses 8.2 to 8.4 too.** PWOFF1 accepts two pairings: part 8's (`everyone` in both files and in the running API's
@@ -4974,6 +5686,9 @@ back and step 2 gives asks and buying back to the team. Before step 3, every san
 withdrawn or cancelled (3.3; PAY0, 7.1, until it prints all zeros). Step 3 (PAY_BACK) is needed only if payments were
 ever real. The people who signed up keep their accounts, but cannot reach the site again until part 8 opens it.
 
+**Publishing (5.9) is not one of these steps.** Closing everything leaves it as it is, behind the site password again;
+PUBOFF (5.9b) is its own step, and what it can and cannot undo is said there.
+
 **If the password was ever off with real payments on (part 8), stop and ask before step 1.** Someone outside the
 team may then hold a paid plan. A paid plan renews every month on its saved card until its owner cancels it, and
 both ways to cancel (Settings, and the `/cancel` link in the plan's mails) are behind the site password. Once the
@@ -5006,7 +5721,8 @@ know none of these settings, and they answer only as the test name.
   gates keep this release's gate code, and the shared tools stay this release's and list the Amazon gate. The release
   before runs and its brakes work; a line-up change waits for the next upload of this code. Ask if one cannot wait.
 - **rbD-B brings back the database only.** Key folders destroyed after DR3 stay destroyed: an account deleted since
-  then comes back without its keys, like the unfinished sign-ups below.
+  then comes back without its keys, like the unfinished sign-ups below. With publishing on, 5.9a says what it means
+  for the public debates and their keys, and that the public library stays held until you release it.
 - **The unfinished sign-ups the new release deleted** (UNFINISHED, part 2: at DR6 and every ten minutes after) come
   back with DR3's cold copy, but without their key folders, which the new release destroyed. Those sign-ups cannot be
   finished, and their addresses and pseudonyms stay taken, until a release with this code runs again and deletes them
@@ -5094,9 +5810,10 @@ that service.
 | bare `PREVIEW_API_STARTUP_REFUSED` after stage `outbound-mail-policy` or `outbound-mail-store` | API start | the mail plan, or the mail's own store | put the last good plan back (MAIL_CLOSE, or 1.5); ask |
 | bare `PREVIEW_API_STARTUP_REFUSED` after stage `pre-start-writer` | API start | the database step that records the charges before Start is missing or refused | ask |
 | bare `PREVIEW_API_STARTUP_REFUSED` after stage `saved-question-key-store` | API start | the saved questions' key store | ask |
-| bare `PREVIEW_API_STARTUP_REFUSED` after stage `corpus-kek`, `publication-secret-domains` or `database-roles` | API start | publication's keys or its clean-up login, set up but not as the code needs | ask |
+| bare `PREVIEW_API_STARTUP_REFUSED` after stage `corpus-kek`, `publication-secret-domains`, `database-roles`, `publication-key-store` or `publication-key-cleanup` | API start | publication's corpus key, its key store or its clean-up login, set up but not as the code needs (5.9) | PUBON and PUBOFF put the file before back by themselves; PUBCHECK (5.9) reads most of what the start checks; ask |
+| bare `PREVIEW_API_STARTUP_REFUSED` after stage `support-keys` | API start | the support key; with publishing on, also a corpus key that is not the API user's `0600` file of 32 bytes, or holds another key's bytes | as above |
 | bare `PREVIEW_UI_STARTUP_REFUSED` | launcher, website | in an upload, first the website file's proof line or its proof file (SB5c); otherwise a rule outside these locks | in an upload: the stage table of part 2 (DR6); otherwise put back the file you changed; ask |
-| bare `PREVIEW_API_STARTUP_REFUSED`, no stage line | launcher | a rule outside these locks, for example a stray key, or the payments line in local mode or on an older release | put back the file you changed; ask |
+| bare `PREVIEW_API_STARTUP_REFUSED`, no stage line | launcher | a rule outside these locks, for example a stray key, or the payments line in local mode or on an older release; or a publication line the API's settings check refuses (for example `PUBLICATION_ENABLED=true` without `CONTENT_ENCRYPTION_ENABLED=true`, a key path missing, or a clean-up line equal to another login's line: PUBON checks these first) | put back the file you changed (PUBON and PUBOFF do it by themselves); ask |
 | `PREVIEW_EGRESS_REFUSED` | the egress proxy's own journal; the unit fails | a bad label in the drop-in, or both forms at once | PAY_UNDO; check the label |
 | `MODE_OTHER_ACCOUNT` | the egress proxy's journal | the mode question named another Quaderno account | PAY_EGRESS with the label of `live.lines` |
 | bare `PREVIEW_RUNNER_STARTUP_REFUSED` | launcher, runner | the runner file has no preview configuration, or no team and no asks line (`PREVIEW_RUNNER_TEAM_REQUIRED`, not printed by name) | put back the runner file; ask |
