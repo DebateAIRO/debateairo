@@ -132,6 +132,7 @@ if the server shows something else.
 | 4 | mail: allow-list on the new path, then open | password on | MAIL_CLOSE |
 | 5 | the main name, and your staff key on it (5.7) | password on | NAME5 |
 | 5.8 | the NETOPIA review window: the public pages without the password (after NAME4), then NETOPIA's review (5.8b) | public pages open; sign-in, sign-up, debates and buying behind the password | REVIEW_CLOSE (or PWON) |
+| 5.9 | public debates: publishing switched on (after 5.7), still behind the site password | password on; public debates readable by those who know it | PUBOFF stops the public pages; what was public stays recorded (5.9b) |
 | 6 | friends' test with test payments (it may run while NETOPIA reviews) | password on | ASKS_CLOSE |
 | 6b | the whole site open while payments are NETOPIA's sandbox: anyone may sign up and ask on the Free plan, only the accounts you list may buy test plans (after part 5 and 5.7, on a release that carries it; before you enrol the point of sale, 5.8b step 3) | open | PWON, then ASKS_CLOSE |
 | 7 | real payments (only after NETOPIA's approval and the signed contract; 6b closed first; if anyone outside the team had the site password, a new one first) | password on | PAY_BACK |
@@ -191,7 +192,7 @@ team has had the site password. If NETOPIA's tester had it (5.8b), run PWNEW (7.
 while payments are real: run ASKS_OPEN
 (6.1) with the line `V=everyone`, and stop there, so the site password stays on. They use the Free plan. Tell them
 not to press **Abonați-vă și plătiți** (Subscribe and pay): payments are real, a plan one of them buys renews every
-month until they cancel it in Settings, and PAY_BACK waits for it. Tell them too that a finished Free debate can go
+month until they cancel it in Settings, and PAY_BACK waits for it. Tell them too that, once publishing is on (5.9), a finished Free debate can go
 public by itself, to everyone inside the site password, and that nobody can take it down by hand until your staff
 key works on dezbatere.ro (5.7). When your own refund and its credit note are
 recorded, run ASKS_CLOSE (6.3), then PAY_BACK (7.11), then part 6 as written, with test payments. Before real payments
@@ -231,6 +232,12 @@ go on a second time, that friends' test closes and the site password changes (7.
   there (5.7), with mail open (4.3), with the four spending gates active and with the review window closed. PWOFF1
   checks each. What still waits for real payments and part 8: buying for anyone signed in (`everyone`), real money,
   and invoices.
+- **Public debates only after 5.7, behind the password, and outside an upload.** PUBON (5.9) refuses while the staff
+  screens are off or no staff key of the Owner works under the name the site answers as (nobody could hide a public
+  debate by hand), while the site does not ask for the password, and while the AI check for publication and reports
+  is off. Never run PUBON or PUBOFF from an upload's preparation (1.8, SB1) to its end: PRECHECK holds the old
+  release's files to SB1's copies, and the way back starts the old release from them. Publishing is no lock: the
+  site password decides who can read a public debate, and closing everything (part 9) leaves publishing as it is.
 - **6b only on a release that carries it.** An older API refuses `everyone-with-listed-buyers` at start
   (`PREVIEW_ASKS_OPEN_TO_INVALID`), and an older API lets any signed-in account buy on the sandbox. So 6b opens only
   once the upload that brought it is over and you would no longer go back to the release before it; while 6b is
@@ -471,7 +478,7 @@ Never change `transportTimeoutMs`: it must stay 5000.
 ### 1.6 The old test debates, and the staff screens
 
 Debates cannot be deleted: the database refuses to delete a debate's rows, by design. What strangers and friends can
-see is only the list of **published** test debates. Hiding is the supported way to take one down. Only the staff
+see is only the list of **published** test debates (none on this server until publishing is switched on, 5.9). Hiding is the supported way to take one down. Only the staff
 screens (the Team page, `/admin/team`) can hide a debate by hand; the public Report button can also hide one by itself
 (5.1b). No menu links to the Team page: type its address after the name the site answers as, for example
 https://v3-preview.dezbatere.ro/admin/team (before the rename) or https://dezbatere.ro/admin/team (after it).
@@ -526,7 +533,7 @@ Read the lines just before `STAFFCHECK_DONE`:
   behind the site password; if one must not, ask.
 
 `the AI check for publication and reports` is the AI check that lets a finished Free debate go public and that reads
-each press of the public Report button (5.1b says why it matters). It is Claude Haiku 5.5 through the Anthropic gate:
+each press of the public Report button (5.1b says why it matters; both need publishing on, 5.9). It is Claude Haiku 5.5 through the Anthropic gate:
 the API holds no key for it, and the API file's `SUPPORT_MODEL_TARGET_JSON` plays no part on this server (it stays
 absent). The line says `on, through the Anthropic gate` when the running release sends the check that way and the API
 file names the gate's socket. Otherwise it says `off:` and why; before the upload of a release that sends the check
@@ -725,7 +732,8 @@ Every line `SAME`: leave `NEWNUM` and `LIMITS` empty; SB3 publishes the live num
 
 Everything here runs with the site up, and nothing on the site changes. It runs the day before the upload, or earlier
 on the upload day itself; do it in this order either way. Each step names its block and the last line it must print.
-On any other last line, run nothing more, and ask.
+On any other last line, run nothing more, and ask. With publishing on (5.9), run PUBBACKUP (5.9, step 4) first, before
+SB1: this upload's cold copy holds the database only, not the keys of the public debates (5.9a).
 
 The practice spends from the gates' daily pots (a day is a Bucharest day). On the same day, the practice and the test
 debate after the switch (part 2: it serves both SB13b and the proof of the step before Start) share the same pots.
@@ -1262,7 +1270,7 @@ show the next.
 | `ui-api-proof` | the proof line in the new API file, or its proof file (SB5c) | DR6AGAIN, then LATELINES, then DR6 |
 | `restore-fence-path` | the fence line in the new API file (H11 step 2), or a fence folder above a key store or key file | the line missing: DR6AGAIN, then LATELINES, then DR6; the overlap: ask |
 | `restore-fence` | the fence folder itself | DR6AGAIN, then FENCEDIR, then DR6 |
-| `corpus-kek`, `publication-secret-domains`, `database-roles` | publication's keys and its clean-up login | ask |
+| `corpus-kek`, `publication-secret-domains`, `database-roles`, `publication-key-store`, `publication-key-cleanup` | publication's keys and its clean-up login: with publishing on (5.9) the new release starts on the same corpus key, key store and clean-up login as the old one, whose lines DR1 copied unchanged (5.9a) | ask |
 | `outbound-mail-policy`, `outbound-mail-store`, or a `PREVIEW_MAIL_…` code | the mail plan (1.5) | ask |
 | `pre-start-writer` | the database step that records the charges before Start | ask |
 | `preview-live-payments`, `preview-asks-open`, `saved-question-key-store` | payments, asks, or the saved questions' keys | ask |
@@ -2071,6 +2079,8 @@ These wait in the database; nothing is lost. This holds on both names, during th
 payments are real (part 7). The site password keeps it small: only people who know it can see a published debate.
 
 **What still happens by itself:**
+On this server the first two points need publishing on (5.9): until PUBON, no debate is public, no Free debate goes
+public, and the Report button has nothing to act on.
 - **Free debates go public.** On the Free plan, a finished debate goes public by itself when two AI checks allow it,
   in this order: the end-of-debate check (below), then the AI check for publication. The page tells the person this
   before they ask. When STAFFCHECK (1.6) says `the AI check for publication and reports: off`, or a check cannot answer
@@ -3978,8 +3988,8 @@ together (the files hold one asks line), and ASKS_OPEN (6.1) is the step for bot
 **Before you open:** mail is open (part 4.3; friends need the verification mail to sign up), payments are the sandbox
 with billing on, and you have read 6.4 (what bounds spending) and 6.5 (the brakes). Do 5.7 first if you can, so
 your staff key works on dezbatere.ro and you can hide a debate by hand during the test. If you have not, tell
-friends that on the Free plan a finished debate goes public by itself when the AI checks allow it (5.1b), and that
-nobody can take it down by hand for now.
+friends that on the Free plan a finished debate goes public by itself when the AI checks allow it (5.1b), once
+publishing is on (5.9), and that nobody can take it down by hand for now.
 
 **If friends buy test plans.** Every open sandbox plan blocks the live start (part 7), so decide this first:
 - Friends may buy test plans only if you withdraw each friend's sandbox plan with WITHDRAWOTHER (3.3) within 14 days
@@ -4350,7 +4360,10 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
 - The AI check for publication and reports can go through the Anthropic gate: AICHECK (end of 6b.1) ends with
   `AICHECK_DONE`, or you have decided to open without it (decision 1 below).
 - With your staff key working, you have read the **Public** tab and used Hide now on anything that must not stay
-  public (Free debates go public by themselves, 5.1b).
+  public (Free debates go public by themselves once publishing is on, 5.9 and 5.1b).
+- Public debates: publishing is on (5.9), or you have decided to open without it. The Free line under the question
+  box and the Terms tell people that a finished Free debate is public; while publishing is off, none is, and the
+  Report button has nothing to act on.
 - NETOPIA's logo shows (LOGOCHECK, part 2).
 - The security review's host-side fixes (NV-51, NV-55's port reservation, NV-56, NV-57) are applied or recorded, as
   part 7's "Before you start" says: the site meets strangers as it will in part 8.
@@ -4514,7 +4527,8 @@ quiet minutes.
      plătiți** the sentence shows; SANDBOXLIST (3.3) is unchanged;
    - only if you want a test plan: a listed account that is not the one you will pay with in part 7 (3.2's rules) buys
      with the test card, and finishes NETOPIA's page;
-   - the AI check (skip this if you open without it, decision 1): run AICHECK (6b.1) and note `calls_today`. A test
+   - the AI check (skip this if you open without it, decision 1, or with publishing off, 5.9): run AICHECK (6b.1)
+     and note `calls_today`. A test
      account of yours on the Free plan asks a short question. A few minutes after its story is written, the debate
      shows on the home page's **Public** tab: the end-of-debate check answers first (at most two minutes after the
      debate finished), then the AI check for publication. If AICHECK showed `UNAVAILABLE` lines just before, the API
@@ -5374,7 +5388,7 @@ holds no working staff key of the Owner account under the name the site answers 
 5.8; PWOFF1 refuses while it is open); mail is open there (4.3: PWOFF1 checks both the
 plan file and the API's mode line); real payments work (part 7); the staff screens are on and your staff key works
 on dezbatere.ro (5.7); with your staff key working, you have read the **Public** tab again and used Hide now on
-anything that went public while your staff key did not work and must not stay public (Free debates go public by themselves, 5.1b);
+anything that went public while your staff key did not work and must not stay public (Free debates go public by themselves once publishing is on, 5.9 and 5.1b);
 NETOPIA's logo shows in the home page's footer (LOGOCHECK, part 2; if it is missing, ask before you take the password
 off); the security review's host-side fixes are applied or recorded (part 7's "Before you start"); you have
 decided your numbers and gate pots (1.7, 6.4); and you have read the
@@ -5561,6 +5575,9 @@ back and step 2 gives asks and buying back to the team. Before step 3, every san
 withdrawn or cancelled (3.3; PAY0, 7.1, until it prints all zeros). Step 3 (PAY_BACK) is needed only if payments were
 ever real. The people who signed up keep their accounts, but cannot reach the site again until part 8 opens it.
 
+**Publishing (5.9) is not one of these steps.** Closing everything leaves it as it is, behind the site password again;
+PUBOFF (5.9b) is its own step, and what it can and cannot undo is said there.
+
 **If the password was ever off with real payments on (part 8), stop and ask before step 1.** Someone outside the
 team may then hold a paid plan. A paid plan renews every month on its saved card until its owner cancels it, and
 both ways to cancel (Settings, and the `/cancel` link in the plan's mails) are behind the site password. Once the
@@ -5593,7 +5610,8 @@ know none of these settings, and they answer only as the test name.
   gates keep this release's gate code, and the shared tools stay this release's and list the Amazon gate. The release
   before runs and its brakes work; a line-up change waits for the next upload of this code. Ask if one cannot wait.
 - **rbD-B brings back the database only.** Key folders destroyed after DR3 stay destroyed: an account deleted since
-  then comes back without its keys, like the unfinished sign-ups below.
+  then comes back without its keys, like the unfinished sign-ups below. With publishing on, 5.9a says what it means
+  for the public debates and their keys, and that the public library stays held until you release it.
 - **The unfinished sign-ups the new release deleted** (UNFINISHED, part 2: at DR6 and every ten minutes after) come
   back with DR3's cold copy, but without their key folders, which the new release destroyed. Those sign-ups cannot be
   finished, and their addresses and pseudonyms stay taken, until a release with this code runs again and deletes them
@@ -5681,9 +5699,10 @@ that service.
 | bare `PREVIEW_API_STARTUP_REFUSED` after stage `outbound-mail-policy` or `outbound-mail-store` | API start | the mail plan, or the mail's own store | put the last good plan back (MAIL_CLOSE, or 1.5); ask |
 | bare `PREVIEW_API_STARTUP_REFUSED` after stage `pre-start-writer` | API start | the database step that records the charges before Start is missing or refused | ask |
 | bare `PREVIEW_API_STARTUP_REFUSED` after stage `saved-question-key-store` | API start | the saved questions' key store | ask |
-| bare `PREVIEW_API_STARTUP_REFUSED` after stage `corpus-kek`, `publication-secret-domains` or `database-roles` | API start | publication's keys or its clean-up login, set up but not as the code needs | ask |
+| bare `PREVIEW_API_STARTUP_REFUSED` after stage `corpus-kek`, `publication-secret-domains`, `database-roles`, `publication-key-store` or `publication-key-cleanup` | API start | publication's corpus key, its key store or its clean-up login, set up but not as the code needs (5.9) | PUBON and PUBOFF put the file before back by themselves; PUBCHECK (5.9) reads each part the start checks; ask |
+| bare `PREVIEW_API_STARTUP_REFUSED` after stage `support-keys` | API start | the support key; with publishing on, also a corpus key that is not the API user's `0600` file of 32 bytes, or holds another key's bytes | as above |
 | bare `PREVIEW_UI_STARTUP_REFUSED` | launcher, website | in an upload, first the website file's proof line or its proof file (SB5c); otherwise a rule outside these locks | in an upload: the stage table of part 2 (DR6); otherwise put back the file you changed; ask |
-| bare `PREVIEW_API_STARTUP_REFUSED`, no stage line | launcher | a rule outside these locks, for example a stray key, or the payments line in local mode or on an older release | put back the file you changed; ask |
+| bare `PREVIEW_API_STARTUP_REFUSED`, no stage line | launcher | a rule outside these locks, for example a stray key, or the payments line in local mode or on an older release; or a publication line the API's settings check refuses (for example `PUBLICATION_ENABLED=true` without `CONTENT_ENCRYPTION_ENABLED=true`, a key path missing, or a clean-up line equal to another login's line: PUBON checks these first) | put back the file you changed (PUBON and PUBOFF do it by themselves); ask |
 | `PREVIEW_EGRESS_REFUSED` | the egress proxy's own journal; the unit fails | a bad label in the drop-in, or both forms at once | PAY_UNDO; check the label |
 | `MODE_OTHER_ACCOUNT` | the egress proxy's journal | the mode question named another Quaderno account | PAY_EGRESS with the label of `live.lines` |
 | bare `PREVIEW_RUNNER_STARTUP_REFUSED` | launcher, runner | the runner file has no preview configuration, or no team and no asks line (`PREVIEW_RUNNER_TEAM_REQUIRED`, not printed by name) | put back the runner file; ask |

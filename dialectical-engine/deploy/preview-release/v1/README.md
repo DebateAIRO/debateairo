@@ -6961,6 +6961,16 @@ older than the one that brought 6b needs MAIN-SITE.md's ASKS_CLOSE first (an old
 signed-in account buy on NETOPIA's sandbox). After SB13b, edit the first line of MAIN-SITE.md's names file, run its
 PWOFF1, the hand edit and PWOFF2 again, then its OPENCHECK.
 
+**While publishing is on** (MAIN-SITE.md 5.9: `PUBLICATION_ENABLED=true` and the corpus key's, the key store's and
+the clean-up login's lines in the API file), DR1's `derive` copies the four lines into the new release's file
+unchanged, PRECHECK prints `publication state A`, and the new API's first start at DR6 uses the same key, store and
+login. No SAME check compares these lines: never change them during an upload (MAIN-SITE.md's PUBON and PUBOFF run
+only outside one). This path has no online backup (SB7), and the cold copy and the nightly backup hold the database
+only: run MAIN-SITE.md's PUBBACKUP in the preparation, before SB1, so the keys of the debates published since its last
+run are in a backup. rbD-B puts back DR3's database only: what went public, was hidden or came down since then is lost
+from it while the key store keeps its files, and the restore fence holds the public library until the owner releases
+it (H11 step 4). Ask before rbD-B when anything went public since DR3 (MAIN-SITE.md 5.9a).
+
 #### DR1. The three env files
 
 ```sh
@@ -6988,8 +6998,10 @@ files. It asks, with the site still up, what DR2 to DR6 and the way back will ne
 `0640`, no key twice) and the old release's files as SB1 copied them; the UI-to-API proof lines and copies (SB5c); the
 fence line, folder and drop-in (FENCEDIR, H11 step 2); that no key store or key file folder sits at or above the
 fence folder (the new API refuses that, `restore-fence-path`); the publication settings' state (`A` with
-`PUBLICATION_ENABLED=true`, `C` without both path lines: nothing new can refuse; `B`, both paths without the true
-line: stop, the corpus key, the store and the cleanup login need a reviewed check first); the database folder (no link
+`PUBLICATION_ENABLED=true`, once MAIN-SITE.md 5.9 switched publishing on and DR1 copied its four lines; `C` without
+both path lines, before it: nothing new can refuse; `B`, both paths without the true line, as MAIN-SITE.md's PUBOFF
+leaves the file once a debate was public: stop, the corpus key, the store and the cleanup login need a reviewed check
+first); the database folder (no link
 in or around it, no extra tablespace) and the free space DR3 needs; the four functions migration 0178 asks about (the
 three that must share the ledger's owner, and the one whose owner must be a superuser) and that no schema
 `erasure_reconcile` exists; that none of the API's, the runner's and the scheduler's logins has a connection limit
@@ -7087,7 +7099,8 @@ echo "the system's daily upgrade next runs: ${UP:-not scheduled}"
 echo PRECHECK_DONE
 ```
 
-What to expect: the read lines above, `key places at or above the fence folder: 0`, `publication state A` or `C`,
+What to expect: the read lines above, `key places at or above the fence folder: 0`, `publication state A` (publishing
+on, MAIN-SITE.md 5.9) or `C` (before it),
 `connection limits of the API, runner and scheduler logins: no limit set`, `sessions idle in a transaction for a minute
 or more: 0`, three `owner against the ledger owner: ... same` lines, the time the system's daily upgrade next runs, and
 then `PRECHECK_DONE`. Do not give the yes within an hour before that upgrade time: an upgrade during the downtime can
