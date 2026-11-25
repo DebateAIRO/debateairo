@@ -1534,10 +1534,12 @@ pubapart() { local k v f; for k in KEK_PATH BLIND_INDEX_KEY_PATH AUDIT_SOURCE_IP
 pubrole() { psqlq "SELECT coalesce((SELECT concat_ws(' ', CASE WHEN NOT r.rolcanlogin THEN 'cannot-sign-in' END, CASE WHEN r.rolsuper OR r.rolcreaterole OR r.rolcreatedb OR r.rolreplication OR r.rolbypassrls THEN 'special-powers' END, CASE WHEN NOT pg_has_role(r.oid, 'debateai_publication_cleanup', 'USAGE') THEN 'no-cleanup-role' END, CASE WHEN pg_has_role(r.oid, 'debateai_runtime', 'MEMBER') OR pg_has_role(r.oid, 'debateai_authorization_runtime', 'MEMBER') THEN 'runtime-member' END, CASE WHEN NOT (has_function_privilege(r.oid, 'serve.claim_publication_key_cleanup(integer)', 'EXECUTE') AND has_function_privilege(r.oid, 'serve.complete_publication_key_cleanup(uuid,uuid,text)', 'EXECUTE') AND has_function_privilege(r.oid, 'serve.claim_publication_key_provision_cleanup(integer)', 'EXECUTE') AND has_function_privilege(r.oid, 'serve.complete_publication_key_provision_cleanup(uuid,uuid)', 'EXECUTE')) THEN 'no-cleanup-functions' END, CASE WHEN coalesce((SELECT bool_or(has_function_privilege(r.oid, p.oid, 'EXECUTE')) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'core' AND p.proname = 'transition_run_publication' AND pg_get_function_identity_arguments(p.oid) = 'uuid, uuid, uuid, uuid, uuid, text, text, uuid, text, jsonb, timestamp with time zone, uuid, uuid, uuid'), false) THEN 'may-publish' END, CASE WHEN has_table_privilege(r.oid, 'serve.publication_key_cleanup_intent', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE') THEN 'cleanup-table-rows' END) FROM pg_roles r WHERE r.rolname = '$CLN'), 'missing')"; }
 pubhba() { psqlq "SELECT coalesce((SELECT concat_ws(' ', auth_method, address, netmask) FROM pg_hba_file_rules WHERE error IS NULL AND type = 'hostssl' AND database && ARRAY['all', 'debateai'] AND user_name && ARRAY['all', '$1'] ORDER BY rule_number LIMIT 1), 'none')"; }
 pubcounts() { psqlq "SELECT concat_ws(' ', (SELECT count(*) FROM serve.publication_snapshot), (SELECT count(*) FROM (SELECT DISTINCT ON (run_id) state FROM core.run_visibility_event ORDER BY run_id, at_seq DESC) v WHERE v.state = 'PUBLISHED'), (SELECT count(*) FROM serve.publication_snapshot s WHERE NOT EXISTS (SELECT 1 FROM serve.publication_key_cleanup_intent c WHERE c.publication_ref = s.publication_ref AND c.completed_at IS NOT NULL)), (SELECT count(*) FROM identity.free_public_ask WHERE outcome IS NULL), (SELECT count(*) FROM identity.free_public_ask WHERE outcome = 'PUBLISHED'), (SELECT count(*) FROM identity.free_public_ask WHERE outcome = 'REFUSED'), (SELECT count(*) FROM serve.publication_key_cleanup_intent WHERE completed_at IS NULL), (SELECT count(*) FROM serve.publication_key_provision_intent), (SELECT count(*) FROM core.run_visibility_event) + (SELECT count(*) FROM core.publication_ref_tombstone))"; }
+pubused() { local c n po ev; c=$(pubcounts) || return 1; read -r n _ _ _ _ _ _ po ev <<<"$c"; ! grep -qE '^(CORPUS_KEK_PATH|PUBLICATION_KEY_STORE_PATH)=' "$A" || printf 'the API file names them; '; [ -z "$(find "$PUB" -maxdepth 1 -type d -name 'backup-*' 2>/dev/null)" ] || printf 'a PUBBACKUP holds them; '; [ "$(keyfiles)" = 0 ] || printf 'the store holds publication keys; '; [ "$n/$po/$ev" = 0/0/0 ] || printf 'the database holds publications; '; }
 staffkey() { psqlq "SELECT count(*) FROM staff.owner_designation d JOIN staff.subject s USING (staff_id) JOIN identity.mfa_factor f ON f.user_id = s.user_id JOIN identity.staff_webauthn_metadata m ON m.mfa_factor_id = f.mfa_factor_id WHERE d.active AND s.state = 'ACTIVE' AND m.user_id = f.user_id AND f.factor_type = 'passkey' AND f.state = 'active' AND f.verified_at IS NOT NULL AND f.backup_eligible = false AND f.backup_state = false AND f.user_verification_required AND f.relying_party_id = '$HOST' AND f.credential_origin = 'https://$HOST'"; }
 aion() { [ -f "$CAPI/dialectical-engine/apps/api/src/publication-check/gate-transport.ts" ] && [ -n "$(sed -n 's/^PREVIEW_PROVIDER_TEST_CONFIG_JSON=//p' "$A" | jq -r '.anthropic_budget_socket // empty' 2>/dev/null || true)" ]; }
 mailmode() { inv "$API" | sed -n 's/^PREVIEW_MAIL_MODE {"mode":"\([a-z-]*\)".*/\1/p' | tail -n 1; }
 pubbackup() { [ -n "$1" ] && [ -d "$1" ] && [ ! -L "$1" ] && [ "$(stat -c '%a %U' "$1")" = '700 root' ] && ( cd "$1" && sha256sum -c --quiet online.sha256 > /dev/null 2>&1 ) && [ "$(tar -tf "$1/online-keys.tar" 2>/dev/null | grep -cxF -e "${KP#/}" -e "${PS#/}/" || true)" = 2 ] && tar -xOf "$1/online-keys.tar" "${KP#/}" 2>/dev/null | cmp -s - "$KP"; }
+apinew() { local v s; [ "$(systemctl is-active "$API" || true)" = active ] || return 1; v=$(systemctl show -p ExecMainStartTimestamp --value "$API"); [ -n "$v" ] && [ "$v" != n/a ] || return 1; s=$(date -d "$v" +%s 2>/dev/null) || return 1; [ "$s" -gt "$(stat -c %Y "$A")" ]; }
 pubprobe() { ( cd "$CAPI/dialectical-engine" && runuser -u "$AU" -- /usr/bin/env -i PATH=/usr/bin:/bin "$N" --import tsx --input-type=module -e 'const { default: pg } = await import("pg"); const { assertPublicationCleanupDatabaseRole: check } = await import("./packages/db/src/publication.ts"); let t = ""; for await (const c of process.stdin) t += c; const m = /^PUBLICATION_CLEANUP_DATABASE_URL=(\S+)$/.exec(t.trim()); if (m === null) { console.log("no line to try"); process.exit(1); } const code = (e) => /^[A-Z0-9_]{1,40}$/.test(String(e?.code)) ? e.code : "no code"; const pool = new pg.Pool({ connectionString: m[1], max: 1, connectionTimeoutMillis: 5000 }); let out = "accepted"; try { (await pool.connect()).release(); } catch (e) { out = e?.code === "28P01" ? "the database refuses its password" : e?.code === "28000" ? "pg_hba.conf does not let it in" : "it does not connect (" + code(e) + ")"; } if (out === "accepted") { try { await check(pool); } catch (e) { out = "it signs in, but the API role check refuses it" + (e?.message === "PUBLICATION_CLEANUP_DATABASE_ROLE_INVALID" ? "" : " (" + code(e) + ")"); } } await pool.end().catch(() => {}); console.log(out); process.exitCode = out === "accepted" ? 0 : 1;' ) < "$1"; }
 EOF
 } > "$M/names.sh.new"
@@ -1603,11 +1605,14 @@ What the helpers do, in short:
   whether the API's unit may write the store; `keyfiles` counts the publication keys in it; `pubapart` names any key,
   store or the restore fence that the two would overlap (the code refuses each). `pubrole` names what the API's role
   check would refuse in the clean-up login (nothing, when all is right); `pubhba` reads the first `pg_hba.conf` line
-  that would let a login in; `pubcounts` counts the database's publications; `staffkey` counts the Owner's working
-  staff keys under the name the site answers as (PWOFF1's count); `aion` says whether the AI check for publication
-  and reports is on (STAFFCHECK's rule); `mailmode` reads the running API's mail mode; `pubbackup` checks one backup
-  folder of PUBBACKUP; `pubprobe` tries a clean-up line as the API will: as the API's user, with the release's own
-  role check, printing one plain answer and never the line.
+  that would let a login in; `pubcounts` counts the database's publications; `pubused` names what has used a corpus
+  key and a store already (the API file, a PUBBACKUP, the store's keys, the database's publications), and prints
+  nothing when nothing has; `staffkey` counts the Owner's working staff keys under the name the site answers as
+  (PWOFF1's count); `aion` says whether the AI check for publication and reports is on (STAFFCHECK's rule);
+  `mailmode` reads the running API's mail mode; `pubbackup` checks one backup folder of PUBBACKUP; `apinew` says
+  whether the running API started after the API file's last change, so that it runs on the file as it is now;
+  `pubprobe` tries a clean-up line as the API will: as the API's user, with the release's own role check, printing one
+  plain answer and never the line.
 
 ### 3.1 Check that every lock is closed (read-only)
 
@@ -3485,7 +3490,10 @@ become public. Claude runs nothing on the server.
 **Before you start.**
 - No upload is under way or being prepared: not from an upload's preparation (1.8, where SB1 copies the API file) to
   its end (part 2, step 33). PRECHECK holds the old release's files to SB1's copies, and the way back starts the old
-  release from them.
+  release from them. This holds for the upload that brought the running release too: until its step 33, its rbD-B
+  can still start the release before, from that release's own file, which has none of publishing's lines. PUBON
+  refuses while a newer upload's names file is in `/root/preview-archive` (its preparation has begun); the rest of
+  this rule no script can see, so keep it yourself.
 - LOCKS0 (3.0) ran with this version of the guide, so the names file has publishing's helpers. Every step below stops,
   with nothing changed, without them.
 - 5.7 is done: the staff screens are on, and your staff key works under the name the site answers as. Without it,
@@ -3504,6 +3512,11 @@ become public. Claude runs nothing on the server.
 4. How often to run PUBBACKUP again (step 4): each public debate's key is only on the server until the next one.
 5. Whether a copy of those backups should also be kept off the server. They hold every key of the site, so that is a
    decision of its own: ask.
+6. Before an upload while publishing is off with the keys kept (state B, 5.9b): PUBON first, which the upload's
+   PRECHECK accepts and which shows the public debates again, or ask for the reviewed check that state B needs.
+7. Old PUBBACKUP folders: each holds every key and every database, and no step removes one. Keep at least the newest
+   one (the one PUBCHECK checks); ask before you remove any. PUBBACKUP says when the free space falls below what an
+   upload's PRECHECK needs.
 
 **1. Where the server stands (PUBCHECK).** It only reads. Run it first, and again whenever you want to know where
 publishing stands.
@@ -3526,9 +3539,11 @@ grep -q "'CORPUS_KEK_PATH'" "$L/backup.mjs" && grep -q '^export function scramSh
 [ "$(grep -c '^CORPUS_KEK_PREVIOUS_PATH=' "$A" || true)" = 0 ] || bad "the API file holds CORPUS_KEK_PREVIOUS_PATH (a change of the corpus key, which no step of this guide makes)"
 for KV in "CORPUS_KEK_PATH=$KP" "PUBLICATION_KEY_STORE_PATH=$PS"; do [ "$(grep -c "^${KV%%=*}=" "$A" || true)" = 0 ] || grep -qxF "$KV" "$A" || bad "the API file's ${KV%%=*} line names another path than this guide's"; done
 [ "$(dirname "$(sed -n 's/^KEK_PATH=//p' "$A")")" = "${KP%/*}" ] && [ ! -L "${KP%/*}" ] && [ "$(stat -c '%a %U' "${KP%/*}")" = "700 $AU" ] || bad "${KP%/*} is not the API's own 0700 key folder, the one its KEK_PATH names"
-if [ ! -e "$KP" ]; then echo "corpus key: not made yet"; todo PUBKEYS; elif keyok; then echo "corpus key: made, as the code needs (the API's user, 0600, 32 bytes, one link, in its 0700 folder)"; else bad "the corpus key $KP is there, but is not the API user's 0600 file of 32 bytes with one link"; fi
+U=$(pubused) || { echo "PUBCHECK_NOT_DONE: the database is unreadable: ask"; exit 1; }; U=${U%; }
+if [ ! -e "$KP" ] && [ -z "$U" ]; then echo "corpus key: not made yet"; todo PUBKEYS; elif [ ! -e "$KP" ]; then bad "the corpus key $KP is missing, although publishing used it already ($U): a new one would not open what the old one locked, and no step of 5.9 makes one then; the old one is in the newest PUBBACKUP"; elif keyok; then echo "corpus key: made, as the code needs (the API's user, 0600, 32 bytes, one link, in its 0700 folder)"; else bad "the corpus key $KP is there, but is not the API user's 0600 file of 32 bytes with one link"; fi
+for K in KEK_PATH BLIND_INDEX_KEY_PATH AUDIT_SOURCE_IP_SALT_PATH SUPPORT_KEK_PATH RECORDS_KEY_PATH; do V=$(sed -n "s/^$K=//p" "$A"); [ -z "$V" ] || [ ! -e "$KP" ] || ! cmp -s "$V" "$KP" || bad "the corpus key holds the same bytes as the key $K names"; done
 [ -d "${PS%/*}" ] && [ ! -L "${PS%/*}" ] || bad "${PS%/*} is not a folder"
-if [ ! -e "$PS" ]; then echo "key store: not made yet"; todo PUBKEYS; elif storeok; then echo "key store: made, as the code needs (the API's user and group, 0700), with $(keyfiles) publication keys in it"; else bad "the key store $PS is there, but is not the API's 0700 folder"; fi
+if [ ! -e "$PS" ] && [ -z "$U" ]; then echo "key store: not made yet"; todo PUBKEYS; elif [ ! -e "$PS" ]; then bad "the key store $PS is missing, although publishing used it already ($U): no step of 5.9 makes a new one then; the old one is in the newest PUBBACKUP"; elif storeok; then echo "key store: made, as the code needs (the API's user and group, 0700), with $(keyfiles) publication keys in it"; else bad "the key store $PS is there, but is not the API's 0700 folder"; fi
 AP=$(pubapart); [ -z "$AP" ] || bad "the corpus key or the key store is not apart from: $AP(the code refuses that)"
 if storewrite; then echo "the API may write the key store: yes"; else echo "the API may write the key store: no"; todo PUBKEYS; fi
 [ -s "$KF" ] && [ "$(grep -c '' "$KF")" = 2 ] && grep -qxF "CORPUS_KEK_PATH=$KP" "$KF" && grep -qxF "PUBLICATION_KEY_STORE_PATH=$PS" "$KF" || todo PUBKEYS
@@ -3548,9 +3563,12 @@ if aion; then echo "the AI check for publication and reports: on, through the An
 MM=$(mailmode || true); echo "mail: ${MM:-did not read} (statements of reasons and answers to reports go out like other account mail)"
 PW=$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login" || true)
 if [ "$PW" = 401 ]; then echo "the site password: on"; else first "PWON (8.4): the site does not ask for the password (its Log in page answered $PW), and publishing goes on only behind it"; fi
+if apinew; then echo "the running API started on the API file as it is now: yes"; else bad "the running API did not start on the API file as it is now: a step that changes the file stopped before its restart ended (PUBON, PUBOFF or another one), so the API may serve another state than the file says"; fi
 C=$(pubcounts) || { echo "PUBCHECK_NOT_DONE: the database is unreadable: ask"; exit 1; }
 read -r NS NP NE FW FP FR CO PO EV <<<"$C"
 echo "the database: publications ever made $NS (public now, hidden ones included, $NP); Free debates waiting to go public $FW, gone public $FP, kept private $FR; key clean-ups waiting $CO; publications being made $PO"
+KC=$(keyfiles); echo "publication keys in the store: $KC; the database expects $NE"
+[ "$KC" -ge "$NE" ] || echo "the store holds fewer keys than the database expects: a key is lost, or a clean-up is under way; run PUBCHECK again in a minute, and if it says this again, ask (PUBON refuses meanwhile)"
 T=''; for S in PUBKEYS PUBLOGIN PUBBACKUP; do case " $TODO " in *" $S "*) T="$T $S";; esac; done; [ "$ST" = A ] || T="$T PUBON"
 if [ -n "$T" ]; then echo "still to do, in this order:$T"; else echo "publishing is on, and nothing of 5.9 is left to do"; fi
 [ -z "$BAD" ] || { echo "PUBCHECK_NOT_DONE: something is not as the code needs (the NOT AS THE CODE NEEDS lines above); no step of 5.9 changes it: ask"; exit 1; }
@@ -3566,10 +3584,13 @@ PUBKEYS PUBLOGIN PUBBACKUP PUBON`, then `PUBCHECK_DONE`. Read the other lines:
   and AICHECK, or PWON. PUBKEYS, PUBLOGIN and PUBBACKUP may run before it: they change nothing on the site.
 - `NOT AS THE CODE NEEDS: …` means the server is not as this section expects, in a way no step here changes (for
   example the clean-up login's grants, `pg_hba.conf`, or `CONTENT_ENCRYPTION_ENABLED`). The last line is then
-  `PUBCHECK_NOT_DONE`: ask, and give that line.
+  `PUBCHECK_NOT_DONE`: ask, and give that line. Two such lines need you at once: `the corpus key … is missing,
+  although publishing used it already` (or the same for the key store), and `the running API did not start on the
+  API file as it is now`. For both, run no other step of 5.9 before you have asked.
 - `the clean-up login: password set …` says whether the login had a password before PUBLOGIN (no guide records one),
   whether it ends, and how many sessions it has now (0 before PUBON; up to 4 after it).
-- `the database: …` is all 0 before the switch. After it, it counts what went public.
+- `the database: …` and `publication keys in the store: …` are all 0 before the switch. After it, they count what
+  went public.
 
 **2. The corpus key and the key store (PUBKEYS).** The corpus key is the one key that locks the keys of every public
 debate. The script makes it as 32 random bytes, written as the API's user straight into its file, so nobody sees it:
@@ -3582,7 +3603,10 @@ outside the restore fence's folder (`…/api/restore-fence`), neither inside it 
 otherwise, and the script checks the same rule first. The API may write only the folders its unit lists; when its
 unit does not list the store, the script adds a drop-in that lists it, `zzzzzzzzzz-keys-publication.conf`, and
 reloads systemd. The running API is unchanged until its next start (PUBON). Run it again at any time: it never makes a
-key that exists, and changes nothing that is already right.
+key that exists, and changes nothing that is already right. It makes the key and the store only while nothing has
+used one yet: once the API file names them, a PUBBACKUP holds them, or the store or the database holds a
+publication, a new key would not open what the old one locked. If the key or the store is missing then, PUBKEYS
+stops, makes nothing, and you ask: the old ones are in the newest PUBBACKUP.
 
 ```sh
 set -euo pipefail
@@ -3596,6 +3620,11 @@ for KV in "CORPUS_KEK_PATH=$KP" "PUBLICATION_KEY_STORE_PATH=$PS"; do [ "$(grep -
 AP=$(pubapart); [ -z "$AP" ] || { echo "PUBKEYS_NOT_DONE: the corpus key or the key store would not be apart from: $AP(the code refuses that); nothing changed: ask"; exit 1; }
 [ -d "${PDROP%/*}" ] || { echo "PUBKEYS_NOT_DONE: the API's template drop-in folder is missing (this is not the template layout); nothing changed: ask"; exit 1; }
 [ ! -e "$KP.new" ] || { echo "PUBKEYS_NOT_DONE: $KP.new exists (an earlier run stopped half-way); nothing changed: ask"; exit 1; }
+MISS=''; [ -e "$KP" ] || MISS='the corpus key'; [ -e "$PS" ] || MISS="${MISS:+$MISS and }the key store"
+if [ -n "$MISS" ]; then
+  U=$(pubused) || { echo "PUBKEYS_NOT_DONE: the database is unreadable; nothing changed: ask"; exit 1; }
+  [ -z "$U" ] || { echo "PUBKEYS_NOT_DONE: $MISS is missing, although publishing used it already (${U%; }); nothing changed: a new one would not open what the old one locked, and the old one is in the newest PUBBACKUP: ask"; exit 1; }
+fi
 if [ -e "$KP" ]; then
   keyok || { echo "PUBKEYS_NOT_DONE: $KP is there, but is not the API user's 0600 file of 32 bytes with one link; nothing changed: ask"; exit 1; }
   echo "corpus key: there already, as the code needs; it is never made again"
@@ -3626,8 +3655,9 @@ exit 0
 
 Expect the `corpus key: made …` and `key store: made …` lines, one line about the API's permission, the line about the
 two kept lines, then `PUBKEYS_DONE`. Run again, it says `there already` for both. A `PUBKEYS_NOT_DONE` that says `nothing
-changed` changed nothing; any other one: ask before anything else. The way back, before PUBON: none is needed. The key
-and the empty store are read by nothing while the API file does not name them; to take the drop-in out again, ask.
+changed` changed nothing; any other one: ask before anything else. `… is missing, although publishing used it
+already`: ask at once, and run no other step of 5.9 first. The way back, before PUBON: none is needed. The key and the
+empty store are read by nothing while the API file does not name them; to take the drop-in out again, ask.
 
 **3. The clean-up login's password and its line (PUBLOGIN).** The API uses a login of its own,
 `debateai_prod_api_publication_cleanup`, to destroy the key of a public debate that comes down or is deleted. The login
@@ -3749,7 +3779,9 @@ store: yes`.
 Each debate that goes public later gets its own key in the store, after this backup: PUBCHECK and PUBAFTER count the
 keys made since the newest PUBBACKUP. Run PUBBACKUP again whenever you want them in a backup too, and always in an
 upload's preparation (5.9a). Each run writes a new folder and deletes nothing. A backup holds every key of the site
-and every database: it stays root-only on this server, and it is no off-site copy.
+and every database: it stays root-only on this server, and it is no off-site copy. The folders add up: PUBBACKUP
+counts them, and says when the free space on `/` falls below what an upload's PRECHECK needs. Which older ones may go
+is your decision 7: ask before you remove any.
 
 ```sh
 set -euo pipefail
@@ -3772,13 +3804,17 @@ jq -c '{event, databases, keys, files: [.files[] | {name, bytes}]}' <<<"$BK"
 pubbackup "$OB" || { echo "PUBBACKUP_NOT_DONE: the backup's files do not match its sums, or it does not hold this corpus key and the key store: ask"; exit 1; }
 { ( umask 077; printf '%s\n' "$OB" > "$BF.new" ) && mv -f "$BF.new" "$BF"; } || { echo "PUBBACKUP_NOT_DONE: the backup is good, but its name was not kept in $BF: ask"; exit 1; }
 echo "the backup in $OB holds the corpus key and the key store ($(keyfiles) publication keys in the store now), every database and the roles"
+echo "PUBBACKUP folders kept: $(find "$PUB" -maxdepth 1 -type d -name 'backup-*' | grep -c . || true)"
+SIZE=$(du -sm /var/lib/postgresql/18/v3-preview 2>/dev/null | cut -f1 || true); AVAIL=$(df --output=avail -BM / | tail -1 | tr -dc 0-9)
+[ -n "$SIZE" ] && [ -n "$AVAIL" ] && [ "$AVAIL" -gt $((SIZE * 2 + 2048)) ] || echo "the free space on / is now below what an upload's PRECHECK needs (twice the database folder and 2 GB more): before the next upload, ask which older PUBBACKUP folders may go"
 echo PUBBACKUP_DONE
 exit 0
 ```
 
 Expect one line with the backup's databases, the names of the keys it holds (`CORPUS_KEK_PATH` and
-`PUBLICATION_KEY_STORE_PATH` among them) and its files with their sizes in bytes, then `the backup in …`, then
-`PUBBACKUP_DONE`. `KEYS_FAILED` means a key store changed while the tool read it (for example a new account's key, or a
+`PUBLICATION_KEY_STORE_PATH` among them) and its files with their sizes in bytes, then `the backup in …`, the count
+of PUBBACKUP folders, then `PUBBACKUP_DONE`. A line `the free space on / is now below what an upload's PRECHECK
+needs` does not stop anything now: ask before the next upload. `KEYS_FAILED` means a key store changed while the tool read it (for example a new account's key, or a
 debate that went public at that moment): run PUBBACKUP again. Any other `PUBBACKUP_NOT_DONE`: ask. To restore from such a backup is a step of its own, which no
 guide has yet: ask.
 
@@ -3799,8 +3835,12 @@ K=$PUB/api-$LABEL.env.before-pubon-$(date -u +%Y%m%dT%H%M%SZ)
 ST=$(pubstate "$A")
 if [ "$ST" = A ]; then
   for P in PUBLICATION_ENABLED CORPUS_KEK_PATH PUBLICATION_KEY_STORE_PATH PUBLICATION_CLEANUP_DATABASE_URL; do [ "$(grep -c "^$P=" "$A" || true)" = 1 ] || { echo "PUBON_NOT_DONE: publishing is on in the API file, but $P is not there exactly once; nothing changed: ask"; exit 1; }; done
-  echo "publishing is on already; nothing changed"; echo PUBON_DONE; exit 0
+  apinew || { echo "PUBON_NOT_DONE: the API file says publishing is on, but the running API did not start on the file as it is now (an earlier PUBON stopped before its restart ended; the file before is the newest $PUB/api-$LABEL.env.before-pubon-… copy); nothing changed: ask"; exit 1; }
+  echo "publishing is on already, and the running API started on the file as it is now; nothing changed"; echo PUBON_DONE; exit 0
 fi
+NF=$(sed -n '1s/^\. //p' "$M/names.sh"); [ -f "$NF" ] && [ -z "$(find "${NF%/*}" -maxdepth 1 -name 'r*-names.sh' -newer "$NF" 2>/dev/null)" ] || { echo "PUBON_NOT_DONE: ${NF%/*} holds an upload's names file newer than the one the names file reads (an upload is being prepared), or the names file's first line names no file: publishing goes on only outside an upload; nothing changed: ask"; exit 1; }
+C=$(pubcounts) || { echo "PUBON_NOT_DONE: the database is unreadable; nothing changed: ask"; exit 1; }
+read -r NS NP NE FW FP FR CO PO EV <<<"$C"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login" || true)" = 401 ] || { echo "PUBON_NOT_DONE: the site does not ask for the password: publishing goes on only behind it (PWON, 8.4, first); nothing changed"; exit 1; }
 grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" && [ "$(staffkey || echo 0)" -ge 1 ] 2>/dev/null || { echo "PUBON_NOT_DONE: the staff screens are off, or the Owner has no working staff key under $HOST, so nobody could hide a public debate by hand: 5.7 first; nothing changed"; exit 1; }
 aion || { echo "PUBON_NOT_DONE: the AI check for publication and reports is off (STAFFCHECK, 1.6), so nothing could pass it; nothing changed: ask"; exit 1; }
@@ -3817,6 +3857,7 @@ if [ "$ST" = B ]; then
 elif [ "$(grep -cE '^(CORPUS_KEK_PATH|PUBLICATION_KEY_STORE_PATH|PUBLICATION_CLEANUP_DATABASE_URL)=' "$A" || true)" = 0 ]; then MODE=first
 else echo "PUBON_NOT_DONE: the API file holds some of the publication lines but not all of them; nothing changed: ask"; exit 1; fi
 keyok && storeok || { echo "PUBON_NOT_DONE: the corpus key or the key store is not as PUBKEYS makes them (PUBKEYS first); nothing changed"; exit 1; }
+KC=$(keyfiles); [ "$KC" -ge "$NE" ] || { echo "PUBON_NOT_DONE: the key store holds $KC publication keys, but the database expects $NE: a key is lost, or a clean-up is under way; nothing changed: run PUBCHECK in a minute, and if the two still differ, ask"; exit 1; }
 storewrite || { echo "PUBON_NOT_DONE: the API's unit does not list the key store as a write path (PUBKEYS first); nothing changed"; exit 1; }
 AP=$(pubapart); [ -z "$AP" ] || { echo "PUBON_NOT_DONE: the corpus key or the key store is not apart from: $AP(the code refuses that); nothing changed: ask"; exit 1; }
 W=$(pubprobe "$LF" || true); [ "$W" = accepted ] || { echo "PUBON_NOT_DONE: the clean-up line is not accepted ($W): PUBLOGIN again; nothing changed"; exit 1; }
@@ -3830,7 +3871,6 @@ mv "$A.new" "$A" || { rm -f "$A.new" "$K"; echo "PUBON_NOT_DONE: the new file wa
 echo "in the API file: publishing on ($([ "$MODE" = again ] && echo 'the kept lines stay' || echo 'with the corpus key, the key store and the clean-up login'); the file before is $K); the API restarts"
 R=0; apiup || R=$?
 if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the file with publishing on'); { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "PUBON_NOT_DONE: $WHY, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; { apistart && webup; } || { echo "PUBON_NOT_DONE: $WHY; the file before is back, but the API or the website did not start on it either (the line above says which): the site is DOWN: ask at once"; exit 1; }; echo "PUBON_NOT_DONE: $WHY; the file before is back, and the API and the website started on it, with publishing off: run PUBCHECK, then ask"; exit 1; fi
-! said -F '[PUBLICATION_CUSTODY_NOT_CONFIGURED]' && ! said -F '[PUBLICATION_KEY_CLEANUP_NOT_CONFIGURED]' || { echo "PUBON_NOT_DONE: the API started, but its journal says publishing is not set up: run PUBAFTER, then ask"; exit 1; }
 echo PUBON_DONE
 exit 0
 ```
@@ -3841,6 +3881,12 @@ Expect the `in the API file: publishing on …` line, the API's start lines (`PR
   A refusal of the publication lines often shows only a bare `PREVIEW_API_STARTUP_REFUSED`, with a stage line before
   it or none (part 10). Run PUBCHECK, which reads most of what the start checks, then ask, and give both last lines.
 - `the site is DOWN`: ask at once.
+- `the running API did not start on the file as it is now`: an earlier PUBON stopped after it changed the file and
+  before the API's restart ended (for example the ssh window closed). The site may be down, or may still run with
+  publishing off. Ask at once.
+- No last line at all (the window closed while PUBON ran): treat it as `PUBON_NOT_DONE` and ask. PUBCHECK shows
+  where it stopped: its line `the running API started on the API file as it is now: yes`, or the line that says it
+  did not.
 - From `PUBON_DONE` on, publishing is on. Run PUBAFTER next.
 
 **6. After the switch (PUBAFTER).** It only reads. Run it right after PUBON, again after the tries of step 7, and on
@@ -3854,7 +3900,7 @@ declare -F pubprobe >/dev/null || { echo "PUBAFTER_NOT_DONE: the names file is f
 [ "$(pubstate "$A")" = A ] || { echo "PUBAFTER_NOT_DONE: the API file does not have publishing on (PUBON first)"; exit 1; }
 NO=''; nope() { echo "not as expected: $1"; NO=yes; }
 [ "$(systemctl is-active "$API" || true)" = active ] && said -F 'PREVIEW_API_STARTED ' || nope "the API is not running, or its journal has no start line since its last start"
-! said -F '[PUBLICATION_CUSTODY_NOT_CONFIGURED]' && ! said -F '[PUBLICATION_KEY_CLEANUP_NOT_CONFIGURED]' || nope "the API's journal says publishing is not set up"
+apinew || nope "the running API did not start on the API file as it is now: a step that changes the file stopped before its restart ended, so the API may run with publishing off"
 P=$(inv "$API" | grep -cF '[PUBLICATION_KEY_CLEANUP_PENDING]' || true); G=$(inv "$API" | grep -cF '[PUBLIC_PAGE_WORK_PENDING]' || true)
 echo "since the API's start: failed passes of the key clean-up $P (one every 30 seconds), failed passes of the public pages $G (one every 15 seconds)"
 [ "$P" = 0 ] || nope "a pass of the key clean-up failed"
@@ -3876,7 +3922,8 @@ echo PUBAFTER_DONE
 exit 0
 ```
 
-Right after PUBON expect: no `not as expected` line, `failed passes of the key clean-up 0`, the counts all 0, `publication
+Right after PUBON expect: no `not as expected` line (one of them is `the running API did not start on the API file as
+it is now`: ask at once), `failed passes of the key clean-up 0`, the counts all 0, `publication
 keys in the store: 0; the database expects 0`, `publication keys made since the newest PUBBACKUP: 0`, then
 `PUBAFTER_DONE`. Later the counts grow with what goes public. `failed passes of the public pages` above 0 now and then
 is the API's own retry; if it grows on every run, ask. `failed passes of the key clean-up` above 0: ask. Its journal
@@ -3922,7 +3969,9 @@ Then run PUBAFTER again: its counts show what went public.
 **To confirm on the server.** These steps were tested on throwaway files, with stand-ins for the server's parts, not
 on this server. Only the server can show: that the API starts with the publication lines (PUBON puts the file before
 back if it does not); that the API's unit lists the store as a write path after PUBKEYS; that the clean-up login signs
-in with its new password through `pg_hba.conf`'s line (PUBLOGIN tries it); and the online backup's size and time.
+in with its new password through `pg_hba.conf`'s line (PUBLOGIN tries it); that systemd's start time of the API
+reads as later than the API file's last change (PUBCHECK's line `the running API started on the API file as it is now:
+yes`; a `no` on the first run, before any step of 5.9: ask); and the online backup's size and time.
 The first time, do each step slowly, and ask if a line differs from the ones above.
 
 ### 5.9a Later uploads, and the way back, with publishing on
@@ -3938,8 +3987,8 @@ The first time, do each step slowly, and ask if a line differs from the ones abo
 - **At DR6** the new API's first start reads the same key, store and login (the stages `corpus-kek`,
   `publication-secret-domains`, `database-roles`, `publication-key-store`, `publication-key-cleanup` and
   `support-keys`). A refusal there is in part 2's stage table: ask.
-- **rbD-A** starts the old release from its own file. That file holds the lines (they went in while it ran), so the
-  public debates are served as before.
+- **rbD-A** starts the old release from its own file. As PUBON runs only outside an upload, that file holds the lines
+  (they went in while it ran, before the upload began), so the public debates are served as before.
 - **rbD-B** puts back DR3's copy of the database only. Everything about public debates written after DR3 is lost from
   the database: a debate that went public, a hide, a report. The keys made since stay in the key store, and nothing
   removes them. A debate taken down or deleted since DR3 comes back as public in the database, without its key, so
@@ -3955,8 +4004,10 @@ the **Public** tab comes back empty, a public page answers "not found", nobody s
 nothing to act on. It never touches the debates themselves. What it does with the lines depends
 on what the database holds:
 - **No debate was ever published** (the database has no publication and the key store no key): it takes the four
-  lines out and puts back `PUBLICATION_ENABLED=false`. The server is back where it was before PUBON. The corpus key, the
-  empty store, the drop-in, the kept lines and the clean-up login's password stay, unused: PUBON can use them again.
+  lines out and puts back `PUBLICATION_ENABLED=false`. Free debates started while publishing was on and not yet public
+  still wait, and go public at the next PUBON if the checks allow it, however old they are: PUBOFF prints how many.
+  The corpus key, the empty store, the drop-in, the kept lines and the clean-up login's password stay, unused: PUBON
+  can use them again.
 - **A debate was ever published**: it changes only `PUBLICATION_ENABLED=true` to `=false`, and keeps the corpus key's,
   the store's and the clean-up login's lines. Taking them out too would leave the database with keys nothing can
   destroy: every deletion of an account or a debate that ever had a public page would wait for ever.
@@ -3982,8 +4033,11 @@ declare -F upfail >/dev/null || { echo "PUBOFF_NOT_DONE: the names file is from 
 declare -F pubprobe >/dev/null || { echo "PUBOFF_NOT_DONE: the names file is from an earlier version of this guide (no pubprobe); nothing changed: run LOCKS0 (3.0) again, then PUBOFF"; exit 1; }
 K=$PUB/api-$LABEL.env.before-puboff-$(date -u +%Y%m%dT%H%M%SZ)
 ST=$(pubstate "$A")
-[ "$ST" != C ] || { echo "publishing is off already, and the API file names none of its keys; nothing changed"; echo PUBOFF_DONE; exit 0; }
-[ "$ST" != B ] || { echo "publishing is off already; the API file keeps the keys' and the clean-up login's lines (5.9b); nothing changed"; echo PUBOFF_DONE; exit 0; }
+if [ "$ST" != A ]; then
+  apinew || { echo "PUBOFF_NOT_DONE: the API file says publishing is off, but the running API did not start on the file as it is now (an earlier PUBOFF stopped before its restart ended; the file before is the newest $PUB/api-$LABEL.env.before-puboff-… copy): it may still serve the public pages, or be down; nothing changed: ask at once"; exit 1; }
+  [ "$ST" != C ] || { echo "publishing is off already, and the API file names none of its keys; the running API started on the file as it is now; nothing changed"; echo PUBOFF_DONE; exit 0; }
+  echo "publishing is off already; the API file keeps the keys' and the clean-up login's lines (5.9b); the running API started on the file as it is now; nothing changed"; echo PUBOFF_DONE; exit 0
+fi
 for P in PUBLICATION_ENABLED CORPUS_KEK_PATH PUBLICATION_KEY_STORE_PATH PUBLICATION_CLEANUP_DATABASE_URL; do [ "$(grep -c "^$P=" "$A" || true)" = 1 ] || { echo "PUBOFF_NOT_DONE: publishing is on, but $P is not in the API file exactly once; nothing changed: ask"; exit 1; }; done
 C=$(pubcounts) || { echo "PUBOFF_NOT_DONE: the database is unreadable; nothing changed: ask"; exit 1; }
 read -r NS NP NE FW FP FR CO PO EV <<<"$C"
@@ -4006,6 +4060,7 @@ if [ "$MODE" = clean ]; then
   C=$(pubcounts) || { echo "PUBOFF_NOT_DONE: publishing is off, but the database is unreadable, so it is not known whether a debate went public meanwhile: ask"; exit 1; }
   read -r NS NP NE FW FP FR CO PO EV <<<"$C"
   [ "$NS/$PO/$EV/$(keyfiles)" = 0/0/0/0 ] || { echo "PUBOFF_NOT_DONE: a debate went public while publishing was being switched off, and the API file now names no key for it: ask at once"; exit 1; }
+  echo "kept: $FW Free debates waiting, started while publishing was on; they go public at the next PUBON if the checks allow it"
 else
   ! said -F '[PUBLICATION_CUSTODY_NOT_CONFIGURED]' && ! said -F '[PUBLICATION_KEY_CLEANUP_NOT_CONFIGURED]' || { echo "PUBOFF_NOT_DONE: the API started with publishing off, but its journal says the keys are not set up: ask"; exit 1; }
   echo "kept: $NP debates recorded as public, $FW Free debates waiting; the next upload's PRECHECK stops on state B: ask before it (5.9b)"
@@ -4014,8 +4069,11 @@ echo PUBOFF_DONE
 exit 0
 ```
 
-Expect the `in the API file: publishing off …` line, the API's start lines, the `kept:` line when debates were
-published, then `PUBOFF_DONE`. `publishing is off already` changed nothing. On `the file before is back, and the API
+Expect the `in the API file: publishing off …` line, the API's start lines, a `kept:` line (the Free debates still
+waiting, and, when debates were published, those recorded as public), then `PUBOFF_DONE`. `publishing is off already`
+changed nothing. `the running API did not start on the file as it is now`: an earlier PUBOFF stopped after it changed
+the file and before the API's restart ended, so the API may still serve the public pages: ask at once. With no last
+line at all (the window closed while PUBOFF ran), ask too: PUBCHECK shows where it stopped. On `the file before is back, and the API
 and the website started on it, with publishing on`: publishing is still on; ask. `a debate went public while
 publishing was being switched off`: ask at once, before any other step. To switch on again: PUBON (step 5), which
 reads the kept lines.

@@ -7,7 +7,7 @@
 // address. Data is made up.
 import { spawnSync } from 'node:child_process';
 import { createHash, createHmac, pbkdf2Sync, randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -55,18 +55,20 @@ const RUNTIME_URL = `postgresql://debateai_prod_api_runtime:${RUNTIME_PASSWORD}@
  * The server's commands, stood in for. `stat` answers from `ls -ldn` (the same on the Mac and on Linux), with root as
  * the owner of this guide's copies and of the API file, and the API's user everywhere else; `systemctl` lists the
  * API's write paths from a file, and a reload adds the drop-in's; the start helpers start the API by the code's own
- * rule for the journal line; `psqlq` answers each of the steps' queries from files; `lc` writes an online backup of the
+ * rule for the journal line, and note when it started; `psqlq` answers each of the steps' queries from files; `lc` writes an online backup of the
  * corpus key and the store; `runuser` runs the command as the test's user, and the `postgres` administrator's psql
  * keeps what it was sent.
  */
 const STUBS = [
-  `stat() { local f=$3 l p o=0 i c n u g s w; l=$(ls -ldn "$f" 2>/dev/null) || return 1; read -r p n u g s _ <<<"$l"; p=\${p:1:9}; for i in 0 1 2 3 4 5 6 7 8; do c=\${p:$i:1}; o=$((o * 2)); [ "$c" = - ] || o=$((o + 1)); done; case "$f" in "$M"|"$M"/*|"$A") w=root; g=root;; *) w=$AU; g=$AGRP;; esac; c=$2; c=\${c//%a/$(printf '%o' "$o")}; c=\${c//%U/$w}; c=\${c//%G/$g}; c=\${c//%h/$n}; c=\${c//%s/$s}; printf '%s\\n' "$c"; }`,
+  `stat() { local f=$3 l p o=0 i c n u g s w; l=$(ls -ldn "$f" 2>/dev/null) || return 1; read -r p n u g s _ <<<"$l"; p=\${p:1:9}; for i in 0 1 2 3 4 5 6 7 8; do c=\${p:$i:1}; o=$((o * 2)); [ "$c" = - ] || o=$((o + 1)); done; case "$f" in "$M"|"$M"/*|"$A") w=root; g=root;; *) w=$AU; g=$AGRP;; esac; c=$2; c=\${c//%a/$(printf '%o' "$o")}; c=\${c//%U/$w}; c=\${c//%G/$g}; c=\${c//%h/$n}; c=\${c//%s/$s}; c=\${c//%Y/$(command date -r "$f" +%s)}; printf '%s\\n' "$c"; }`,
   'chown() { :; }',
   `chmod() { case "$1" in --reference=*) command chmod "$(stat -c %a "\${1#--reference=}")" "$2";; *) command chmod "$@";; esac; }`,
   'install() { local m=0755 d=; while [ $# -gt 0 ]; do case "$1" in -d) d=1; shift;; -m) m=$2; shift 2;; -o|-g) shift 2;; *) break;; esac; done; [ -n "$d" ] || return 1; local x; for x; do mkdir -p "$x" && command chmod "$m" "$x"; done; }',
   'pgstub() { case " $* " in *" -f - "*) cat > "$D/sql";; *) echo 1;; esac; }',
   'runuser() { local u=; [ "$1" = -u ] && u=$2; while [ "$1" != -- ]; do shift; done; shift; if [ "$u" = postgres ]; then pgstub "$@"; else "$@"; fi; }',
-  'systemctl() { case "$1" in show) cat "$D/rw" 2>/dev/null || true;; daemon-reload) [ ! -e "$PDROP" ] || sed -n \'s/^ReadWritePaths=//p\' "$PDROP" >> "$D/rw";; is-active) echo active;; esac; }',
+  'systemctl() { case "$1" in show) case "$3" in ExecMainStartTimestamp) cat "$D/started" 2>/dev/null || true;; *) cat "$D/rw" 2>/dev/null || true;; esac;; daemon-reload) [ ! -e "$PDROP" ] || sed -n \'s/^ReadWritePaths=//p\' "$PDROP" >> "$D/rw";; is-active) cat "$D/active" 2>/dev/null || echo active;; esac; }',
+  // GNU date reads `@<seconds>`; the Mac's date does not, so the stand-in does for it.
+  'date() { if [ "${1:-}" = -d ]; then case "$2" in @[0-9]*) echo "${2#@}";; *) return 1;; esac; else command date "$@"; fi; }',
   'psqlq() { printf \'%s\\n\' "$1" >> "$D/queries"; case "$1" in',
   "  *cannot-sign-in*) cat \"$D/role\" 2>/dev/null || true;;",
   "  *pg_hba_file_rules*publication_cleanup*) cat \"$D/hba\" 2>/dev/null || echo 'scram-sha-256 127.0.0.1 255.255.255.255';; *pg_hba_file_rules*) echo 'scram-sha-256 127.0.0.1 255.255.255.255';;",
@@ -77,11 +79,11 @@ const STUBS = [
   'curl() { cat "$D/login"; }',
   'inv() { cat "$D/journal" 2>/dev/null || true; }',
   'said() { [ "$(inv "$API" | grep -c "$@" || true)" -gt 0 ]; }',
-  `startapi() { if [ -e "$D/api-refuses" ]; then rm -f "$D/api-refuses"; echo PREVIEW_API_STARTUP_REFUSED > "$D/journal"; echo 'the API did not start'; return 1; fi; { echo 'PREVIEW_API_STARTED {}'; [ "$(pubstate "$A")" = A ] || [ "$(pubstate "$A")" = B ] || echo '[PUBLICATION_CUSTODY_NOT_CONFIGURED]'; } > "$D/journal"; echo 'PREVIEW_API_STARTED {}'; }`,
+  `startapi() { if [ -e "$D/api-refuses" ]; then rm -f "$D/api-refuses"; echo PREVIEW_API_STARTUP_REFUSED > "$D/journal"; echo 'the API did not start'; return 1; fi; { echo 'PREVIEW_API_STARTED {}'; [ "$(pubstate "$A")" = A ] || [ "$(pubstate "$A")" = B ] || echo '[PUBLICATION_CUSTODY_NOT_CONFIGURED]'; } > "$D/journal"; echo "@$(( $(command date +%s) + 1 ))" > "$D/started"; [ ! -e "$D/counts-after" ] || mv "$D/counts-after" "$D/counts"; echo 'PREVIEW_API_STARTED {}'; }`,
   'apiup() { startapi || return 1; }', 'apistart() { startapi; }', 'webup() { :; }',
   helper('upfail'),
-  `lc() { [ "$1" = backup.mjs ] && [ "$2" = --online ] || return 1; local out=$3; [ ! -e "$D/backup-fails" ] || { echo '{"event":"PREVIEW_ONLINE_BACKUP_FAILED","reason":"KEYS_FAILED"}'; return 1; }; echo dump > "$out/online-debateai.dump"; echo roles > "$out/online-globals.sql"; tar -C / -cf "$out/online-keys.tar" "\${KP#/}" "\${PS#/}"; ( cd "$out" && sha256sum online-debateai.dump online-globals.sql online-keys.tar > online.sha256 ); echo '{"event":"PREVIEW_ONLINE_BACKUP_OK","databases":["debateai","postgres"],"keys":["KEK_PATH","CORPUS_KEK_PATH","PUBLICATION_KEY_STORE_PATH"],"files":[{"name":"online-debateai.dump","bytes":5,"sha256":"x"}]}'; }`,
-  "df() { echo Avail; echo 999999M; }", "du() { printf '100\\t%s\\n' \"$2\"; }",
+  `lc() { [ "$1" = backup.mjs ] && [ "$2" = --online ] || return 1; local out=$3; [ ! -e "$D/backup-fails" ] || { echo '{"event":"PREVIEW_ONLINE_BACKUP_FAILED","reason":"KEYS_FAILED"}'; return 1; }; echo dump > "$out/online-debateai.dump"; echo roles > "$out/online-globals.sql"; tar -C / -cf "$out/online-keys.tar" "\${KP#/}" "\${PS#/}"; ( cd "$out" && sha256sum online-debateai.dump online-globals.sql online-keys.tar > online.sha256 ); [ ! -e "$D/backup-badsum" ] || echo other > "$out/online-globals.sql"; if [ -e "$D/backup-nokeys" ]; then echo '{"event":"PREVIEW_ONLINE_BACKUP_OK","databases":["debateai"],"keys":["KEK_PATH"],"files":[]}'; else echo '{"event":"PREVIEW_ONLINE_BACKUP_OK","databases":["debateai","postgres"],"keys":["KEK_PATH","CORPUS_KEK_PATH","PUBLICATION_KEY_STORE_PATH"],"files":[{"name":"online-debateai.dump","bytes":5,"sha256":"x"}]}'; fi; }`,
+  "df() { echo Avail; cat \"$D/avail\" 2>/dev/null || echo 999999M; }", "du() { printf '100\\t%s\\n' \"$2\"; }",
   // Tries a clean-up line as the API would; the real try is run on its own below.
   'pubprobe() { if grep -qE \'^PUBLICATION_CLEANUP_DATABASE_URL=postgres(ql)?://debateai_prod_api_publication_cleanup:\' "$1"; then cat "$D/probe"; else echo "no line to try"; fi; }'
 ];
@@ -125,6 +127,12 @@ function withServer<T>(body: (server: Server) => T): T {
     writeFileSync(join(dir, 'counts'), '0 0 0 0 0 0 0 0 0\n');
     writeFileSync(join(dir, 'probe'), 'accepted\n');
     writeFileSync(join(dir, 'journal'), 'PREVIEW_API_STARTED {}\n[PUBLICATION_CUSTODY_NOT_CONFIGURED]\nPREVIEW_MAIL_MODE {"mode":"allow-list","origin":"https://dezbatere.ro"}\n');
+    // The running API started after its file was written, and the names file's first line reads this upload's names file.
+    writeFileSync(join(dir, 'started'), `@${Math.floor(statSync(api).mtimeMs / 1000) + 1}\n`);
+    mkdirSync(join(dir, 'archive'));
+    writeFileSync(join(dir, 'archive/rcur-names.sh'), '');
+    utimesSync(join(dir, 'archive/rcur-names.sh'), new Date(Date.now() - 86_400_000), new Date(Date.now() - 86_400_000));
+    writeFileSync(join(dir, 'main-site/names.sh'), `. ${dir}/archive/rcur-names.sh\n`);
     return body({ dir, api, kp: join(keys, 'corpus-kek.bin'), ps: join(lib, 'api/publication-keys'), pub: join(dir, 'main-site/pub'),
       drop: join(dir, 'systemd/debateai-preview-api@.service.d/zzzzzzzzzz-keys-publication.conf') });
   } finally {
@@ -368,7 +376,7 @@ describe('5.9 on a throwaway server, from today\'s state to publishing on and of
     expect(sorted(after)).toEqual(sorted(before.replace('PUBLICATION_ENABLED=false\n', '') + `PUBLICATION_ENABLED=true\nCORPUS_KEK_PATH=${server.kp}\nPUBLICATION_KEY_STORE_PATH=${server.ps}\n${line}`));
     expect(statSync(server.api).mode & 0o777).toBe(0o640);
     expect(readdirSync(server.pub).filter(name => name.startsWith('api-cur.env.before-pubon-')).length).toBeGreaterThan(0);
-    expect(run(server, 'PUBON').lines.slice(-2)).toEqual(['publishing is on already; nothing changed', 'PUBON_DONE']);
+    expect(run(server, 'PUBON').lines.slice(-2)).toEqual(['publishing is on already, and the running API started on the file as it is now; nothing changed', 'PUBON_DONE']);
     const look = run(server, 'PUBAFTER');
     expect(look.last).toBe('PUBAFTER_DONE');
     expect(look.lines).toEqual(expect.arrayContaining(['since the API\'s start: failed passes of the key clean-up 0 (one every 30 seconds), failed passes of the public pages 0 (one every 15 seconds)',
@@ -380,8 +388,9 @@ describe('5.9 on a throwaway server, from today\'s state to publishing on and of
     const clean = run(server, 'PUBOFF');
     expect(clean.last).toBe('PUBOFF_DONE');
     expect(clean.out).toContain('in the API file: publishing off, and its four lines out, as no debate was ever published');
+    expect(clean.lines).toContain('kept: 0 Free debates waiting, started while publishing was on; they go public at the next PUBON if the checks allow it');
     expect(sorted(apiFile(server))).toEqual(sorted(before));
-    expect(run(server, 'PUBOFF').lines.slice(-2)).toEqual(['publishing is off already, and the API file names none of its keys; nothing changed', 'PUBOFF_DONE']);
+    expect(run(server, 'PUBOFF').lines.slice(-2)).toEqual(['publishing is off already, and the API file names none of its keys; the running API started on the file as it is now; nothing changed', 'PUBOFF_DONE']);
     // On again, then a debate goes public: PUBOFF now keeps the keys' lines, and PUBON only puts the true line back.
     expect(run(server, 'PUBON').last).toBe('PUBON_DONE');
     mkdirSync(join(server.ps, 'publications/11111111-1111-4111-8111-111111111111'), { recursive: true });
@@ -452,6 +461,169 @@ describe('5.9 on a throwaway server, from today\'s state to publishing on and of
     expect(existsSync(join(server.pub, 'backup-folder'))).toBe(false);
   }));
 
+  it('PUBKEYS never makes the corpus key or the store anew once publishing used them, and PUBCHECK and PUBON stop on it', () => withServer(server => {
+    // Before anything used them, a lost key is simply made again.
+    expect(run(server, 'PUBKEYS').last).toBe('PUBKEYS_DONE');
+    rmSync(server.kp);
+    expect(run(server, 'PUBKEYS').last).toBe('PUBKEYS_DONE');
+    for (const step of ['PUBLOGIN', 'PUBBACKUP', 'PUBON'] as const) expect(run(server, step).last).toBe(`${step}_DONE`);
+    // A debate went public.
+    mkdirSync(join(server.ps, 'publications/11111111-1111-4111-8111-111111111111'), { recursive: true });
+    writeFileSync(join(server.ps, 'publications/11111111-1111-4111-8111-111111111111/publication-key.v1.json'), '{}');
+    writeFileSync(join(server.dir, 'counts'), '1 1 1 0 1 0 0 0 1\n');
+    const key = readFileSync(server.kp);
+    rmSync(server.kp);
+    const used = 'the API file names them; a PUBBACKUP holds them; the store holds publication keys; the database holds publications';
+    expect(run(server, 'PUBKEYS').last).toBe(`PUBKEYS_NOT_DONE: the corpus key is missing, although publishing used it already (${used}); nothing changed: a new one would not open what the old one locked, and the old one is in the newest PUBBACKUP: ask`);
+    expect(existsSync(server.kp)).toBe(false);
+    const check = run(server, 'PUBCHECK');
+    expect(check.lines).toContain(`NOT AS THE CODE NEEDS: the corpus key ${server.kp} is missing, although publishing used it already (${used}): a new one would not open what the old one locked, and no step of 5.9 makes one then; the old one is in the newest PUBBACKUP`);
+    expect(check.last).toBe('PUBCHECK_NOT_DONE: something is not as the code needs (the NOT AS THE CODE NEEDS lines above); no step of 5.9 changes it: ask');
+    writeFileSync(server.kp, key, { mode: 0o600 });
+    rmSync(server.ps, { recursive: true });
+    expect(run(server, 'PUBKEYS').last).toBe(`PUBKEYS_NOT_DONE: the key store is missing, although publishing used it already (the API file names them; a PUBBACKUP holds them; the database holds publications); nothing changed: a new one would not open what the old one locked, and the old one is in the newest PUBBACKUP: ask`);
+    expect(existsSync(server.ps)).toBe(false);
+    expect(run(server, 'PUBCHECK').lines).toContain(`NOT AS THE CODE NEEDS: the key store ${server.ps} is missing, although publishing used it already (the API file names them; a PUBBACKUP holds them; the database holds publications): no step of 5.9 makes a new one then; the old one is in the newest PUBBACKUP`);
+    // The store back, but without its key: after a PUBOFF that keeps the lines, PUBON refuses, as the database expects
+    // one key more than the store holds.
+    mkdirSync(server.ps, { mode: 0o700 });
+    expect(run(server, 'PUBOFF').last).toBe('PUBOFF_DONE');
+    const off = apiFile(server);
+    expect(off).toContain('PUBLICATION_ENABLED=false\n');
+    expect(off).toContain(`CORPUS_KEK_PATH=${server.kp}\n`);
+    expect(run(server, 'PUBON').last).toBe('PUBON_NOT_DONE: the key store holds 0 publication keys, but the database expects 1: a key is lost, or a clean-up is under way; nothing changed: run PUBCHECK in a minute, and if the two still differ, ask');
+    expect(apiFile(server)).toBe(off);
+    const after = run(server, 'PUBCHECK');
+    expect(after.lines).toEqual(expect.arrayContaining(['publication keys in the store: 0; the database expects 1',
+      'the store holds fewer keys than the database expects: a key is lost, or a clean-up is under way; run PUBCHECK again in a minute, and if it says this again, ask (PUBON refuses meanwhile)']));
+  }));
+
+  it('PUBKEYS keeps a PUBBACKUP\'s key: after a clean PUBOFF, a lost key is not made again either', () => withServer(server => {
+    for (const step of ['PUBKEYS', 'PUBLOGIN', 'PUBBACKUP', 'PUBON', 'PUBOFF'] as const) expect(run(server, step).last).toBe(`${step}_DONE`);
+    expect(apiFile(server)).not.toContain('CORPUS_KEK_PATH=');
+    rmSync(server.kp);
+    expect(run(server, 'PUBKEYS').last).toBe('PUBKEYS_NOT_DONE: the corpus key is missing, although publishing used it already (a PUBBACKUP holds them); nothing changed: a new one would not open what the old one locked, and the old one is in the newest PUBBACKUP: ask');
+    expect(existsSync(server.kp)).toBe(false);
+  }));
+
+  it('PUBKEYS and PUBCHECK refuse a corpus key that holds the bytes of another key, and a path the API file names otherwise', () => withServer(server => {
+    writeFileSync(server.kp, readFileSync(join(dirname(server.kp), 'kek.bin')), { mode: 0o600 });
+    expect(run(server, 'PUBKEYS').last).toBe('PUBKEYS_NOT_DONE: the corpus key holds the same bytes as the key KEK_PATH names: ask');
+    expect(existsSync(server.ps)).toBe(false);
+    expect(run(server, 'PUBCHECK').lines).toContain('NOT AS THE CODE NEEDS: the corpus key holds the same bytes as the key KEK_PATH names');
+    rmSync(server.kp);
+    const before = apiFile(server);
+    writeFileSync(server.api, `${before}CORPUS_KEK_PATH=${dirname(server.kp)}/other-kek.bin\n`);
+    expect(run(server, 'PUBKEYS').last).toBe('PUBKEYS_NOT_DONE: the API file\'s CORPUS_KEK_PATH line names another path than this guide\'s; nothing changed: ask');
+    expect(existsSync(server.kp) || existsSync(server.ps)).toBe(false);
+  }));
+
+  it('PUBON and PUBOFF never say DONE again when the running API did not start on the file as it is now', () => withServer(server => {
+    for (const step of ['PUBKEYS', 'PUBLOGIN', 'PUBBACKUP', 'PUBON'] as const) expect(run(server, step).last).toBe(`${step}_DONE`);
+    const started = readFileSync(join(server.dir, 'started'), 'utf8');
+    // Stopped after the file swap, before the restart: the API still runs from its earlier start.
+    writeFileSync(join(server.dir, 'started'), '@1000\n');
+    expect(run(server, 'PUBON').last).toBe(`PUBON_NOT_DONE: the API file says publishing is on, but the running API did not start on the file as it is now (an earlier PUBON stopped before its restart ended; the file before is the newest ${server.pub}/api-cur.env.before-pubon-… copy); nothing changed: ask`);
+    const check = run(server, 'PUBCHECK');
+    expect(check.lines).toContain('NOT AS THE CODE NEEDS: the running API did not start on the API file as it is now: a step that changes the file stopped before its restart ended (PUBON, PUBOFF or another one), so the API may serve another state than the file says');
+    expect(check.last).toBe('PUBCHECK_NOT_DONE: something is not as the code needs (the NOT AS THE CODE NEEDS lines above); no step of 5.9 changes it: ask');
+    const after = run(server, 'PUBAFTER');
+    expect(after.lines).toContain('not as expected: the running API did not start on the API file as it is now: a step that changes the file stopped before its restart ended, so the API may run with publishing off');
+    expect(after.last).toBe('PUBAFTER_NOT_DONE: something is not as expected (the lines above): ask');
+    // Stopped during the restart, which the API refused: the unit is failed.
+    writeFileSync(join(server.dir, 'started'), started);
+    writeFileSync(join(server.dir, 'active'), 'failed\n');
+    expect(run(server, 'PUBON').last).toMatch(/^PUBON_NOT_DONE: the API file says publishing is on, but the running API did not start on the file as it is now/u);
+    rmSync(join(server.dir, 'active'));
+    expect(run(server, 'PUBON').last).toBe('PUBON_DONE');
+    // PUBOFF, both ways, stopped after its swap.
+    expect(run(server, 'PUBOFF').last).toBe('PUBOFF_DONE');
+    writeFileSync(join(server.dir, 'started'), '@1000\n');
+    const stopped = `PUBOFF_NOT_DONE: the API file says publishing is off, but the running API did not start on the file as it is now (an earlier PUBOFF stopped before its restart ended; the file before is the newest ${server.pub}/api-cur.env.before-puboff-… copy): it may still serve the public pages, or be down; nothing changed: ask at once`;
+    expect(run(server, 'PUBOFF').last).toBe(stopped);
+    writeFileSync(join(server.dir, 'started'), started);
+    expect(run(server, 'PUBON').last).toBe('PUBON_DONE');
+    mkdirSync(join(server.ps, 'publications/11111111-1111-4111-8111-111111111111'), { recursive: true });
+    writeFileSync(join(server.ps, 'publications/11111111-1111-4111-8111-111111111111/publication-key.v1.json'), '{}');
+    writeFileSync(join(server.dir, 'counts'), '1 1 1 0 1 0 0 0 1\n');
+    expect(run(server, 'PUBOFF').last).toBe('PUBOFF_DONE');
+    writeFileSync(join(server.dir, 'started'), '@1000\n');
+    expect(run(server, 'PUBOFF').last).toBe(stopped);
+  }));
+
+  it('a clean PUBOFF says how many Free debates still wait, and stops when a debate went public during its restart', () => withServer(server => {
+    for (const step of ['PUBKEYS', 'PUBLOGIN', 'PUBBACKUP', 'PUBON'] as const) expect(run(server, step).last).toBe(`${step}_DONE`);
+    writeFileSync(join(server.dir, 'counts'), '0 0 0 3 0 0 0 0 0\n');
+    const off = run(server, 'PUBOFF');
+    expect(off.lines.slice(-2)).toEqual(['kept: 3 Free debates waiting, started while publishing was on; they go public at the next PUBON if the checks allow it', 'PUBOFF_DONE']);
+    expect(run(server, 'PUBON').last).toBe('PUBON_DONE');
+    writeFileSync(join(server.dir, 'counts'), '0 0 0 0 0 0 0 0 0\n');
+    writeFileSync(join(server.dir, 'counts-after'), '1 1 1 0 1 0 0 0 1\n');
+    expect(run(server, 'PUBOFF').last).toBe('PUBOFF_NOT_DONE: a debate went public while publishing was being switched off, and the API file now names no key for it: ask at once');
+  }));
+
+  it('PUBON and PUBOFF refuse, with the API file unchanged, a file that would not be only their own lines changed', () => withServer(server => {
+    for (const step of ['PUBKEYS', 'PUBLOGIN', 'PUBBACKUP'] as const) expect(run(server, step).last).toBe(`${step}_DONE`);
+    const before = apiFile(server);
+    writeFileSync(server.api, `${before}NODE_ENV=production\n`);
+    const twice = apiFile(server);
+    expect(run(server, 'PUBON').last).toBe('PUBON_NOT_DONE: the new file is not the publishing lines added and, at most, the line PUBLICATION_ENABLED=false taken out; nothing changed: ask');
+    expect(apiFile(server)).toBe(twice);
+    expect(readdirSync(server.pub).filter(name => name.includes('.before-pubon-') || name.endsWith('.new'))).toEqual([]);
+    writeFileSync(server.api, before);
+    expect(run(server, 'PUBON').last).toBe('PUBON_DONE');
+    const on = apiFile(server);
+    writeFileSync(server.api, `${on}NODE_ENV=production\n`);
+    const onTwice = apiFile(server);
+    expect(run(server, 'PUBOFF').last).toBe('PUBOFF_NOT_DONE: the new file is not only the publication lines changed; nothing changed: ask');
+    expect(apiFile(server)).toBe(onTwice);
+    expect(readdirSync(server.pub).filter(name => name.includes('.before-puboff-'))).toEqual([]);
+  }));
+
+  it('PUBON refuses, with nothing changed, the guards that protect the API file', () => withServer(server => {
+    for (const step of ['PUBKEYS', 'PUBLOGIN', 'PUBBACKUP'] as const) expect(run(server, step).last).toBe(`${step}_DONE`);
+    const before = apiFile(server);
+    const refused = (setUp: () => void, undo: () => void, last: string) => {
+      setUp();
+      const out = run(server, 'PUBON');
+      undo();
+      expect(out.last).toBe(last);
+      expect(apiFile(server)).toBe(before);
+      expect(readdirSync(server.pub).filter(name => name.includes('.before-pubon-'))).toEqual([]);
+    };
+    const archive = join(server.dir, 'archive');
+    refused(() => writeFileSync(join(archive, 'rnext-names.sh'), ''), () => rmSync(join(archive, 'rnext-names.sh')),
+      `PUBON_NOT_DONE: ${archive} holds an upload's names file newer than the one the names file reads (an upload is being prepared), or the names file's first line names no file: publishing goes on only outside an upload; nothing changed: ask`);
+    const settings = join(server.dir, 'rels/api/dialectical-engine/packages/register/src/runtime-environment.ts');
+    const known = readFileSync(settings, 'utf8');
+    refused(() => writeFileSync(settings, 'export {};\n'), () => writeFileSync(settings, known),
+      'PUBON_NOT_DONE: this release does not know the publication settings; nothing changed: ask');
+    refused(() => writeFileSync(server.api, before.replace('PUBLICATION_ENABLED=false', 'PUBLICATION_ENABLED=maybe')), () => writeFileSync(server.api, before),
+      'PUBON_NOT_DONE: the API file\'s PUBLICATION_ENABLED line is not one line PUBLICATION_ENABLED=false; nothing changed: ask');
+    const line = readFileSync(join(server.pub, 'cleanup.line'), 'utf8');
+    refused(() => writeFileSync(join(server.pub, 'cleanup.line'), `${line}${line}`), () => writeFileSync(join(server.pub, 'cleanup.line'), line),
+      'PUBON_NOT_DONE: the clean-up line is not kept as PUBLOGIN keeps it (PUBLOGIN first); nothing changed');
+    const rw = readFileSync(join(server.dir, 'rw'), 'utf8');
+    refused(() => writeFileSync(join(server.dir, 'rw'), rw.replace(` ${server.ps}`, '').replace(`-${server.ps}`, '')), () => writeFileSync(join(server.dir, 'rw'), rw),
+      'PUBON_NOT_DONE: the API\'s unit does not list the key store as a write path (PUBKEYS first); nothing changed');
+    refused(() => writeFileSync(server.api, before.replace(/^AUDIT_KEY_STORE_PATH=.*$/mu, `AUDIT_KEY_STORE_PATH=${dirname(server.ps)}`)), () => writeFileSync(server.api, before),
+      'PUBON_NOT_DONE: the corpus key or the key store is not apart from: AUDIT_KEY_STORE_PATH (the code refuses that); nothing changed: ask');
+    refused(() => chmodSync(server.api, 0o600), () => chmodSync(server.api, 0o640),
+      `PUBON_NOT_DONE: ${server.api} is not root's 0640 file ending in a newline; nothing changed: ask`);
+    refused(() => chmodSync(server.kp, 0o644), () => chmodSync(server.kp, 0o600),
+      'PUBON_NOT_DONE: the corpus key or the key store is not as PUBKEYS makes them (PUBKEYS first); nothing changed');
+    // State B whose clean-up line is not the one PUBLOGIN kept.
+    const b = `${before}CORPUS_KEK_PATH=${server.kp}\nPUBLICATION_KEY_STORE_PATH=${server.ps}\n${line.replace(/:[0-9a-f]{64}@/u, `:${'0'.repeat(64)}@`)}`;
+    writeFileSync(server.api, b);
+    expect(run(server, 'PUBON').last).toBe('PUBON_NOT_DONE: the publication lines the API file keeps are not the ones PUBKEYS and PUBLOGIN kept; nothing changed: ask');
+    expect(apiFile(server)).toBe(b);
+    // The database unread: PUBON says so, not that a staff key is missing.
+    writeFileSync(server.api, before);
+    rmSync(join(server.dir, 'counts'));
+    expect(run(server, 'PUBON').last).toBe('PUBON_NOT_DONE: the database is unreadable; nothing changed: ask');
+    expect(apiFile(server)).toBe(before);
+  }));
+
   it('PUBLOGIN prints nothing of an API line it cannot read, and sets no password while the login is signed in or its pg_hba.conf line differs', () => withServer(server => {
     const before = apiFile(server);
     // A socket form with no host is no URL for node: its error would print the line, password and all.
@@ -517,6 +689,33 @@ describe('5.9 on a throwaway server, from today\'s state to publishing on and of
     expect(differs.last).toBe('PUBLOGIN_DONE');
     expect(readFileSync(lf, 'utf8')).toBe(`${inFile}\n`);
     expect(readdirSync(server.pub).filter(name => name.startsWith('cleanup.line.set-aside-')).length).toBeGreaterThanOrEqual(1);
+  }));
+
+  it('PUBBACKUP refuses without the room, a backup that does not report the key, or one whose sums do not match, and warns before an upload runs short', () => withServer(server => {
+    expect(run(server, 'PUBKEYS').last).toBe('PUBKEYS_DONE');
+    // A failed run leaves its folder; it is renamed so that the next run within the same second has a free name.
+    const leftover = (tag: string) => {
+      for (const name of readdirSync(server.pub)) if (/^backup-\d{8}T\d{6}Z$/u.test(name)) renameSync(join(server.pub, name), join(server.pub, `${name}-${tag}`));
+    };
+    writeFileSync(join(server.dir, 'avail'), '1000M\n');
+    expect(run(server, 'PUBBACKUP').last).toBe('PUBBACKUP_NOT_DONE: not enough free space under /root for a backup (1000 MB free; the database folder is 100 MB, and the backup needs that and 2 GB more at most); nothing changed: ask');
+    expect(readdirSync(server.pub).filter(name => name.startsWith('backup-'))).toEqual([]);
+    writeFileSync(join(server.dir, 'avail'), '999999M\n');
+    writeFileSync(join(server.dir, 'backup-nokeys'), '');
+    expect(run(server, 'PUBBACKUP').last).toBe('PUBBACKUP_NOT_DONE: the backup did not report OK with the corpus key and the key store in it: ask');
+    leftover('nokeys');
+    rmSync(join(server.dir, 'backup-nokeys'));
+    writeFileSync(join(server.dir, 'backup-badsum'), '');
+    expect(run(server, 'PUBBACKUP').last).toBe('PUBBACKUP_NOT_DONE: the backup\'s files do not match its sums, or it does not hold this corpus key and the key store: ask');
+    leftover('badsum');
+    rmSync(join(server.dir, 'backup-badsum'));
+    expect(existsSync(join(server.pub, 'backup-folder'))).toBe(false);
+    // Room for this backup, but no longer for an upload's PRECHECK (twice the database folder and 2 GB more).
+    writeFileSync(join(server.dir, 'avail'), '2200M\n');
+    const short = run(server, 'PUBBACKUP');
+    expect(short.last).toBe('PUBBACKUP_DONE');
+    expect(short.lines).toEqual(expect.arrayContaining(['PUBBACKUP folders kept: 3',
+      'the free space on / is now below what an upload\'s PRECHECK needs (twice the database folder and 2 GB more): before the next upload, ask which older PUBBACKUP folders may go']));
   }));
 
   it('no step printed a key, a password, the clean-up line or an amount', () => withServer(server => {
