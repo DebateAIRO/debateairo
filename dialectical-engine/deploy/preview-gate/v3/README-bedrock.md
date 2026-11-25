@@ -62,15 +62,20 @@ One reviewed model:
   is built to show exactly the three things the documentation leaves open: the model name the reply carries, the token
   counts it reports, and how the cache is reported. If the probe halts, Luna stays switched off and nothing else is
   affected; the fix is a reviewed code change and a later upload.
-- **The key goes in right before the first probe, never at the upload.** Once the key and Luna's address (the app's
-  settings, "Switch it on" step 5) are both in, the API checks Luna through this gate at every ask: it probes every
-  model it declares whose last check is old, not only the line-up's. Each such check is a real paid call, made by
-  someone's ask. Without the key the gate refuses those checks before anything is set aside: nothing is sent or
-  charged, the gate does not halt, and Luna is simply left out of the debates, which run on the other models as before.
-  So step 4 waits for Luna's own day ("Switch it on"): after the notice's time to object when the notice is owed, and
-  after the halt watcher and the address timer run, right before the probe (step 8). The line-up activation follows
-  the next day, after the bill check. So these paid checks run for about a day before Luna joins the debates, and
-  always with the halt watcher on.
+- **The key goes in right before the first probe, never at the upload.** An ask checks only the models its line-up
+  seats, so while no line-up seats Luna no ask reaches this gate, key or no key, and the first real Amazon call is the
+  owner's probe (step 8). It must come with the halt watcher on, so that a halt e-mails the owner. So step 4 waits for
+  Luna's own day ("Switch it on"): after the notice's time to object when the notice is owed, and after the halt watcher
+  and the address timer run, right before the probe (step 8). The line-up activation follows the next day, after the
+  bill check; from then on an ask whose line-up seats Luna checks it with a real paid call through this gate.
+- **A release from before that rule checks every declared model at every ask.** Its
+  `apps/api/src/provider-discovery.ts` has no `probeModelIds`. It probes, at every ask, every model it declares whose
+  last check is old, not only the line-up's. With such a release running, once the key and Luna's address (the app's
+  settings, "Switch it on" step 5) are both in, every ask makes a paid check of Luna, before the owner's probe. While
+  Amazon refuses the key (401 or 403), the first such ask halts this gate (`provider_key_refused`), and the release
+  tools and the owner's runbook refuse until it is open again ("Re-open after a halt", after "A new key"). Without the
+  key the gate refuses those checks before anything is set aside: nothing is sent or charged, and the gate does not
+  halt. So while such a release runs, keep the key out.
 - **Busy answers bill nothing and never halt.** HTTP 429 (too many requests), 503 (service unavailable) and 529
   (overloaded), each with Amazon's error text and no token count: the call is released, nothing is charged, the day's
   record keeps a $0 `released_unbilled` entry, and that call alone fails with `PROVIDER_REFUSED_UNBILLED`. After 2 of
@@ -263,7 +268,7 @@ another gate's key, and `FOLDER_NOT_SAFE` when step 3 was not done. Nothing is w
 |---|---|---|
 | `schema` | `preview-provider-budget-go-v3` | The gate's GO format. |
 | `provider` | `"bedrock"` | This gate's provider. |
-| `enabled_models` | `["us.openai.gpt-6-luna"]` | The one reviewed model. No debate seats it until "Switch it on"; once the key is in, the API's checks at each ask reach it (step 4). |
+| `enabled_models` | `["us.openai.gpt-6-luna"]` | The one reviewed model. No debate seats it until "Switch it on", and no ask checks it before then (a release from before that rule does once the key is in: step 4). |
 | `scope_id` | `preview-deepinfra-v3-20261010` | The SAME `scope_id` as the app's preview configuration: the app asks every gate with its one `scope_id`. |
 | `target_host` | `vps-a156d797` | The server's host name, as in the other GOs. The gate refuses to run anywhere else. |
 | `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), as for the other gates. |
@@ -378,7 +383,8 @@ What to expect:
 
 **Until "Switch it on".** Nothing starts this gate at boot: its unit has no `[Install]`, and the boot drop-in comes at
 "Switch it on". After a reboot, start it by hand (`systemctl start debateai-preview-bedrock-budget`) when you need it;
-meanwhile its `state` on disk stays `active`, and the API's checks of Luna fail at once, so Luna is left out. Its 31
+meanwhile its `state` on disk stays `active`, no ask calls it while no line-up seats Luna, and once one does, the API's
+checks of Luna fail at once, so Luna is left out. Its 31
 days run from step 6's `activate`: while no call reaches it, `window_open` turns `false` after them, and the owner's
 runbook's ASKS_OPEN refuses until its `stop`, then its `activate` (`deploy/preview-auth-dev/v1/MAIN-SITE.md`, 6.5).
 
@@ -436,8 +442,9 @@ providers page"). An account outside the team is an account of anyone other than
 own test sign-ups do not count; a friend's or NETOPIA's tester's do. When unsure, ask.
 
 **1. The notice, when it is owed.** When any account outside the team exists, the notice goes out first, and every step
-below waits until its time to object has passed. The key waits too: once it is in, every ask makes a paid check of
-Luna ("Decisions you should know about"). When no such account exists, go on to step 2.
+below waits until its time to object has passed. The key waits too: the first real Amazon call must come with the halt
+watcher on, and a release from before the rule that an ask checks only its line-up's models makes a paid check of
+Luna at every ask once the key is in ("Decisions you should know about"). When no such account exists, go on to step 2.
 
 **2. The gate running, start at boot, and the two watchers.** This needs no key. First set `R`, as install step 1
 does, but from the newest upload's names file (fill in `rNN`, that upload's number: its release is the current one,
@@ -614,5 +621,6 @@ replies written from the documentation. Only the server shows:
   (any field the gate does not know halts); and the charge against Amazon's own bill the day after.
 - The API (uid 994) can ask `/remaining` on the new socket; any other account is closed at once.
 - The halt email arrives once per halt, with this gate's own re-open command.
-- While no key is in, the API's checks of Luna at ask time are refused by the gate before anything is set aside, with
-  no halt (`status` keeps `halts` as it was and `today_spend_usd` at 0).
+- While no line-up seats Luna, no ask reaches this gate (`status` keeps `halts` as it was and `today_spend_usd` at 0
+  until the probe). On a release from before that rule, while no key is in, the API's checks of Luna at ask time are
+  refused by the gate before anything is set aside, with no halt.

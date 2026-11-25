@@ -1980,8 +1980,17 @@ describe('the upload that brings the Amazon gate: its steps come where the uploa
       expect(flat, text).toContain(text);
     for (const gone of ['Piece 1, before SB4', 'Piece 2, before SB4', 'its older tools read two gates', 'are a separate change', 'The release tools count four gates'])
       expect(flat, gone).not.toContain(gone);
-    // Piece 4: the notice when it is owed, then the watchers, then the key and the probe, then the activation. From the
-    // key on every ask makes a paid check of Luna, so the key never waits through the notice's time to object unwatched.
+    // An ask checks only the models its line-up seats, so no ask reaches Amazon before Luna is seated. A release from
+    // before that rule checks every declared model at every ask: with the key in, a key Amazon refuses halts the gate at
+    // the first ask, so the section says how to tell such a release and how the gate is opened again.
+    for (const text of ['none sends Amazon anything: an ask checks only the models its line-up seats',
+      '**Before this rule, an ask checked every declared model.**', 'has no `probeModelIds`',
+      'that first ask halts the Amazon gate (`provider_key_refused`)', 'So while such a release runs, keep the key out of the Amazon gate.'])
+      expect(flat, text).toContain(text);
+    for (const gone of ['from the key on, every ask makes a paid check of Luna', 'the API checks Luna through the gate at every ask'])
+      expect(flat, gone).not.toContain(gone);
+    // Piece 4: the notice when it is owed, then the watchers, then the key and the probe, then the activation. The first
+    // real Amazon call is the owner's probe, so the key never goes in before the halt watcher runs.
     // S-5's terminal keeps its ssh -N running, so LUNAROW runs in S-6's second terminal, where P is set again; an scp of
     // S-5 brings the server's settings back.
     const practice = read('tools/preview-practice/README.md').replace(/\s+/g, ' ');
