@@ -440,7 +440,8 @@ describe('who may arm a permit, and for whom', () => {
     expect(present).toEqual(["SELECT count(*) FROM pg_proc WHERE oid = to_regprocedure('staff.arm_rekey(uuid,text,text,text)')"]);
     expect(queries.filter((sql) => sql === present[0])).toHaveLength(3);
     expect((await database.pool.query(present[0]!)).rows[0].count).toBe('1');
-    const admitted = [...new Set(queries.filter((sql) => sql.includes('pg_hba_file_rules')))];
+    // The staff recovery login's own line; publishing's `pubhba` reads the same view for other logins, and its own test runs it.
+    const admitted = [...new Set(queries.filter((sql) => sql.includes('pg_hba_file_rules') && sql.includes("'debateai_prod_staff_recovery'")))];
     expect(admitted).toHaveLength(1);
     expect(queries.filter((sql) => sql === admitted[0])).toHaveLength(3);
     const rule = (await database.pool.query(admitted[0]!)).rows[0].coalesce as string;
