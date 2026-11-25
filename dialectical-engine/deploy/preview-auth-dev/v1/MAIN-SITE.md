@@ -548,7 +548,10 @@ browser). **This is your last chance for staff work (Hide now, reports, publicat
 Do this **before DR2** of the upload, while the old release still runs on the test name:
 1. Sign in. Open the home page's **Public** tab. Read every published debate.
 2. If one should not be public: tell the team first (each hide e-mails the debate's author). Then open
-   https://v3-preview.dezbatere.ro/admin/team (the Team page; no menu links to it) → public review → **Hide now**. Each hide needs the staff hardware key, and the staff key you have now works only on the test name.
+   https://v3-preview.dezbatere.ro/admin/team (the Team page; no menu links to it) → **Public debates under review**
+   (Dezbateri publice în curs de verificare): paste the debate's public link into **The debate's public link** (Linkul
+   public al dezbaterii), press **Open** (Deschide), then **Hide now** (Ascunde acum). The panel lists only hidden
+   debates, so the link is the way to a public one. Each hide needs the staff hardware key, and the staff key you have now works only on the test name.
 3. If the Team page shows open reports, settle them now too. Publication reviews (**Publication reviews**, Cereri de
    publicare) open from the link on the Team page once your key is verified. Settling usually needs the team tools unlocked: if the page says
    `Team tools are locked…` (in step 2 or 3), run UNLOCK (5.7, step 3) as root. It unlocks them for one hour and ends
@@ -2787,8 +2790,10 @@ the page says "Team tools are locked…" (Instrumentele echipei sunt blocate…)
 within the 15 minutes. If the browser refuses the key twice, ask.
 
 **6. Verify, and check.** On the Team page press **Verify security key for team access** (Verifică cheia de
-securitate pentru accesul echipei) and touch the key. The page now shows your access. Open public review and check
-that a published debate shows **Hide now** (do not press it unless you mean it). Then, as root, run STAFFDB (1.6)
+securitate pentru accesul echipei) and touch the key. The page now shows your access. In **Public debates under
+review** (Dezbateri publice în curs de verificare), paste a published debate's public link into **The debate's public
+link** (Linkul public al dezbaterii) and press **Open** (Deschide): check that it shows **Hide now** (Ascunde acum),
+and do not press it unless you mean it. While no debate is public (before 5.9), skip this check. Then, as root, run STAFFDB (1.6)
 again: expect a key line for the new name, like `dezbatere.ro https://dezbatere.ro 1`, beside the old one for the
 test name.
 
@@ -3435,29 +3440,36 @@ Switching publishing on changes this for the people who know the site password:
   after a tick box and a security check. No V4 page has this button.
 - Public debates are listed on the home page's **Public** tab and read at `/public/debate/<id>`. On one, a signed-in
   person can dig, write a report on their own allowance, and press **Report a problem** (Raportați o problemă).
+- A dig on a public debate goes public too: once its AI check allows it, it changes that public page for everyone,
+  under the digger's pseudonym, and it cannot be taken back (the Terms say so). A dig of a private debate stays
+  private.
 - More mail goes out, through the same mail plan as other account mail: statements of reasons and answers to the
   people who report (the EU's Digital Services Act asks for both), and notices to the staff. In allow-list mode (4.2)
   they reach only the four allow-listed addresses; a refused one is tried again and given up after 20 tries.
 - Deleting an account keeps its public debates and takes its pseudonym off them, as the Terms say. A data export holds
   the reports the person sent.
 
-For you, the Owner: Hide now, the reports and the public review on the Team page have something to act on (with your
-staff key, 5.7); the AI checks use more of the Anthropic gate's day; and the keys of public debates live in a new key
-store on the server, which a backup must hold (step 4).
+For you, the Owner: on the Team page (`/admin/team`), **Public debates under review** (Dezbateri publice în curs de
+verificare) and the reports have something to act on, with your staff key (5.7). That panel lists only the hidden
+debates: to reach **Hide now** (Ascunde acum) for a public one, you paste its public link into the panel (step 7.5).
+The AI checks use more of the Anthropic gate's day, and the keys of public debates live in a new key store on the
+server, which a backup must hold (step 4).
 
 **What does not change.** The site password stays on: only people who know it can read a public debate. Someone with
 the password but no account sees no list on the home page, but can open a public debate whose address they have. The
-NETOPIA review window (5.8) never opens a debate. Asks, payments, mail, the name, and the website's and the runner's
-files stay as they are. No upload is needed.
+NETOPIA review window (5.8) never opens a debate. Asks, payments, the mail settings, the name, and the website's and
+the runner's files stay as they are. No upload is needed.
 
 **The debates that exist already.** None of them goes public by itself, not even a Free debate that finishes after the
 switch: a Free debate is marked to go public only when it is started while publishing is on. Free debates started
-before the switch showed the line above, but they stay private; only their owner's Publish makes one public. Digs
-never go public by themselves.
+before the switch showed the line above, but they stay private; only their owner's Publish makes one public. A dig of
+a private debate never goes public, the ones that exist already included: only a dig on a public debate changes a
+public page (above).
 
 **What cannot be undone once a debate has been public.**
-- Its owner cannot take it back: the site has no "unpublish", for one debate or for all. Only staff **Hide now** (5.7)
-  takes it off the list and its page, and the end-of-debate check may delete it (5.1b).
+- Its owner cannot take it back: the site has no "unpublish", for one debate or for all. Only staff **Hide now** (5.7),
+  or the Report button's AI check when it agrees with a report (5.1b), takes it off the list and its page, and the
+  end-of-debate check may delete it (5.1b).
 - Anyone who read it may have kept a copy.
 - Deleting its owner's account keeps it public, without the pseudonym.
 - Its key stays in the key store and in every backup made after it.
@@ -3484,8 +3496,9 @@ become public. Claude runs nothing on the server.
 
 **Your decisions, before you start.**
 1. Whether to switch on now at all. Once one debate has been public, the list above holds.
-2. What to tell the people whose Free debates were started before the switch: they saw the line that Free debates are
-   public, and theirs stay private.
+2. What to tell people. Those whose Free debates were started before the switch saw the line that Free debates are
+   public, and theirs stay private. Anyone who digs on a public debate changes that page for everyone, under their
+   pseudonym, for good, once the dig's check allows it.
 3. Mail: statements of reasons and answers to reports reach a friend only in open mode (4.3), or when the friend's
    address is one of the four allow-listed ones.
 4. How often to run PUBBACKUP again (step 4): each public debate's key is only on the server until the next one.
@@ -3561,7 +3574,8 @@ PUBKEYS PUBLOGIN PUBBACKUP PUBON`, then `PUBCHECK_DONE`. Read the other lines:
 **2. The corpus key and the key store (PUBKEYS).** The corpus key is the one key that locks the keys of every public
 debate. The script makes it as 32 random bytes, written as the API's user straight into its file, so nobody sees it:
 `/etc/debateai-v3-preview/api/corpus-kek.bin`, mode `0600`, beside the API's other keys in its own `0700` folder. The
-code refuses a corpus key with any other owner, mode, size or a second name, and one with the bytes of another key.
+code refuses a corpus key with any other owner, mode, size or a second name (its support-keys check at start wants
+exactly `0600`, also with a custody group set), and one with the bytes of another key.
 The key store is an empty folder, `/var/lib/debateai-v3-preview/api/publication-keys`, the API's own, `0700`: the API
 writes one key file into it for each debate that goes public. Both lie apart from every other key and store, and
 outside the restore fence's folder (`…/api/restore-fence`), neither inside it nor above it: the code refuses
@@ -3802,7 +3816,7 @@ Expect the `in the API file: publishing on …` line, the API's start lines (`PR
 - Every `PUBON_NOT_DONE` that says `nothing changed` changed nothing: do what it names, or ask.
 - `the file before is back, and the API and the website started on it, with publishing off`: the site runs as before.
   A refusal of the publication lines often shows only a bare `PREVIEW_API_STARTUP_REFUSED`, with a stage line before
-  it or none (part 10). Run PUBCHECK, which reads each part the start checks, then ask, and give both last lines.
+  it or none (part 10). Run PUBCHECK, which reads most of what the start checks, then ask, and give both last lines.
 - `the site is DOWN`: ask at once.
 - From `PUBON_DONE` on, publishing is on. Run PUBAFTER next.
 
@@ -3874,8 +3888,11 @@ line is `[PUBLICATION_KEY_CLEANUP_PENDING]`.
    Look at it, then press Cancel. Send a report only if something on a page must be looked at: its check may hide the
    debate at once, and its answer is a mail. 6b.2 (step 4) has a test report with a claim that is plainly not on the
    page, if you want one.
-5. **Staff.** On the Team page (`/admin/team`) → public review, the public debate shows with **Hide now**. Do not
-   press it unless you mean it.
+5. **Staff.** Copy the address of a public debate's page (`/public/debate/<id>`). On the Team page (`/admin/team`), in
+   **Public debates under review** (Dezbateri publice în curs de verificare), paste it into **The debate's public
+   link** (Linkul public al dezbaterii) and press **Open** (Deschide). The panel lists only hidden debates, so this is
+   the way to a public one. The page shows "Public. Anyone can read it now." (Publică. Oricine o poate citi acum.) and
+   **Hide now** (Ascunde acum). Do not press it unless you mean it.
 
 Then run PUBAFTER again: its counts show what went public.
 
@@ -3911,8 +3928,8 @@ The first time, do each step slowly, and ask if a line differs from the ones abo
 ### 5.9b Switching publishing off again (PUBOFF)
 
 **What is possible.** The site has no way to make every public debate private again. PUBOFF stops the public pages:
-the **Public** tab comes back empty, a public page answers "not found", Publish answers that it is not available, and
-the Report button has nothing to act on. It never touches the debates themselves. What it does with the lines depends
+the **Public** tab comes back empty, a public page answers "not found", nobody sees Publish, and the Report button has
+nothing to act on. It never touches the debates themselves. What it does with the lines depends
 on what the database holds:
 - **No debate was ever published** (the database has no publication and the key store no key): it takes the four
   lines out and puts back `PUBLICATION_ENABLED=false`. The server is back where it was before PUBON. The corpus key, the
@@ -4366,9 +4383,9 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
   `AICHECK_DONE`, or you have decided to open without it (decision 1 below).
 - With your staff key working, you have read the **Public** tab and used Hide now on anything that must not stay
   public (Free debates go public by themselves once publishing is on, 5.9 and 5.1b).
-- Public debates: publishing is on (5.9), or you have decided to open without it. The Free line under the question
-  box and the Terms tell people that a finished Free debate is public; while publishing is off, none is, and the
-  Report button has nothing to act on.
+- Public debates: publishing is on (5.9), or you have decided to open without it (decision 7 below). The Free line
+  under the question box and the Terms tell people that a finished Free debate is public; while publishing is off,
+  none is, and the Report button has nothing to act on.
 - NETOPIA's logo shows (LOGOCHECK, part 2).
 - The security review's host-side fixes (NV-51, NV-55's port reservation, NV-56, NV-57) are applied or recorded, as
   part 7's "Before you start" says: the site meets strangers as it will in part 8.
@@ -4444,6 +4461,9 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
    are in test mode only invited accounts can buy. Decide whether the Terms, the test-mode note, or both must say
    that buying is open only to invited accounts while payments are in test mode. Changing either needs an upload, so
    decide before you open.
+7. **Public debates.** Open with publishing on (5.9), or without it, knowing that the line under the question box and
+   the Terms say a finished Free debate is public while none becomes public, and that the Report button then has
+   nothing to act on.
 
 **The AI check, read at the server (AICHECK).** It only reads, and it prints names, states and counts, never an amount.
 It checks that the release sends the check through the Anthropic gate, that the API file names the gate's socket, and
@@ -5396,7 +5416,8 @@ on dezbatere.ro (5.7); with your staff key working, you have read the **Public**
 anything that went public while your staff key did not work and must not stay public (Free debates go public by themselves once publishing is on, 5.9 and 5.1b);
 NETOPIA's logo shows in the home page's footer (LOGOCHECK, part 2; if it is missing, ask before you take the password
 off); the security review's host-side fixes are applied or recorded (part 7's "Before you start"); you have
-decided your numbers and gate pots (1.7, 6.4); and you have read the
+decided your numbers and gate pots (1.7, 6.4); you have decided whether to open with publishing on (5.9) or without
+it, as in 6b's decision 7; and you have read the
 warning in bold at the start of part 9: once strangers can buy, closing everything again needs help.
 
 **6b uses 8.2 to 8.4 too.** PWOFF1 accepts two pairings: part 8's (`everyone` in both files and in the running API's
@@ -5704,7 +5725,7 @@ that service.
 | bare `PREVIEW_API_STARTUP_REFUSED` after stage `outbound-mail-policy` or `outbound-mail-store` | API start | the mail plan, or the mail's own store | put the last good plan back (MAIL_CLOSE, or 1.5); ask |
 | bare `PREVIEW_API_STARTUP_REFUSED` after stage `pre-start-writer` | API start | the database step that records the charges before Start is missing or refused | ask |
 | bare `PREVIEW_API_STARTUP_REFUSED` after stage `saved-question-key-store` | API start | the saved questions' key store | ask |
-| bare `PREVIEW_API_STARTUP_REFUSED` after stage `corpus-kek`, `publication-secret-domains`, `database-roles`, `publication-key-store` or `publication-key-cleanup` | API start | publication's corpus key, its key store or its clean-up login, set up but not as the code needs (5.9) | PUBON and PUBOFF put the file before back by themselves; PUBCHECK (5.9) reads each part the start checks; ask |
+| bare `PREVIEW_API_STARTUP_REFUSED` after stage `corpus-kek`, `publication-secret-domains`, `database-roles`, `publication-key-store` or `publication-key-cleanup` | API start | publication's corpus key, its key store or its clean-up login, set up but not as the code needs (5.9) | PUBON and PUBOFF put the file before back by themselves; PUBCHECK (5.9) reads most of what the start checks; ask |
 | bare `PREVIEW_API_STARTUP_REFUSED` after stage `support-keys` | API start | the support key; with publishing on, also a corpus key that is not the API user's `0600` file of 32 bytes, or holds another key's bytes | as above |
 | bare `PREVIEW_UI_STARTUP_REFUSED` | launcher, website | in an upload, first the website file's proof line or its proof file (SB5c); otherwise a rule outside these locks | in an upload: the stage table of part 2 (DR6); otherwise put back the file you changed; ask |
 | bare `PREVIEW_API_STARTUP_REFUSED`, no stage line | launcher | a rule outside these locks, for example a stray key, or the payments line in local mode or on an older release; or a publication line the API's settings check refuses (for example `PUBLICATION_ENABLED=true` without `CONTENT_ENCRYPTION_ENABLED=true`, a key path missing, or a clean-up line equal to another login's line: PUBON checks these first) | put back the file you changed (PUBON and PUBOFF do it by themselves); ask |

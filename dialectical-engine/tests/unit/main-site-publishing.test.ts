@@ -522,9 +522,11 @@ describe('the words of 5.9, and where the rest of the guide points to it', () =>
     expect(flat).toContain('On this server the first two points need publishing on (5.9): until PUBON, no debate is public, no Free debate goes public, and the Report button has nothing to act on.');
     expect(flat).toContain('With publishing on (5.9), run PUBBACKUP (5.9, step 4) first, before SB1');
     expect(flat).toContain('| `corpus-kek`, `publication-secret-domains`, `database-roles`, `publication-key-store`, `publication-key-cleanup` | publication\'s keys and its clean-up login: with publishing on (5.9)');
-    expect(flat).toContain('PUBON and PUBOFF put the file before back by themselves; PUBCHECK (5.9) reads each part the start checks; ask |');
+    expect(flat).toContain('PUBON and PUBOFF put the file before back by themselves; PUBCHECK (5.9) reads most of what the start checks; ask |');
     expect(flat).toContain('**Publishing (5.9) is not one of these steps.**');
-    expect(flat).toContain('- Public debates: publishing is on (5.9), or you have decided to open without it.');
+    expect(flat).toContain('- Public debates: publishing is on (5.9), or you have decided to open without it (decision 7 below).');
+    expect(flat).toContain('7. **Public debates.** Open with publishing on (5.9), or without it, knowing that the line under the question box and the Terms say a finished Free debate is public while none becomes public');
+    expect(flat).toContain('you have decided whether to open with publishing on (5.9) or without it, as in 6b\'s decision 7;');
     expect(flat).toContain('PUBON and PUBOFF) needs its `upfail`');
     const flatGuide = guide.replace(/\s+/g, ' ');
     expect(flatGuide).toContain('**While publishing is on** (MAIN-SITE.md 5.9:');
