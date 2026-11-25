@@ -6923,8 +6923,9 @@ export async function evaluateAskAdmission(
   /**
    * V-28(2) — FIRST, before anything is discovered or probed.
    *
-   * Panel discovery probes the vendors this ask may use, and a probe is itself a
-   * request to a paid gateway. Taking the money decision after it would spend
+   * On the preview, panel discovery probes the models this ask may seat; hosted
+   * and local probe every declared vendor. A probe is itself a request to a paid
+   * gateway. Taking the money decision after it would spend
    * money to find out that no money may be spent, so the day's ceiling is the
    * first question this function asks.
    *

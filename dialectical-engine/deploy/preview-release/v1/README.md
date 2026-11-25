@@ -3777,8 +3777,8 @@ key out of the Amazon gate.
   state is still `active`. Once the key is in, the first call after the 31 days halts the gate
   (`open_window_expired`), and its `activate` opens it again.
 - **After a reboot it is not running.** Its unit has no `[Install]`, and the boot drop-in that starts it with the site
-  comes only at "Switch it on". Its `state` on disk stays `active`, so the tools and ASKS_OPEN are satisfied. While no
-  line-up seats Luna, no ask calls it; once one does, Luna's checks at ask time fail at once (Luna is left out).
+  comes only at "Switch it on". Its `state` on disk stays `active`, so the tools and ASKS_OPEN are satisfied. No ask
+  calls it: no line-up seats Luna before "Switch it on", whose step 2 starts the gate at boot.
   `systemctl start debateai-preview-bedrock-budget` starts it; "Switch it on" step 2 does.
 
 **Piece 4, any day after the upload: Luna in the line-up.** Not part of the upload, and never during one.

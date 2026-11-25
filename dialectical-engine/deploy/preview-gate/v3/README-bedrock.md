@@ -384,8 +384,8 @@ What to expect:
 
 **Until "Switch it on".** Nothing starts this gate at boot: its unit has no `[Install]`, and the boot drop-in comes at
 "Switch it on". After a reboot, start it by hand (`systemctl start debateai-preview-bedrock-budget`) when you need it;
-meanwhile its `state` on disk stays `active`, no ask calls it while no line-up seats Luna, and once one does, the API's
-checks of Luna fail at once, so Luna is left out. Its 31
+meanwhile its `state` on disk stays `active`, and no ask calls it: no line-up seats Luna before "Switch it on", whose
+step 2 starts the gate at boot. Its 31
 days run from step 6's `activate`: while no call reaches it, `window_open` turns `false` after them, and the owner's
 runbook's ASKS_OPEN refuses until its `stop`, then its `activate` (`deploy/preview-auth-dev/v1/MAIN-SITE.md`, 6.5).
 
