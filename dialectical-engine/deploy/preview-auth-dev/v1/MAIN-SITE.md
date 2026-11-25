@@ -3610,21 +3610,26 @@ echo PUBKEYS_DONE
 exit 0
 ```
 
-Expect the `corpus key: made …` and `key store: made …` lines, one line about the API's permission, the line about
-`$KF`, then `PUBKEYS_DONE`. Run again, it says `there already` for both. A `PUBKEYS_NOT_DONE` that says `nothing
+Expect the `corpus key: made …` and `key store: made …` lines, one line about the API's permission, the line about the
+two kept lines, then `PUBKEYS_DONE`. Run again, it says `there already` for both. A `PUBKEYS_NOT_DONE` that says `nothing
 changed` changed nothing; any other one: ask before anything else. The way back, before PUBON: none is needed. The key
 and the empty store are read by nothing while the API file does not name them; to take the drop-in out again, ask.
 
 **3. The clean-up login's password and its line (PUBLOGIN).** The API uses a login of its own,
 `debateai_prod_api_publication_cleanup`, to destroy the key of a public debate that comes down or is deleted. The login
 exists, its line in `pg_hba.conf` exists, and PUBCHECK reads whether its roles and grants are as the API's start check
-needs them. No guide records that it was ever given a password. How this server's other logins got theirs: each of the
-API's logins is one line in the API file, a database address of one form (the API's own login over TLS on the
-server's loopback, as the runner's guide says for its login: `deploy/preview-auth-dev/v1/README.md`, the runner file),
-and the one password the tools of this guide set on this server, the staff recovery login's (5.7), is made on the
-server and sent to the database only as a SCRAM verifier, never as the password itself
-(`deploy/preview-lifecycle/v1/jit-creator-actor.mjs`). The production password tool (`pnpm db:provision-principals`)
-cannot run on this server and would change every login's password (the release guide's H0). So PUBLOGIN:
+needs them. No guide records that it was ever given a password, and none records how the API's other logins first got
+theirs. What is known:
+- each of the API's logins is one line in the API file, all of one form: the login, its password, and the server's own
+  database over TLS on the server's loopback (the runner's guide, `deploy/preview-auth-dev/v1/README.md`, gives the same
+  form for the runner's login);
+- the one password this guide's tools set on this server, the staff recovery login's (5.7), is made on the server and
+  reaches the database only as a SCRAM verifier, never as the password itself
+  (`deploy/preview-lifecycle/v1/jit-creator-actor.mjs`);
+- the production password tool (`pnpm db:provision-principals`) cannot run on this server, and it would change every
+  login's password (the release guide's H0).
+
+So PUBLOGIN does it the way 5.7 does:
 1. makes a new random password on the server, which nobody sees or types;
 2. writes the line `PUBLICATION_CLEANUP_DATABASE_URL=…`: the API's own `DATABASE_URL`, with only the login and the
    password changed, into a root-only file beside this guide's other copies (`clean-up line` below);
@@ -3736,8 +3741,8 @@ exit 0
 
 Expect one line with the backup's databases, the names of the keys it holds (`CORPUS_KEK_PATH` and
 `PUBLICATION_KEY_STORE_PATH` among them) and its files with their sizes in bytes, then `the backup in …`, then
-`PUBBACKUP_DONE`. `KEYS_FAILED` means a key changed while the tool read it (a debate went public at that moment): run
-PUBBACKUP again. Any other `PUBBACKUP_NOT_DONE`: ask. To restore from such a backup is a step of its own, which no
+`PUBBACKUP_DONE`. `KEYS_FAILED` means a key store changed while the tool read it (for example a new account's key, or a
+debate that went public at that moment): run PUBBACKUP again. Any other `PUBBACKUP_NOT_DONE`: ask. To restore from such a backup is a step of its own, which no
 guide has yet: ask.
 
 **5. The switch (PUBON).** It checks everything above once more, keeps a copy of the API file, and puts the four
