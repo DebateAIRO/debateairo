@@ -2173,7 +2173,10 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "identity.continue_paused_run_in_release(uuid,uuid,text,bigint)", "identity.join_investigation_nested(uuid,uuid,uuid,text[],text)",
     "identity.join_public_tree(uuid,uuid,uuid,uuid,text)", "identity.open_investigation(uuid,uuid)",
     "identity.open_public_flag(uuid,uuid,uuid,jsonb,integer,integer,integer)", "identity.open_public_report(uuid,uuid,uuid,boolean)",
-    "identity.read_age_check_outcome(uuid)", "identity.read_ask_clarify_spent(uuid,timestamp with time zone,timestamp with time zone)",
+    "identity.read_age_check_outcome(uuid)",
+    // 0191: the country the request's own account chose at sign-up, asked as read_age_check_outcome asks of the account's own record.
+    "identity.read_registration_country(uuid)",
+    "identity.read_ask_clarify_spent(uuid,timestamp with time zone,timestamp with time zone)",
     "identity.read_data_export_status(uuid)", "identity.read_debate_last_visit(uuid,uuid)", "identity.read_dig_level(uuid,uuid)",
     "identity.read_dig_links(uuid,uuid)", "identity.read_dig_picks_of_run(uuid)", "identity.read_email_settings(uuid,uuid)",
     // 0189: whether the publication check kept a Free debate of the owner's private, asked as 0171's read_run_is_dig asks.

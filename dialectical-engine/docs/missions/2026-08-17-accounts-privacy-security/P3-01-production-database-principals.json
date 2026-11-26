@@ -3686,6 +3686,13 @@
         "EXECUTE ON FUNCTION core.take_down_check_deleted_debates(integer)",
         "EXECUTE ON FUNCTION identity.read_free_debates_to_publish_after(integer,timestamptz,uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0191_registration_country_read.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_registration_country(uuid)"
+      ]
     }
   ],
   "privilegeRevocations": [

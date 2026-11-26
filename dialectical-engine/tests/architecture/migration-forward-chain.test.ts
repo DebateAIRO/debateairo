@@ -1063,9 +1063,11 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains the check deleting a public debate 0190 after 0189 as an expand step that keeps 0130's verifier and gives the erasure login nothing, and documents it", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
-    // The chain head: three new functions, their owners set by one reviewed DO block.
-    expect(names.slice(-2)).toEqual(["0189_free_debate_refused_by_check.sql", "0190_check_deletes_public_debate.sql"]);
-    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    // Three new functions, their owners set by one reviewed DO block. Found by name: the sign-up country read for prices
+    // (0191) follows it.
+    const at = names.indexOf("0190_check_deletes_public_debate.sql");
+    expect(names.slice(at - 1, at + 1)).toEqual(["0189_free_debate_refused_by_check.sql", "0190_check_deletes_public_debate.sql"]);
+    const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
     expect(JSON.parse((await bytesOf("lineage/check-deletes-public-debate-forward0190.json")).toString("utf8"))).toEqual({
       version: "check-deletes-public-debate-forward0190-v1",
       baseRecipeSha256: plan.recipeSha256,
@@ -1125,6 +1127,56 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(step.sql).not.toContain("NOT_SHOWN");
     expect(readme.replace(/\s+/gu, " ")).toContain(
       "a Free debate the publication check kept private (0189, below) the seventy-ninth, and the check deleting a public debate with the Free sweep reading past waiting debates (0190, below) the eightieth");
+  });
+
+  it("chains the sign-up country read for prices 0191 after 0190 as an expand step that keeps 0130's verifier, and documents it", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    // The chain head: one function of the API's billing role, its owner set by one reviewed DO block.
+    expect(names.slice(-2)).toEqual(["0190_check_deletes_public_debate.sql", "0191_registration_country_read.sql"]);
+    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    expect(JSON.parse((await bytesOf("lineage/registration-country-read-forward0191.json")).toString("utf8"))).toEqual({
+      version: "registration-country-read-forward0191-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: { name: "0190_check_deletes_public_debate.sql", manifestSha256: sha256(await bytesOf("lineage/check-deletes-public-debate-forward0190.json")), verifierSha256: previous.verifierSha256 },
+      migration: { name: "0191_registration_country_read.sql", sha256: sha256(await bytesOf("0191_registration_country_read.sql")) },
+      verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) },
+      amendsPostconditionsOf: []
+    });
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/registration-country-read-forward0191.json")));
+    expect(step.previousName).toBe(previous.name);
+    expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+    expect(step.previousVerifierSha256).toBe(previous.verifierSha256);
+    expect(step.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
+    expect(step.replayVerifierSql).toBeUndefined();
+    expect(step.amendsPostconditionsOf ?? []).toEqual([]);
+    // One new function, its owner, its revoke and its one grant; nothing earlier replaced, nothing of billing.
+    const statements = step.sql.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("--")).join("\n");
+    expect(statements.match(/^(?:CREATE|ALTER|REVOKE|GRANT|DROP|INSERT|UPDATE|DELETE|DO)\b.*$/gmu)).toEqual([
+      "CREATE OR REPLACE FUNCTION identity.read_registration_country(p_owner_ref uuid) RETURNS text",
+      "DO $registration_country_read_owner$",
+      "REVOKE ALL ON FUNCTION identity.read_registration_country(uuid)",
+      "GRANT EXECUTE ON FUNCTION identity.read_registration_country(uuid) TO debateai_billing_runtime;"
+    ]);
+    expect(statements).not.toMatch(/\bbilling\./u);
+    const earlier = (await readdir(MIGRATIONS)).filter((name) => /^\d{4}_.*\.sql$/u.test(name) && name < step.name);
+    for (const name of earlier) expect((await bytesOf(name)).toString("utf8"), name).not.toContain("read_registration_country");
+    const lines = step.sql.split("\n");
+    const reviewed = lines.findIndex((line) => line.startsWith("-- n1: reviewed "));
+    expect(lines.filter((line) => line.startsWith("-- n1: reviewed "))).toHaveLength(1);
+    expect(lines[reviewed + 1]).toBe("DO $registration_country_read_owner$");
+    const loader = await readFile(new URL("migration-forward0191.ts", DB_SOURCE), "utf8");
+    expect(loader).toContain('"identity.read_registration_country(uuid)"');
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The sign-up country, read for prices (0191)"));
+    expect(section.startsWith("## The sign-up country, read for prices (0191)")).toBe(true);
+    for (const needle of ["0190", "0191_registration_country_read.sql", "registration-country-read-forward0191.json", "packages/db/src/migration-forward0191.ts",
+      "MIGRATION_FORWARD0191_", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "REQUEST_OWNER_MISMATCH", "debateai_billing_runtime",
+      "tests/integration/registration-country-0191.test.ts"
+    ]) expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "(0190, below) the eightieth, and the sign-up country read for prices (0191, below) the eighty-first");
   });
 
   // The release before refuses, at its restart on a database ahead of it, an amendment recorded by a step it does not

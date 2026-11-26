@@ -673,7 +673,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // branch): the V4 line left migrate() as it was.
 // Threat reports removed (2026-11-19): the module exports the threat-report repository adapter alone, without its row
 // types (synthesis-flag S04's line above), since only the retention sweep is left. migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "1cd2d623a39cd8293392571f0a38b713b8bbc5b62617e459b307dcf4f6445695";
+// The sign-up country read for prices (0191): the module exports the reader of the request's own account's country.
+// migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "ac555127666b5f1329b7214f8709353b171ab890b9f667ce9c9be84a28d33c7a";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each
