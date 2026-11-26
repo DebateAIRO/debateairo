@@ -157,5 +157,11 @@
   "home.removal.close": "Закрыть",
   "home.flag.underReview": "ПОМЕЧЕНО · НА РАССМОТРЕНИИ",
   "home.flag.approved": "ОДОБРЕНО",
-  "home.flag.refused": "НЕ ОДОБРЕНО"
+  "home.flag.refused": "НЕ ОДОБРЕНО",
+  "home.upvote.label.one": "Проголосуйте. {count} голос",
+  "home.upvote.label.few": "Проголосуйте. {count} голоса",
+  "home.upvote.label.many": "Проголосуйте. {count} голосов",
+  "home.upvote.label.other": "Проголосуйте. {count} голоса",
+  "home.upvote.signedOut": "Войдите, чтобы проголосовать",
+  "home.upvote.failed": "Не удалось сохранить ваш голос. Попробуйте ещё раз."
 }

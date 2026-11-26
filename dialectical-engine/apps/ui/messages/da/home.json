@@ -155,5 +155,9 @@
   "home.removal.close": "Luk",
   "home.flag.underReview": "MARKERET · UNDER GENNEMGANG",
   "home.flag.approved": "GODKENDT",
-  "home.flag.refused": "IKKE GODKENDT"
+  "home.flag.refused": "IKKE GODKENDT",
+  "home.upvote.label.one": "Stem. {count} stemme",
+  "home.upvote.label.other": "Stem. {count} stemmer",
+  "home.upvote.signedOut": "Log ind for at stemme",
+  "home.upvote.failed": "Din stemme kunne ikke gemmes. Prøv igen."
 }

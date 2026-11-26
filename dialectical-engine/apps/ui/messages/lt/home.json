@@ -157,5 +157,11 @@
   "home.removal.close": "Uždaryti",
   "home.flag.underReview": "PAŽYMĖTA · PERŽIŪRIMA",
   "home.flag.approved": "PRITARTA",
-  "home.flag.refused": "NEPRITARTA"
+  "home.flag.refused": "NEPRITARTA",
+  "home.upvote.label.one": "Balsuokite. {count} balsas",
+  "home.upvote.label.few": "Balsuokite. {count} balsai",
+  "home.upvote.label.many": "Balsuokite. {count} balso",
+  "home.upvote.label.other": "Balsuokite. {count} balsų",
+  "home.upvote.signedOut": "Prisijunkite, kad balsuotumėte",
+  "home.upvote.failed": "Jūsų balso išsaugoti nepavyko. Bandykite dar kartą."
 }

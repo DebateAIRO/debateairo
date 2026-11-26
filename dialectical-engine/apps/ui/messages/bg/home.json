@@ -155,5 +155,9 @@
   "home.removal.close": "Затваряне",
   "home.flag.underReview": "МАРКИРАНО · В ПРОЦЕС НА ПРЕГЛЕД",
   "home.flag.approved": "ОДОБРЕНО",
-  "home.flag.refused": "НЕОДОБРЕНО"
+  "home.flag.refused": "НЕОДОБРЕНО",
+  "home.upvote.label.one": "Гласувайте. {count} глас",
+  "home.upvote.label.other": "Гласувайте. {count} гласа",
+  "home.upvote.signedOut": "Влезте, за да гласувате",
+  "home.upvote.failed": "Гласът Ви не можа да бъде запазен. Опитайте отново."
 }

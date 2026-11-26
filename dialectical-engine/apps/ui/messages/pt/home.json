@@ -156,5 +156,10 @@
   "home.removal.close": "Fechar",
   "home.flag.underReview": "SINALIZADO · EM ANÁLISE",
   "home.flag.approved": "APROVADO",
-  "home.flag.refused": "NÃO APROVADO"
+  "home.flag.refused": "NÃO APROVADO",
+  "home.upvote.label.one": "Vote. {count} voto",
+  "home.upvote.label.many": "Vote. {count} votos",
+  "home.upvote.label.other": "Vote. {count} votos",
+  "home.upvote.signedOut": "Inicie sessão para votar",
+  "home.upvote.failed": "Não foi possível guardar o seu voto. Tente novamente."
 }

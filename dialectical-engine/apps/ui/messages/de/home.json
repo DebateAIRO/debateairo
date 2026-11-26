@@ -155,5 +155,9 @@
   "home.removal.close": "Schließen",
   "home.flag.underReview": "MARKIERT · IN ÜBERPRÜFUNG",
   "home.flag.approved": "GENEHMIGT",
-  "home.flag.refused": "NICHT GENEHMIGT"
+  "home.flag.refused": "NICHT GENEHMIGT",
+  "home.upvote.label.one": "Stimmen Sie ab. {count} Stimme",
+  "home.upvote.label.other": "Stimmen Sie ab. {count} Stimmen",
+  "home.upvote.signedOut": "Melden Sie sich an, um abzustimmen",
+  "home.upvote.failed": "Ihre Stimme konnte nicht gespeichert werden. Versuchen Sie es erneut."
 }

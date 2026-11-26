@@ -155,5 +155,9 @@
   "home.removal.close": "Sulgege",
   "home.flag.underReview": "MÄRGISTATUD · LÄBIVAATAMISEL",
   "home.flag.approved": "HEAKS KIIDETUD",
-  "home.flag.refused": "HEAKS KIITMATA"
+  "home.flag.refused": "HEAKS KIITMATA",
+  "home.upvote.label.one": "Hääletage. {count} hääl",
+  "home.upvote.label.other": "Hääletage. {count} häält",
+  "home.upvote.signedOut": "Logige sisse, et hääletada",
+  "home.upvote.failed": "Teie häält ei õnnestunud salvestada. Proovige uuesti."
 }

@@ -87,6 +87,24 @@ test("count catalogues render the numeral in the grammatical position and form",
   assert.deepEqual(rendered("ar", "time", "time.minutes", numbers(100)), ["قبل 100 دقيقة"]);
 });
 
+test("the upvote button's spoken name is the owner's wording, with the count in each form", () => {
+  const home = (locale) => JSON.parse(readFileSync(join(process.cwd(), "messages", locale, "home.json"), "utf8"));
+  const named = (locale, counts) => counts.map((count) => tPlural(home(locale), "home.upvote.label", count, locale));
+  const numbers = (...values) => values;
+
+  assert.deepEqual(named("en", numbers(0, 1, 2, 1234)), [
+    "Upvote. 0 votes", "Upvote. 1 vote", "Upvote. 2 votes", "Upvote. 1234 votes"
+  ]);
+  assert.deepEqual(named("ro", numbers(0, 1, 2, 19, 20, 100, 101, 1234)), [
+    "Votați. 0 voturi", "Votați. 1 vot", "Votați. 2 voturi", "Votați. 19 voturi", "Votați. 20 de voturi",
+    "Votați. 100 de voturi", "Votați. 101 voturi", "Votați. 1234 de voturi"
+  ]);
+  assert.equal(t(home("en"), "home.upvote.signedOut"), "Sign in to upvote");
+  assert.equal(t(home("ro"), "home.upvote.signedOut"), "Autentificați-vă pentru a vota");
+  assert.equal(t(home("en"), "home.upvote.failed"), "Your vote could not be saved. Try again.");
+  assert.equal(t(home("ro"), "home.upvote.failed"), "Votul dvs. nu a putut fi salvat. Încercați din nou.");
+});
+
 test("date and number helpers honor the requested locale", () => {
   const instant = new Date("2026-09-22T12:00:00.000Z");
   const dateOptions = { timeZone: "UTC", year: "numeric", month: "long", day: "numeric" };

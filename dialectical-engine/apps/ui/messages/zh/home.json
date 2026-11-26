@@ -154,5 +154,8 @@
   "home.removal.close": "关闭",
   "home.flag.underReview": "已标记 · 审核中",
   "home.flag.approved": "已批准",
-  "home.flag.refused": "未获批准"
+  "home.flag.refused": "未获批准",
+  "home.upvote.label.other": "请投票。{count} 票",
+  "home.upvote.signedOut": "请登录以投票",
+  "home.upvote.failed": "无法保存您的投票。请重试。"
 }

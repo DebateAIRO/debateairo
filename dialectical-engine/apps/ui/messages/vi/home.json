@@ -154,5 +154,8 @@
   "home.removal.close": "Đóng",
   "home.flag.underReview": "BỊ GẮN CỜ · ĐANG XEM XÉT",
   "home.flag.approved": "ĐÃ ĐƯỢC PHÊ DUYỆT",
-  "home.flag.refused": "KHÔNG ĐƯỢC PHÊ DUYỆT"
+  "home.flag.refused": "KHÔNG ĐƯỢC PHÊ DUYỆT",
+  "home.upvote.label.other": "Bình chọn. {count} lượt bình chọn",
+  "home.upvote.signedOut": "Đăng nhập để bình chọn",
+  "home.upvote.failed": "Không thể lưu lượt bình chọn của bạn. Hãy thử lại."
 }

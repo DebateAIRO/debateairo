@@ -155,5 +155,9 @@
   "home.removal.close": "Sulje",
   "home.flag.underReview": "MERKITTY · TARKASTETTAVANA",
   "home.flag.approved": "HYVÄKSYTTY",
-  "home.flag.refused": "EI HYVÄKSYTTY"
+  "home.flag.refused": "EI HYVÄKSYTTY",
+  "home.upvote.label.one": "Äänestä. {count} ääni",
+  "home.upvote.label.other": "Äänestä. {count} ääntä",
+  "home.upvote.signedOut": "Kirjaudu sisään, jotta voit äänestää",
+  "home.upvote.failed": "Ääntäsi ei voitu tallentaa. Yritä uudelleen."
 }

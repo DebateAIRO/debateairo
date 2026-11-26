@@ -157,5 +157,11 @@
   "home.removal.close": "Zavrieť",
   "home.flag.underReview": "OZNAČENÉ · NA POSÚDENÍ",
   "home.flag.approved": "SCHVÁLENÉ",
-  "home.flag.refused": "NESCHVÁLENÉ"
+  "home.flag.refused": "NESCHVÁLENÉ",
+  "home.upvote.label.one": "Hlasujte. {count} hlas",
+  "home.upvote.label.few": "Hlasujte. {count} hlasy",
+  "home.upvote.label.many": "Hlasujte. {count} hlasu",
+  "home.upvote.label.other": "Hlasujte. {count} hlasov",
+  "home.upvote.signedOut": "Prihláste sa, aby ste mohli hlasovať",
+  "home.upvote.failed": "Váš hlas sa nepodarilo uložiť. Skúste to znova."
 }

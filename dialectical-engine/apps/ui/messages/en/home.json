@@ -155,5 +155,9 @@
   "home.questionRefusal.months": "six months",
   "home.flag.underReview": "FLAGGED · UNDER REVIEW",
   "home.flag.approved": "APPROVED",
-  "home.flag.refused": "NOT APPROVED"
+  "home.flag.refused": "NOT APPROVED",
+  "home.upvote.label.one": "Upvote. {count} vote",
+  "home.upvote.label.other": "Upvote. {count} votes",
+  "home.upvote.signedOut": "Sign in to upvote",
+  "home.upvote.failed": "Your vote could not be saved. Try again."
 }

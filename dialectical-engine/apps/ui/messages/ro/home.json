@@ -156,5 +156,10 @@
   "home.removal.close": "Închideți",
   "home.flag.underReview": "MARCATĂ · ÎN CURS DE EXAMINARE",
   "home.flag.approved": "APROBATĂ",
-  "home.flag.refused": "NEAPROBATĂ"
+  "home.flag.refused": "NEAPROBATĂ",
+  "home.upvote.label.one": "Votați. {count} vot",
+  "home.upvote.label.few": "Votați. {count} voturi",
+  "home.upvote.label.other": "Votați. {count} de voturi",
+  "home.upvote.signedOut": "Autentificați-vă pentru a vota",
+  "home.upvote.failed": "Votul dvs. nu a putut fi salvat. Încercați din nou."
 }

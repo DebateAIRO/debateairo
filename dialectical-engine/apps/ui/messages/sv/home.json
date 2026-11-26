@@ -155,5 +155,9 @@
   "home.removal.close": "Stäng",
   "home.flag.underReview": "MARKERAD · UNDER GRANSKNING",
   "home.flag.approved": "GODKÄND",
-  "home.flag.refused": "EJ GODKÄND"
+  "home.flag.refused": "EJ GODKÄND",
+  "home.upvote.label.one": "Rösta. {count} röst",
+  "home.upvote.label.other": "Rösta. {count} röster",
+  "home.upvote.signedOut": "Logga in för att rösta",
+  "home.upvote.failed": "Din röst kunde inte sparas. Försök igen."
 }
