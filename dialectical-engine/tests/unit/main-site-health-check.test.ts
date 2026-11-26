@@ -58,8 +58,15 @@ const lineOf = (lines: readonly string[], start: string) => {
   return found[0]!;
 };
 
-function bash(text: string) {
-  const out = spawnSync('bash', ['-c', text], { encoding: 'utf8', env: { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH ?? ''}` } });
+/**
+ * Runs shell text. A scratch folder reaches it as the variable `D` (and, with `cwd`, as the folder it runs in), never as
+ * a path written into the text: a folder name with a quote in it could otherwise end the text's own quoting.
+ */
+function bash(text: string, scratch: Readonly<{ dir?: string; cwd?: boolean }> = {}) {
+  const out = spawnSync('bash', ['-c', text], {
+    encoding: 'utf8', ...(scratch.dir !== undefined && scratch.cwd ? { cwd: scratch.dir } : {}),
+    env: { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH ?? ''}`, ...(scratch.dir !== undefined ? { D: scratch.dir } : {}) }
+  });
   return { status: out.status, out: out.stdout, err: out.stderr, lines: out.stdout.trim().split('\n'), last: out.stdout.trim().split('\n').at(-1) };
 }
 
@@ -154,7 +161,7 @@ describe('the edit', () => {
   };
   const strip = (dir: string, text: string) => {
     writeFileSync(join(dir, 'in'), text);
-    return bash(`set -euo pipefail\n${EDIT}\ncd '${dir}'\nif hstrip in > out; then echo stripped; hshape in out; else echo refused; fi`);
+    return bash(`set -euo pipefail\n${EDIT}\nif hstrip in > out; then echo stripped; hshape in out; else echo refused; fi`, { dir, cwd: true });
   };
 
   it('takes out the three lines, whatever the indentation, and nothing else; the shape is the one both steps accept', () => withFiles(dir => {
@@ -183,7 +190,7 @@ describe('the edit', () => {
   it('a copy that takes out more than the three lines has another shape', () => withFiles(dir => {
     writeFileSync(join(dir, 'a'), caddyfile());
     writeFileSync(join(dir, 'b'), caddyfile({ secret: false }).replace('    health_fails 1\n', ''));
-    const run = bash(`set -euo pipefail\n${EDIT}\ncd '${dir}'\nhshape a b`);
+    const run = bash(`set -euo pipefail\n${EDIT}\nhshape a b`, { dir, cwd: true });
     expect(run.out.trim()).toBe('taken out: 4 lines (other, other, }); added: 0; places: 1');
   }));
 });
@@ -274,14 +281,14 @@ const CNEW_HERE = 'cnew() { [ "$(cat "$D/caddy-state")" = active ] && cmp -s "$C
 
 /** Runs a step in the world: the names file (or a step's own paths) replaced by the stand-ins, the maintenance flag in the world. */
 function run(lines: readonly string[], w: World, swap: Readonly<Record<string, string>> = {}) {
-  let text = lines.join('\n').replace(NAMES_LINE, () => [`D='${w.dir}'`, ...STUBS].join('\n'))
+  let text = lines.join('\n').replace(NAMES_LINE, () => STUBS.join('\n'))
     .replaceAll('/etc/debateai-v3-preview/lifecycle/maintenance-pending', '$D/maintenance-pending')
     .replaceAll(CNEW, () => CNEW_HERE);
   for (const [from, to] of Object.entries(swap)) {
     expect(text, from).toContain(from);
     text = text.replace(from, () => to);
   }
-  const result = bash(text);
+  const result = bash(text, { dir: w.dir });
   // Nothing the steps print names the secret's line or its file.
   expect(result.out).not.toContain(SECRET_FILE);
   expect(result.out).not.toContain('X-Debateai-Edge-Secret {');
@@ -289,9 +296,9 @@ function run(lines: readonly string[], w: World, swap: Readonly<Record<string, s
 }
 /** HEALTHBACK and PWON read no names file: their own paths go to the world, with the stand-ins before them. */
 const OWN_PATHS = 'C=/etc/debateai-v3-preview/public/Caddyfile; M=/root/preview-archive/main-site';
-const own = (w: World) => ({ [OWN_PATHS]: [`D='${w.dir}'`, ...STUBS].join('\n') });
+const own = () => ({ [OWN_PATHS]: STUBS.join('\n') });
 /** HEALTHBACK also reads the release table itself, through the lifecycle tools: stood in for by the world's status.json. */
-const ownBack = (w: World) => ({ ...own(w), [lineOf(HEALTHBACK, 'lc() {')]: 'lc() { [ "$1 $2" = \'release-check.mjs status\' ] || return 9; cat "$D/status.json"; }' });
+const ownBack = (w: World) => ({ ...own(), [lineOf(HEALTHBACK, 'lc() {')]: 'lc() { [ "$1 $2" = \'release-check.mjs status\' ] || return 9; cat "$D/status.json"; }' });
 
 describe('HEALTH1 and HEALTH2 on the server\'s shape', () => {
   it('with the password on: the live file and NAME1\'s and NAME2\'s copies lose the three lines, and nothing else', () => withWorld({}, w => {
@@ -343,7 +350,7 @@ describe('HEALTH1 and HEALTH2 on the server\'s shape', () => {
     // PWON, as the runbook has it: the password back, from the kept copy, and no secret in the health check.
     rmSync(join(w.dir, 'restarts'));
     writeFileSync(join(w.dir, 'after1/login'), '401');
-    const pwon = run(script('PWON'), w, own(w));
+    const pwon = run(script('PWON'), w, own());
     expect(pwon.last).toBe('PWON_DONE');
     expect(w.live()).toBe(caddyfile({ repository: true, secret: false }));
     expect(w.live()).not.toContain('health_headers');
@@ -568,7 +575,7 @@ describe('a run cut off at any point is finished by HEALTH2 again, or undone by 
     expect(w.has('restarts')).toBe(false);
     expect(run(HEALTH1, w).last).toBe('HEALTH1_NOT_DONE: HEALTH2 was cut off after its copy without the secret went live: run HEALTH2 again (it finishes), or HEALTHBACK (it puts everything back); nothing changed');
     // PWON refuses here (the live file is not PWOFF2's any more): the reason this run must be finished first.
-    expect(run(script('PWON'), w, own(w)).last).toMatch(/^PWON_NOT_DONE: the live Caddyfile is not the one PWOFF2 put in place/);
+    expect(run(script('PWON'), w, own()).last).toMatch(/^PWON_NOT_DONE: the live Caddyfile is not the one PWOFF2 put in place/);
     const again = run(HEALTH2, w);
     expect(again.lines).toContain('HEALTH2 was cut off after its copy went live, before every check after the restart had passed: Caddy restarts again on it, and the checks run against the answers kept before the change');
     expect(again.lines).toContain('kept copies on the record of the run that was cut off: 5');
@@ -736,13 +743,13 @@ describe('whether Caddy started on the live file (cnew)', () => {
       const ask = (state: string, since: string, mtime: string) => {
         writeFileSync(join(dir, 'state'), state); writeFileSync(join(dir, 'since'), since); writeFileSync(join(dir, 'mtime'), mtime);
         return bash([
-          `D='${dir}'; C="$D/Caddyfile"`,
+          'C="$D/Caddyfile"',
           'systemctl() { case "$1" in is-active) cat "$D/state";; show) [ "$*" = \'show -p ActiveEnterTimestamp --value caddy\' ] && cat "$D/since";; esac; }',
           // date -d reads the time systemd prints; the stand-in takes it as @<seconds>, and refuses anything else, as date does a time it cannot read.
           'date() { if [ "$1" = -d ]; then case "$2" in @[0-9]*) echo "${2#@}";; *) return 1;; esac; else command date "$@"; fi; }',
           'stat() { [ "$1 $2 $3" = "-c %Y $C" ] && cat "$D/mtime"; }',
           CNEW, 'if cnew; then echo yes; else echo no; fi'
-        ].join('\n')).out.trim();
+        ].join('\n'), { dir }).out.trim();
       };
       expect(ask('active', '@1000', '990')).toBe('yes');
       // The same second counts as after: a put-back comes seconds after Caddy's last start.
@@ -793,9 +800,9 @@ describe('the runbook\'s words', () => {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), 'main-site-health-daily-')));
     try {
       writeFileSync(join(dir, 'Caddyfile'), caddyfile());
-      expect(bash(line.replace('/etc/debateai-v3-preview/public/Caddyfile', `${dir}/Caddyfile`)).out).toBe('health_headers lines in the live Caddyfile: 1\n');
+      expect(bash(line.replace('/etc/debateai-v3-preview/public/Caddyfile', '"$D/Caddyfile"'), { dir }).out).toBe('health_headers lines in the live Caddyfile: 1\n');
       writeFileSync(join(dir, 'Caddyfile'), caddyfile({ secret: false }));
-      expect(bash(line.replace('/etc/debateai-v3-preview/public/Caddyfile', `${dir}/Caddyfile`)).out).toBe('health_headers lines in the live Caddyfile: 0\n');
+      expect(bash(line.replace('/etc/debateai-v3-preview/public/Caddyfile', '"$D/Caddyfile"'), { dir }).out).toBe('health_headers lines in the live Caddyfile: 0\n');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
