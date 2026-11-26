@@ -2,7 +2,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { foldSubscription, microsToDecimal, upgradeMonthCreditOverrideMicros, upgradeProrationMicros } from "@debateai/billing-core";
 import { BillingRepository, EntitlementRepository } from "@debateai/db";
 import { netopiaAmountToMicros } from "@debateai/payments-netopia";
+import { planById } from "@debateai/register";
 import { taxSummaryJobFor } from "../../apps/api/src/billing/owner-jobs.js";
+import { testBillingPlans } from "../support/billingFixtures.js";
 import { netopiaCountry, startBillingStack, type BillingStack } from "../support/billingStack.js";
 import { fakeTaxMicros } from "../support/fake-tax-engine.js";
 import { TEST_APP_ORIGIN } from "../support/httpSession.js";
@@ -194,15 +196,20 @@ describe("P23 paid plans, end to end on the fake stack", () => {
       "SELECT total_micros::text FROM billing.charge WHERE charge_id = $1", [chargeRef]
     );
     const paidCents = Number(paid.rows[0]!.total_micros) / 10_000;
-    await stack.spend(person, 3_300_000);              // 10% of Pro's made-up month (testBillingPlans)
+    // A tenth of Pro's month, read from the plan the stack runs on (testBillingPlans), so a change of Pro's credit
+    // moves the amount spent with it and the share below stays nine tenths.
+    const proCreditMicros = planById(testBillingPlans, "PRO").monthlyCreditMicros;
+    expect(proCreditMicros % 10).toBe(0);
+    await stack.spend(person, proCreditMicros / 10);
     // Owner's decision of 16 November 2026: the days gone by do not count. Nine days of a 28–31-day period are about
     // 30 % of it, and the refund is still the 90 % of the price that matches the credit not used.
     stack.advanceDays(9);
     // OUG 34/2014 art. 11^1 (owner ruling 2026-11-04): the signed-in person withdraws with no step-up.
     const withdrawn = await stack.post(person, "/v1/billing/subscription/withdraw", {});
     expect(withdrawn.status).toBe(200);
-    // price × (33.00 − 3.30) ÷ 33.00 = price × 0.9, floored to the cent.
-    const expectedCents = Math.floor(paidCents * 0.9);
+    // price × (credit − a tenth of it) ÷ credit = price × 9 ÷ 10, floored to the cent. With Pro's credit of 19.80:
+    // 59.50 (50.00 and Germany's 19 %) × (19.80 − 1.98) ÷ 19.80 = 53.55.
+    const expectedCents = Math.floor((paidCents * 9) / 10);
     expect(withdrawn.body.refund).toBe((expectedCents / 100).toFixed(2));
     await stack.runJobs();
     expect(await stack.subscriptionStatus(person.ownerRef)).toBe("WITHDRAWN");
