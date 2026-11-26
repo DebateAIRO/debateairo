@@ -1,8 +1,9 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { BillingRepository, migrate } from "@debateai/db";
 import { computeWindows } from "@debateai/billing-core";
 import { TypedDomainError } from "@debateai/kernel";
+import type { AccountCountryPort } from "../../apps/api/src/billing/account-country.js";
 import { QuoteService, type QuoteInput } from "../../apps/api/src/billing/quote.js";
 import { openQuoteLocation } from "../../apps/api/src/billing/records.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -26,9 +27,10 @@ beforeAll(async () => {
 afterAll(async () => { await database?.stop(); });
 beforeEach(() => { tax = new AdjustableTaxEngine(); geo = new StubGeo(); audit = []; });
 
-const service = () => new QuoteService({
+const service = (accountCountry?: AccountCountryPort) => new QuoteService({
   repository, tax, geo, countryPolicy: testCountryPolicy, policy: testBillingPolicy, plans: testBillingPlans,
-  recordsKey: KEY, audit: (event, fields) => { audit.push({ event, ...fields }); }
+  recordsKey: KEY, audit: (event, fields) => { audit.push({ event, ...fields }); },
+  ...(accountCountry === undefined ? {} : { accountCountry })
 });
 const input = (ownerRef: string, overrides: Partial<QuoteInput> = {}): QuoteInput => ({
   ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "RO", name: null, firstName: "Ana", lastName: "Pop",
@@ -154,5 +156,46 @@ describe("P8b the quote", () => {
       for (const event of activeSubscriptionEvents(ownerRef, NOW)) await repository.appendSubscriptionEvent(client, event);
     });
     await expect(service().create(input(ownerRef))).rejects.toMatchObject({ status: 409, code: "ALREADY_SUBSCRIBED" });
+  });
+});
+
+describe("the first quote starts from the account's sign-up country", () => {
+  /** The pricing page's first quote: no country, nobody named yet. */
+  const first = (ownerRef: string) => input(ownerRef, { country: null, firstName: null, lastName: null, region: null, city: null });
+
+  it("starts the first quote from the account's sign-up country, and asks to confirm it when the connection is elsewhere", async () => {
+    geo.country = "DE";
+    const result = await service({ read: async () => "RO" }).create(first(randomUUID()));
+    expect(result).toMatchObject({ declaredCountry: "RO", ipCountry: "DE", countryConfirmNeeded: true });
+    expect(result.quote).toMatchObject({ taxCountry: "RO", taxRateBasisPoints: 2_100 });
+    geo.country = "RO";
+    expect(await service({ read: async () => "RO" }).create(first(randomUUID())))
+      .toMatchObject({ declaredCountry: "RO", countryConfirmNeeded: false });
+  });
+
+  it("uses the connection when the account chose no country, and the body's country when it names one", async () => {
+    geo.country = "DE";
+    const read = vi.fn(async () => null);
+    expect(await service({ read }).create(first(randomUUID()))).toMatchObject({ declaredCountry: "DE", countryConfirmNeeded: false });
+    const named = vi.fn(async () => "RO");
+    expect(await service({ read: named }).create(input(randomUUID(), { country: "DE" }))).toMatchObject({ declaredCountry: "DE" });
+    expect(named).not.toHaveBeenCalled();
+  });
+
+  it("answers the one 503 and stores nothing when the account's country cannot be read", async () => {
+    const ownerRef = randomUUID();
+    const refused = Object.assign(new Error("REQUEST_OWNER_MISMATCH"), { code: "42501" });
+    await expect(service({ read: async () => { throw refused; } }).create(first(ownerRef)))
+      .rejects.toMatchObject({ status: 503, code: "TAX_SERVICE_UNAVAILABLE" });
+    expect((await database.pool.query("SELECT 1 FROM billing.quote WHERE owner_ref=$1", [ownerRef])).rowCount).toBe(0);
+    expect(audit).toEqual([{ event: "billing.quote.refused", code: "TAX_SERVICE_UNAVAILABLE", reason: "ACCOUNT_COUNTRY_UNREADABLE" }]);
+  });
+
+  it("refuses a sign-up country as it refuses a typed one: closed for payment, and over Tor", async () => {
+    await expect(service({ read: async () => "GB" }).create(first(randomUUID())))
+      .rejects.toMatchObject({ status: 403, code: "COUNTRY_PAYMENT_UNAVAILABLE" });
+    geo.tor = true;
+    await expect(service({ read: async () => "RO" }).create(first(randomUUID())))
+      .rejects.toMatchObject({ status: 403, code: "TOR_REFUSED" });
   });
 });

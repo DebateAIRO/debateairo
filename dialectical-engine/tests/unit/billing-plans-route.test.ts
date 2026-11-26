@@ -590,6 +590,14 @@ describe("P8a the API root hands the billing runtime's routes to buildApi", () =
     const returnOpen = (returns[0] ?? 0) + (returned?.[0].length ?? 0) - 1;
     expect(topLevelMembers(runtime, returnOpen)).toContainEqual(expect.stringMatching(/^routes(?:\s*:\s*routes)?$/u));
   });
+
+  it("gives the billing runtime the sign-up country reader on the request pool, and the runtime gives it to the routes and the quote", async () => {
+    const main = code(await readFile("apps/api/src/main.ts", "utf8"));
+    const members = topLevelMembers(main, braceAfter(main, /\bcreateBillingRuntime\(\s*\{/u)).filter((member) => /^accountCountry\b/u.test(member));
+    expect(members).toEqual(["accountCountry: new PostgresRegistrationCountryReader(pool)"]);
+    const runtime = code(await readFile("apps/api/src/billing/runtime.ts", "utf8"));
+    expect(runtime.match(/accountCountry:\s*deps\.accountCountry/gu)?.length).toBe(2);
+  });
 });
 
 /** The billing runtime as main.ts composes it, over the given pool and connectors; composing it starts nothing. */

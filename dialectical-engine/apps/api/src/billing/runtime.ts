@@ -26,6 +26,7 @@ import { createSmartBillInvoiceHandler, createSmartBillStornoHandler, smartBillP
 import { BillingMaintenance } from "./maintenance.js";
 import { NetopiaNoticeIntake } from "./netopia-intake.js";
 import type { NoticeSpool } from "./notice-spool.js";
+import type { AccountCountryPort } from "./account-country.js";
 import { catalogueOrderText } from "./order-text-catalogue.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { OwnerJobs } from "./owner-jobs.js";
@@ -61,6 +62,8 @@ export type BillingRuntimeDeps = Readonly<{
   plansInForce?: PlansInForcePort;
   countryPolicy: CountryPolicy;
   geo: GeoLookup;
+  /** The sign-up country of the request's account; absent: the connection's. */
+  accountCountry?: AccountCountryPort;
   /** L4's re-acceptance answer (main.ts's `legal`): billing routes refuse LEGAL_REACCEPTANCE_REQUIRED. */
   legal: BillingLegalGate;
   dekStore: ReadableUserDekStore;
@@ -309,6 +312,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({
     plans: deps.plans, geo: deps.geo, legal: deps.legal, clock: deps.clock,
+    ...(deps.accountCountry === undefined ? {} : { accountCountry: deps.accountCountry }),
     // The plans list names the payment system (sandbox or live), so the pages' test-mode note follows the server.
     paymentEnvironment: deps.connectors.paymentEnvironment,
     // Terms §12: the plans list shows each country's price with its tax, from the tax engine the quote asks.
@@ -317,7 +321,8 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     }),
     quotes: new QuoteService({
       repository, tax: deps.connectors.tax, geo: deps.geo, countryPolicy: deps.countryPolicy, policy: deps.policy,
-      plans: deps.plans, recordsKey: deps.connectors.recordsKey, audit: deps.audit
+      plans: deps.plans, recordsKey: deps.connectors.recordsKey, audit: deps.audit,
+      ...(deps.accountCountry === undefined ? {} : { accountCountry: deps.accountCountry })
     }),
     checkout, charges: new ChargeStatusReader({ repository, jobs, clock: deps.clock }),
     netopiaNotices,
