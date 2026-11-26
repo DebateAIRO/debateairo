@@ -6813,8 +6813,10 @@ has less, these two steps make room.
   takes `OVER='yes'`;
 - whether it holds the pnpm store the next staging starts from (SB1: the store this names file names, and the one the
   current release's own upload names);
-- that its folders are real folders, with no link on the way to them and nothing of another file system inside; for a
-  label, exactly its seven folders, and no other entry under `releases` or `artifacts` naming it.
+- that its folders are real folders, with no link on the way to them, nothing of another file system inside, and no
+  mount point on them or inside them (read from the mount table: `rm` tells another disk only by its device number, and
+  a bind mount from the same disk has the same one, so `rm` would go through it and delete what it shows); for a label,
+  exactly its seven folders, and no other entry under `releases` or `artifacts` naming it.
 
 Both steps read the newest upload's names file (fill in its `rNN`), and stop when another upload's archive folder is
 newer. CLEARLOOK runs at any time. CLEAR1 runs with the owner's yes for its one name, and refuses, with nothing
@@ -6829,7 +6831,7 @@ set -euo pipefail
 # CLEARLOOK: every archive folder, and every label under releases and artifacts that the release lock does not pin, with what deleting it would free and what may still need it, then may be cleared or KEEP. Read-only: nothing is moved or deleted.
 # The clear-out's facts (the same lines in CLEARLOOK and CLEAR1). A name is held to one strict pattern before any path is made from it, and CLEAR1 reads every fact again, for its one name, right before it deletes.
 export LC_ALL=C; shopt -s nullglob dotglob
-O=/opt/debateai-v3-preview; PA=/root/preview-archive; MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending; PROC=/proc; UD='/etc/systemd/system /run/systemd/system /run/systemd/transient /usr/lib/systemd/system'; WALK='/ /run'
+O=/opt/debateai-v3-preview; PA=/root/preview-archive; MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending; PROC=/proc; UD='/etc/systemd/system /run/systemd/system /run/systemd/transient /usr/lib/systemd/system'; WALK='/ /run'; MI=/proc/self/mountinfo
 # An archive folder's name is a release label, a dash and the UTC second SB15 archived it; a label is what SB1 makes. Both are lower-case letters, digits and dashes only.
 LRE='^[a-z0-9][a-z0-9-]{0,70}[a-z0-9]$'; ARE='^[a-z0-9][a-z0-9-]{0,70}[a-z0-9]-[0-9]{8}T[0-9]{6}Z$'; SRE='^[0-9]+ [0-9]+$'
 # The folders a name stands for, one per line: the archive folder, or a label's six release folders and its artifacts folder. Nothing for any other name.
@@ -6888,6 +6890,9 @@ cjudge() {
   if [ "$NE" -gt 0 ]; then X=$(csize "$@" 2>/dev/null || true); if [[ $X =~ $SRE ]]; then SZ=${X% *}; OT=${X#* }; fi; else SZ=0; fi
   [ "$SZ" != unread ] || K="$K; what it frees is unread"
   [ "$OT" = 0 ] || K="$K; $OT entries in it lie on another file system"
+  # Mount points on one of its folders or inside one, from the mount table. rm and the count above tell another disk only by its device number, and a bind mount from the same disk has the same one: rm would go through it and delete what it shows, which lives elsewhere.
+  X=unread; if [ -r "$MI" ]; then X=$(awk -v l="$(cpaths "$NM" | tr '\n' ' ')" 'BEGIN { n = split(l, p, " ") } { for (i = 1; i <= n; i++) if ($5 == p[i] || index($5, p[i] "/") == 1) { c++; break } } END { print c + 0 }' "$MI" 2>/dev/null || echo unread); fi
+  case "$X" in 0) ;; [1-9]*) K="$K; $X mount points on it or in it (the deletion would go through them)";; *) K="$K; the mount table is unread";; esac
   if grep -qxF -e "$LB" <<<"$PIN"; then PN=yes; K="$K; pinned in the release lock"; fi
   if [ "$LB" = "$CUR" ] || { [ -n "$CM" ] && [ "$CM" = "$CURC" ]; }; then K="$K; the current release"; fi
   if [ "$LB" = "$BEFL" ] || { [ -n "$CM" ] && [ "$CM" = "$BEFC" ]; }; then K="$K; the release before the current one (the way back)"; fi
@@ -6956,11 +6961,13 @@ staged or draining, the maintenance flag, a detached step running); when `NAME` 
 a space or a line break, or is neither an archive folder's name nor a label; when `YES` is not the same name; when a
 folder is a link, has a link on the way to it, or is not where the name says (directly under the archive, or a label's
 seven folders under `releases` and `artifacts`); and when CLEARLOOK's line for the name, read again now, does not end
-`may be cleared`. Then it prints each folder it deletes with its size, says that NOTHING is kept, writes `started` to its
-record, deletes each folder with `rm -rf --one-file-system --preserve-root=all`, which removes a link inside as a link
-and never what it points to, does not go into another file system, and refuses `/` and a mount point, reads the free
-space before and after, and adds one line (the time, the name, the MB freed) to the root-only record
-`/root/preview-archive/clear-out.log`.
+`may be cleared`. Then it prints each folder it deletes with its size, says that NOTHING is kept, and writes a first line
+to the root-only record `/root/preview-archive/clear-out.log` (the time, the name, `started`, the MB it expects to free).
+It deletes each folder with `rm -rf --one-file-system --preserve-root=all`, which removes a link inside as a link and
+never what it points to, does not go into another disk, and refuses `/`; a bind mount from the same disk would not stop
+it, which is why a name with a mount point on it or inside it is never cleared. It reads the free space before and after,
+and writes a second line (the time, the name, `deleted` or `not wholly deleted`, the MB freed). So each run adds two
+lines: the first lets a run cut off half way take what is left of a label's folders.
 
 ```sh
 set -euo pipefail
@@ -6971,7 +6978,7 @@ YES=''                                                    # the same name again,
 OVER=''                                                   # yes, only once the owner declared the newest upload over (no way back will be taken any more); else empty
 # The clear-out's facts (the same lines in CLEARLOOK and CLEAR1). A name is held to one strict pattern before any path is made from it, and CLEAR1 reads every fact again, for its one name, right before it deletes.
 export LC_ALL=C; shopt -s nullglob dotglob
-O=/opt/debateai-v3-preview; PA=/root/preview-archive; MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending; PROC=/proc; UD='/etc/systemd/system /run/systemd/system /run/systemd/transient /usr/lib/systemd/system'; WALK='/ /run'
+O=/opt/debateai-v3-preview; PA=/root/preview-archive; MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending; PROC=/proc; UD='/etc/systemd/system /run/systemd/system /run/systemd/transient /usr/lib/systemd/system'; WALK='/ /run'; MI=/proc/self/mountinfo
 # An archive folder's name is a release label, a dash and the UTC second SB15 archived it; a label is what SB1 makes. Both are lower-case letters, digits and dashes only.
 LRE='^[a-z0-9][a-z0-9-]{0,70}[a-z0-9]$'; ARE='^[a-z0-9][a-z0-9-]{0,70}[a-z0-9]-[0-9]{8}T[0-9]{6}Z$'; SRE='^[0-9]+ [0-9]+$'
 # The folders a name stands for, one per line: the archive folder, or a label's six release folders and its artifacts folder. Nothing for any other name.
@@ -7030,6 +7037,9 @@ cjudge() {
   if [ "$NE" -gt 0 ]; then X=$(csize "$@" 2>/dev/null || true); if [[ $X =~ $SRE ]]; then SZ=${X% *}; OT=${X#* }; fi; else SZ=0; fi
   [ "$SZ" != unread ] || K="$K; what it frees is unread"
   [ "$OT" = 0 ] || K="$K; $OT entries in it lie on another file system"
+  # Mount points on one of its folders or inside one, from the mount table. rm and the count above tell another disk only by its device number, and a bind mount from the same disk has the same one: rm would go through it and delete what it shows, which lives elsewhere.
+  X=unread; if [ -r "$MI" ]; then X=$(awk -v l="$(cpaths "$NM" | tr '\n' ' ')" 'BEGIN { n = split(l, p, " ") } { for (i = 1; i <= n; i++) if ($5 == p[i] || index($5, p[i] "/") == 1) { c++; break } } END { print c + 0 }' "$MI" 2>/dev/null || echo unread); fi
+  case "$X" in 0) ;; [1-9]*) K="$K; $X mount points on it or in it (the deletion would go through them)";; *) K="$K; the mount table is unread";; esac
   if grep -qxF -e "$LB" <<<"$PIN"; then PN=yes; K="$K; pinned in the release lock"; fi
   if [ "$LB" = "$CUR" ] || { [ -n "$CM" ] && [ "$CM" = "$CURC" ]; }; then K="$K; the current release"; fi
   if [ "$LB" = "$BEFL" ] || { [ -n "$CM" ] && [ "$CM" = "$BEFC" ]; }; then K="$K; the release before the current one (the way back)"; fi
@@ -7083,7 +7093,7 @@ set --; while IFS= read -r X; do if [ -n "$X" ] && [ -d "$X" ] && [ ! -L "$X" ];
 F0=$(df -Pk / | awk 'NR == 2 { print $4 }')
 echo "NOTHING of $NAME is kept, and this cannot be undone; it frees about $CZ MB"
 { ( umask 077; printf '%s %s started: about %s MB to free\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$NAME" "$CZ" >> "$PA/clear-out.log" ) && chmod 0600 "$PA/clear-out.log"; } || { echo "CLEAR1_NOT_DONE: the record $PA/clear-out.log could not be written: ask; nothing deleted"; exit 1; }
-# One rm per folder, each checked against the three roots first: rm removes a link inside as a link, never what it points to, does not go into another file system, and refuses / and a folder that is a mount point.
+# One rm per folder, each checked against the three roots first: rm removes a link inside as a link, never what it points to, does not go into another disk, and refuses /. It tells a disk only by its device number, so a bind mount from the same disk would not stop it: cjudge keeps every name with a mount point on it or in it.
 GONE=yes
 for X in "$@"; do
   case "$X" in "$O"/archive/?*|"$O"/releases/auth-dev-?*|"$O"/artifacts/auth-dev-?*) ;; *) echo "CLEAR1_NOT_DONE: $X lies outside the archive, releases and artifacts: nothing more deleted: ask"; exit 1;; esac
@@ -7091,9 +7101,9 @@ for X in "$@"; do
   if [ -e "$X" ] || [ -L "$X" ]; then GONE=no; fi
 done
 F1=$(df -Pk / | awk 'NR == 2 { print $4 }'); MB=$(( (${F1:-0} - ${F0:-0}) / 1024 ))
-( umask 077; printf '%s %s %s: %s MB freed\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$NAME" "$([ "$GONE" = yes ] && echo deleted || echo 'partly deleted')" "$MB" >> "$PA/clear-out.log" ) || true
-[ "$GONE" = yes ] || { echo "CLEAR1_NOT_DONE: $NAME is only partly deleted ($MB MB freed; nothing of it is kept): run CLEARLOOK, then CLEAR1 again with the same name for what is left; if it stops again: ask"; exit 1; }
-echo "deleted for good: $NAME; $MB MB freed; free on / now $(awk -v k="$F1" 'BEGIN { printf "%.1f", k * 1024 / 1e9 }') GB (before: $(awk -v k="$F0" 'BEGIN { printf "%.1f", k * 1024 / 1e9 }') GB); one line added to $PA/clear-out.log"
+( umask 077; printf '%s %s %s: %s MB freed\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$NAME" "$([ "$GONE" = yes ] && echo deleted || echo 'not wholly deleted')" "$MB" >> "$PA/clear-out.log" ) || true
+[ "$GONE" = yes ] || { echo "CLEAR1_NOT_DONE: $NAME is not wholly deleted ($MB MB freed; what was removed is not kept, and the rest is still there): run CLEARLOOK, then CLEAR1 again with the same name for what is left; if it stops again: ask"; exit 1; }
+echo "deleted for good: $NAME; $MB MB freed; free on / now $(awk -v k="$F1" 'BEGIN { printf "%.1f", k * 1024 / 1e9 }') GB (before: $(awk -v k="$F0" 'BEGIN { printf "%.1f", k * 1024 / 1e9 }') GB); two lines added to $PA/clear-out.log (started, then deleted)"
 echo CLEAR1_DONE
 ```
 

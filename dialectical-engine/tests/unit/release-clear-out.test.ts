@@ -3,8 +3,9 @@
 // deletes one name for good. Both live only in the guide, so they are run here in bash against scratch folders, with
 // the server's commands stood in for (the release table, systemd, the disk's free space, and rm, which checks its own
 // options before it deletes in the scratch folder). The traps are run one by one: an empty name, "..", a slash, a glob,
-// a link in the path, a pinned label, the current release, the Turnstile relay's folder, a label the newest upload's lock
-// copy pins, a name outside the allowed roots, and every other fact that keeps a folder.
+// a link in the path, a mount point on or in a folder (from a stand-in mount table), a pinned label, the current release,
+// the Turnstile relay's folder, a label the newest upload's lock copy pins, a name outside the allowed roots, and every
+// other fact that keeps a folder.
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -14,7 +15,7 @@ import { dirname, join, resolve } from 'node:path';
 const ROOT = resolve(import.meta.dirname, '../..');
 const guide = readFileSync(resolve(ROOT, 'deploy/preview-release/v1/README.md'), 'utf8');
 const NAMES_LINE = '. /root/preview-archive/rNN-names.sh';
-const PATHS_LINE = "O=/opt/debateai-v3-preview; PA=/root/preview-archive; MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending; PROC=/proc; UD='/etc/systemd/system /run/systemd/system /run/systemd/transient /usr/lib/systemd/system'; WALK='/ /run'";
+const PATHS_LINE = "O=/opt/debateai-v3-preview; PA=/root/preview-archive; MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending; PROC=/proc; UD='/etc/systemd/system /run/systemd/system /run/systemd/transient /usr/lib/systemd/system'; WALK='/ /run'; MI=/proc/self/mountinfo";
 
 /** Every fenced block of the guide, as its lines. */
 function fencedBlocks(text: string): string[][] {
@@ -104,6 +105,15 @@ function world(): World {
   put(join(dir, 'ms-steps'), '');
   // Free space in KB; the stand-in rm adds 1 MB for each folder it deletes.
   put(join(dir, 'avail'), '15000000\n');
+  // The mount table, as /proc/self/mountinfo has it: the root disk, /proc, /run, and a bind mount whose path only starts
+  // like an archive folder's (the name, then more letters): it is not inside that folder.
+  put(join(dir, 'mountinfo'), [
+    '29 1 252:1 / / rw,relatime shared:1 - ext4 /dev/vda1 rw,errors=remount-ro',
+    '30 29 0:5 / /proc rw,nosuid,nodev,noexec,relatime shared:12 - proc proc rw',
+    '31 29 0:25 / /run rw,nosuid,nodev,noexec,relatime shared:5 - tmpfs tmpfs rw,size=401508k,mode=755',
+    `120 29 252:1 /srv/old ${opt(`archive/${R28}`)}-old rw,relatime shared:1 - ext4 /dev/vda1 rw,errors=remount-ro`,
+    ''
+  ].join('\n'));
   // One process: the website of the current release, with its program, folder, an argument and an open file there.
   const proc = join(dir, 'proc', '4242');
   mkdirSync(join(proc, 'fd'), { recursive: true });
@@ -129,10 +139,10 @@ function stubs(w: World, names: Names = {}): string[] {
     'psqlq() { [ ! -e "$D/table-unread" ] || return 1; cat "$D/release-table"; }',
     'systemctl() { case "$1" in show) case "$3" in ExecStart) cat "$D/relay-exec";; WorkingDirectory) cat "$D/relay-wd";; esac;; list-units) case "$*" in *ms-step*) cat "$D/ms-steps";; *) cat "$D/units";; esac;; esac; }',
     'df() { printf \'Filesystem 1024-blocks Used Available Capacity Mounted on\\nscratch 100000000 1 %s 1%% /\\n\' "$(cat "$D/avail")"; }',
-    'rm() { printf \'%s\\n\' "$*" >> "$D/rm-calls"; if [ "$#" = 5 ] && [ "$1 $2 $3 $4" = \'-rf --one-file-system --preserve-root=all --\' ]; then echo $(( $(cat "$D/avail") + 1024 )) > "$D/avail"; command rm -rf -- "$5"; else return 97; fi; }'
+    'rm() { printf \'%s\\n\' "$*" >> "$D/rm-calls"; [ ! -e "$D/rm-refuses" ] || return 1; if [ "$#" = 5 ] && [ "$1 $2 $3 $4" = \'-rf --one-file-system --preserve-root=all --\' ]; then echo $(( $(cat "$D/avail") + 1024 )) > "$D/avail"; command rm -rf -- "$5"; else return 97; fi; }'
   ];
 }
-const OWN_PATHS = 'O="$D/opt"; PA="$D/pa"; MF="$D/maintenance-pending"; PROC="$D/proc"; UD="$D/systemd"; WALK="$D/opt $D/pa $D/elsewhere"';
+const OWN_PATHS = 'O="$D/opt"; PA="$D/pa"; MF="$D/maintenance-pending"; PROC="$D/proc"; UD="$D/systemd"; WALK="$D/opt $D/pa $D/elsewhere"; MI="$D/mountinfo"';
 
 function run(lines: readonly string[], w: World, fill: Readonly<Record<string, string>> = {}, names: Names = {}) {
   let text = lines.join('\n');
@@ -241,7 +251,7 @@ describe('CLEAR1 deletes one name for good', () => {
     // The other archive folders, and r28's file r29 shared, are still there.
     expect(existsSync(w.opt(`archive/${R28}/auth-dev-a00000028-r28-v1/shared`))).toBe(true);
     expect(existsSync(w.opt(`archive/${R30}`))).toBe(true);
-    expect(one.lines.at(-2)).toBe(`deleted for good: ${R29}; 1 MB freed; free on / now 15.4 GB (before: 15.4 GB); one line added to ${w.dir}/pa/clear-out.log`);
+    expect(one.lines.at(-2)).toBe(`deleted for good: ${R29}; 1 MB freed; free on / now 15.4 GB (before: 15.4 GB); two lines added to ${w.dir}/pa/clear-out.log (started, then deleted)`);
     const record = w.file('pa/clear-out.log').trim().split('\n');
     expect(record).toHaveLength(2);
     expect(record[0]).toMatch(new RegExp(`^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\dZ ${R29} started: about 2 MB to free$`));
@@ -249,6 +259,22 @@ describe('CLEAR1 deletes one name for good', () => {
     // A second run finds nothing to delete.
     expect(clear(w, R29).last).toMatch(/^CLEAR1_NOT_DONE: a00000029-r29-v1-20261126T052817Z may not be cleared now/);
     expect(rmCalls(w)).toHaveLength(1);
+  }));
+
+  it('a folder rm does not remove: not wholly deleted, said as it is, with both lines in the record; run again, it goes', () => withWorld(w => {
+    writeFileSync(join(w.dir, 'rm-refuses'), '');
+    const one = clear(w, R29);
+    expect(one.status).toBe(1);
+    expect(one.last).toBe(`CLEAR1_NOT_DONE: ${R29} is not wholly deleted (0 MB freed; what was removed is not kept, and the rest is still there): run CLEARLOOK, then CLEAR1 again with the same name for what is left; if it stops again: ask`);
+    expect(existsSync(w.opt(`archive/${R29}`))).toBe(true);
+    const record = w.file('pa/clear-out.log').trim().split('\n');
+    expect(record).toHaveLength(2);
+    expect(record[0]).toMatch(new RegExp(`^\\S+ ${R29} started: about 2 MB to free$`));
+    expect(record[1]).toMatch(new RegExp(`^\\S+ ${R29} not wholly deleted: 0 MB freed$`));
+    rmSync(join(w.dir, 'rm-refuses'));
+    expect(clear(w, R29).last).toBe('CLEAR1_DONE');
+    expect(existsSync(w.opt(`archive/${R29}`))).toBe(false);
+    expect(w.file('pa/clear-out.log').trim().split('\n')).toHaveLength(4);
   }));
 
   it('an unused label: its seven folders, and nothing of another label', () => withWorld(w => {
@@ -329,6 +355,31 @@ describe('CLEAR1 refuses, with nothing deleted', () => {
     rmSync(w.opt(`releases/auth-dev-fallback-${R24}-ui`), { recursive: true });
     symlinkSync(join(w.dir, 'elsewhere', 'precious'), w.opt(`releases/auth-dev-fallback-${R24}-ui`));
     expect(refused(w, `'${R24}'`, /may not be cleared now/).lines.join('\n')).toContain(`releases/auth-dev-fallback-${R24}-ui is a link, or no real folder`);
+  }));
+
+  it('a mount point on the archive folder itself, or inside one of a label\'s folders: rm\'s own checks would not stop it', () => withWorld(w => {
+    const mounts = w.file('mountinfo');
+    // A bind mount of another folder of the same disk on the archive folder itself: the same device number as its parent,
+    // so neither --one-file-system nor --preserve-root=all, nor the count of entries on another file system, sees it.
+    writeFileSync(join(w.dir, 'mountinfo'), `${mounts}121 29 252:1 /opt/debateai-v3-preview/releases/live ${w.opt(`archive/${R29}`)} rw,relatime shared:1 - ext4 /dev/vda1 rw\n`);
+    const look = run(CLEARLOOK, w);
+    expect(look.last, look.err).toBe('CLEARLOOK_DONE');
+    expect(look.of(R29)).toMatch(/; KEEP: 1 mount points on it or in it \(the deletion would go through them\)$/);
+    // A mount whose path only starts like r28's archive folder is not in it.
+    expect(look.of(R28)).toMatch(/; may be cleared$/);
+    expect(refused(w, `'${R29}'`, /may not be cleared now/).of(R29)).toMatch(/; KEEP: 1 mount points on it or in it \(the deletion would go through them\)$/);
+    expect(existsSync(w.opt(`archive/${R29}/auth-dev-a00000029-r29-v1/site-inputs.json`))).toBe(true);
+    // Another disk mounted inside one of a label's seven folders.
+    writeFileSync(join(w.dir, 'mountinfo'), `${mounts}122 29 259:3 / ${w.opt(`releases/auth-dev-fallback-${R24}-runner`)}/dialectical-engine/cache rw,relatime shared:40 - ext4 /dev/vdb1 rw\n`);
+    expect(run(CLEARLOOK, w).of(R24)).toMatch(/; KEEP: 1 mount points on it or in it \(the deletion would go through them\)$/);
+    expect(refused(w, `'${R24}'`, /may not be cleared now/).of(R24)).toMatch(/; KEEP: 1 mount points on it or in it \(the deletion would go through them\)$/);
+    for (const path of sevenOf(R24)) expect(existsSync(w.opt(path)), path).toBe(true);
+  }));
+
+  it('an unread mount table keeps every name', () => withWorld(w => {
+    rmSync(join(w.dir, 'mountinfo'));
+    expect(refused(w, `'${R29}'`, /may not be cleared now/).of(R29)).toMatch(/; KEEP: the mount table is unread$/);
+    expect(run(CLEARLOOK, w).lines.at(-2)).toBe('may be cleared: 0 names, 0 MB in all (each counted alone; names that share files free more together)');
   }));
 
   it('a root that is a link', () => withWorld(w => {
@@ -449,6 +500,11 @@ describe('the guides\' words', () => {
     expect(text).toContain('**`DISK`**');
     expect(text).toContain('CLEARLOOK and CLEAR1 (SB15b)');
     expect(text).toContain('NOTHING of it is kept, and it cannot be undone. One name per run, on purpose');
+    // Each run of CLEAR1 adds two lines to its record, and the text says so; rm's own checks are not promised to stop a mount.
+    expect(text).toContain('So each run adds two lines: the first lets a run cut off half way take what is left of a label\'s folders.');
+    expect(text).toContain('a bind mount from the same disk would not stop it, which is why a name with a mount point on it or inside it is never cleared');
+    expect(text).not.toContain('refuses `/` and a mount point');
+    expect(text).not.toContain('adds one line (the time, the name, the MB freed)');
     const main = flat(runbook);
     expect(main).toContain('the release guide\'s CLEARLOOK');
     expect(main.match(/CLEARLOOK/g)!.length).toBeGreaterThanOrEqual(3);

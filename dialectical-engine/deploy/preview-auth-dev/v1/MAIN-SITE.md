@@ -4157,9 +4157,10 @@ the ordinary way, not detached.
 **When.** At any time outside an upload. The names file refuses while a release is staged or draining. HEALTH1 and
 HEALTH2 also refuse, with nothing changed, while the maintenance flag is there (a restart of the server, or other
 maintenance, is under way), while a detached step runs, while Caddy does not run, while the NETOPIA review window is
-open (REVIEW_CLOSE first, then HEALTH1 and HEALTH2, then REVIEW_OPEN again), between PWOFF1 and PWOFF2, and while an
-edited copy for SIGNUPS waits. With the site password off (6b, or part 8) they work: PWOFF1's two copies get the same
-edit. HEALTHBACK's own rules are under "The way back".
+open (REVIEW_CLOSE first, then HEALTH1 and HEALTH2, then REVIEW_OPEN again), between PWOFF1 and PWOFF2, while an
+edited copy for SIGNUPS waits, and while a put-back cut off half way waits for HEALTHBACK (below). With the site
+password off (6b, or part 8) they work: PWOFF1's two copies get the same edit. HEALTHBACK's own rules are under "The
+way back".
 
 **The kept copies.** Several steps keep a copy of the Caddyfile, and later compare the live file with it or put it
 back:
@@ -4202,7 +4203,9 @@ KEPT=("$M/name/Caddyfile.before-dezbatere" "$M/name/Caddyfile.phase1" "$M/name/C
 rz() { local r c k; r=$(curl -s -m 5 -w '\n%{http_code}' "http://127.0.0.1:$1/readyz" || true); c=${r##*$'\n'}; k=$(jq -r '.releaseKey // empty' <<<"${r%$'\n'*}" 2>/dev/null || true); printf '%s %s\n' "${c:-000}" "${k:-none}"; }
 # How far a HEALTH2 whose copy is live got, by its record of the kept copies (written before the copy goes live): checks (cut off before every check after the restart had passed), copies (a kept copy still as it was), done, or unread. A record without the answers before the change comes from an earlier HEALTH2, which wrote it only once every check had passed.
 hstage() { local KD F T; KD=$(cat "$H/last-kept" 2>/dev/null || true); [ -n "$KD" ] && [ -f "$KD/list" ] || { echo unread; return 0; }; if [ -e "$KD/before" ] && [ ! -e "$KD/checked" ]; then echo checks; return 0; fi; while read -r F T; do [ ! -e "$F" ] || cmp -s "$F" "$KD/$T.after" || { echo copies; return 0; }; done < "$KD/list"; echo done; }
-# The guards (the same lines in HEALTH1 and HEALTH2): no detached step, no maintenance, Caddy running, the review window closed, no SIGNUPS copy waiting, and PWOFF1's copies only as PWOFF2 left them, or as a HEALTH2 whose copy is live found or left them. HLIVE says whether HEALTH1's copy without the secret is the live file.
+# Whether Caddy runs and has started since the live Caddyfile was last written (the same line in HEALTH1, HEALTH2 and HEALTHBACK). A put-back (HEALTH2's after a failed check, or HEALTHBACK's) cut off between putting a file in place and the restart leaves Caddy on the file it replaced. A put-back comes seconds after Caddy's last start, so a start in the same second as the write counts as after it.
+cnew() { local v s; [ "$(systemctl is-active caddy || true)" = active ] || return 1; v=$(systemctl show -p ActiveEnterTimestamp --value caddy 2>/dev/null || true); [ -n "$v" ] && [ "$v" != n/a ] || return 1; s=$(date -d "$v" +%s 2>/dev/null) || return 1; [ "$s" -ge "$(stat -c %Y "$C")" ]; }
+# The guards (the same lines in HEALTH1 and HEALTH2): no detached step, no maintenance, Caddy running, the review window closed, no SIGNUPS copy waiting, no put-back cut off half way (HEALTHBACK finishes it), and PWOFF1's copies only as PWOFF2 left them, or as a HEALTH2 whose copy is live found or left them. HLIVE says whether HEALTH1's copy without the secret is the live file.
 hguards() {
   [ -z "$(systemctl list-units 'ms-step-*' --no-legend --state=active,activating,deactivating)" ] || { echo "$1_NOT_DONE: a detached step still runs (read its log first); nothing changed"; exit 1; }
   [ ! -e /etc/debateai-v3-preview/lifecycle/maintenance-pending ] || { echo "$1_NOT_DONE: the maintenance flag is there (a restart of the server, or other maintenance, is under way): wait until it is over; nothing changed"; exit 1; }
@@ -4210,6 +4213,12 @@ hguards() {
   ! grep -qE 'review_locked|review_quiet|review window begin' "$C" || { echo "$1_NOT_DONE: the NETOPIA review window is open: REVIEW_CLOSE (5.8) first, then HEALTH1 and HEALTH2, then REVIEW_OPEN again; nothing changed"; exit 1; }
   [ ! -e "$M/password/Caddyfile.signups" ] || { echo "$1_NOT_DONE: an edited copy for SIGNUPS waits: finish SIGNUPS (6.5 (c)), or move $M/password/Caddyfile.signups aside; nothing changed"; exit 1; }
   HLIVE=no; if [ -s "$HA" ] && cmp -s "$C" "$HA"; then HLIVE=yes; fi
+  # The file before HEALTH2 live again while HEALTH2's record is there: a put-back ran (HEALTH2's after a failed check, or HEALTHBACK's). One cut off half way is finished by HEALTHBACK; a new HEALTH1 would move the record aside, and leave kept copies with HEALTH2's edit, or Caddy on the file without the secret.
+  KX=$(cat "$H/last-kept" 2>/dev/null || true)
+  if [ "$HLIVE" = no ] && [ -n "$KX" ] && [ -f "$KX/list" ] && [ -s "$HB" ] && cmp -s "$C" "$HB"; then
+    while read -r F T; do if [ -e "$F" ] && cmp -s "$F" "$KX/$T.after"; then echo "$1_NOT_DONE: the file before HEALTH2 is live again, but the kept copy ${F#"$M"/} still has HEALTH2's edit (a HEALTHBACK cut off after it put the file back?): run HEALTHBACK again (it finishes); nothing changed"; exit 1; fi; done < "$KX/list"
+    cnew || { echo "$1_NOT_DONE: the file before HEALTH2 is live again, but Caddy has not restarted since it was put in place (a put-back cut off before its restart), so Caddy still runs the file it replaced: run HEALTHBACK (it restarts Caddy on the file before); nothing changed"; exit 1; }
+  fi
   if [ -e "$M/password/Caddyfile.before-open" ] || [ -e "$M/password/Caddyfile.open" ]; then
     if [ "$HLIVE" = yes ]; then
       [ -s "$M/password/Caddyfile.before-open" ] && [ -s "$M/password/Caddyfile.open" ] && { cmp -s "$M/password/Caddyfile.open" "$HB" || cmp -s "$M/password/Caddyfile.open" "$HA"; } || { echo "$1_NOT_DONE: HEALTH2's copy is live, but PWOFF1's copies are neither as HEALTH2 found them nor as it left them: ask; nothing changed"; exit 1; }
@@ -4309,7 +4318,9 @@ KEPT=("$M/name/Caddyfile.before-dezbatere" "$M/name/Caddyfile.phase1" "$M/name/C
 rz() { local r c k; r=$(curl -s -m 5 -w '\n%{http_code}' "http://127.0.0.1:$1/readyz" || true); c=${r##*$'\n'}; k=$(jq -r '.releaseKey // empty' <<<"${r%$'\n'*}" 2>/dev/null || true); printf '%s %s\n' "${c:-000}" "${k:-none}"; }
 # How far a HEALTH2 whose copy is live got, by its record of the kept copies (written before the copy goes live): checks (cut off before every check after the restart had passed), copies (a kept copy still as it was), done, or unread. A record without the answers before the change comes from an earlier HEALTH2, which wrote it only once every check had passed.
 hstage() { local KD F T; KD=$(cat "$H/last-kept" 2>/dev/null || true); [ -n "$KD" ] && [ -f "$KD/list" ] || { echo unread; return 0; }; if [ -e "$KD/before" ] && [ ! -e "$KD/checked" ]; then echo checks; return 0; fi; while read -r F T; do [ ! -e "$F" ] || cmp -s "$F" "$KD/$T.after" || { echo copies; return 0; }; done < "$KD/list"; echo done; }
-# The guards (the same lines in HEALTH1 and HEALTH2): no detached step, no maintenance, Caddy running, the review window closed, no SIGNUPS copy waiting, and PWOFF1's copies only as PWOFF2 left them, or as a HEALTH2 whose copy is live found or left them. HLIVE says whether HEALTH1's copy without the secret is the live file.
+# Whether Caddy runs and has started since the live Caddyfile was last written (the same line in HEALTH1, HEALTH2 and HEALTHBACK). A put-back (HEALTH2's after a failed check, or HEALTHBACK's) cut off between putting a file in place and the restart leaves Caddy on the file it replaced. A put-back comes seconds after Caddy's last start, so a start in the same second as the write counts as after it.
+cnew() { local v s; [ "$(systemctl is-active caddy || true)" = active ] || return 1; v=$(systemctl show -p ActiveEnterTimestamp --value caddy 2>/dev/null || true); [ -n "$v" ] && [ "$v" != n/a ] || return 1; s=$(date -d "$v" +%s 2>/dev/null) || return 1; [ "$s" -ge "$(stat -c %Y "$C")" ]; }
+# The guards (the same lines in HEALTH1 and HEALTH2): no detached step, no maintenance, Caddy running, the review window closed, no SIGNUPS copy waiting, no put-back cut off half way (HEALTHBACK finishes it), and PWOFF1's copies only as PWOFF2 left them, or as a HEALTH2 whose copy is live found or left them. HLIVE says whether HEALTH1's copy without the secret is the live file.
 hguards() {
   [ -z "$(systemctl list-units 'ms-step-*' --no-legend --state=active,activating,deactivating)" ] || { echo "$1_NOT_DONE: a detached step still runs (read its log first); nothing changed"; exit 1; }
   [ ! -e /etc/debateai-v3-preview/lifecycle/maintenance-pending ] || { echo "$1_NOT_DONE: the maintenance flag is there (a restart of the server, or other maintenance, is under way): wait until it is over; nothing changed"; exit 1; }
@@ -4317,6 +4328,12 @@ hguards() {
   ! grep -qE 'review_locked|review_quiet|review window begin' "$C" || { echo "$1_NOT_DONE: the NETOPIA review window is open: REVIEW_CLOSE (5.8) first, then HEALTH1 and HEALTH2, then REVIEW_OPEN again; nothing changed"; exit 1; }
   [ ! -e "$M/password/Caddyfile.signups" ] || { echo "$1_NOT_DONE: an edited copy for SIGNUPS waits: finish SIGNUPS (6.5 (c)), or move $M/password/Caddyfile.signups aside; nothing changed"; exit 1; }
   HLIVE=no; if [ -s "$HA" ] && cmp -s "$C" "$HA"; then HLIVE=yes; fi
+  # The file before HEALTH2 live again while HEALTH2's record is there: a put-back ran (HEALTH2's after a failed check, or HEALTHBACK's). One cut off half way is finished by HEALTHBACK; a new HEALTH1 would move the record aside, and leave kept copies with HEALTH2's edit, or Caddy on the file without the secret.
+  KX=$(cat "$H/last-kept" 2>/dev/null || true)
+  if [ "$HLIVE" = no ] && [ -n "$KX" ] && [ -f "$KX/list" ] && [ -s "$HB" ] && cmp -s "$C" "$HB"; then
+    while read -r F T; do if [ -e "$F" ] && cmp -s "$F" "$KX/$T.after"; then echo "$1_NOT_DONE: the file before HEALTH2 is live again, but the kept copy ${F#"$M"/} still has HEALTH2's edit (a HEALTHBACK cut off after it put the file back?): run HEALTHBACK again (it finishes); nothing changed"; exit 1; fi; done < "$KX/list"
+    cnew || { echo "$1_NOT_DONE: the file before HEALTH2 is live again, but Caddy has not restarted since it was put in place (a put-back cut off before its restart), so Caddy still runs the file it replaced: run HEALTHBACK (it restarts Caddy on the file before); nothing changed"; exit 1; }
+  fi
   if [ -e "$M/password/Caddyfile.before-open" ] || [ -e "$M/password/Caddyfile.open" ]; then
     if [ "$HLIVE" = yes ]; then
       [ -s "$M/password/Caddyfile.before-open" ] && [ -s "$M/password/Caddyfile.open" ] && { cmp -s "$M/password/Caddyfile.open" "$HB" || cmp -s "$M/password/Caddyfile.open" "$HA"; } || { echo "$1_NOT_DONE: HEALTH2's copy is live, but PWOFF1's copies are neither as HEALTH2 found them nor as it left them: ask; nothing changed"; exit 1; }
@@ -4448,7 +4465,10 @@ the change. So, run HEALTH2 again: when its copy is not live yet, it starts over
 the record says it got. Before every check after the restart had passed, it restarts Caddy again and runs the checks
 against the answers it kept, and on a failed check puts the file before back; after them, it gives the edit to the
 kept copies still as they were. HEALTHBACK instead undoes everything, from any point. HEALTH1 refuses until one of the
-two has run. HEALTH2 needs Caddy running; HEALTHBACK does not.
+two has run. HEALTH2 needs Caddy running; HEALTHBACK does not. One cut-off HEALTH2 does not finish by itself: cut while
+it put the file before back after a failed check, after the file was in place and before Caddy restarted on it, it
+leaves Caddy on the copy that failed. HEALTH1 and HEALTH2 then refuse and name HEALTHBACK, which restarts Caddy on the
+file before.
 
 **When only some kept copies got the edit**, HEALTH2's last line names them. Until they have it, a step that puts one
 back would bring the secret back, and while `password/Caddyfile.open` is among them PWON refuses and OPENCHECK and
@@ -4479,7 +4499,11 @@ was cut off before its copy went live), and while each kept copy has HEALTH2's e
 moves PWOFF1's copies aside). Once a later step changed the live file or a kept copy (PWOFF2, PWON, SIGNUPS,
 REVIEW_OPEN, NAME5, or a hand edit), it refuses with nothing changed; ask then. It checks that every kept copy is back
 before it moves HEALTH1's copies and HEALTH2's record aside, so a HEALTHBACK cut off half way is finished by running it
-again.
+again. With the file before live, it restarts Caddy when Caddy has not started since that file was put in place (it
+compares Caddy's start time with the file's time): a put-back cut off before its restart, HEALTH2's after a failed check
+or its own, leaves Caddy on the file without the secret. While a HEALTHBACK cut off half way is not finished, HEALTH1 and
+HEALTH2 refuse and say to run HEALTHBACK again: otherwise HEALTH1 would move HEALTH2's record aside, and the kept copies
+would keep the edit while the live file has the secret.
 
 ```sh
 set -euo pipefail
@@ -4487,6 +4511,8 @@ set -euo pipefail
 C=/etc/debateai-v3-preview/public/Caddyfile; M=/root/preview-archive/main-site; H=$M/health
 HB=$H/Caddyfile.before-health; HA=$H/Caddyfile.health; TS=$(date -u +%Y%m%dT%H%M%SZ)
 lc() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/$1" "${@:2}"; }
+# Whether Caddy runs and has started since the live Caddyfile was last written (the same line in HEALTH1, HEALTH2 and HEALTHBACK). A put-back (HEALTH2's after a failed check, or HEALTHBACK's) cut off between putting a file in place and the restart leaves Caddy on the file it replaced. A put-back comes seconds after Caddy's last start, so a start in the same second as the write counts as after it.
+cnew() { local v s; [ "$(systemctl is-active caddy || true)" = active ] || return 1; v=$(systemctl show -p ActiveEnterTimestamp --value caddy 2>/dev/null || true); [ -n "$v" ] && [ "$v" != n/a ] || return 1; s=$(date -d "$v" +%s 2>/dev/null) || return 1; [ "$s" -ge "$(stat -c %Y "$C")" ]; }
 # The guards of HEALTH1 and HEALTH2 that a way back needs: no detached step, no maintenance, no release staged or draining (read from the release table, as the names file reads it), the review window closed, no SIGNUPS copy waiting. It does not ask for Caddy running: it restarts Caddy and judges it by Caddy's own answer, so a Caddy that does not run is a reason to go back, not to wait. PWOFF1's copies are held to HEALTH2's record below.
 [ -z "$(systemctl list-units 'ms-step-*' --no-legend --state=active,activating,deactivating)" ] || { echo "HEALTHBACK_NOT_DONE: a detached step still runs (read its log first); nothing changed"; exit 1; }
 [ ! -e /etc/debateai-v3-preview/lifecycle/maintenance-pending ] || { echo "HEALTHBACK_NOT_DONE: the maintenance flag is there (a restart of the server, or other maintenance, is under way): wait until it is over; nothing changed"; exit 1; }
@@ -4497,18 +4523,29 @@ ST=$(lc release-check.mjs status 2>&1) || { echo "HEALTHBACK_NOT_DONE: release-c
 [ -s "$HB" ] && [ -s "$HA" ] || { echo "HEALTHBACK_NOT_DONE: HEALTH1's copies are not there (HEALTHBACK ran already, or HEALTH1 never did); nothing changed"; exit 1; }
 # The live file is HEALTH2's copy (it ran, or was cut off once its copy was live), or the file before (HEALTH2 put it back itself, did not get that far, or a HEALTHBACK cut off after it did); anything else is a later step's.
 if cmp -s "$C" "$HA"; then LIVE=after; elif cmp -s "$C" "$HB"; then LIVE=before; else echo "HEALTHBACK_NOT_DONE: the live Caddyfile is neither the one HEALTH2 put in place nor the one before it (a later step changed it); nothing changed: ask"; exit 1; fi
+# With the file before live, Caddy runs it only once it has started since that file was put in place: a put-back cut off before its restart (HEALTH2's after a failed check, or this step's) left Caddy on the file without the secret, and it restarts here. RS says whether Caddy restarts.
+RS=yes; if [ "$LIVE" = before ] && cnew; then RS=no; fi
 # HEALTH2's record of the kept copies, written before its copy went live.
 KD=$(cat "$H/last-kept" 2>/dev/null || true)
-if [ -z "$KD" ] && [ "$LIVE" = before ]; then echo "the live Caddyfile is the one from before HEALTH2 already, and HEALTH2 left no record of kept copies (it did not get that far); nothing changed"; echo HEALTHBACK_DONE; exit 0; fi
+if [ -z "$KD" ] && [ "$LIVE" = before ]; then
+  [ "$RS" = no ] || { echo "HEALTHBACK_NOT_DONE: the live Caddyfile is the one from before HEALTH2, and HEALTH2 left no record of kept copies, but Caddy ($(systemctl is-active caddy || true)) has not started since that file was written: ask; nothing changed"; exit 1; }
+  echo "the live Caddyfile is the one from before HEALTH2 already, and HEALTH2 left no record of kept copies (it did not get that far); nothing changed"; echo HEALTHBACK_DONE; exit 0
+fi
 [ -n "$KD" ] && [ -f "$KD/list" ] || { echo "HEALTHBACK_NOT_DONE: HEALTH2's list of kept copies is missing; nothing changed: ask"; exit 1; }
 # Each kept copy HEALTH2 listed has its edit (HEALTH2 changed it), is still as it was (HEALTH2 did not get to it, or a cut-off HEALTHBACK put it back), or is gone (PWON moves PWOFF1's copies aside); anything else changed since: stop.
 NA=0; while read -r F T; do if [ ! -e "$F" ] || cmp -s "$F" "$KD/$T.before"; then :; elif cmp -s "$F" "$KD/$T.after"; then NA=$((NA + 1)); else echo "HEALTHBACK_NOT_DONE: the kept copy ${F#"$M"/} changed since HEALTH2; nothing changed: ask"; exit 1; fi; done < "$KD/list"
-if [ "$LIVE" = before ] && [ "$NA" = 0 ]; then echo "the live Caddyfile is the one from before HEALTH2 already, and no kept copy has HEALTH2's edit (HEALTH2 did not get that far, or put the file back itself); nothing changed"; echo HEALTHBACK_DONE; exit 0; fi
+if [ "$LIVE" = before ] && [ "$NA" = 0 ] && [ "$RS" = no ]; then echo "the live Caddyfile is the one from before HEALTH2 already, and no kept copy has HEALTH2's edit (HEALTH2 did not get that far, or put the file back itself); nothing changed"; echo HEALTHBACK_DONE; exit 0; fi
 # PWOFF1's copies made after HEALTH2 are not on its record: the file before under them would leave PWOFF2 and PWON a live file they do not expect.
 if [ -e "$M/password/Caddyfile.open" ] && ! awk -v f="$M/password/Caddyfile.open" '$1 == f { x = 1 } END { exit !x }' "$KD/list"; then echo "HEALTHBACK_NOT_DONE: PWOFF1's copies were made after HEALTH2 (they are not on its record): run PWON first (the password still asks, so it only moves them aside), then HEALTHBACK; nothing changed"; exit 1; fi
 if [ "$LIVE" = after ]; then
   cp -p "$C" "$H/Caddyfile.before-healthback-$TS"
   { install -o root -g root -m 0644 "$HB" "$C.new" && mv "$C.new" "$C" && cmp -s "$HB" "$C"; } || { echo "HEALTHBACK_NOT_DONE: the file before HEALTH2 was not put in place; Caddy was not restarted: ask"; exit 1; }
+elif [ "$RS" = yes ]; then
+  echo "the live Caddyfile is the one from before HEALTH2 already, but Caddy ($(systemctl is-active caddy || true)) has not started since it was put in place (a put-back cut off before its restart): Caddy restarts on it now"
+else
+  echo "the live Caddyfile is the one from before HEALTH2 already, and Caddy has started on it: only the kept copies go back"
+fi
+if [ "$RS" = yes ]; then
   systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; sleep 3
   # Caddy's own answer judges the restart: the public route refuses /readyz with 404 on one of the two names (PWON tries the same two), and that needs no website. It is asked for at most about 30 seconds. The loopback listener passes the request on to the website, so its code is printed as information only: it is 200 only while the website runs.
   ZC=000; T1=$(( $(date +%s) + 30 )); for i in $(seq 1 15); do for N in dezbatere.ro v3-preview.dezbatere.ro; do ZC=$(curl -s -o /dev/null -m 5 -w '%{http_code}' "https://$N/readyz" || true); [ "$ZC" != 404 ] || break; done; [ "$ZC" != 404 ] || break; [ "$(date +%s)" -lt "$T1" ] || break; sleep 1; done
@@ -4521,8 +4558,6 @@ if [ "$LIVE" = after ]; then
     ZA=000; for N in dezbatere.ro v3-preview.dezbatere.ro; do ZA=$(curl -s -o /dev/null -m 5 -w '%{http_code}' "https://$N/readyz" || true); [ "$ZA" != 404 ] || break; done
     echo "HEALTHBACK_NOT_DONE: Caddy did not come back on the file before (Caddy $CS; the public /readyz $ZC, where Caddy's own refusal is 404); the file without the secret is back (the live file is HEALTH2's copy: $FA), and Caddy is $CA and refuses /readyz itself: $([ "$ZA" = 404 ] && echo yes || echo no) (active and yes: as after HEALTH2; anything else: the site is DOWN): ask at once"; exit 1
   fi
-else
-  echo "the live Caddyfile is the one from before HEALTH2 already: only the kept copies go back"
 fi
 # The kept copies with HEALTH2's edit go back; one still as it was, or gone, stays as it is.
 while read -r F T; do if [ -e "$F" ] && cmp -s "$F" "$KD/$T.after"; then { install -o root -g root -m 0644 "$KD/$T.before" "$F.new" && mv "$F.new" "$F"; } || true; fi; done < "$KD/list"
@@ -4538,7 +4573,8 @@ exit 0
 Expect `after the restart: Caddy active; the public /readyz 404 …` (the loopback listener `200` while the website
 runs, anything else while it is stopped), `Caddy's health check sends the edge secret again …`, then
 `HEALTHBACK_DONE`. With the file before live already, it says so and puts back only the kept copies with HEALTH2's
-edit, or, with none, changes nothing. HEALTH1 can then run again.
+edit, or, with none, changes nothing; when Caddy has not started on that file since it was put in place, it says so and
+restarts Caddy first, judged as above. HEALTH1 can then run again.
 
 ---
 
