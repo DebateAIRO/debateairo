@@ -19,6 +19,8 @@ import { MODEL_STRENGTHS, TypedDomainError, parseReleaseKey, type ActivationStat
 export * from "./publication-check.js";
 export * from "./synthesis-check-erasure.js";
 export { PostgresThreatReportRepository } from "./threat-reports.js";
+// 0192: the sign-up country of the request's own account, which a signed-in person's prices start from.
+export { PostgresRegistrationCountryReader } from "./registration-country.js";
 // Row-level security S01 (PLAN §0.3): the request scope and the cross-account routing createPool applies.
 export {
   ACCOUNT_CREDENTIAL_SETTING,

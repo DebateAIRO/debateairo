@@ -46,7 +46,8 @@ export type SupportRoutePolicy = (route: SupportRoutePath) => Readonly<{
   config: Readonly<{
     auth: "public" | "user" | "operator";
     origin?: "trusted";
-    session?: "optional";
+    // The shared policy table's session member; the support routes are "optional" ones.
+    session?: "optional" | "best-effort";
   }>;
 }>;
 

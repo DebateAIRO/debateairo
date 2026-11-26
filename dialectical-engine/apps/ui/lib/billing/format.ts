@@ -56,7 +56,7 @@ export function planName(catalog: MessageCatalog, planId: BillingPlanId): string
   return t(catalog, `billing.plans.${planId}.name`);
 }
 
-/** "4× the Plus allowance": the allowance as a multiple, never as dollars of credit (spec §1.2, §2.5.3). */
+/** "3× the Plus allowance": the allowance as a multiple, never as dollars of credit (spec §1.2, §2.5.3). */
 export function allowanceText(catalog: MessageCatalog, locale: string, planId: BillingPlanId, ratio: string): string {
   if (planId === "FREE") return t(catalog, "billing.pricing.allowanceFree");
   if (ratio === "1") return t(catalog, "billing.pricing.allowancePlus");

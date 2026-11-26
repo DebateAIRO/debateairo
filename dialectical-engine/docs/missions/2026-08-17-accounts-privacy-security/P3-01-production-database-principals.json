@@ -3686,6 +3686,20 @@
         "EXECUTE ON FUNCTION core.take_down_check_deleted_debates(integer)",
         "EXECUTE ON FUNCTION identity.read_free_debates_to_publish_after(integer,timestamptz,uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0192_registration_country_read.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_registration_country(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_authorization_runtime",
+      "source": "migrations/0193_google_return_connects_account.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.finish_social_callback_v3(jsonb,jsonb)"
+      ]
     }
   ],
   "privilegeRevocations": [

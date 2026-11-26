@@ -170,7 +170,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/asks/paths/combine", auth: "user", resource: "run-owner", action: "read-start-combine" },
   { route: "POST /v1/asks/paths/fit", auth: "user", resource: "run-owner", action: "read-start-fit" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
-  { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
+  { route: "GET /v1/billing/plans", auth: "public", session: "best-effort", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
   { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
   { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" },
@@ -457,6 +457,11 @@ describe("S7 deny-by-default authorization", () => {
       expect(response.json(), policy.route).toEqual({ error: "SESSION_REQUIRED" });
     }
     await api.close();
+  });
+
+  it("reads a session best-effort on the plans list only, and only on a GET", () => {
+    expect(authorizationPolicyInventory.filter((policy) => "session" in policy && policy.session === "best-effort")
+      .map((policy) => policy.route)).toEqual(["GET /v1/billing/plans"]);
   });
 
   it("rejects registration of a route outside the canonical policy table", async () => {

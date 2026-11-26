@@ -41,8 +41,8 @@ const PLANS = Object.freeze({
   plans: [
     { plan_id: "FREE" as const, net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, total_price: "0.00", allowance_vs_plus: "0.04" },
     { plan_id: "PLUS" as const, net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, total_price: "23.80", allowance_vs_plus: "1" },
-    { plan_id: "PRO" as const, net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, total_price: "59.50", allowance_vs_plus: "4" },
-    { plan_id: "MAX" as const, net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, total_price: "238.00", allowance_vs_plus: "30" }
+    { plan_id: "PRO" as const, net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, total_price: "59.50", allowance_vs_plus: "3" },
+    { plan_id: "MAX" as const, net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, total_price: "238.00", allowance_vs_plus: "15" }
   ]
 });
 const BILLING_LINKS = ["/pricing", "/terms#legal-section-12", "/cancel", "/withdraw"];

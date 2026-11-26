@@ -2173,7 +2173,10 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "identity.continue_paused_run_in_release(uuid,uuid,text,bigint)", "identity.join_investigation_nested(uuid,uuid,uuid,text[],text)",
     "identity.join_public_tree(uuid,uuid,uuid,uuid,text)", "identity.open_investigation(uuid,uuid)",
     "identity.open_public_flag(uuid,uuid,uuid,jsonb,integer,integer,integer)", "identity.open_public_report(uuid,uuid,uuid,boolean)",
-    "identity.read_age_check_outcome(uuid)", "identity.read_ask_clarify_spent(uuid,timestamp with time zone,timestamp with time zone)",
+    "identity.read_age_check_outcome(uuid)",
+    // 0192: the country the request's own account chose at sign-up, asked as read_age_check_outcome asks of the account's own record.
+    "identity.read_registration_country(uuid)",
+    "identity.read_ask_clarify_spent(uuid,timestamp with time zone,timestamp with time zone)",
     "identity.read_data_export_status(uuid)", "identity.read_debate_last_visit(uuid,uuid)", "identity.read_dig_level(uuid,uuid)",
     "identity.read_dig_links(uuid,uuid)", "identity.read_dig_picks_of_run(uuid)", "identity.read_email_settings(uuid,uuid)",
     // 0189: whether the publication check kept a Free debate of the owner's private, asked as 0171's read_run_is_dig asks.
@@ -2292,6 +2295,9 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     // 0178's four, each gated as its older twin is: the mailed verification token, the social flow's proof and state, and the step-up grant's token.
     "identity.consume_verification_set_password(text,timestamp with time zone,jsonb,text)",
     "identity.create_social_account_v2(jsonb,jsonb)", "identity.finish_social_callback_v2(jsonb,jsonb)",
+    // 0193's return beside 0178's, gated as it is (the flow's state, cookie, claim and provider configuration); the account it may connect is
+    // found from the address the provider's verified proof names, never from an owner or account the caller hands it.
+    "identity.finish_social_callback_v3(jsonb,jsonb)",
     "identity.request_email_change_bounded(uuid,uuid,text,uuid,bytea,jsonb,text,text,timestamp with time zone,jsonb,integer,bigint)",
   ] as const;
   const PUBLIC = [

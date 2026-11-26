@@ -10,6 +10,7 @@ import { planNetPrice, priceCurrencyFor, type BillingPlans, type PlanId } from "
 import { clientIpNetworkScope } from "../client-ip.js";
 import type { LegalAcceptanceApplication } from "../legal.js";
 import type { AuthenticatedSession } from "../sessions.js";
+import type { AccountCountryPort } from "./account-country.js";
 import type { ChargeStatusPort } from "./charge-status.js";
 import type { CheckoutServicePort } from "./checkout.js";
 import type { DisplayedTaxPort } from "./displayed-tax.js";
@@ -43,7 +44,7 @@ export const BILLING_ROUTE_PATHS = Object.freeze([
 export type BillingRoutePath = typeof BILLING_ROUTE_PATHS[number];
 
 export type BillingRoutePolicy = (route: BillingRoutePath) => Readonly<{
-  config: Readonly<{ auth: "public" | "user" | "operator"; origin?: "trusted"; session?: "optional" }>;
+  config: Readonly<{ auth: "public" | "user" | "operator"; origin?: "trusted"; session?: "optional" | "best-effort" }>;
 }>;
 
 export interface BillingUsageReader {
@@ -93,6 +94,11 @@ export type BillingRouteDeps = Readonly<{
   plans?: BillingPlans;
   /** Part C: the connection's country for the plans' currency; absent, the rule's default. */
   geo?: GeoLookup;
+  /**
+   * The signed-in account's sign-up country, which the plans list prices for before the connection's; absent, the
+   * connection's country, as before. main.ts supplies it through the billing runtime.
+   */
+  accountCountry?: AccountCountryPort;
   /** Terms §12: the connection country's tax on the plans list; absent, the list carries no total and the page shows no price. */
   displayedTax?: DisplayedTaxPort;
   /**
@@ -155,7 +161,8 @@ async function refuseUnconfirmedAge(read: BillingAgeConfirmation | undefined, se
 
 /**
  * Spec 2026-10-05 §2.16.5: the answer names the caller's currency and country's tax, so only the browser may keep it
- * for a minute; a shared cache would hand one country's prices to everyone.
+ * for a minute; a shared cache would hand one country's prices to everyone. It also depends on the signed-in account
+ * (its sign-up country), so the answer varies by cookie and a browser does not keep one person's list for another.
  */
 const PLANS_CACHE_CONTROL = "private, max-age=60";
 
@@ -236,7 +243,7 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     // hooks last in their category), so only a served list may be cached for a minute. A 404 (billing off) or a 429
     // keeps no-store.
     onSend: async (_request, reply, payload) => {
-      if (reply.statusCode === 200) reply.header("cache-control", PLANS_CACHE_CONTROL);
+      if (reply.statusCode === 200) reply.header("cache-control", PLANS_CACHE_CONTROL).header("vary", "Cookie");
       return payload;
     }
   }, async (request, reply) => {
@@ -245,12 +252,24 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     // A source-keyed scope counts the caller's network (DL5-F3: an IPv6 address is its /64), as G3a's does.
     if (!admit.gate(reply, "publicReads", "GET /v1/billing/plans", clientIpNetworkScope(source(request).ip))) return reply;
     // Terms §12: prices include the tax of where the person lives, so the list prices for a place: the country the
-    // visitor chose (and in the US and Canada the postal code), else the connection's. A query that does not parse is
-    // no choice at all.
+    // visitor chose, else the signed-in account's sign-up country, else the connection's (and in the US and Canada
+    // the postal code). A query that does not parse is no choice at all.
     const query = BillingPlansQuerySchema.safeParse(request.query);
+    const country = query.success ? query.data.country : undefined;
+    // The account's country is read only when nothing was chosen; a read that fails, however it fails, answers as for
+    // a visitor.
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    let accountCountry: string | null | undefined;
+    if (country === undefined && ownerRef !== undefined && deps.accountCountry !== undefined) {
+      try {
+        accountCountry = await deps.accountCountry.read(ownerRef);
+      } catch {
+        accountCountry = null;
+      }
+    }
     const place = pricingPlace({
-      geo: deps.geo, ip: source(request).ip,
-      country: query.success ? query.data.country : undefined,
+      geo: deps.geo, ip: source(request).ip, country,
+      ...(accountCountry === undefined ? {} : { accountCountry }),
       postalCode: query.success ? query.data.postal_code : undefined
     });
     // Spec 2026-10-05 §2.16.1: every plan's net price in each currency, and the one that place pays in.

@@ -1,0 +1,18 @@
+{
+  "version": "google-return-connects-account-forward0193-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0192_registration_country_read.sql",
+    "manifestSha256": "891dedf72e8299e5d49aa9c421304fa897f484b27db1fff44fe334bfd92216b0",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0193_google_return_connects_account.sql",
+    "sha256": "d34608b2aad53f4f7571927acaf173198cad6f9c8e9fcea7350538fe351811cc"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": []
+}

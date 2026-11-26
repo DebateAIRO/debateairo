@@ -151,3 +151,5 @@ tests/integration/erased-owner-unlinked-0177.test.ts
 tests/integration/unfinished-signup-expiry-database.test.ts
 # A Free debate the publication check kept private (0189): only its owner's visibility read says KEPT_PRIVATE, only after a BLOCK or UNSURE check, and no other account, request or login learns it.
 tests/integration/free-debate-refused-by-check-0189.test.ts
+# The sign-up country, read for prices (0192): only the request's own account learns its country, never the US state, and no other account, request or login learns it.
+tests/integration/registration-country-0192.test.ts

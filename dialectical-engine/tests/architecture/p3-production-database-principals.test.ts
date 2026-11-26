@@ -1817,6 +1817,20 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION core.take_down_check_deleted_debates(integer)",
     "EXECUTE ON FUNCTION identity.read_free_debates_to_publish_after(integer,timestamptz,uuid)"
   ]
+},
+// 0192: the country the request's own account chose at sign-up, never the US state. The API's billing role's alone: the billing
+// routes ask it on the request login, inside the account's own request.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0192_registration_country_read.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_registration_country(uuid)"]
+},
+// 0193: the sign-in return that connects Google to the account signing in with the same address. The API's authorization
+// role's alone, as 0178's identity.finish_social_callback_v2, which it supersedes for the new release.
+{
+  "roleName": "debateai_authorization_runtime",
+  "source": "migrations/0193_google_return_connects_account.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.finish_social_callback_v3(jsonb,jsonb)"]
 }
 ]);
     expect(manifest.privilegeRevocations).toEqual([
@@ -2409,6 +2423,40 @@ it("discloses exactly 0190's grants: the takedown and the Free list read from a 
     "GRANT EXECUTE ON FUNCTION core.take_down_check_deleted_debates(integer) TO debateai_rls_all_accounts;",
     "GRANT EXECUTE ON FUNCTION identity.read_free_debates_to_publish_after(integer,timestamptz,uuid) TO debateai_rls_all_accounts;"
   ]);
+});
+
+it("discloses exactly 0192's grant: the sign-up country of the request's own account, to the API's billing role alone", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0192_registration_country_read.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_authorization_runtime|debateai_rls_all_accounts|debateai_erasure_runtime";
+  // As for 0189: every GRANT line naming one of the disclosed roles names it alone.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0192_registration_country_read.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // One function, the billing role's alone: no runtime, no marker, no table grant.
+  expect(declared).toEqual(["GRANT EXECUTE ON FUNCTION identity.read_registration_country(uuid) TO debateai_billing_runtime;"]);
+});
+
+it("discloses exactly 0193's grant: the sign-in return that connects Google by itself, to the API's authorization role alone", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0193_google_return_connects_account.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_authorization_runtime|debateai_rls_all_accounts|debateai_erasure_runtime";
+  // As for 0189: every GRANT line naming one of the disclosed roles names it alone.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0193_google_return_connects_account.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // One function, the authorization role's alone (as the function it supersedes): no runtime, no billing role, no table grant.
+  expect(declared).toEqual(["GRANT EXECUTE ON FUNCTION identity.finish_social_callback_v3(jsonb,jsonb) TO debateai_authorization_runtime;"]);
 });
 
 it("discloses exactly 0125's grants to the API's billing role and the export worker (italy-clause-approval S01)", async () => {

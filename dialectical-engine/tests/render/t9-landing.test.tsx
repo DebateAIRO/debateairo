@@ -28,6 +28,7 @@ type JSDOMModule = {
 
 const routeMocks = vi.hoisted(() => ({
   sessionCookie: null as string | null,
+  client: vi.fn(),
   readPublicDebates: vi.fn(async () => ({ items: [], total: 0 })),
   listDebatesPageServer: vi.fn(async () => ({ summaries: [], shown: 0, total: 0 })),
   getBillingPlans: vi.fn(async (): Promise<unknown> => {
@@ -37,7 +38,10 @@ const routeMocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/serverApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/serverApi.js")>()),
-  createServerContractClient: () => ({ readPublicDebates: routeMocks.readPublicDebates, getBillingPlans: routeMocks.getBillingPlans }),
+  createServerContractClient: (...args: unknown[]) => {
+    routeMocks.client(...args);
+    return { readPublicDebates: routeMocks.readPublicDebates, getBillingPlans: routeMocks.getBillingPlans };
+  },
   listDebatesPageServer: routeMocks.listDebatesPageServer
 }));
 
@@ -461,7 +465,7 @@ describe("T9-C4 landing content", () => {
       tax: { country: "DE", tax_name: "MwSt.", tax_rate_bp: 1_900, tax_status: "TAXABLE" },
       plans: [
         { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, total_price: "0.00", allowance_vs_plus: "0.05" },
-        { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, total_price: "238.00", allowance_vs_plus: "33" },
+        { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, total_price: "238.00", allowance_vs_plus: "15" },
         { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, total_price: "23.80", allowance_vs_plus: "1" }
       ]
     });
@@ -525,8 +529,8 @@ describe("T9-C4 landing content", () => {
     plans: [
       { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, total_price: "0.00", allowance_vs_plus: "0.05" },
       { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, total_price: "23.80", allowance_vs_plus: "1" },
-      { plan_id: "PRO", net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, total_price: "59.50", allowance_vs_plus: "5" },
-      { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, total_price: "238.00", allowance_vs_plus: "33" }
+      { plan_id: "PRO", net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, total_price: "59.50", allowance_vs_plus: "3" },
+      { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, total_price: "238.00", allowance_vs_plus: "15" }
     ]
   });
   /** Whether `first` comes before `second` in the document. */
@@ -539,8 +543,12 @@ describe("T9-C4 landing content", () => {
     // each paid price first as the total with the visitor's country's tax in it, then under it, smaller, our price
     // and that tax apart, placed after the closing title and lede and before the "Ask a question" button.
     routeMocks.getBillingPlans.mockClear();
+    routeMocks.client.mockClear();
     routeMocks.getBillingPlans.mockResolvedValueOnce(GERMANY_PLANS);
     const pricing = (await renderRoute(null)).querySelector('[data-landing-section="pricing"]');
+    // The landing's plans request sends no session.
+    expect(routeMocks.client.mock.calls.length).toBeGreaterThan(0);
+    for (const call of routeMocks.client.mock.calls) expect(call[1]).toBeUndefined();
     const plans = pricing?.querySelector("[data-landing-plans]");
     const cards = [...(plans?.querySelectorAll("[data-pricing-cards] > article") ?? [])];
     expect(cards.map((card) => card.getAttribute("data-plan"))).toEqual(["FREE", "PLUS", "PRO", "MAX"]);

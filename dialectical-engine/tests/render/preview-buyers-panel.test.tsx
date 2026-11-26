@@ -140,6 +140,9 @@ describe("the list", () => {
     const remove = button("Remove", row(ANA))!;
     expect(host.querySelector(`#${remove.getAttribute("aria-describedby")}`)?.textContent).toBe("a•••@example.com");
     expect(host.querySelector("[data-preview-buyers-not-now]")).toBeNull();
+    // The form says what a change needs: the security key alone, with no alert while the team tools are locked.
+    expect(host.querySelector("form[data-preview-buyers-form]")?.textContent).toContain(
+      "Adding and removing need only your security key. While the team tools are locked, no security alert goes out, but the change is still recorded.");
   });
   it("says so when nobody is on it", async () => {
     await mount(server({ ...basePage, buyers: [] }));
@@ -221,12 +224,12 @@ describe("allowing an account to buy", () => {
     expect(field()!.value).toBe("");
     expect(text()).not.toContain(error);
   });
-  it("locked team tools: says that adding needs them unlocked and that removing does not", async () => {
+  it("the team tools locking while a change is saved: says nothing changed and that the key alone is enough to try again", async () => {
     const api = server(basePage, { refuse: { path: "/v1/admin/webauthn/action/options", status: 503, error: "STAFF_ALERT_UNAVAILABLE" } });
     await mount(api);
     await allow(ADDRESS);
     await confirm();
-    expect(status()).toBe("The team tools are locked, so nothing was added. Unlock them on the server, then try again. Removing works while they are locked.");
+    expect(status()).toBe("The team tools locked while this was being saved, so nothing changed. Try again: your security key alone is enough.");
     expect(api.changes()).toEqual([]);
     expect(field()!.value).toBe("");
   });
@@ -242,7 +245,7 @@ describe("allowing an account to buy", () => {
     [409, "PREVIEW_BUYERS_FULL", "The list is full (20 accounts, the team included). Remove one first."],
     [409, "PREVIEW_BUYER_ALREADY", "That account can buy already."],
     [409, "STAFF_OPERATION_CONFLICT", "This clashed with another change. Nothing changed: look at the list again and repeat."],
-    [503, "STAFF_ALERT_UNAVAILABLE", "The team tools are locked, so nothing was added. Unlock them on the server, then try again. Removing works while they are locked."],
+    [503, "STAFF_ALERT_UNAVAILABLE", "The team tools locked while this was being saved, so nothing changed. Try again: your security key alone is enough."],
     [500, "SOME_INTERNAL_CODE", "This did not go through. Look at the list and try again."]
   ])("the change's %i %s is one plain sentence with no code in it", async (status_, error, sentence) => {
     const api = server(basePage, { refuse: { path: "/v1/admin/preview-buyers", status: status_, error } });

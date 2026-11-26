@@ -210,8 +210,8 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
   it.each([
     ["FREE", 330_000, 0],
     ["PLUS", 6_600_000, 440_000],
-    ["PRO", 33_000_000, 440_000],
-    ["MAX", 220_000_000, 440_000]
+    ["PRO", 19_800_000, 440_000],
+    ["MAX", 99_000_000, 440_000]
   ] as const)("v4 %s: the day and week borrow; the month's wall stands at its limit less its reserve, the overflow as tolerance", (id, limit, reserve) => {
     const windows = personWindowsFor(planById(plans, id), anchor, now, 9_500);
     for (const window of windows.filter((entry) => entry.scope !== "PERSON_MONTH")) {
@@ -227,10 +227,10 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
   });
 
   it("v4 after an upgrade: the prorated month keeps the reserve and the tolerance; the day and week under it borrow (A6)", () => {
-    const windows = personWindowsFor(planById(plans, "PRO"), anchor, now, 9_500, 2_200_000);
+    const windows = personWindowsFor(planById(plans, "PRO"), anchor, now, 9_500, 1_100_000);
     expect(windows.map((window) => [window.limitMicros, window.finishBasisPoints, window.finishOverflowMicros ?? null,
       window.keepsReserveMicros ?? null, window.borrows ?? null]))
-      .toEqual([[2_200_000, 10_000, null, null, true], [2_200_000, 10_000, null, null, true], [2_200_000, 10_000, 220_000, 440_000, null]]);
+      .toEqual([[1_100_000, 10_000, null, null, true], [1_100_000, 10_000, null, null, true], [1_100_000, 10_000, 220_000, 440_000, null]]);
   });
 
   it("a sealed v3 plan keeps its share edge and carries no overflow member", () => {
@@ -256,13 +256,13 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
 
   it("uses a prorated month credit after an upgrade, and never lets a day or week cap exceed it (A6)", () => {
     const pro = planById(plans, "PRO");
-    // PLUS -> PRO at half the period, on the made-up credits: 6.6 + (33 - 6.6) x 0.5 = 19.8 USD for the month.
-    expect(personWindowsFor(pro, anchor, now, 9_500, 19_800_000).map((window) => window.limitMicros))
-      .toEqual([3_630_000, 14_520_000, 19_800_000]);
-    expect(personWindowsFor(pro, anchor, now, 9_500, 2_200_000).map((window) => window.limitMicros))
-      .toEqual([2_200_000, 2_200_000, 2_200_000]);
+    // PLUS -> PRO at half the period, on the made-up credits: 6.6 + (19.8 - 6.6) x 0.5 = 13.2 USD for the month.
+    expect(personWindowsFor(pro, anchor, now, 9_500, 13_200_000).map((window) => window.limitMicros))
+      .toEqual([2_178_000, 8_712_000, 13_200_000]);
+    expect(personWindowsFor(pro, anchor, now, 9_500, 1_100_000).map((window) => window.limitMicros))
+      .toEqual([1_100_000, 1_100_000, 1_100_000]);
     expect(personWindowsFor(pro, anchor, now, 9_500, null).map((window) => window.limitMicros))
-      .toEqual([3_630_000, 14_520_000, 33_000_000]);
+      .toEqual([2_178_000, 8_712_000, 19_800_000]);
   });
 
   it("refuses a close edge outside 5000-10000 and an override below one micro-unit (0084's CHECK says > 0)", () => {
@@ -276,7 +276,7 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
 });
 
 describe("allowanceVsPlus: the pricing page's multiple, never a dollar figure", () => {
-  it.each([["FREE", "0.05"], ["PLUS", "1"], ["PRO", "5"], ["MAX", "33.33"]] as const)("%s is %s x Plus", (id, multiple) => {
+  it.each([["FREE", "0.05"], ["PLUS", "1"], ["PRO", "3"], ["MAX", "15"]] as const)("%s is %s x Plus", (id, multiple) => {
     expect(allowanceVsPlus(plans, id)).toBe(multiple);
   });
 

@@ -13,7 +13,7 @@ import { authorizeStaffAlertFixture } from "../support/staffAlertReadiness.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
- * 0186, the preview's approved buyers, on real Postgres through the logins' own grants: the API's request login (the
+ * 0186, the preview's approved buyers, with its door as 0191 restated it, on real Postgres through the logins' own grants: the API's request login (the
  * runtime and billing roles), a runner-shaped login (the runtime role alone) and the API's system login. A proof here is
  * stored the way the ceremony stores one; the ceremony itself admits the buyer binding below ("the key ceremony").
  */
@@ -79,6 +79,7 @@ async function buyer(label: string): Promise<BillingTestAccount> { return create
 async function auditCount(operationId: string): Promise<number> {
   return (await database.pool.query("SELECT count(*)::int AS n FROM staff.audit_event WHERE operation_id=$1", [operationId])).rows[0].n;
 }
+const outboxCount = async (): Promise<number> => (await database.pool.query("SELECT count(*)::int AS n FROM staff.alert_outbox")).rows[0].n;
 const consumed = async (proofId: string) => (await database.pool.query("SELECT consumed_at FROM staff.action_proof WHERE proof_id=$1", [proofId])).rows[0].consumed_at as Date | null;
 
 beforeAll(async () => {
@@ -313,18 +314,45 @@ describe("the account and the list", () => {
 });
 
 describe("the team tools", () => {
-  it("an addition while they are locked is refused, without an alert and with one whose operation was never opened, and writes nothing", async () => {
-    const ana = await buyer("locked-add"), at = await revision();
-    const plain = binding("PREVIEW_BUYER_ADD", ana.userId, at), noAlert = await storedProof(owner, plain, null);
-    await expect(api.query(ACT, [owner.context, noAlert.proofId, plain, command("PREVIEW_BUYER_ADD", ana.userId, at, plain.operationId as string), null]))
-      .rejects.toMatchObject({ code: "P0001", message: "STAFF_ALERT_UNAVAILABLE" });
-    const closed = await storedProof(owner, plain, null);
+  it("an addition while they are locked goes on as a removal does: listed, its row says alerted false, the proof is used, and no audit row or alert is written", async () => {
+    const ana = await buyer("locked-add"), at = await revision(), outbox = await outboxCount();
+    const proven = binding("PREVIEW_BUYER_ADD", ana.userId, at), stored = await storedProof(owner, proven, null);
+    await api.query(ACT, [owner.context, stored.proofId, proven, command("PREVIEW_BUYER_ADD", ana.userId, at, proven.operationId as string), null]);
+    expect(await listed(ana.userId)).toBe(true);
+    expect(await rows(ana.userId)).toEqual([{ kind: "ADDED", alerted: false, revision: at + 1 }]);
+    expect(await consumed(stored.proofId)).not.toBeNull();
+    expect(await auditCount(proven.operationId as string)).toBe(0);
+    expect(await outboxCount()).toBe(outbox);
+    expect((await repository.readList(owner.context as never, hash(owner.sessionId))).buyers.map((row) => row.userId)).toContain(ana.userId);
+    await change(owner, "PREVIEW_BUYER_REMOVE", ana.userId, { locked: true });
+  });
+  it("an addition that comes with an alert whose operation was never opened is still refused, and writes nothing", async () => {
+    const ana = await buyer("closed-add"), at = await revision();
+    const plain = binding("PREVIEW_BUYER_ADD", ana.userId, at), closed = await storedProof(owner, plain, null);
     const alert = { schema: "staff-alert-v1", event: "PREVIEW_BUYER_ADDED", operationId: plain.operationId, envelope: ENVELOPE };
     await expect(api.query(ACT, [owner.context, closed.proofId, plain, command("PREVIEW_BUYER_ADD", ana.userId, at, plain.operationId as string), alert]))
       .rejects.toThrow("STAFF_ALERT_UNAVAILABLE");
     expect(await revision()).toBe(at);
-    expect(await consumed(noAlert.proofId)).toBeNull();
+    expect(await listed(ana.userId)).toBe(false);
+    expect(await consumed(closed.proofId)).toBeNull();
     expect(await auditCount(plain.operationId as string)).toBe(0);
+  });
+  it("added, removed and added again while they are locked: each row says alerted false, and the account's latest row decides", async () => {
+    const ana = await buyer("locked-cycle"), before = await revision();
+    await change(owner, "PREVIEW_BUYER_ADD", ana.userId, { locked: true });
+    await change(owner, "PREVIEW_BUYER_REMOVE", ana.userId, { locked: true });
+    expect(await listed(ana.userId)).toBe(false);
+    await change(owner, "PREVIEW_BUYER_ADD", ana.userId, { locked: true });
+    expect(await listed(ana.userId)).toBe(true);
+    expect(await rows(ana.userId)).toEqual([{ kind: "ADDED", alerted: false, revision: before + 1 }, { kind: "REMOVED", alerted: false, revision: before + 2 },
+      { kind: "ADDED", alerted: false, revision: before + 3 }]);
+    // Unlocked again, the next change sends its alert as before.
+    await change(owner, "PREVIEW_BUYER_REMOVE", ana.userId);
+    expect((await rows(ana.userId)).at(-1)).toEqual({ kind: "REMOVED", alerted: true, revision: before + 4 });
+  });
+  it("0191 dropped 0186's CHECK that only a removal may go without an alert, and left the table's other CHECKs", async () => {
+    const checks = (await database.pool.query("SELECT conname FROM pg_constraint WHERE conrelid='staff.preview_buyer_event'::regclass AND contype='c' ORDER BY conname")).rows.map((row) => row.conname);
+    expect(checks).toEqual(["preview_buyer_event_kind_check", "preview_buyer_event_request_sha256_check", "preview_buyer_event_revision_check"]);
   });
   it("a removal while they are locked goes on: its row says alerted false, and no audit row or alert is written", async () => {
     const ana = await buyer("locked-remove");

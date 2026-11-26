@@ -106,7 +106,10 @@ Nothing uses the relay yet: the API is not in its group and has no settings line
 
 ## 5. API: let the API reach the relay, add the two settings lines, restart the API
 
-This restarts the API once. Sign-ins and new questions wait a few seconds; running debates are the runner's and go on.
+This restarts the API once, and the website with it (the website's unit is bound to its API). The whole site answers
+503 for about two minutes (measured on 2026-11-25: each of the two re-checks its release before it starts, about a
+minute each), then comes back by itself. Running debates are the runner's and go on. Pick a quiet moment and tell the
+owner the two minutes before running it.
 
 ```bash
 set -euo pipefail
