@@ -2176,6 +2176,10 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "identity.read_age_check_outcome(uuid)",
     // 0192: the country the request's own account chose at sign-up, asked as read_age_check_outcome asks of the account's own record.
     "identity.read_registration_country(uuid)",
+    // 0193: a person's upvote of a public debate, its withdrawal, and which of the listed debates the account upvoted; each asks
+    // identity.request_owner_matches before anything else, as 0192's read does.
+    "identity.cast_public_debate_upvote(uuid,uuid)", "identity.withdraw_public_debate_upvote(uuid,uuid)",
+    "identity.read_own_public_debate_upvotes(uuid,uuid[])",
     "identity.read_ask_clarify_spent(uuid,timestamp with time zone,timestamp with time zone)",
     "identity.read_data_export_status(uuid)", "identity.read_debate_last_visit(uuid,uuid)", "identity.read_dig_level(uuid,uuid)",
     "identity.read_dig_links(uuid,uuid)", "identity.read_dig_picks_of_run(uuid)", "identity.read_email_settings(uuid,uuid)",

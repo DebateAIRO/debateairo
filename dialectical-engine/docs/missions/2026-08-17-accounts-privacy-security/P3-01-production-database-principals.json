@@ -3693,6 +3693,36 @@
       "grants": [
         "EXECUTE ON FUNCTION identity.read_registration_country(uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0193_public_debate_upvotes.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.cast_public_debate_upvote(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.withdraw_public_debate_upvote(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_own_public_debate_upvotes(uuid,uuid[])"
+      ]
+    },
+    {
+      "roleName": "debateai_rls_all_accounts",
+      "source": "migrations/0193_public_debate_upvotes.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_public_debate_upvote_counts(uuid[])"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0193_public_debate_upvotes.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_public_debate_upvotes(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_rls_all_accounts",
+      "source": "migrations/0193_public_debate_upvotes.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.delete_gone_public_debate_upvotes(integer)"
+      ]
     }
   ],
   "privilegeRevocations": [

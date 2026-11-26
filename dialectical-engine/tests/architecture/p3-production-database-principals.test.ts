@@ -1824,6 +1824,37 @@ describe("P3-01 production database-principal manifest", () => {
   "roleName": "debateai_billing_runtime",
   "source": "migrations/0192_registration_country_read.sql",
   "grants": ["EXECUTE ON FUNCTION identity.read_registration_country(uuid)"]
+},
+// 0193: a person's upvote of a public debate, its withdrawal, and which of the asked debates the account upvoted. The API's
+// billing role's alone: the API calls each on the request login, inside the account's own request; no table grant.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0193_public_debate_upvotes.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.cast_public_debate_upvote(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.withdraw_public_debate_upvote(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_own_public_debate_upvotes(uuid,uuid[])"
+  ]
+},
+// 0193: how many accounts upvoted each public debate. The cross-account marker's: the API reads it on its system login inside
+// the public list's own frame, X10.
+{
+  "roleName": "debateai_rls_all_accounts",
+  "source": "migrations/0193_public_debate_upvotes.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_public_debate_upvote_counts(uuid[])"]
+},
+// 0193: the account's own upvotes for its export. The export worker's alone, behind 0128's lease gate, as 0162's reader.
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0193_public_debate_upvotes.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_public_debate_upvotes(uuid,uuid)"]
+},
+// 0193: the sweep of the votes of debates that can never be public again. The cross-account marker's: the API calls it from a
+// timer on its system login, outside any request.
+{
+  "roleName": "debateai_rls_all_accounts",
+  "source": "migrations/0193_public_debate_upvotes.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.delete_gone_public_debate_upvotes(integer)"]
 }
 ]);
     expect(manifest.privilegeRevocations).toEqual([
@@ -2433,6 +2464,36 @@ it("discloses exactly 0192's grant: the sign-up country of the request's own acc
   expect(actual).toEqual(declared);
   // One function, the billing role's alone: no runtime, no marker, no table grant.
   expect(declared).toEqual(["GRANT EXECUTE ON FUNCTION identity.read_registration_country(uuid) TO debateai_billing_runtime;"]);
+});
+
+it("discloses exactly 0193's grants: the vote, its withdrawal and the own-votes read to the API's billing role, the count and the sweep to the cross-account marker, the export reader to the export worker", async () => {
+  const SOURCE = "migrations/0193_public_debate_upvotes.sql";
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile(SOURCE, "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_authorization_runtime|debateai_rls_all_accounts|debateai_erasure_runtime|debateai_data_export_worker";
+  // As for 0192: every GRANT line naming one of the disclosed roles names it alone.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === SOURCE)
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  expect(declared).toEqual([
+    "GRANT EXECUTE ON FUNCTION identity.cast_public_debate_upvote(uuid,uuid) TO debateai_billing_runtime;",
+    "GRANT EXECUTE ON FUNCTION identity.delete_gone_public_debate_upvotes(integer) TO debateai_rls_all_accounts;",
+    "GRANT EXECUTE ON FUNCTION identity.read_data_export_public_debate_upvotes(uuid,uuid) TO debateai_data_export_worker;",
+    "GRANT EXECUTE ON FUNCTION identity.read_own_public_debate_upvotes(uuid,uuid[]) TO debateai_billing_runtime;",
+    "GRANT EXECUTE ON FUNCTION identity.read_public_debate_upvote_counts(uuid[]) TO debateai_rls_all_accounts;",
+    "GRANT EXECUTE ON FUNCTION identity.withdraw_public_debate_upvote(uuid,uuid) TO debateai_billing_runtime;"
+  ]);
+  // Six GRANT lines in the whole file, every one disclosed; nothing for the erasure login, whose functions the API counts at its start.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)]).toHaveLength(6);
+  expect(sql).not.toMatch(/^GRANT [^\n]+ TO debateai_erasure_runtime;$/mu);
+  // Four entries, by what each grant is for: the request's three, the list's count, the export, the timer's sweep.
+  expect(manifest.privilegeDisclosures.filter(entry => entry.source === SOURCE).map(entry => entry.roleName))
+    .toEqual(["debateai_billing_runtime", "debateai_rls_all_accounts", "debateai_data_export_worker", "debateai_rls_all_accounts"]);
 });
 
 it("discloses exactly 0125's grants to the API's billing role and the export worker (italy-clause-approval S01)", async () => {
