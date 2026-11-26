@@ -15,9 +15,9 @@ import type { StaffAlertIntentProducer } from "./alerts.js";
  * Only the Owner: every route asks TEAM_GRANT and the owner designation before it reads anything, so nobody else learns
  * whether an address has an account or who is listed. A change needs the Owner's fresh hardware-key proof, made by the
  * existing key ceremony under the action TEAM_GRANT and bound by the server to the change, the account, the list's
- * revision and the operation (`canonicalPreviewBuyerBinding`); the database computes the same digest again. An addition
- * needs the team tools unlocked and sends the independent alert; a removal is containment and goes on while they are
- * locked. The typed address only travels in POST bodies: it is turned into the blind index and dropped, and never enters a
+ * revision and the operation (`canonicalPreviewBuyerBinding`); the database computes the same digest again. That proof
+ * is all an addition or a removal needs: while the team tools are unlocked the change also sends the independent alert,
+ * and while they are locked it goes on without one and is still recorded (alerted false, 0191). The typed address only travels in POST bodies: it is turned into the blind index and dropped, and never enters a
  * proof, a row, an answer or a log. The list shows each account's address shortened (`maskedAddress`).
  */
 export type PreviewBuyerIntent = Extract<contract.StaffActionIntent, { action: "PREVIEW_BUYER_ADD" | "PREVIEW_BUYER_REMOVE" }>;
@@ -150,8 +150,8 @@ export function registerPreviewBuyerRoutes(route: Route, service: () => PreviewB
     const { authentication, binding } = await actionAuthority(request, intent);
     const proof = await access().readActionProof(authentication, proofHandle, binding);
     if (proof === null) throw REFUSED();
-    // An addition has come through actionAuthority's lock check; a removal never waits for the alert channel.
-    const alertIntent = intent.action === "PREVIEW_BUYER_REMOVE" && !await unlocked() ? null
+    // Neither change waits for the alert channel: with the team tools locked it is recorded without an alert.
+    const alertIntent = !await unlocked() ? null
       : await intents().mutation({ event: intent.action === "PREVIEW_BUYER_ADD" ? "PREVIEW_BUYER_ADDED" : "PREVIEW_BUYER_REMOVED", operationId: binding.operationId,
         keyUserId: authentication.context.userId, actorStaffId: authentication.context.staffId, subjectStaffId: authentication.context.staffId, reason: { code: "GRANT_CHANGE" } });
     const receipt = await present().repository.act({ actor: authentication.context, proof, intent: intent.action, targetUserId: binding.targetId,

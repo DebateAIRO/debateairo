@@ -715,6 +715,13 @@ describe('the words of 6b', () => {
     expect(flat).toContain(`**${said('title')}**`);
     for (const key of ['address', 'add', 'remove', 'confirm', 'cancel']) expect(flat, key).toContain(`**${said(key)}**`);
     for (const key of ['added', 'removed', 'unknown', 'onTeam', 'already', 'stale', 'nothingChanged']) expect(flat, key).toContain(`"${said(key)}"`);
+    // The rare refusal when the team tools lock while a change is saved: its first sentence, as the box prints it.
+    expect(flat).toContain(`"${said('locked').split('. ')[0]}. …"`);
+    // Adding takes the security key alone; no step of 6b.3 sends the Owner to UNLOCK first.
+    const add = runbook.slice(runbook.indexOf('**To allow an account to buy:**'), runbook.indexOf('**To stop an account from buying:**')).replace(/\s+/g, ' ');
+    expect(add).toContain('an addition needs only your security key');
+    expect(add).toContain('if they are locked, it sends no alert, but is recorded like every change');
+    expect(add).not.toMatch(/needs them unlocked/);
     const confirm = said('confirmAdd').replace('{address}', maskedAddress('stefan.nour@example.com')!);
     expect(flat).toContain(`"${confirm}"`);
     expect(flat).toContain('stefan.nour@example.com reads `ste•••n.n•••our@example.com`');
@@ -740,10 +747,12 @@ describe('the words of 6b', () => {
     expect(guide).toContain('before any way back to a release older than that one (WB2 included) come MAIN-SITE.md\'s PWON, then ASKS_CLOSE');
     // The Team page's list: nothing to copy, additions wait from SB3, and its alerts arrive before a way back to a release without it.
     expect(guide).toContain('Removing an account there works at any time; adding one waits from SB3 until the upload is over');
-    expect(guide).toContain('the security alert of every addition, and every removal made with the tools unlocked, that day must have arrived (MAIN-SITE.md 5.6)');
+    expect(guide).toContain('the security alert of every change made with the tools unlocked that day must have arrived (MAIN-SITE.md 5.6)');
     expect(guide).toContain('never change the list (MAIN-SITE.md\'s BUYERS, and additions on its Team page\'s list) from SB3 on');
-    expect(flat).toContain('before any WB2 to such a release, check that the alert of every addition, and every removal made with the tools unlocked, that day has arrived');
-    expect(flat).toContain('first check that the security alert of every addition, and every removal made with the tools unlocked, that day has arrived at your alert address (5.6)');
+    expect(flat).toContain('before any WB2 to such a release, check that the alert of every change made with the tools unlocked that day has arrived');
+    expect(flat).toContain('first check that the security alert of every change made with the tools unlocked that day has arrived at your alert address (5.6)');
+    // A change on the Team page's list takes the security key alone: with the tools locked it sends no alert but is recorded.
+    expect(flat).toContain('one made while they are locked sends none, but is recorded');
     // After that way back, the older release's audit history on the Team page answers an error while the list's changes are in it.
     expect(flat).toContain('its audit history there shows an error while the list\'s changes are in it, until the next upload brings back a release that carries the list (5.6)');
   });

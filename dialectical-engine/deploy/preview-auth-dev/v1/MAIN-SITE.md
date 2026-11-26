@@ -2513,12 +2513,13 @@ the two staff name lines. With the lines naming the other name the API refuses t
 - The Team page's list of approved buyers (6b.3) is in the database, not in the files: `derive` and SAME have nothing
   to copy, and both releases of a side-by-side upload read the same list at every pay button. Removing an account
   there works at any time, during an upload too. Adding one waits from SB3 until the upload is over (SB14, or the day
-  you decide not to go back), like BUYERS. The reason is its security alert: an addition sends one to your alert
-  address within a minute or two, as does a removal made while the team tools are unlocked, and a release older than
-  the one that carries the list does not know that alert. Its alert sender runs only while its release is the current
-  one, so during the upload it never touches the alert; but after a way back to it (WB2) it would drop an alert still
-  waiting to go out. So, before any WB2 to such a release, check that the alert of every addition, and every removal
-  made with the tools unlocked, that day has arrived; if one has not, wait a few minutes, then ask. After such a way
+  you decide not to go back), like BUYERS. The reason is its security alert: a change made while the team tools are
+  unlocked, an addition or a removal, sends one to your alert address within a minute or two (one made while they are
+  locked sends none, but is recorded), and a release older than the one that carries the list does not know that
+  alert. Its alert sender runs only while its release is the current one, so during the upload it never touches the
+  alert; but after a way back to it (WB2) it would drop an alert still waiting to go out. So, before any WB2 to such a
+  release, check that the alert of every change made with the tools unlocked that day has arrived; if one has not,
+  wait a few minutes, then ask. After such a way
   back, accounts you allowed on the Team page are refused at the pay button (the team line still buys), that
   release's Team page has no box for the list, and its audit history on the Team page shows an error while the list's
   changes are in it. The list stays in the database and counts again, while 6b is open, once a release that carries
@@ -3378,8 +3379,8 @@ the answer comes in time.
 account. Its tester signs up like anyone else (the bot check, the e-mail link, a second factor). Its test payment can
 go one of three ways; ask NETOPIA which it wants:
 - (a) You list its tester. Ask NETOPIA for the address its tester will sign up with, and for the billing country the
-  tester will choose. Once the tester has signed up, allow that address on the Team page (6b.3), with the team tools
-  unlocked; nothing restarts. On a release before the Team page's list, run BUYERS (6b.3b) with that address instead,
+  tester will choose. Once the tester has signed up, allow that address on the Team page (6b.3), with your security
+  key; nothing restarts. On a release before the Team page's list, run BUYERS (6b.3b) with that address instead,
   in the same quiet minutes as the other accounts you list (each BUYERS run is one restart of the API). The tester
   then buys with the test card the test-mode note prints, with no password anywhere.
 - (b) You pay with your own listed account while NETOPIA watches.
@@ -4454,7 +4455,7 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
   you ever use it, PWON and ASKS_CLOSE come first; drained: you would no longer choose rbD-B);
 - while 6b is open, go back to an older release only after PWON, then ASKS_CLOSE; a way back from the release that
   carries the Team page's list to the release before it (both carry 6b) needs neither, but has its own rule (5.6: the
-  alerts of the day's additions arrived first);
+  alerts of the day's changes made with the tools unlocked arrived first);
 - the sentence an account that is not listed sees (`billing.checkout.invitedBuyersOnly`) is written in English first
   and translated into Romanian before a release: check that the release you uploaded carries the Romanian words, or
   Romanian pages show it in English.
@@ -4631,8 +4632,8 @@ quiet minutes.
    `listed buyers: <how many> (the team line)`, on a release that carries the Team page's list the line that the list
    is empty, then `ASKS_OPEN_DONE`. If it refuses because accounts from an earlier opening are still on the Team page's
    list, remove them there first (6.1).
-3. List each account you allow now that has signed up already: on the Team page (6b.3), with the team tools unlocked
-   (UNLOCK, 5.7 step 3); on a release before the Team page's list, BUYERS (6b.3b) instead.
+3. List each account you allow now that has signed up already: on the Team page (6b.3), with your security key; on a
+   release before the Team page's list, BUYERS (6b.3b) instead.
 4. A test behind the password, with the password typed:
    - an account that is not listed asks a short question: the debate starts;
    - that account opens a plan from `/pricing`: the whole order page shows, with its price; at **Abonați-vă și
@@ -4676,9 +4677,9 @@ payments are NETOPIA's sandbox.
 
 **To allow an account to buy:**
 1. The account has signed up already (the person did it; you cannot do it for them).
-2. Unlock the team tools: UNLOCK (5.7, step 3), as root. It keeps them unlocked for one hour; nothing restarts. Every
-   addition, like every other change on the Team page, needs them unlocked, and sends the security alert to your
-   alert address.
+2. The team tools may be locked or unlocked: an addition needs only your security key. If they are unlocked (UNLOCK,
+   5.7 step 3, for some other change), the addition sends the security alert to your alert address; if they are
+   locked, it sends no alert, but is recorded like every change. No UNLOCK is needed for this box.
 3. In the browser where your staff key works on dezbatere.ro, open https://dezbatere.ro/admin/team (type the
    address), and verify your key as usual (**Verify security key for team access**).
 4. In the box **Who may buy while payments are in test mode**, type the person's address in **The account's email
@@ -4691,17 +4692,18 @@ payments are NETOPIA's sandbox.
    characters before the @ shows only the dots (`•••@example.com`), and one of three or four only its first character.
    If it is not the person you mean, press **Cancel**. Otherwise press **Confirm** and touch your key.
 6. Expect "Done: this account can buy now.", and a new row: the shortened address and "allowed on <date>". The line
-   above the rows counts the accounts that can buy, the team included. The security alert arrives at your alert
-   address within a minute or two.
-7. Lock the tools again when you are done: `systemctl stop debateai-preview-team-unlock` (they lock by themselves
-   after one hour anyway).
+   above the rows counts the accounts that can buy, the team included. If the team tools were unlocked, the security
+   alert arrives at your alert address within a minute or two; if they were locked, none comes.
+7. If you unlocked the team tools for something else, lock them again when you are done:
+   `systemctl stop debateai-preview-team-unlock` (they lock by themselves after one hour anyway).
 
 The person is not told: no mail goes to them. Tell them yourself, with the rules of 6b.1 (decision 5).
 
-**To stop an account from buying:** press **Remove** on its row, then **Confirm**, and touch your key. It works while
-the team tools are locked (no UNLOCK); a removal made while they are locked sends no alert, but is recorded like every
-change. Expect "Done: this account can no longer start a purchase." Its next checkout or upgrade is refused at the last
-button. A plan it holds goes on until it is withdrawn or cancelled, as "Taking an account off the list" below says.
+**To stop an account from buying:** press **Remove** on its row, then **Confirm**, and touch your key. As for an
+addition, the team tools may be locked (no UNLOCK): a removal made while they are locked sends no alert, but is
+recorded like every change. Expect "Done: this account can no longer start a purchase." Its next checkout or upgrade
+is refused at the last button. A plan it holds goes on until it is withdrawn or cancelled, as "Taking an account off
+the list" below says.
 
 **What the box may say instead:**
 - "No account uses that address. The person must sign up first.": check the address; the account must exist and be
@@ -4711,7 +4713,12 @@ button. A plan it holds goes on until it is withdrawn or cancelled, as "Taking a
   together are at the cap (6b, "The list").
 - "The list changed meanwhile. Nothing changed: look at the list again and repeat.": the list changed in another
   window or by an account's erasure; read the box again and repeat.
-- "The team tools are locked, so nothing was added. …": UNLOCK (5.7, step 3), then again.
+- "The team tools locked while this was being saved, so nothing changed. …": the team tools locked in the moment
+  between your key and the change (their hour ended, or they were stopped). Press the button again: your key alone is
+  enough, and with the tools locked the change sends no alert.
+- "The team tools are locked, so nothing was added. …": the release running is older than the one that lets an
+  addition go on with the key alone; there an addition still needs the team tools unlocked. UNLOCK (5.7, step 3), then
+  again.
 - "Adding works only while the whole site is open with test payments. …": 6b is not open (or it closed): the box
   then says that the list counts for nothing right now, counts only the accounts on it ("Accounts on this list: …"),
   and offers only **Remove**.
@@ -4973,8 +4980,8 @@ The brakes are those of 6.5, fastest first:
   lets anyone signed in buy on the sandbox). rbD-B puts back the database copy made at DR3: every account, debate and
   mail written since, strangers' included, is lost (part 9).
 - From the release that carries the Team page's list to the release before it (WB2; both carry 6b, so 6b may stay
-  open): first check that the security alert of every addition, and every removal made with the tools unlocked, that
-  day has arrived at your alert address (5.6). After the switch, the accounts on the Team page's list are refused at
+  open): first check that the security alert of every change made with the tools unlocked that day has arrived at
+  your alert address (5.6). After the switch, the accounts on the Team page's list are refused at
   the pay button and the team line still buys: it fails closed. That release's Team page has no box for the list, and
   its audit history there shows an error while the list's changes are in it, until the next upload brings back a
   release that carries the list (5.6). To list a buyer on that release, BUYERS (6b.3b).

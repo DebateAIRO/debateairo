@@ -94,7 +94,8 @@ const STEPS: ReadonlyArray<readonly [name: string, n1: ForwardStepN1]> = [
   ["0187_passkey_allow_credentials.sql", "expand"],
   ["0188_recovery_permit.sql", "expand"],
   ["0189_free_debate_refused_by_check.sql", "expand"],
-  ["0190_check_deletes_public_debate.sql", "expand"]
+  ["0190_check_deletes_public_debate.sql", "expand"],
+  ["0191_preview_buyer_add_key_only.sql", "drained"]
 ];
 
 /** Every step's file name, in chain order. */

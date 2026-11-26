@@ -3,9 +3,9 @@ import { TypedDomainError, type SecurityReceipt, type StaffContext, type StaffPr
 import { guardedAuthorityQuery, type StaffAlertIntent } from "./staff-access.js";
 
 /**
- * The preview's approved buyers (migration 0186), through 0186's definers only: no login reads or writes the table.
- * SQL owns who may act (the Owner), the revision, the proof, the cap and the record; the API brings the account a typed
- * address names and, for an addition, the independent alert.
+ * The preview's approved buyers (migration 0186, its door restated by 0191), through those definers only: no login reads
+ * or writes the table. SQL owns who may act (the Owner), the revision, the proof, the cap and the record; the API brings
+ * the account a typed address names and, while the team tools are unlocked, the independent alert.
  */
 export type PreviewBuyerIntent = "PREVIEW_BUYER_ADD" | "PREVIEW_BUYER_REMOVE";
 export type PreviewBuyerRow = Readonly<{ ref: string; userId: string; since: Date }>;
@@ -18,7 +18,7 @@ export type PreviewBuyerChange = Readonly<{
   targetUserId: string;
   expectedRevision: number;
   operationId: string;
-  /** Null only for a removal while the team tools are locked: the door then writes its own row and no audit row or alert. */
+  /** Null while the team tools are locked, for an addition or a removal: the door then writes its own row and no audit row or alert. */
   alertIntent: StaffAlertIntent | null;
 }>;
 

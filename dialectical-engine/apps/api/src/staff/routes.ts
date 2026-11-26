@@ -190,8 +190,10 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         memberState?: TeamAllowanceState;
     }>> {
         const authentication = auth(request), required = capability(intent);
-        // Containment (TEAM_DISABLE = OFFBOARD, EMERGENCY_DISABLE = COMPROMISE, decision 33's hide, 0186's removal of a buyer and 0188's refusal of an ask) stays available while locked.
-        if (intent.action !== 'TEAM_DISABLE' && intent.action !== 'EMERGENCY_DISABLE' && intent.action !== 'PUBLIC_REVIEW_HIDE' && intent.action !== 'PREVIEW_BUYER_REMOVE' && intent.action !== 'RECOVERY_PERMIT_REFUSE')
+        // Containment (TEAM_DISABLE = OFFBOARD, EMERGENCY_DISABLE = COMPROMISE, decision 33's hide, 0186's removal of a buyer and 0188's refusal of an ask)
+        // stays available while locked, and so does the Owner's addition of a test-payment buyer (0191): the key proof alone, recorded with no alert.
+        if (intent.action !== 'TEAM_DISABLE' && intent.action !== 'EMERGENCY_DISABLE' && intent.action !== 'PUBLIC_REVIEW_HIDE' && intent.action !== 'PREVIEW_BUYER_REMOVE'
+            && intent.action !== 'PREVIEW_BUYER_ADD' && intent.action !== 'RECOVERY_PERMIT_REFUSE')
             await requireUnlocked();
         let binding: ActionBinding;
         let allowanceState: InternalAllowanceCommandState | undefined;
