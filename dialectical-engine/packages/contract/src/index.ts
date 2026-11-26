@@ -720,7 +720,7 @@ export type BillingPlansPlace = z.infer<typeof BillingPlansPlaceSchema>;
 
 /**
  * GET /v1/billing/plans (public). Every plan's net price in each currency, and `currency`, the one the place pays in
- * (spec 2026-10-05 §2.16.1). Credit is never shown in dollars: "4" reads "4× the Plus allowance". Terms §12: `tax` is
+ * (spec 2026-10-05 §2.16.1). Credit is never shown in dollars: "3" reads "3× the Plus allowance". Terms §12: `tax` is
  * the place's tax and each plan's `total_price` its price in `currency` with that tax; both are present exactly when
  * `place.status` is PRICED, so a net price is never offered as the price.
  * `environment` is the payment system this server's card payments go to, the same value the checkout answers: the

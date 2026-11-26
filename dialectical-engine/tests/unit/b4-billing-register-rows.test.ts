@@ -52,8 +52,8 @@ describe("billingPlans v4 carries the four plans, with made-up limits and the pu
   it.each([
     ["FREE", "free", 0, 0, 0, 330_000, null, null],
     ["PLUS", "premium", 20_000_000, 20_000_000, 100_000_000, 6_600_000, 1_100, 4_400],
-    ["PRO", "premium", 50_000_000, 50_000_000, 250_000_000, 33_000_000, 1_100, 4_400],
-    ["MAX", "premium", 200_000_000, 200_000_000, 1_000_000_000, 220_000_000, 1_100, 4_400]
+    ["PRO", "premium", 50_000_000, 50_000_000, 250_000_000, 19_800_000, 1_100, 4_400],
+    ["MAX", "premium", 200_000_000, 200_000_000, 1_000_000_000, 99_000_000, 1_100, 4_400]
   ] as const)("%s: tier %s, price USD %d EUR %d RON %d, credit %d, day %s, week %s, edge 100% + the overflow", (id, tier, usd, eur, ron, credit, day, week) => {
     const plan = planById(plans, id);
     // v4 (owner 2026-10-30, Q1 and Q3): every limit may be passed by a FIXED amount, Free included, never a share.
@@ -95,8 +95,8 @@ describe("billingPlans v4 carries the four plans, with made-up limits and the pu
   it("computes each cap as credit x basis points / 10000, rounded down", () => {
     expect(planCapMicros(planById(plans, "PLUS"), "DAY")).toBe(726_000);
     expect(planCapMicros(planById(plans, "PLUS"), "WEEK")).toBe(2_904_000);
-    expect(planCapMicros(planById(plans, "MAX"), "DAY")).toBe(24_200_000);
-    expect(planCapMicros(planById(plans, "MAX"), "MONTH")).toBe(220_000_000);
+    expect(planCapMicros(planById(plans, "MAX"), "DAY")).toBe(10_890_000);
+    expect(planCapMicros(planById(plans, "MAX"), "MONTH")).toBe(99_000_000);
     expect(planCapMicros(planById(plans, "FREE"), "DAY")).toBeNull();
     expect(planCapMicros(planById(plans, "FREE"), "MONTH")).toBe(330_000);
     const odd = plansRow();
