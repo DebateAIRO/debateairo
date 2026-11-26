@@ -4,21 +4,21 @@ import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
 
 /**
- * 0191, a Google sign-in connects to its account by itself (expand; migrations/lineage/README.md "A Google sign-in connects
- * to its account by itself (0191)"): one definer, identity.finish_social_callback_v3, which is 0178's
+ * 0193, a Google sign-in connects to its account by itself (expand; migrations/lineage/README.md "A Google sign-in connects
+ * to its account by itself (0193)"): one definer, identity.finish_social_callback_v3, which is 0178's
  * identity.finish_social_callback_v2 with one more arm: a sign-in through Google, for an address Google itself answers
  * for, that an active account with a second step signs in with, makes that account's Google link and goes on as a
  * linked sign-in. Granted to the API's authorization role only, as the function it supersedes. No table, column or
  * table right is added, and no earlier function changes. It keeps 0130's verifier and amends no earlier step.
  */
-const NAME = "0191_google_return_connects_account.sql";
-const VERSION = "google-return-connects-account-forward0191-v1";
-const MANIFEST_PATH = "lineage/google-return-connects-account-forward0191.json";
+const NAME = "0193_google_return_connects_account.sql";
+const VERSION = "google-return-connects-account-forward0193-v1";
+const MANIFEST_PATH = "lineage/google-return-connects-account-forward0193.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
 const PREVIOUS = "0190_check_deletes_public_debate.sql";
 const FUNCTIONS: readonly string[] = ["identity.finish_social_callback_v3(jsonb,jsonb)"];
 const AMENDS: readonly never[] = [];
-const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0191_${detail}`); };
+const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0193_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -36,7 +36,7 @@ async function postconditionEvidence(client: PoolClient): Promise<string> {
   return sha(JSON.stringify({ functions }));
 }
 
-export async function loadForward0191(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {
+export async function loadForward0193(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {
   const directory = new URL("../../../migrations/", import.meta.url);
   const bytes = await readFile(new URL(MANIFEST_PATH, directory));
   const raw: unknown = JSON.parse(bytes.toString("utf8"));

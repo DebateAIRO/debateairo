@@ -1064,7 +1064,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
     // Three new functions, their owners set by one reviewed DO block. Found by name: a Google sign-in connecting to its
-    // account by itself (0191) follows it.
+    // account by itself (0193) follows it.
     const at = names.indexOf("0190_check_deletes_public_debate.sql");
     expect(names.slice(at - 1, at + 1)).toEqual(["0189_free_debate_refused_by_check.sql", "0190_check_deletes_public_debate.sql"]);
     const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
@@ -1129,21 +1129,21 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "a Free debate the publication check kept private (0189, below) the seventy-ninth, and the check deleting a public debate with the Free sweep reading past waiting debates (0190, below) the eightieth");
   });
 
-  it("chains a Google sign-in connecting to its account by itself 0191 after 0190 as an expand step that keeps 0130's verifier, and documents it", async () => {
+  it("chains a Google sign-in connecting to its account by itself 0193 after 0190 as an expand step that keeps 0130's verifier, and documents it", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
     // The chain head: one function of the API's authorization role, its owner set by one reviewed DO block.
-    expect(names.slice(-2)).toEqual(["0190_check_deletes_public_debate.sql", "0191_google_return_connects_account.sql"]);
+    expect(names.slice(-2)).toEqual(["0190_check_deletes_public_debate.sql", "0193_google_return_connects_account.sql"]);
     const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
-    expect(JSON.parse((await bytesOf("lineage/google-return-connects-account-forward0191.json")).toString("utf8"))).toEqual({
-      version: "google-return-connects-account-forward0191-v1",
+    expect(JSON.parse((await bytesOf("lineage/google-return-connects-account-forward0193.json")).toString("utf8"))).toEqual({
+      version: "google-return-connects-account-forward0193-v1",
       baseRecipeSha256: plan.recipeSha256,
       previous: { name: "0190_check_deletes_public_debate.sql", manifestSha256: sha256(await bytesOf("lineage/check-deletes-public-debate-forward0190.json")), verifierSha256: previous.verifierSha256 },
-      migration: { name: "0191_google_return_connects_account.sql", sha256: sha256(await bytesOf("0191_google_return_connects_account.sql")) },
+      migration: { name: "0193_google_return_connects_account.sql", sha256: sha256(await bytesOf("0193_google_return_connects_account.sql")) },
       verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) },
       amendsPostconditionsOf: []
     });
-    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/google-return-connects-account-forward0191.json")));
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/google-return-connects-account-forward0193.json")));
     expect(step.previousName).toBe(previous.name);
     expect(step.previousManifestSha256).toBe(previous.manifestSha256);
     expect(step.previousVerifierSha256).toBe(previous.verifierSha256);
@@ -1177,20 +1177,20 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     const reviewed = lines.findIndex((line) => line.startsWith("-- n1: reviewed "));
     expect(lines.filter((line) => line.startsWith("-- n1: reviewed "))).toHaveLength(1);
     expect(lines[reviewed + 1]).toBe("DO $google_return_connects_account_owner$");
-    const loader = await readFile(new URL("migration-forward0191.ts", DB_SOURCE), "utf8");
+    const loader = await readFile(new URL("migration-forward0193.ts", DB_SOURCE), "utf8");
     expect(loader).toContain('const FUNCTIONS: readonly string[] = ["identity.finish_social_callback_v3(jsonb,jsonb)"];');
     const readme = (await bytesOf("lineage/README.md")).toString("utf8");
-    const section = readme.slice(readme.indexOf("## A Google sign-in connects to its account by itself (0191)"));
-    expect(section.startsWith("## A Google sign-in connects to its account by itself (0191)")).toBe(true);
-    for (const needle of ["0190", "0191_google_return_connects_account.sql", "google-return-connects-account-forward0191.json", "packages/db/src/migration-forward0191.ts",
-      "MIGRATION_FORWARD0191_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "verify-effective-capabilities-130.sql", "replayVerifierSql",
+    const section = readme.slice(readme.indexOf("## A Google sign-in connects to its account by itself (0193)"));
+    expect(section.startsWith("## A Google sign-in connects to its account by itself (0193)")).toBe(true);
+    for (const needle of ["0190", "0193_google_return_connects_account.sql", "google-return-connects-account-forward0193.json", "packages/db/src/migration-forward0193.ts",
+      "MIGRATION_FORWARD0193_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "verify-effective-capabilities-130.sql", "replayVerifierSql",
       "previous.manifestSha256", "migration.sha256", "renumber", "identity.finish_social_callback_v3(jsonb,jsonb)", "identity.finish_social_callback_v2",
       "debateai_authorization_runtime", "assertedEmailIndex", "google-authoritative", "mfa_required", "signup_required", "METHOD_CHANGED", "identity.social.LINK",
       "staff.consumer_security_affiliated", "identity.login_method_current_internal", "identity.mfa_recovery_eligible", "GOOGLE_RETURN_CONNECTS_ACCOUNT_OWNER_UNABLE",
       "identity.lock_account_t9_internal", "tests/integration/social-auth-journey.test.ts"
     ]) expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
-      "the check deleting a public debate with the Free sweep reading past waiting debates (0190, below) the eightieth, and a Google sign-in connecting to its account by itself (0191, below) the eighty-first");
+      "the check deleting a public debate with the Free sweep reading past waiting debates (0190, below) the eightieth, and a Google sign-in connecting to its account by itself (0193, below) the eighty-first");
   });
 
   // The release before refuses, at its restart on a database ahead of it, an amendment recorded by a step it does not

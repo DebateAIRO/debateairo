@@ -705,9 +705,9 @@ describe('NV-14 verification by the inbox holder', () => {
     });
 });
 
-// 0191, owner ruling 2026-11-26: "Continue with Google" with the address an account already signs in with connects
+// 0193, owner ruling 2026-11-26: "Continue with Google" with the address an account already signs in with connects
 // Google to that account by itself, and the sign-in goes on to the account's second step.
-describe('a Google sign-in for the address an account already signs in with (0191)', () => {
+describe('a Google sign-in for the address an account already signs in with (0193)', () => {
     /** An active account as the e-mail sign-up leaves it: a password, an authenticator code, and no Google link. */
     async function passwordAccount(h: Awaited<ReturnType<typeof harness>>) {
         const signup = await h.signup();
@@ -782,12 +782,12 @@ describe('a Google sign-in for the address an account already signs in with (019
         const h = await harness();
         try {
             // A typed address with no proof from Google leaves a pending account waiting for its mail.
-            const pending = await h.signup('unfinished-0191@gmail.com');
+            const pending = await h.signup('unfinished-0193@gmail.com');
             expect(pending.result).not.toHaveProperty('enrollment_token');
-            const row = (await db.pool.query('SELECT user_id,state FROM identity."user" WHERE email_blind_index=$1', [createEmailBlindIndex(blindKey, 'unfinished-0191@gmail.com')])).rows[0];
+            const row = (await db.pool.query('SELECT user_id,state FROM identity."user" WHERE email_blind_index=$1', [createEmailBlindIndex(blindKey, 'unfinished-0193@gmail.com')])).rows[0];
             expect(row.state).toBe('pending_verification');
             // Its real holder arrives with Google's proof of that address.
-            const cb = await h.callback({ sub: randomUUID(), email: 'unfinished-0191@gmail.com' });
+            const cb = await h.callback({ sub: randomUUID(), email: 'unfinished-0193@gmail.com' });
             expect(cb.status).toBe('signup_required');
             expect(await links(row.user_id)).toEqual([]);
         }

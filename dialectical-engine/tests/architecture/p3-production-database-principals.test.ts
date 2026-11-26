@@ -1818,11 +1818,11 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION identity.read_free_debates_to_publish_after(integer,timestamptz,uuid)"
   ]
 },
-// 0191: the sign-in return that connects Google to the account signing in with the same address. The API's authorization
+// 0193: the sign-in return that connects Google to the account signing in with the same address. The API's authorization
 // role's alone, as 0178's identity.finish_social_callback_v2, which it supersedes for the new release.
 {
   "roleName": "debateai_authorization_runtime",
-  "source": "migrations/0191_google_return_connects_account.sql",
+  "source": "migrations/0193_google_return_connects_account.sql",
   "grants": ["EXECUTE ON FUNCTION identity.finish_social_callback_v3(jsonb,jsonb)"]
 }
 ]);
@@ -2418,9 +2418,9 @@ it("discloses exactly 0190's grants: the takedown and the Free list read from a 
   ]);
 });
 
-it("discloses exactly 0191's grant: the sign-in return that connects Google by itself, to the API's authorization role alone", async () => {
+it("discloses exactly 0193's grant: the sign-in return that connects Google by itself, to the API's authorization role alone", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
-  const sql = await readFile("migrations/0191_google_return_connects_account.sql", "utf8");
+  const sql = await readFile("migrations/0193_google_return_connects_account.sql", "utf8");
   const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_authorization_runtime|debateai_rls_all_accounts|debateai_erasure_runtime";
   // As for 0189: every GRANT line naming one of the disclosed roles names it alone.
   expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
@@ -2428,7 +2428,7 @@ it("discloses exactly 0191's grant: the sign-in return that connects Google by i
       && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
   const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
     .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
-  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0191_google_return_connects_account.sql")
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0193_google_return_connects_account.sql")
     .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
   expect(actual).toEqual(declared);
   // One function, the authorization role's alone (as the function it supersedes): no runtime, no billing role, no table grant.
