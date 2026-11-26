@@ -259,7 +259,9 @@ go on a second time, that friends' test closes and the site password changes (7.
   names file below stops you when a release is staged or draining. Only
   the brakes (a), (b) and (b2) of 6.5 may run during an upload: the gates' `stop`, PWON (the site password back) and
   REVIEW_CLOSE (the review window closed). The gates' new code and the Amazon gate of part 2 restart gates and run
-  `activate`: they are no brakes, so they run before SB3, never in this window. One exception, and only this one:
+  `activate`: they are no brakes, so they run before SB3, never in this window. The server's restart (the lifecycle
+  guide's "Restarting the server") stops the API and restarts the gates: it is no brake either, and runs before SB3 or
+  after the upload is over. One exception, and only this one:
   when GATEREADY prints `MISSING (piece 2): the Amazon gate's service is not running` after a reboot, and
   `systemctl show -p Result,NRestarts debateai-preview-bedrock-budget` shows `Result=success` and `NRestarts=0`, run
   `systemctl start debateai-preview-bedrock-budget`, then GATEREADY again. In any other case, stop and ask.
@@ -1127,16 +1129,20 @@ Two other stops can come in either run:
   store this upload started from; if none is left, its line says so: ask.
 - **`NO_MAINTENANCE` with `reboot required`.** A system update on the server wants a restart. Only SB4's release check
   reads that flag: nothing else in the upload, and not the switch, reads it, so every step works the same with it.
-  Whether you go on with the restart still owed, or restart the server first, on a day of its own, and run SB4 again,
-  is your decision (step 4: no restart between piece 2 and your yes). SB4's last line then names `NO_MAINTENANCE` and
+  Whether you go on with the restart still owed, or restart the server first, on a day of its own, and begin the
+  upload again from SB3, is your decision (step 4: no restart between piece 2 and your yes). SB4's last line then names `NO_MAINTENANCE` and
   ends with a sentence that says so, but only when the other names on it are `GATE_ROWS_N1` and `LIFECYCLE_FILES`;
   with any other name there, that name is the stop: ask. To go on, type `later` between the quotes of `REBOOT=''` at
   the top of SB4 and run it again: it prints `NO_MAINTENANCE: reboot required is not counted …`, and its last line is
   the expected one, with `but NO_MAINTENANCE (reboot required), not counted (REBOOT=later)` before `: use`. To restart
   first: the lifecycle guide's "Restarting the server" (`deploy/preview-lifecycle/v1/README.md`) has the steps
-  (RESTART_LOOK, RESTART_GO, RESTART_UP), on your yes, before this upload stages its release (SB10); after the restart
-  RESTART_UP starts by hand what the boot does not start. Before you choose, read whether the server restarts by
-  itself after its daily upgrade: in a root shell,
+  (RESTART_LOOK, RESTART_GO, RESTART_UP), on your yes; after the restart RESTART_UP starts by hand what the boot does
+  not start. SB4 comes after SB3, and the restart is no brake (the order rules), so it does not run inside this upload:
+  either go on with `REBOOT='later'` and restart once the upload is over, or leave this upload before it changes
+  anything live (before SB8 on the side-by-side path, before DR2 on the drained path; until then nothing the
+  running site uses has changed), restart, and begin it again from SB3 (SB3b sets SB3's plan aside so SB3 can run
+  again; ask first). Before you choose, read whether the server restarts by itself after its daily upgrade: in a root
+  shell,
   `apt-config shell AR Unattended-Upgrade::Automatic-Reboot` (it changes nothing) prints `AR='true'` when it does, and
   then it may restart on its own with the restart owed: ask. `maintenance pending` instead, or any other new name: stop
   and ask.
@@ -4091,8 +4097,8 @@ reads the kept lines.
 
 ### 5.10 Caddy's health check without the edge secret (HEALTH1, HEALTH2, HEALTHBACK)
 
-**What it is.** Caddy asks each website slot every second whether it is ready (`/readyz`), straight at the slot's
-port, and sends visitors to the first slot that says yes. On this server that question still carries the edge secret,
+**What it is.** Caddy asks each website slot, every 2 seconds on this server, whether it is ready (`/readyz`),
+straight at the slot's port, and sends visitors to the first slot that says yes. On this server that question still carries the edge secret,
 the header `X-Debateai-Edge-Secret`, which Caddy otherwise adds only to the requests it passes on to the website. The
 shared rules in the repository (`deploy/preview-release/v1/caddy/debateai-slots.caddy`) have had no secret there
 since the security review (NV-55): the website answers its readiness to anyone who asks, so the secret is not needed,
@@ -4344,8 +4350,10 @@ it: the site is as before HEALTH2, and nothing else changed. Ask.
 prints `0`.
 
 **The way back** (HEALTHBACK). It puts back the Caddyfile HEALTH1 kept, and the kept copies as HEALTH2 found them, and
-restarts Caddy (about a second, as above). It reads no names file, so it works at any time, during an upload too. It
-works only while the live Caddyfile is still the one HEALTH2 put in place and the kept copies are still HEALTH2's: once
+restarts Caddy (about a second, as above). It reads no names file, so it works at any time, during an upload too.
+It judges the restart by Caddy's own answer (the public route refuses `/readyz` with 404), so it works while the
+website is stopped too, as in the drained upload's downtime or during a restart of the server; the loopback
+listener's answer, which comes from the website behind Caddy, is printed only as information. It works only while the live Caddyfile is still the one HEALTH2 put in place and the kept copies are still HEALTH2's: once
 a later step changed one (PWOFF2, PWON, SIGNUPS, REVIEW_OPEN, NAME5, or a hand edit), it refuses with nothing changed;
 ask then.
 
@@ -4364,10 +4372,13 @@ while read -r F T; do [ ! -e "$F" ] || cmp -s "$F" "$KD/$T.after" || { echo "HEA
 cp -p "$C" "$H/Caddyfile.before-healthback-$TS"
 { install -o root -g root -m 0644 "$HB" "$C.new" && mv "$C.new" "$C" && cmp -s "$HB" "$C"; } || { echo "HEALTHBACK_NOT_DONE: the file before HEALTH2 was not put in place; Caddy was not restarted: ask"; exit 1; }
 systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; sleep 3
-EC=000; for i in $(seq 1 15); do EC=$(curl -s -o /dev/null -m 15 -w '%{http_code}' http://127.0.0.1:3090/readyz || true); [ "$EC" = 200 ] && break; sleep 1; done
-if [ "$(systemctl is-active caddy || true)" != active ] || [ "$EC" != 200 ]; then
+# Caddy's own answer judges the restart: the public route refuses /readyz with 404 on one of the two names (PWON tries the same two), and that needs no website. The loopback listener passes the request on to the website, so its code is printed as information only: it is 200 only while the website runs.
+ZC=000; for i in $(seq 1 15); do for N in dezbatere.ro v3-preview.dezbatere.ro; do ZC=$(curl -s -o /dev/null -m 5 -w '%{http_code}' "https://$N/readyz" || true); [ "$ZC" = 404 ] && break; done; [ "$ZC" = 404 ] && break; sleep 1; done
+CS=$(systemctl is-active caddy || true); EC=$(curl -s -o /dev/null -m 5 -w '%{http_code}' http://127.0.0.1:3090/readyz || true)
+echo "after the restart: Caddy $CS; the public /readyz $ZC (404: Caddy's own refusal); the loopback listener ${EC:-000} (through Caddy to the website: 200 while the website runs; information only)"
+if [ "$CS" != active ] || [ "$ZC" != 404 ]; then
   { install -o root -g root -m 0644 "$HA" "$C.new" && mv "$C.new" "$C"; } || true; systemctl restart caddy || true; sleep 3
-  echo "HEALTHBACK_NOT_DONE: Caddy did not come back on the file before (its readiness listener answered $EC); the file without the secret is back and Caddy is $(systemctl is-active caddy || true) (active: as after HEALTH2; anything else: the site is DOWN): ask at once"; exit 1
+  echo "HEALTHBACK_NOT_DONE: Caddy did not come back on the file before (Caddy $CS; the public /readyz $ZC, where Caddy's own refusal is 404); the file without the secret is back and Caddy is $(systemctl is-active caddy || true) (active: as after HEALTH2; anything else: the site is DOWN): ask at once"; exit 1
 fi
 KB=''
 while read -r F T; do if [ -e "$F" ]; then { install -o root -g root -m 0644 "$KD/$T.before" "$F.new" && mv "$F.new" "$F" && cmp -s "$KD/$T.before" "$F"; } || KB="$KB ${F#"$M"/}"; fi; done < "$KL"
@@ -4378,7 +4389,9 @@ echo HEALTHBACK_DONE
 exit 0
 ```
 
-Expect `Caddy's health check sends the edge secret again …`, then `HEALTHBACK_DONE`. HEALTH1 can then run again.
+Expect `after the restart: Caddy active; the public /readyz 404 …` (the loopback listener `200` while the website
+runs, anything else while it is stopped), `Caddy's health check sends the edge secret again …`, then
+`HEALTHBACK_DONE`. HEALTH1 can then run again.
 
 ---
 

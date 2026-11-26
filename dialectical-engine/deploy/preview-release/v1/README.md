@@ -5935,19 +5935,22 @@ system update is installed that takes effect only after a restart. The release c
 flag: no other step of the upload reads it, and neither does the switch (SB13 and DR6 read only MT1's flag), so every
 step runs the same with it. On the side-by-side path it alone makes the verdict `NOT_READY`; on the drained path it is
 named with the other BAD checks. Whether to go on with the upload with the restart still owed, or to restart the
-server first and run SB4 again, is the owner's decision:
+server first and begin the upload again from SB3, is the owner's decision:
 - **To go on**, run SB4 again with `REBOOT='later'` at its top. That run prints `NO_MAINTENANCE: reboot required is
   not counted …` and then ends as it would without the flag: `SB4_DONE` on the side-by-side path (then SB5), the
   expected `DRAINED_PATH` line on the drained path. `REBOOT='later'` passes only the restart flag: `maintenance
   pending`, alone or with it, still stops.
 - **To restart first**: the lifecycle guide's "Restarting the server" (`deploy/preview-lifecycle/v1/README.md`), on
   the owner's yes: RESTART_LOOK reads whether now is a safe time, RESTART_GO restarts, RESTART_UP starts by hand what
-  the boot does not start and proves the state before. The restart comes at a quiet time while no release drains,
-  before this upload's SB10 stages its release (and on the upload that brings the Amazon gate, not between piece 2
-  and the yes: `deploy/preview-auth-dev/v1/MAIN-SITE.md`, part 2). After it, what comes back by itself and what must
+  the boot does not start and proves the state before. The restart stops the API and restarts the gates, so it is no
+  brake, and the order rules of `deploy/preview-auth-dev/v1/MAIN-SITE.md` keep it out of an upload from SB3 to the
+  end of DR6 (or SB13). SB4 comes after SB3: to restart first, leave this upload before it changes anything live
+  (before SB8, or DR2 on the drained path), restart at a quiet time, and begin the upload again from SB3 (SB3b sets
+  SB3's plan aside; ask first). On the upload that brings the Amazon gate the restart also never comes between piece
+  2 and the yes (`deploy/preview-auth-dev/v1/MAIN-SITE.md`, part 2). After it, what comes back by itself and what must
   be started by hand is the lifecycle guide's "Boot sequence" (`deploy/preview-lifecycle/v1/README.md`): no runner starts by itself,
   during a drain SB14b starts the runners again, and an installed Amazon gate that is not switched on yet does not
-  start by itself either ("After a reboot it is not running", above). Then run SB4 again.
+  start by itself either ("After a reboot it is not running", above). SB4 then runs again in its place, after SB3.
 
 Whether the system's daily upgrade (the timer PRECHECK reads) also restarts the server by itself is its
 unattended-upgrades setting `Unattended-Upgrade::Automatic-Reboot`, which these guides do not set:

@@ -254,6 +254,38 @@ describe('RESTART_GO, RESTART_BACK and RESTART_UP', () => {
     expect(runner).toBeGreaterThan(at(UP, '[ "$EK" = "200 $KEY" ] || bad edge'));
     expect(at(UP, '[ -z "$BAD" ] || { echo "RESTART_UP_NOT_DONE:$BAD')).toBeLessThan(at(UP, 'if [ -e "$MF" ]; then mv "$MF"'));
   });
+
+  it('RESTART_UP holds the runner, as SB14B does, while a gate it needs is halted or its window is closed', () => {
+    // The gate part of RESTART_UP, then its runner decision; the gates' services, sockets and status stood in for.
+    const start = at(UP, 'for G in deepinfra:provider-budget:deepinfra-budget-v3 ');
+    const end = UP.findIndex((line, index) => index > start && line === 'done');
+    const gates = UP.slice(start, end + 1).join('\n').replace('[ -S "/run/debateai-v3-preview/$GK.sock" ]', '[ "$(svc "$GN")" = active ]');
+    expect(gates).toContain('[ "$(svc "$GN")" = active ]');
+    const run = (halted: Readonly<Record<string, string>>, pxn = 'named', down = '') => bash([
+      'set -euo pipefail', lineOf(UP, "BAD=''; bad()"), lineOf(UP, "ASK=''; ask()"), lineOf(UP, "NORUN=''"),
+      `PXN='${pxn}'; GD=deepinfra; PD=p; GAN=anthropic; PAN=p; GPX=perplexity; PPX=p; GBR=bedrock; PBR=p`,
+      `svc() { case " ${down} " in *" $1 "*) echo inactive;; *) echo active;; esac; }`,
+      'systemctl() { case "$2" in debateai-preview-provider-budget) svc deepinfra;; debateai-preview-anthropic-budget) svc anthropic;; debateai-preview-perplexity-budget) svc perplexity;; *) svc bedrock;; esac; }',
+      `gs() { case "$1" in ${Object.entries(halted).map(([gate, status]) => `${gate}) printf '%s\\n' '${status}';;`).join(' ')} *) printf '%s\\n' '{"state":"active","window_open":true,"in_flight":0}';; esac; }`,
+      `gatesok() { [ -z '${Object.keys(halted).join(' ')}' ]; }`,
+      gates, lineOf(UP, 'gatesok || bad gates'),
+      lineOf(UP, 'if [ -n "$NORUN" ]; then bad runner'), 'else echo WOULD START THE RUNNER', 'fi'
+    ].join('\n'));
+    const HALTED = '{"state":"halted","window_open":true,"in_flight":0,"reason":"a reason"}';
+    const CLOSED = '{"state":"active","window_open":false,"in_flight":0}';
+    const WAITS = 'BAD (runner): not started: it waits for: gates (the BAD lines above come first)';
+    expect(run({}).lines.at(-1)).toBe('WOULD START THE RUNNER');
+    const deepinfra = run({ deepinfra: HALTED });
+    expect(deepinfra.lines).toContain('BAD (gates): the deepinfra gate is halted with its window open true (reason a reason): its reason is read first; it is re-opened only on the owner\'s yes (PWOFF1\'s gatesok needs all four)');
+    expect(deepinfra.lines.at(-1)).toBe(WAITS);
+    expect(run({ anthropic: CLOSED }).lines.at(-1)).toBe(WAITS);
+    expect(run({ perplexity: HALTED }).lines.at(-1)).toBe(WAITS);
+    expect(run({ perplexity: HALTED }, 'not named').lines.at(-1)).toBe('WOULD START THE RUNNER');
+    // The Amazon gate does not hold the runner: it is not needed for debates before "Switch it on".
+    expect(run({ bedrock: CLOSED }).lines.at(-1)).toBe('WOULD START THE RUNNER');
+    // A halted gate whose service is also down is named once.
+    expect(run({ deepinfra: HALTED }, 'named', 'deepinfra').lines.at(-1)).toBe(WAITS);
+  });
 });
 
 describe('the guides around it', () => {

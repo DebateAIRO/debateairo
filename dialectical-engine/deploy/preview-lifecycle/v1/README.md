@@ -233,8 +233,9 @@ notify address, where it is installed, may email the owner a "down" and then an 
 All four steps read the names file of MAIN-SITE.md 3.0 (`/root/preview-archive/main-site/names.sh`, written by
 LOCKS0), and RESTART_GO, RESTART_BACK and RESTART_UP run as detached runs (MAIN-SITE.md, "How to run a server step").
 The names file refuses while a release is staged or draining (`NAMES_NOT_DONE: a release is staged or draining`), so
-none of them runs in the middle of an upload: restart before an upload's SB10 stages the new release, or after its
-drain has ended. The record of the state before goes into the root-only folder
+none of them runs in the middle of an upload. The restart stops the API and restarts the gates, so it is no brake,
+and MAIN-SITE.md's order rules keep it out of an upload from SB3 to the end of DR6 (or SB13): restart before an
+upload's SB3, or after the upload is over. The record of the state before goes into the root-only folder
 `/root/preview-archive/main-site/restart/<time>/`, and `restart/last` names the newest one; nothing else in these guides
 uses them. RESTART_GO's restart is a transient systemd timer named `restart-go-reboot`.
 
@@ -247,7 +248,9 @@ Before anything on the server:
 - **A quiet hour.** No debate runs or waits, no release drains, not from 02:45 to 03:45 Bucharest time (the nightly
   dump), and not within the hour before the system's daily upgrade. RESTART_GO refuses at those times.
 - **Someone who can reach the server as root for the hours after**: RESTART_UP, and the brakes of MAIN-SITE.md 6.5,
-  run as root.
+  run as root. When the operator's ssh access has an end time, at least 90 minutes of it are left before RESTART_LOOK:
+  that covers the restart and RESTART_UP. Past that end only the owner can reach the server, so for the hours after,
+  the owner, or an operator whose access lasts, is at hand.
 - **The owner's yes.** It names the restart, the runner's one start by RESTART_UP, and any `ACCEPT` word (below) the
   owner has read and accepts.
 
@@ -859,7 +862,7 @@ What it starts by hand, in this order, and only on these conditions:
 | A gate that ran before, and the Amazon gate | the boot did not start it (`inactive`, `Result=success`, `NRestarts=0`) and its own start check passes now; then up to 30 s for its socket | `systemctl start debateai-preview-<gate>` |
 | A gate watcher or the backup timer that ran before | the boot did not start it | `systemctl start <that timer>` |
 | The API and the website, once more | the API gave up at the boot on `POSTGRES_NOT_READY` alone | `apistart`, then `webup` |
-| The current release's runner, last and once | the database, Hatchet, the DeepInfra and Anthropic gates (and the web search gate when the runner's file names its socket), the API and the website are right | `systemctl start debateai-preview-runner@<label>`, with SB14B's wait and journal lines |
+| The current release's runner, last and once | the database, Hatchet, the DeepInfra and Anthropic gates (and the web search gate when the runner's file names its socket: each one running, `active`, its window open, as SB14B needs), the API and the website are right | `systemctl start debateai-preview-runner@<label>`, with SB14B's wait and journal lines |
 | MT1's flag moved into `$S` | a run with no `BAD` line | MT2's line |
 
 **`BAD` and `ASK`.** A `BAD (…)` line means the restart is not proven yet; it holds the maintenance flag. An `ASK (…)`
@@ -889,7 +892,7 @@ RD=$(cat "$M/restart/last" 2>/dev/null || true)
 umask 077; date +%s >> "$RD/up-runs"; echo "RESTART_UP, run $(grep -c . "$RD/up-runs" || true) since the restart"
 BAD=''; bad() { echo "BAD ($1): $2"; case " $BAD " in *" $1 "*) ;; *) BAD="$BAD $1";; esac; }
 ASK=''; ask() { echo "ASK ($1): $2"; case " $ASK " in *" $1 "*) ;; *) ASK="$ASK $1";; esac; }
-NORUN=''
+NORUN=''; norun() { case " $NORUN " in *" $1 "*) ;; *) NORUN="$NORUN $1";; esac; }
 gcheck() { local U=$1 AL AF XL1 OUT RC R1 PY; local -a PA
   GCN=0; GCBAD=0
   AL=$(systemctl show -p IPAddressAllow --value "$U" 2>/dev/null || true); AF=$(systemctl show -p RestrictAddressFamilies --value "$U" 2>/dev/null || true)
@@ -961,12 +964,16 @@ for G in deepinfra:provider-budget:deepinfra-budget-v3 anthropic:anthropic-budge
   GJ=$(gs "$GF" "$GP" 2>/dev/null | jq -r '"\(.state) \(.window_open) \(.in_flight) \(.reason // "none")"' 2>/dev/null || true); [ -n "$GJ" ] || GJ='unread unread unread unread'
   read -r GS GW GI GR <<<"$GJ"
   echo "$GN gate: service $SA; socket $SKS; state $GS; window open $GW; calls in flight $GI"
-  [ "$GS" = active ] && [ "$GW" = true ] || bad gates "the $GN gate is $GS with its window open $GW (reason $GR): its reason is read first; it is re-opened only on the owner's yes (PWOFF1's gatesok needs all four)"
+  # A gate the runner needs that is halted, or whose window is closed, holds the runner as SB14B does: the DeepInfra and Anthropic gates always, the web search gate when the runner's file names its socket. The Amazon gate does not hold it (above).
+  if [ "$GS" != active ] || [ "$GW" != true ]; then
+    bad gates "the $GN gate is $GS with its window open $GW (reason $GR): its reason is read first; it is re-opened only on the owner's yes (PWOFF1's gatesok needs all four)"
+    case "$GN" in deepinfra|anthropic) norun gates;; perplexity) [ "$PXN" = 'not named' ] || norun gates;; esac
+  fi
   if [ "$SA" != active ] || [ "$SKS" != there ]; then
     case "$GN" in
       bedrock) ask amazon-gate "the Amazon gate's service does not run: no ask calls it before 'Switch it on' (the release guide's 'After a reboot it is not running'); start it by hand later, once its start check passes, then restart the runner when no debate runs (the Amazon gate guide's 'Switch it on', step 4)";;
-      perplexity) bad gates "the web search gate's service does not run"; [ "$PXN" = 'not named' ] || NORUN="$NORUN gates";;
-      *) bad gates "the $GN gate's service does not run"; NORUN="$NORUN gates";;
+      perplexity) bad gates "the web search gate's service does not run"; [ "$PXN" = 'not named' ] || norun gates;;
+      *) bad gates "the $GN gate's service does not run"; norun gates;;
     esac
   fi
 done
@@ -1102,10 +1109,12 @@ What the operator tells the owner, in order:
    cannot be called off: wait. RESTART_BACK applies only when RESTART_GO ended `RESTART_GO_NOT_DONE`, or when the
    timer was stopped before it fired.
 3. **At 5 minutes with no ssh**, look from the Mac whether the site answers at all:
-   `curl -s -o /dev/null -m 15 -w '%{http_code}\n' https://dezbatere.ro/login` (the test name while the main name is
-   not open). Any code but `000` (`401` while the site password is on, `200` once it is off) means the server and Caddy
+   `curl -s -o /dev/null -m 15 -w '%{http_code}\n' https://dezbatere.ro/login`, with the name the site answers as:
+   the main name, dezbatere.ro, or `https://v3-preview.dezbatere.ro/login` while the site still answers only as the
+   test name. Any code but `000` (`401` while the site password is on, `200` once it is off) means the server and Caddy
    are up and only ssh is missing; `000` means the server is not up yet. Tell the owner which.
-4. **At 10 minutes with no ssh**, tell the owner the time of `RESTART_GO_DONE`, and keep trying.
+4. **At 10 minutes with no ssh**, tell the owner the time of `RESTART_GO_DONE`, and keep trying. The operator's ssh
+   access has its own end time; past it, only the owner can reach the server.
 5. **At 15 minutes**, the owner opens this server in the hosting company's control panel, reads the state the panel
    shows for it, and opens its console there. The owner describes the screen in words (never a password or a code in
    a chat):
@@ -1124,7 +1133,7 @@ What the operator tells the owner, in order:
    - nothing at all: the server may not run. Starting or restarting it from the panel is the owner's choice.
 6. **When the console gives no way in: rescue mode, and repair first.** The panel's rescue mode starts the server from
    a rescue system; the hosting company sends its access to the owner, and it stays out of any chat. From there the
-   server's disk and the failed boot's journal can be read. Repairing the boot loses nothing: for a kernel problem,
+   server's disk and the failed boot's journal (when the journal is kept) can be read. Repairing the boot loses nothing: for a kernel problem,
    mount the disk, `chroot` into it, and set the earlier kernel for one boot (`grub-reboot`); for a mount or network
    problem, put back the file the boot stopped on. Then restart from the panel, back to the disk. The owner decides
    each step.
@@ -1133,7 +1142,9 @@ What the operator tells the owner, in order:
    page's changes, an upload made since; the four spending gates' ledgers (after such a restore a gate no longer knows
    the calls already paid since that point, so on that day it could let spending go past its daily limit); publication
    keys made since, and the record of mail sent since. After such a restore the boot starts the API, the website and
-   the gates by itself. So the first commands, as root, before anything else:
+   the gates by itself: until the first commands below run, the restored sessions work and the public pages answer
+   (through the review window too, when it was open at that point). The owner hears this before the restart, not
+   after. So the first commands, as root, before anything else:
    `systemctl stop 'debateai-preview-ui@*' 'debateai-preview-api@*' 'debateai-preview-runner@*'`, then each gate's
    `stop` (MAIN-SITE.md 6.5 (a)), so the gates stay halted. Then the block of "Restore a nightly dump" (below: the
    restored sessions revoked, the fence marked; a whole-disk restore brings the fence's file back with the database,

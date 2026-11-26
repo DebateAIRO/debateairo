@@ -439,10 +439,27 @@ describe('HEALTHBACK', () => {
 
   it('when Caddy does not come back on the file before, the file without the secret goes back', () => withWorld({}, w => {
     run(HEALTH1, w); run(HEALTH2, w);
-    writeFileSync(join(w.dir, 'after/listener'), '000');
+    writeFileSync(join(w.dir, 'after/public-readyz'), '000');
     const back = run(HEALTHBACK, w, own(w));
-    expect(back.last).toBe('HEALTHBACK_NOT_DONE: Caddy did not come back on the file before (its readiness listener answered 000); the file without the secret is back and Caddy is active (active: as after HEALTH2; anything else: the site is DOWN): ask at once');
+    expect(back.last).toBe('HEALTHBACK_NOT_DONE: Caddy did not come back on the file before (Caddy active; the public /readyz 000, where Caddy\'s own refusal is 404); the file without the secret is back and Caddy is active (active: as after HEALTH2; anything else: the site is DOWN): ask at once');
     expect(w.live()).toBe(caddyfile({ secret: false }));
+  }));
+
+  it('judges Caddy by its own answer, so it works while the website is stopped (the listener only as information)', () => withWorld({}, w => {
+    run(HEALTH1, w); run(HEALTH2, w);
+    // The website stopped, as in the drained upload's downtime: the listener passes the request on and gets no answer.
+    writeFileSync(join(w.dir, 'after/listener'), '503');
+    const back = run(HEALTHBACK, w, own(w));
+    expect(back.lines).toContain('after the restart: Caddy active; the public /readyz 404 (404: Caddy\'s own refusal); the loopback listener 503 (through Caddy to the website: 200 while the website runs; information only)');
+    expect(back.last).toBe('HEALTHBACK_DONE');
+    expect(w.live()).toBe(caddyfile());
+  }));
+
+  it('says the site is down when Caddy does not run after the restart', () => withWorld({}, w => {
+    run(HEALTH1, w); run(HEALTH2, w);
+    writeFileSync(join(w.dir, 'caddy-dies'), '');
+    const back = run(HEALTHBACK, w, own(w));
+    expect(back.last).toBe('HEALTHBACK_NOT_DONE: Caddy did not come back on the file before (Caddy failed; the public /readyz 404, where Caddy\'s own refusal is 404); the file without the secret is back and Caddy is failed (active: as after HEALTH2; anything else: the site is DOWN): ask at once');
   }));
 });
 
