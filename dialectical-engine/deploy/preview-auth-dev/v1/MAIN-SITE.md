@@ -4455,7 +4455,7 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
   you ever use it, PWON and ASKS_CLOSE come first; drained: you would no longer choose rbD-B);
 - while 6b is open, go back to an older release only after PWON, then ASKS_CLOSE; a way back from the release that
   carries the Team page's list to the release before it (both carry 6b) needs neither, but has its own rule (5.6: the
-  alerts of the day's additions arrived first);
+  alerts of the day's changes made with the tools unlocked arrived first);
 - the sentence an account that is not listed sees (`billing.checkout.invitedBuyersOnly`) is written in English first
   and translated into Romanian before a release: check that the release you uploaded carries the Romanian words, or
   Romanian pages show it in English.
