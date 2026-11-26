@@ -97,6 +97,7 @@ import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresT
 import { recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
 import { PostgresRegistrationCountryReader } from "@debateai/db";
+import { PostgresPublicDebateUpvoteRepository } from "@debateai/db";
 // FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
 // by tools/orphan-audit; the module's state is process-global, so this instance routes the same pools).
 import { assertAccountContextLogins, attestEveryRoute, onOwnConnections } from "../../../packages/db/src/account-context.js";
@@ -1240,6 +1241,8 @@ const readAccountEmail = accountEmailReader(crossAccountPool(pool, "X27"), dekSt
 const teamLimitRepository = new PostgresTeamLimitRepository(pool);
 const publicReviewRepository = new PostgresPublicReviewRepository(pool);
 const publicFlagRepository = new PostgresPublicFlagRepository(pool);
+// 0193: 0193's three request functions, on the request login under the caller's session.
+const publicDebateUpvoteRepository = new PostgresPublicDebateUpvoteRepository(pool);
 // 0186: the preview's approved buyers. The yes or no at the pay button and the Owner's list and changes run on the request
 // login, whose billing role holds 0186's grants. The Owner's look-up of a typed address and the shortened addresses on the
 // list read other accounts' rows, so they run on the system login (X39), and only after the Owner's authority is checked.
@@ -2211,6 +2214,7 @@ const api = buildApi({
   // 0157 (D1): the person's own statements of reasons, their facts opened under the debate's key as the two accounts' review opens them.
   ...(publications === undefined ? {} : { moderationStatements: { repository: moderationStatementRepository,
     withKey: <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => publications.withReviewKey(publicationRef, runId, use) } }),
+  ...(publications === undefined ? {} : { publicVotes: { repository: publicDebateUpvoteRepository } }),
   ...(publications === undefined ? {} : { publicTree: {
     pool, tree: new PostgresPublicTreeRepository(pool), contributions: new PostgresPublicDebateRepository(pool),
     readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef),

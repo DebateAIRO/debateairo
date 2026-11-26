@@ -2164,6 +2164,10 @@ export const contractInventory = Object.freeze({
     // Decision 13: a report on a public debate.
     "POST /v1/public/debates/{id}/report",
     "POST /v1/public/debates/{id}/flag",
+    // Upvotes on public debates: cast, take back, and the signed-in person's own votes among a page's debates.
+    "PUT /v1/public/debates/{id}/vote",
+    "DELETE /v1/public/debates/{id}/vote",
+    "GET /v1/account/public-debate-votes",
     "GET /v1/geo/availability",
     "POST /v1/support/messages",
     "GET /v1/support/status",
