@@ -5989,9 +5989,9 @@ MX=$(sed -n 's/^const MAX_RELEASES = \([1-9][0-9]*\);.*$/\1/p' "$CAPI/dialectica
 NL=$(jq -r '.releases | length' "$LOCK")
 ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB4_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 if [ "$(jq -r --arg l "$LABEL" '.releases | has($l)' "$LOCK")" = false ] && [ "$NL" -ge "$MX" ]; then
-  RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=$(readlink -f "$RP" 2>/dev/null || true)
+  RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=''; if [ -n "$RP" ]; then RR=$(readlink -f "$RP" 2>/dev/null || true); fi
   [ -n "$RR" ] || { echo "SB4_NOT_DONE: the release lock is full ($NL of $MX releases), and the Turnstile relay's program path is unread, so no release can be named for SB15: ask"; exit 1; }
-  RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RW=$(readlink -f "${RW#!}" 2>/dev/null || true)
+  RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RW=${RW#!}; if [ -n "$RW" ]; then RW=$(readlink -f "$RW" 2>/dev/null || true); fi
   # The release folders the relay's program and its working folder lie in: those releases stay.
   RF=''; for RX in "$RR" "$RW"; do case "$RX" in /opt/debateai-v3-preview/releases/*) RX=${RX#/opt/debateai-v3-preview/releases/}; RF="$RF ${RX%%/*}";; esac; done
   # The release whose folder holds the store this upload's A3 started from: a staging again from OLABEL starts from it too.
@@ -6867,9 +6867,9 @@ cfacts() {
   CURC=$(awk '$2 == "CURRENT" { print substr($1, index($1, "-") + 1, 9) }' <<<"$RT"); BEFC=$(awk '$2 != "CURRENT" && $3 != "-" { print $3, substr($1, index($1, "-") + 1, 9) }' <<<"$RT" | sort | tail -n 1 | cut -d ' ' -f 2)
   # The pnpm stores the next staging starts from (SB1): the one this names file names, and the one the current release's own upload names.
   STORES=$OSTORE; for F in "$PA"/r*-names.sh; do if grep -qx "LABEL=$CUR" "$F" 2>/dev/null; then STORES="$STORES"$'\n'"$(sed -n 's/^OSTORE=//p' "$F")"; fi; done
-  # The Turnstile relay's program and working folder, read as SB4 reads them.
-  RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=$(readlink -f "$RP" 2>/dev/null || true)
-  RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RW=$(readlink -f "${RW#!}" 2>/dev/null || true)
+  # The Turnstile relay's program and working folder, read as SB4 reads them. An empty path is never resolved: this server's readlink answers the folder it runs in for one, which would read as a relay that runs elsewhere.
+  RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=''; if [ -n "$RP" ]; then RR=$(readlink -f "$RP" 2>/dev/null || true); fi
+  RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RW=${RW#!}; if [ -n "$RW" ]; then RW=$(readlink -f "$RW" 2>/dev/null || true); fi
   PP=$(ppaths | sort -u)
 }
 # One name judged, on one line: its facts, then "may be cleared" or "KEEP: <reasons>". CV says which (ok or keep), and CZ what it frees in MB. The newest upload's lock copy, and its own release while not current, keep a name only until the owner declares that upload over (OVER=yes).
@@ -7014,9 +7014,9 @@ cfacts() {
   CURC=$(awk '$2 == "CURRENT" { print substr($1, index($1, "-") + 1, 9) }' <<<"$RT"); BEFC=$(awk '$2 != "CURRENT" && $3 != "-" { print $3, substr($1, index($1, "-") + 1, 9) }' <<<"$RT" | sort | tail -n 1 | cut -d ' ' -f 2)
   # The pnpm stores the next staging starts from (SB1): the one this names file names, and the one the current release's own upload names.
   STORES=$OSTORE; for F in "$PA"/r*-names.sh; do if grep -qx "LABEL=$CUR" "$F" 2>/dev/null; then STORES="$STORES"$'\n'"$(sed -n 's/^OSTORE=//p' "$F")"; fi; done
-  # The Turnstile relay's program and working folder, read as SB4 reads them.
-  RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=$(readlink -f "$RP" 2>/dev/null || true)
-  RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RW=$(readlink -f "${RW#!}" 2>/dev/null || true)
+  # The Turnstile relay's program and working folder, read as SB4 reads them. An empty path is never resolved: this server's readlink answers the folder it runs in for one, which would read as a relay that runs elsewhere.
+  RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=''; if [ -n "$RP" ]; then RR=$(readlink -f "$RP" 2>/dev/null || true); fi
+  RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RW=${RW#!}; if [ -n "$RW" ]; then RW=$(readlink -f "$RW" 2>/dev/null || true); fi
   PP=$(ppaths | sort -u)
 }
 # One name judged, on one line: its facts, then "may be cleared" or "KEEP: <reasons>". CV says which (ok or keep), and CZ what it frees in MB. The newest upload's lock copy, and its own release while not current, keep a name only until the owner declares that upload over (OVER=yes).

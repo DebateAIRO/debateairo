@@ -138,6 +138,8 @@ function stubs(w: World, names: Names = {}): string[] {
     'lc() { [ "$1 $2" = \'release-check.mjs status\' ] || return 9; cat "$D/status.json"; }',
     'psqlq() { [ ! -e "$D/table-unread" ] || return 1; cat "$D/release-table"; }',
     'systemctl() { case "$1" in show) case "$3" in ExecStart) cat "$D/relay-exec";; WorkingDirectory) cat "$D/relay-wd";; esac;; list-units) case "$*" in *ms-step*) cat "$D/ms-steps";; *) cat "$D/units";; esac;; esac; }',
+    // The server's readlink (uutils) answers the folder it runs in for an empty path, where GNU's and BSD's fail: the steps must never ask it one.
+    'readlink() { if [ "$1" = -f ] && [ -z "${2-}" ]; then pwd; else command readlink "$@"; fi; }',
     'df() { printf \'Filesystem 1024-blocks Used Available Capacity Mounted on\\nscratch 100000000 1 %s 1%% /\\n\' "$(cat "$D/avail")"; }',
     'rm() { printf \'%s\\n\' "$*" >> "$D/rm-calls"; [ ! -e "$D/rm-refuses" ] || return 1; if [ "$#" = 5 ] && [ "$1 $2 $3 $4" = \'-rf --one-file-system --preserve-root=all --\' ]; then echo $(( $(cat "$D/avail") + 1024 )) > "$D/avail"; command rm -rf -- "$5"; else return 97; fi; }'
   ];
