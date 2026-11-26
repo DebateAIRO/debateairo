@@ -77,7 +77,8 @@ describe("0191: the sign-up country, read for the request's own account", () => 
     for (const key of ["AUTHORIZATION_DATABASE_URL", "RUNNER_DATABASE_URL", "ERASURE_DATABASE_URL", "DATA_EXPORT_DATABASE_URL", "SUPPORT_DATABASE_URL"] as const) {
       const pool = createPool(logins.url(key), { max: 1 });
       opened.push(pool);
-      await expect(pool.query("SELECT identity.read_registration_country($1)", [randomUUID()]), key).rejects.toMatchObject({ code: "42501" });
+      // Two messages are accepted: the support login has no right on the schema at all, the others are stopped at the function.
+      await expect(pool.query("SELECT identity.read_registration_country($1)", [randomUUID()]), key).rejects.toMatchObject({ code: "42501", message: expect.stringMatching(/^permission denied for (function read_registration_country|schema identity)$/) });
     }
     // The function is the only way: the billing role holds no right on the table itself.
     expect((await database.pool.query<{ privilege: string }>(`SELECT privilege FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE']) AS privilege

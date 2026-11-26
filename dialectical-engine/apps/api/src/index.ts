@@ -3016,22 +3016,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         }
         request.cookieRefresh = Object.freeze({ sessionToken, csrfToken: csrfCookieToken });
       }
-      if (request.routeOptions.config.session === "best-effort") {
+      if (request.routeOptions.config.session === "best-effort" && request.method === "GET") {
         // The plans list prices a signed-in account for its own country, but never fails over a session: no token, an
         // unknown one or a lookup that throws all leave the request a visitor's. No cookie is refreshed, since the
-        // answer may be kept by the browser, and the policy is for GET only, so there is no CSRF check.
+        // answer may be kept by the browser. Only GET looks at a session here, so no CSRF check is needed and any
+        // other method stays a visitor's.
         const sessionToken = exactCookie(request.headers.cookie, SESSION_COOKIE_NAME);
         if (sessionToken === null || options.sessions === undefined) return;
-        let authenticated: AuthenticatedSession | null;
         try {
-          authenticated = await options.sessions.authenticate(sessionToken, sourceFor(request));
+          const authenticated = await options.sessions.authenticate(sessionToken, sourceFor(request));
+          if (authenticated === null) return;
+          setRequestCredential(sessionToken);
+          request.authenticatedSession = authenticated;
+          request.session = authenticated.session;
         } catch {
           return;
         }
-        if (authenticated === null) return;
-        setRequestCredential(sessionToken);
-        request.authenticatedSession = authenticated;
-        request.session = authenticated.session;
       }
       return;
     }

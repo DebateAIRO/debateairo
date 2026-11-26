@@ -906,6 +906,12 @@ describe("GET /v1/billing/plans starts from the signed-in account's sign-up coun
   it("leaves the optional-session routes as they were: a session lookup that throws still fails them", async () => {
     const { api } = plansApi({ sessions: throwingSessions() });
     const status = await api.inject({ method: "GET", url: "/v1/support/status", headers: testSessionHeaders(OWNER) });
-    expect(status.statusCode).toBeGreaterThanOrEqual(500);
+    expect(status.statusCode).toBe(500);
+    expect(status.json()).toEqual({ error: "INTERNAL_ERROR", message: "INTERNAL_ERROR" });
+    // Control: with working sessions the same request reaches the handler, which answers that support is not composed.
+    const control = plansApi({}).api;
+    const answered = await control.inject({ method: "GET", url: "/v1/support/status", headers: testSessionHeaders(OWNER) });
+    expect(answered.statusCode).toBe(503);
+    expect(answered.json()).toMatchObject({ error: "SUPPORT_NOT_COMPOSED" });
   });
 });

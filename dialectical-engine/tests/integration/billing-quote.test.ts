@@ -198,4 +198,10 @@ describe("the first quote starts from the account's sign-up country", () => {
     await expect(service({ read: async () => "RO" }).create(first(randomUUID())))
       .rejects.toMatchObject({ status: 403, code: "TOR_REFUSED" });
   });
+
+  it("refuses a sign-up country when the connection's country is unknown, as it refuses a typed one", async () => {
+    geo.country = "XX";
+    await expect(service({ read: async () => "RO" }).create(first(randomUUID())))
+      .rejects.toMatchObject({ status: 403, code: "COUNTRY_UNKNOWN" });
+  });
 });
