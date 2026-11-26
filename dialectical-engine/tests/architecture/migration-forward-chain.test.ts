@@ -1186,7 +1186,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "MIGRATION_FORWARD0191_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "verify-effective-capabilities-130.sql", "replayVerifierSql",
       "previous.manifestSha256", "migration.sha256", "renumber", "identity.finish_social_callback_v3(jsonb,jsonb)", "identity.finish_social_callback_v2",
       "debateai_authorization_runtime", "assertedEmailIndex", "google-authoritative", "mfa_required", "signup_required", "METHOD_CHANGED", "identity.social.LINK",
-      "staff.consumer_security_affiliated", "identity.login_method_current_internal", "identity.lock_account_t9_internal", "tests/integration/social-auth-journey.test.ts"
+      "staff.consumer_security_affiliated", "identity.login_method_current_internal", "identity.mfa_recovery_eligible", "GOOGLE_RETURN_CONNECTS_ACCOUNT_OWNER_UNABLE",
+      "identity.lock_account_t9_internal", "tests/integration/social-auth-journey.test.ts"
     ]) expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
       "the check deleting a public debate with the Free sweep reading past waiting debates (0190, below) the eightieth, and a Google sign-in connecting to its account by itself (0191, below) the eighty-first");

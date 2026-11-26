@@ -756,6 +756,7 @@ describe('a Google sign-in for the address an account already signs in with (019
     it.each([
         ['an address Google does not itself answer for', async (_h: Awaited<ReturnType<typeof harness>>, _userId: string) => ({ email_verified: false })],
         ['a held account', async (_h: Awaited<ReturnType<typeof harness>>, userId: string) => { await db.pool.query('INSERT INTO identity.account_security_hold(user_id,held) VALUES($1,true)', [userId]); return {}; }],
+        ['an account the known-password recovery still serves, which any Google link would close for good', async (_h: Awaited<ReturnType<typeof harness>>, userId: string) => { await db.pool.query('INSERT INTO identity.mfa_recovery_legacy_cohort(user_id) VALUES($1)', [userId]); expect((await db.pool.query('SELECT identity.mfa_recovery_eligible($1) eligible', [userId])).rows[0].eligible).toBe(true); return {}; }],
         ['a staff account', async (_h: Awaited<ReturnType<typeof harness>>, userId: string) => { await db.pool.query('INSERT INTO staff.subject(user_id) VALUES($1)', [userId]); return {}; }],
         ['a suspended account', async (_h: Awaited<ReturnType<typeof harness>>, userId: string) => { await db.pool.query(`UPDATE identity."user" SET state='suspended' WHERE user_id=$1`, [userId]); return {}; }],
         ['an account whose Google link was removed', async (_h: Awaited<ReturnType<typeof harness>>, userId: string) => { await db.pool.query(`INSERT INTO identity.social_identity(user_id,provider,issuer,app_scope,subject,configuration,revoked_at) VALUES($1,'google','https://accounts.google.com','journey-client',$2,$3,clock_timestamp())`, [userId, randomUUID(), configurations[0]!.configuration]); return {}; }],
@@ -769,6 +770,8 @@ describe('a Google sign-in for the address an account already signs in with (019
             expect(cb.status).toBe('signup_required');
             expect(await links(account.userId)).toEqual(linksBefore);
             expect(await counts(account.userId)).toEqual(before);
+            if (_name.startsWith('an account the known-password recovery'))
+                expect((await db.pool.query('SELECT identity.mfa_recovery_eligible($1) eligible', [account.userId])).rows[0].eligible).toBe(true);
         }
         finally {
             await h.registration.drainMailDispatches();

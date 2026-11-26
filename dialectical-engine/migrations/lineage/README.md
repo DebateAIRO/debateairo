@@ -1723,8 +1723,12 @@ taken. The owner ruled on 2026-11-26 that Google connects by itself. This step a
 - What is not connected, each answering `signup_required` exactly as v2: an account that is not active or is held; a
   staff account (`staff.consumer_security_affiliated`: those never sign in through a provider); an account that already
   has any Google link, live or removed (a removed link stays removed, and a second Google subject is never added beside
-  a first); an account with no second step (`identity.login_method_current_internal`); another provider; an address the
-  provider does not itself answer for. `LINK` and `PROVIDER_STEP_UP`, which name their account by a session, are
+  a first); an account with no second step (`identity.login_method_current_internal`); an account 0107's known-password
+  recovery still serves (`identity.mfa_recovery_eligible`: any provider row, even a removed one, closes that recovery for
+  good, and this link is made before the second step is passed, so a person who lost their authenticator must not lose
+  that way back by pressing the Google button; the step refuses to apply, `GOOGLE_RETURN_CONNECTS_ACCOUNT_OWNER_UNABLE`,
+  where the function's owner could not ask it); another provider; an address the provider does not itself answer for.
+  A subject another account took in the same moment refuses the return (`SOCIAL_FLOW_INVALID`). `LINK` and `PROVIDER_STEP_UP`, which name their account by a session, are
   unchanged.
 - Locks. The account is found by its address before any lock, then locked with the flow's and the subject's accounts in
   the one order `identity.lock_security_subjects` gives every caller, and every condition is asked again under

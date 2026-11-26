@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0191_google_return_connects_account.sql",
-    "sha256": "59f7ef56fc61388bf418ca060f10f003ced59a2337e7f7d6c756b6a63953b39a"
+    "sha256": "e6d703057c76d1d95c6741d4aa9d1df3ca15ad30321550651387bc28d194df26"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

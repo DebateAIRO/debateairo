@@ -17,6 +17,8 @@
 --   - an account that already has any link to Google, live or removed (a removed link stays removed; a second Google
 --     subject is never added beside a first);
 --   - an account with no second step the sign-in can ask for;
+--   - an account 0107's known-password recovery still serves (identity.mfa_recovery_eligible): a provider row, even a
+--     removed one, closes that recovery for good, and this link is made before the second step is passed;
 --   - any other provider, and any address the provider does not itself answer for (assertedEmailIndex null);
 --   - LINK and the step-up, which name their account by a session and are unchanged.
 -- Whoever reaches this arm has shown Google's proof for the address, in this browser, in a flow this caller claimed, so
@@ -84,14 +86,20 @@ DECLARE f identity.social_flow%ROWTYPE;s identity.social_identity%ROWTYPE;a reco
  -- account's locks: it is active and not held (lock_account_t9_internal answered), it still signs in with that address,
  -- it is no staff account (those never sign in through a provider), it has no link to this provider at all (a link the
  -- person removed stays removed, and a second Google subject is never added beside a first), and it has a second step
- -- the sign-in below can ask for. Then the link is made exactly as LINK makes it: the row, the "sign-in method changed"
+ -- the sign-in below can ask for, and it is not one of the accounts 0107's known-password recovery still serves (any
+ -- provider row, even a removed one, closes that way back for good, and this link is made before the second step is
+ -- passed: a person who lost their authenticator must not lose that recovery by pressing the Google button). Then the
+ -- link is made as LINK makes it (a subject another account took meanwhile refuses the return): the row, the "sign-in method changed"
  -- notice to the account's verified addresses, and the LINK audit event. An account that fails any condition is left
  -- untouched and the return answers signup_required, as before this step.
  IF cand IS NOT NULL AND s.user_id IS NULL THEN
   IF a.audit_token IS NOT NULL AND EXISTS(SELECT 1 FROM identity."user" WHERE user_id=cand AND state='active' AND email_blind_index=idx)
   AND NOT staff.consumer_security_affiliated(cand) AND NOT EXISTS(SELECT 1 FROM identity.social_identity WHERE user_id=cand AND provider=f.provider)
-  AND identity.login_method_current_internal(cand,(SELECT mfa_factor_id FROM identity.mfa_factor WHERE user_id=cand AND factor_type='totp' AND state='active' AND verified_at IS NOT NULL ORDER BY created_at DESC LIMIT 1)) THEN
-   INSERT INTO identity.social_identity(user_id,provider,issuer,app_scope,subject,configuration) VALUES(cand,f.provider,p->>'issuer',p->>'appScope',p->>'subject',f.configuration) RETURNING * INTO s;
+  AND identity.login_method_current_internal(cand,(SELECT mfa_factor_id FROM identity.mfa_factor WHERE user_id=cand AND factor_type='totp' AND state='active' AND verified_at IS NOT NULL ORDER BY created_at DESC LIMIT 1))
+  AND NOT identity.mfa_recovery_eligible(cand) THEN
+   INSERT INTO identity.social_identity(user_id,provider,issuer,app_scope,subject,configuration) VALUES(cand,f.provider,p->>'issuer',p->>'appScope',p->>'subject',f.configuration)
+   ON CONFLICT(provider,issuer,app_scope,subject) DO NOTHING RETURNING * INTO s;
+   IF NOT FOUND THEN RAISE EXCEPTION 'SOCIAL_FLOW_INVALID';END IF;
    PERFORM set_config('debateai.mail_locale', f.mail_locale, true);
    PERFORM identity.enqueue_consumer_security_notice_internal(cand,'METHOD_CHANGED');PERFORM identity.append_social_audit_internal(a.audit_token,'LINK',p_source);
   END IF;
@@ -114,13 +122,17 @@ DECLARE f identity.social_flow%ROWTYPE;s identity.social_identity%ROWTYPE;a reco
 END $$;
 
 -- Owned by the owner of the function it supersedes, which reads and writes the same rows and calls the same helpers.
--- n1: reviewed sets the owner of the one function this step creates to the owner of the function it supersedes; the release before never calls it
+-- n1: reviewed sets the owner of the one function this step creates to the owner of the function it supersedes and checks what that owner may ask; the release before never calls it
 DO $google_return_connects_account_owner$
 DECLARE v_owner name;
 BEGIN
   SELECT pg_catalog.pg_get_userbyid(p.proowner) INTO STRICT v_owner FROM pg_catalog.pg_proc AS p
     WHERE p.oid = 'identity.finish_social_callback_v2(jsonb,jsonb)'::regprocedure;
   EXECUTE pg_catalog.format('ALTER FUNCTION identity.finish_social_callback_v3(jsonb,jsonb) OWNER TO %I', v_owner);
+  -- The one helper the new arm asks that the superseded function did not: the step refuses to apply where the owner could not ask it.
+  IF NOT pg_catalog.has_function_privilege(v_owner, 'identity.mfa_recovery_eligible(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='GOOGLE_RETURN_CONNECTS_ACCOUNT_OWNER_UNABLE';
+  END IF;
 END
 $google_return_connects_account_owner$;
 
