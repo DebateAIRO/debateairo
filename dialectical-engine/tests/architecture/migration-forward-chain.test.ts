@@ -1181,9 +1181,11 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains the sign-up country read for prices 0192 after 0191 as an expand step that keeps 0130's verifier, and documents it", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
-    // The chain head: one function of the API's billing role, its owner set by one reviewed DO block.
-    expect(names.slice(-2)).toEqual(["0191_preview_buyer_add_key_only.sql", "0192_registration_country_read.sql"]);
-    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    // One function of the API's billing role, its owner set by one reviewed DO block. Found by name: a Google sign-in
+    // connecting to its account by itself (0193) follows it.
+    const at = names.indexOf("0192_registration_country_read.sql");
+    expect(names.slice(at - 1, at + 1)).toEqual(["0191_preview_buyer_add_key_only.sql", "0192_registration_country_read.sql"]);
+    const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
     expect(JSON.parse((await bytesOf("lineage/registration-country-read-forward0192.json")).toString("utf8"))).toEqual({
       version: "registration-country-read-forward0192-v1",
       baseRecipeSha256: plan.recipeSha256,
@@ -1226,6 +1228,70 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     ]) expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
       "(0191, below) the eighty-first, and the sign-up country read for prices (0192, below) the eighty-second");
+  });
+
+  it("chains a Google sign-in connecting to its account by itself 0193 after 0192 as an expand step that keeps 0130's verifier, and documents it", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    // The chain head: one function of the API's authorization role, its owner set by one reviewed DO block.
+    expect(names.slice(-2)).toEqual(["0192_registration_country_read.sql", "0193_google_return_connects_account.sql"]);
+    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    expect(JSON.parse((await bytesOf("lineage/google-return-connects-account-forward0193.json")).toString("utf8"))).toEqual({
+      version: "google-return-connects-account-forward0193-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: { name: "0192_registration_country_read.sql", manifestSha256: sha256(await bytesOf("lineage/registration-country-read-forward0192.json")), verifierSha256: previous.verifierSha256 },
+      migration: { name: "0193_google_return_connects_account.sql", sha256: sha256(await bytesOf("0193_google_return_connects_account.sql")) },
+      verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) },
+      amendsPostconditionsOf: []
+    });
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/google-return-connects-account-forward0193.json")));
+    expect(step.previousName).toBe(previous.name);
+    expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+    expect(step.previousVerifierSha256).toBe(previous.verifierSha256);
+    expect(step.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
+    expect(step.replayVerifierSql).toBeUndefined();
+    expect(step.amendsPostconditionsOf ?? []).toEqual([]);
+    // One new function, its owner, its revoke and its one grant; nothing earlier replaced, nothing of billing.
+    const statements = step.sql.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("--")).join("\n");
+    expect(statements.match(/^(?:CREATE|ALTER|REVOKE|GRANT|DROP|DO)\b.*$/gmu)).toEqual([
+      "CREATE OR REPLACE FUNCTION identity.finish_social_callback_v3(p jsonb,p_source jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$",
+      "DO $google_return_connects_account_owner$",
+      "REVOKE ALL ON FUNCTION identity.finish_social_callback_v3(jsonb,jsonb)",
+      "GRANT EXECUTE ON FUNCTION identity.finish_social_callback_v3(jsonb,jsonb) TO debateai_authorization_runtime;"
+    ]);
+    expect(statements).not.toMatch(/\bbilling\./u);
+    const earlier = (await readdir(MIGRATIONS)).filter((name) => /^\d{4}_.*\.sql$/u.test(name) && name < step.name);
+    for (const name of earlier) expect((await bytesOf(name)).toString("utf8"), name).not.toContain("finish_social_callback_v3");
+    // The new function is 0178's, line for line, but for its name, its two new variables and the two places the arm touches.
+    const bodyOf = (sql: string, name: string) => { const from = sql.indexOf(`CREATE OR REPLACE FUNCTION identity.${name}(`); return sql.slice(from, sql.indexOf("\nEND $$;", from)).split("\n"); };
+    const older = bodyOf((await bytesOf("0178_security_fixes_run3.sql")).toString("utf8"), "finish_social_callback_v2"), newer = bodyOf(step.sql, "finish_social_callback_v3");
+    const kept = older.filter((line) => newer.includes(line));
+    expect(older.length - kept.length).toBe(4);
+    expect(older.filter((line) => !newer.includes(line)).map((line) => line.slice(0, 60))).toEqual([
+      "CREATE OR REPLACE FUNCTION identity.finish_social_callback_v",
+      "DECLARE f identity.social_flow%ROWTYPE;s identity.social_ide",
+      " PERFORM identity.lock_security_subjects(ARRAY(SELECT DISTIN",
+      " IF s.user_id IS NOT NULL THEN SELECT * INTO a FROM identity"
+    ]);
+    const lines = step.sql.split("\n");
+    const reviewed = lines.findIndex((line) => line.startsWith("-- n1: reviewed "));
+    expect(lines.filter((line) => line.startsWith("-- n1: reviewed "))).toHaveLength(1);
+    expect(lines[reviewed + 1]).toBe("DO $google_return_connects_account_owner$");
+    const loader = await readFile(new URL("migration-forward0193.ts", DB_SOURCE), "utf8");
+    expect(loader).toContain('const FUNCTIONS: readonly string[] = ["identity.finish_social_callback_v3(jsonb,jsonb)"];');
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## A Google sign-in connects to its account by itself (0193)"));
+    expect(section.startsWith("## A Google sign-in connects to its account by itself (0193)")).toBe(true);
+    for (const needle of ["0192", "0193_google_return_connects_account.sql", "google-return-connects-account-forward0193.json", "packages/db/src/migration-forward0193.ts",
+      "MIGRATION_FORWARD0193_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "verify-effective-capabilities-130.sql", "replayVerifierSql",
+      "previous.manifestSha256", "migration.sha256", "renumber", "identity.finish_social_callback_v3(jsonb,jsonb)", "identity.finish_social_callback_v2",
+      "debateai_authorization_runtime", "assertedEmailIndex", "google-authoritative", "mfa_required", "signup_required", "METHOD_CHANGED", "identity.social.LINK",
+      "staff.consumer_security_affiliated", "identity.login_method_current_internal", "identity.mfa_recovery_eligible", "GOOGLE_RETURN_CONNECTS_ACCOUNT_OWNER_UNABLE",
+      "identity.lock_account_t9_internal", "tests/integration/social-auth-journey.test.ts"
+    ]) expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "the sign-up country read for prices (0192, below) the eighty-second, and a Google sign-in connecting to its account by itself (0193, below) the eighty-third");
   });
 
   // The release before refuses, at its restart on a database ahead of it, an amendment recorded by a step it does not

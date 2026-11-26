@@ -3693,6 +3693,13 @@
       "grants": [
         "EXECUTE ON FUNCTION identity.read_registration_country(uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_authorization_runtime",
+      "source": "migrations/0193_google_return_connects_account.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.finish_social_callback_v3(jsonb,jsonb)"
+      ]
     }
   ],
   "privilegeRevocations": [
