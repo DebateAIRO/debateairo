@@ -134,6 +134,7 @@ if the server shows something else.
 | 5 | the main name, and your staff key on it (5.7) | password on | NAME5 |
 | 5.8 | the NETOPIA review window: the public pages without the password (after NAME4), then NETOPIA's review (5.8b) | public pages open; sign-in, sign-up, debates and buying behind the password | REVIEW_CLOSE (or PWON) |
 | 5.9 | public debates: publishing switched on (after 5.7), still behind the site password | password on; public debates readable by those who know it | PUBOFF stops the public pages; what was public stays recorded (5.9b) |
+| 5.10 | Caddy's health check without the edge secret (at any time outside an upload, on your yes) | as before; Caddy restarts (about a second) | HEALTHBACK |
 | 6 | friends' test with test payments (it may run while NETOPIA reviews) | password on | ASKS_CLOSE |
 | 6b | the whole site open while payments are NETOPIA's sandbox: anyone may sign up and ask on the Free plan, only the accounts you list may buy test plans (after part 5 and 5.7, on a release that carries it; before you enrol the point of sale, 5.8b step 3) | open | PWON, then ASKS_CLOSE |
 | 7 | real payments (only after NETOPIA's approval and the signed contract; 6b closed first; if anyone outside the team had the site password, a new one first) | password on | PAY_BACK |
@@ -1397,9 +1398,10 @@ request starts the N-1 check, which is expected to be red while drained steps ar
 - **The sandbox start counts one more thing.** The API's sandbox start also counts open live payment work. This
   database never took a live payment, so the count is 0 and the API starts as before.
 - **Caddy's health check.** This upload does not change Caddy. Its two-slot health check is still the transition's (the
-  edge secret in the probe, a 1-second limit, out after one miss); nothing is worse than today. It changes only with
-  its own reviewed step, written for this server's Caddyfile, and run before NAME1 (5.1): after NAME1, every kept copy
-  pins the old lines (NAME2, NAME3, NAME5, NAME1_BACK, REVIEW_OPEN, PWOFF2 and PWON compare or restore them).
+  edge secret in the probe, a 1-second limit, out after one miss); nothing is worse than today. The secret comes out
+  with its own reviewed step, HEALTH1 and HEALTH2 (5.10), outside an upload; they change the kept copies too (NAME2,
+  NAME3, NAME5, NAME1_BACK, REVIEW_OPEN, PWOFF2 and PWON compare or restore them), so they work before NAME1 or after
+  it. The limit and the one miss change only with a reviewed step of their own.
 - **Until Luna's own day: the Amazon gate unused.** Its window closes 31 days after its `activate` (piece 2). With no
   key, no call reaches it, so it stays `active` with `window_open` false, and ASKS_OPEN (6.1, 8.1) refuses then: run
   its `stop` line, then its `activate` line (6.5). After a reboot nothing starts it (its start at boot comes with Luna's
@@ -1877,10 +1879,10 @@ LOGOCHECK ended with `LOGOCHECK_DONE`, **mail is on the v2 plan** (part 4.2 or 4
 STAFFMAIN, with nothing changed, until it has `upfail`.
 
 This upload does not change Caddy. Its two-slot health check is still the transition's (the edge secret in the probe, a
-1-second limit, out after one miss); nothing is worse than before. It changes only with its own reviewed step, written
-for this server's Caddyfile, and run before NAME1: after NAME1, every kept copy pins the old lines (NAME2, NAME3,
-NAME5, NAME1_BACK, REVIEW_OPEN, PWOFF2 and PWON compare or restore them). Decide before NAME1 whether that step comes
-first.
+1-second limit, out after one miss); nothing is worse than before. The secret comes out with HEALTH1 and HEALTH2
+(5.10), before NAME1 or after it: every kept copy pins the old lines (NAME2, NAME3, NAME5, NAME1_BACK, REVIEW_OPEN,
+PWOFF2 and PWON compare or restore them), and HEALTH2 takes the secret out of each kept copy too. The limit and the one
+miss change only with a reviewed step of their own.
 
 NAME3 and NAME5 restart the Turnstile relay, so its program must be where the relay's unit says. NAME2 (5.2) reads
 that path first and stops if the file is missing or not root's.
@@ -2500,7 +2502,7 @@ the two staff name lines. With the lines naming the other name the API refuses t
   v3-preview.dezbatere.ro.
 - From NAME1 on, change nothing in the Caddyfile by hand: NAME2 and NAME1_BACK refuse a changed file, and NAME5 puts
   back the copy NAME1 made. Only the steps of this document change it (NAME3, REVIEW_OPEN, REVIEW_CLOSE, PWOFF2, PWON,
-  SIGNUPS). Ask first. NETOPIA's logo needs no Caddy change: a later upload carries its line by itself.
+  SIGNUPS, HEALTH2, HEALTHBACK). Ask first. NETOPIA's logo needs no Caddy change: a later upload carries its line by itself.
 - The NETOPIA review window (5.8) stays open through a later upload: no upload step reads or changes the Caddyfile
   after NAME1, and nobody can buy through the window. During the drained upload's downtime the open pages show an
   error, to NETOPIA's reviewer too, so do not upload while NETOPIA is reviewing. After SB13b, change the first line
@@ -4087,6 +4089,297 @@ and the website started on it, with publishing on`: publishing is still on; ask.
 publishing was being switched off`: ask at once, before any other step. To switch on again: PUBON (step 5), which
 reads the kept lines.
 
+### 5.10 Caddy's health check without the edge secret (HEALTH1, HEALTH2, HEALTHBACK)
+
+**What it is.** Caddy asks each website slot every second whether it is ready (`/readyz`), straight at the slot's
+port, and sends visitors to the first slot that says yes. On this server that question still carries the edge secret,
+the header `X-Debateai-Edge-Secret`, which Caddy otherwise adds only to the requests it passes on to the website. The
+shared rules in the repository (`deploy/preview-release/v1/caddy/debateai-slots.caddy`) have had no secret there
+since the security review (NV-55): the website answers its readiness to anyone who asks, so the secret is not needed,
+and a secret should travel only where it must. On this server the shared rules (the block `(debateai_slots)` that
+every two-slot proxy imports) still have the three lines from before that fix:
+
+```caddyfile
+    health_headers {
+        X-Debateai-Edge-Secret {file./etc/debateai-v3-preview/ui-edge.caddy.secret}
+    }
+```
+
+HEALTH1 looks and makes the copy without them; HEALTH2 puts it in place; HEALTHBACK is the way back. Nothing else in
+Caddy changes. The `header_up X-Debateai-Edge-Secret` lines stay: they are how the website knows that a request came
+through Caddy. The other health settings stay too (below).
+
+**What visitors notice.** HEALTH2 restarts Caddy (it runs with `admin off`: a restart, never a reload). For about a
+second a page may not load; reloading it helps. Nothing else changes for them. Run HEALTH2 only with the owner's yes,
+at a quiet minute. Run all three steps the ordinary way, not detached.
+
+**When.** At any time outside an upload. The names file refuses while a release is staged or draining. HEALTH1 and
+HEALTH2 also refuse, with nothing changed, while the maintenance flag is there (a restart of the server, or other
+maintenance, is under way), while a detached step runs, while Caddy does not run, while the NETOPIA review window is
+open (REVIEW_CLOSE first, then HEALTH1 and HEALTH2, then REVIEW_OPEN again), between PWOFF1 and PWOFF2, and while an
+edited copy for SIGNUPS waits. With the site password off (6b, or part 8) they work: PWOFF1's two copies get the same
+edit.
+
+**The kept copies.** Several steps keep a copy of the Caddyfile, and later compare the live file with it or put it
+back:
+- NAME1's `name/Caddyfile.before-dezbatere` (NAME1_BACK puts it back; NAME2 builds from it);
+- `name/Caddyfile.phase1` (NAME3 and NAME1_BACK compare with it; NAME5 puts it back);
+- NAME2's `name/Caddyfile.main` (NAME3 puts it in place; REVIEW_OPEN compares with it);
+- PWOFF1's `password/Caddyfile.before-open` and `password/Caddyfile.open` (PWOFF2 and SIGNUPS compare with them;
+  OPENCHECK compares with the second; PWON compares with the second and puts the first back).
+
+If they kept the secret, PWON or NAME5 would bring it back, and REVIEW_OPEN, PWON, SIGNUPS and OPENCHECK would refuse
+or fail on a live file that no longer equals their copy. So HEALTH2, once every check after the restart has passed,
+takes the same three lines out of each kept copy that has them, and keeps each copy as it was in
+`main-site/health/kept-<time>`. The review window's copies exist only while it is open, and both steps refuse then.
+Files with a time in their name (`Caddyfile.before-name5-<time>`, `Caddyfile.before-signups-<time>`, the copies PWON
+and REVIEW_CLOSE move aside) are records that no step reads or puts back. The release guide's ways back of the hosted
+switch and of the transition upload (T) put back files from before those steps; those uploads are long over, and their
+ways back are not run again. No other step keeps a Caddyfile: the switch (`release-switch.mjs`) never reads it, and
+`caddy-slots.mjs` writes a changed copy of the live file only in T and in PM2, and never looks at the health check's
+header.
+
+**The other health settings.** HEALTH1 compares the shared rules, without the secret, with this release's
+`debateai-slots.caddy`, and names each setting that differs. This server's rules come from the transition upload: a
+probe every 2 seconds, a 1-second limit, out after one miss. The repository's are 1 second, 3 seconds and two misses
+(NV-27). HEALTH2 changes none of them; only the secret goes. Bringing them to the repository's values is a reviewed
+step of its own: ask.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# HEALTH1: Caddy's health check looked at, then two copies of the live Caddyfile kept, the second with the edge secret taken out of the health check. Nothing live changes.
+H=$M/health; HB=$H/Caddyfile.before-health; HA=$H/Caddyfile.health; TS=$(date -u +%Y%m%dT%H%M%SZ)
+# The health check's secret (the same lines in HEALTH1 and HEALTH2). It is the one health_headers block of the shared rules (debateai_slots): three lines, "health_headers {", one line naming X-Debateai-Edge-Secret and its file, and "}". hstrip prints the file without those three lines, and fails unless the file has exactly that block and no other line naming health_headers.
+hstrip() { awk '{ t = $0; sub(/^[ \t]+/, "", t) } index(t, "health_headers") { n++ } $0 == "(debateai_slots) {" { s = 1 } s && !g && t == "health_headers {" { g = 1; next } g == 1 { g = 2; if (t ~ /^X-Debateai-Edge-Secret [{]file[.][^} \t]+[}]$/) next; bad = 1 } g == 2 { g = 3; if (t == "}") { k++; next } bad = 1 } s && $0 == "}" { s = 0 } { print } END { if (n != 1 || k != 1 || bad) exit 1 }' "$1"; }
+# What an edit took out, as shapes, never a line's content; HS is the one shape both steps accept.
+hshape() { local R N F S L A P; R=$(diff "$1" "$2" | sed -n 's/^<[[:space:]]*//p' || true); N=$(grep -c . <<<"$R" || true); F=$(sed -n 1p <<<"$R"); [ "$F" = 'health_headers {' ] || F=other; S=$(sed -n 2p <<<"$R"); if grep -qxE 'X-Debateai-Edge-Secret [{]file[.][^} ]+[}]' <<<"$S"; then S="the secret's line"; else S=other; fi; L=$(sed -n '$p' <<<"$R"); [ "$L" = '}' ] || L=other; A=$(diff "$1" "$2" | grep -c '^>' || true); P=$(diff "$1" "$2" | grep -c '^[0-9]' || true); printf 'taken out: %s lines (%s, %s, %s); added: %s; places: %s\n' "$N" "$F" "$S" "$L" "$A" "$P"; }
+HS="taken out: 3 lines (health_headers {, the secret's line, }); added: 0; places: 1"
+# The kept copies that later steps compare the live file with, or put back (5.10).
+KEPT=("$M/name/Caddyfile.before-dezbatere" "$M/name/Caddyfile.phase1" "$M/name/Caddyfile.main" "$M/password/Caddyfile.before-open" "$M/password/Caddyfile.open")
+# A slot's website asked as Caddy's health check asks it once the secret is out: straight at its port, with no secret. Prints the status (000: nothing listens) and the release key it names.
+rz() { local r c k; r=$(curl -s -m 5 -w '\n%{http_code}' "http://127.0.0.1:$1/readyz" || true); c=${r##*$'\n'}; k=$(jq -r '.releaseKey // empty' <<<"${r%$'\n'*}" 2>/dev/null || true); printf '%s %s\n' "${c:-000}" "${k:-none}"; }
+# The guards (the same lines in HEALTH1 and HEALTH2): no detached step, no maintenance, Caddy running, the review window closed, no SIGNUPS copy waiting, and PWOFF1's copies only as PWOFF2 left them.
+hguards() {
+  [ -z "$(systemctl list-units 'ms-step-*' --no-legend --state=active,activating,deactivating)" ] || { echo "$1_NOT_DONE: a detached step still runs (read its log first); nothing changed"; exit 1; }
+  [ ! -e /etc/debateai-v3-preview/lifecycle/maintenance-pending ] || { echo "$1_NOT_DONE: the maintenance flag is there (a restart of the server, or other maintenance, is under way): wait until it is over; nothing changed"; exit 1; }
+  [ "$(systemctl is-active caddy || true)" = active ] || { echo "$1_NOT_DONE: Caddy does not run now: look; nothing changed"; exit 1; }
+  ! grep -qE 'review_locked|review_quiet|review window begin' "$C" || { echo "$1_NOT_DONE: the NETOPIA review window is open: REVIEW_CLOSE (5.8) first, then HEALTH1 and HEALTH2, then REVIEW_OPEN again; nothing changed"; exit 1; }
+  [ ! -e "$M/password/Caddyfile.signups" ] || { echo "$1_NOT_DONE: an edited copy for SIGNUPS waits: finish SIGNUPS (6.5 (c)), or move $M/password/Caddyfile.signups aside; nothing changed"; exit 1; }
+  if [ -e "$M/password/Caddyfile.before-open" ] || [ -e "$M/password/Caddyfile.open" ]; then
+    [ -s "$M/password/Caddyfile.before-open" ] && [ -s "$M/password/Caddyfile.open" ] && cmp -s "$C" "$M/password/Caddyfile.open" && ! cmp -s "$C" "$M/password/Caddyfile.before-open" || { echo "$1_NOT_DONE: PWOFF1's copies are there, but the live Caddyfile is not the one PWOFF2 put in place (between PWOFF1 and PWOFF2?): finish PWOFF2, or run PWON; nothing changed"; exit 1; }
+    echo "the site password is off (PWOFF2's file is live): PWOFF1's two copies get the same edit"
+  fi
+}
+hguards HEALTH1
+case "$UIP" in 3100|3200) ;; *) echo "HEALTH1_NOT_DONE: the names file gives this release no slot's website port: ask; nothing changed"; exit 1;; esac
+N=$(grep -c health_headers "$C" || true)
+[ "$N" != 0 ] || { echo "HEALTH1_NOT_DONE: the live Caddyfile has no health_headers line: its health check sends no secret already, and HEALTH2 is not needed; nothing changed"; exit 1; }
+hstrip "$C" > /dev/null || { echo "HEALTH1_NOT_DONE: the live Caddyfile does not have exactly one three-line health_headers block, naming only X-Debateai-Edge-Secret, inside the shared rules (lines naming health_headers: $N): ask; nothing changed"; exit 1; }
+echo "health_headers: one block of three lines, inside the shared rules, naming only X-Debateai-Edge-Secret"
+# Every proxy sends the edge secret once, from one file: these lines stay as they are.
+PX=$(grep -cE '^[[:space:]]*reverse_proxy ' "$C" || true); SX=$(grep -cE '^[[:space:]]*header_up X-Debateai-Edge-Secret [{]file[.][^} ]+[}]$' "$C" || true)
+SF=$(sed -n 's/^[[:space:]]*header_up X-Debateai-Edge-Secret {file\.\([^} ]*\)}$/\1/p' "$C" | sort -u | grep -c . || true)
+echo "proxies: $PX; their header_up lines with the edge secret: $SX, from $SF file"
+[ "$PX" -ge 1 ] && [ "$SX" = "$PX" ] && [ "$SF" = 1 ] || { echo "HEALTH1_NOT_DONE: not every proxy sends the edge secret exactly once from one file: ask; nothing changed"; exit 1; }
+for P in 3100 3200; do
+  RZ=$(rz "$P")
+  if [ "$P" = "$UIP" ]; then
+    echo "this release's website (port $P), asked with no secret: ${RZ%% *}; it names this release: $([ "${RZ#* }" = "$KEY" ] && echo yes || echo no)"
+    [ "$RZ" = "200 $KEY" ] || { echo "HEALTH1_NOT_DONE: this release's website does not answer its readiness 200 to a request with no secret, so Caddy would take it out: ask; nothing changed"; exit 1; }
+  else
+    echo "the other slot's website (port $P): ${RZ%% *} (000: nothing listens there, as in an empty slot)"
+    [ "${RZ%% *}" = 000 ] || { echo "HEALTH1_NOT_DONE: something answers on the other slot's website port, while no release is staged or draining: ask; nothing changed"; exit 1; }
+  fi
+done
+[ "$(edgekey)" = "200 $KEY" ] || { echo "HEALTH1_NOT_DONE: the loopback readiness listener does not answer 200 from this release: ask; nothing changed"; exit 1; }
+echo "the loopback readiness listener: 200, from this release"
+ZP=$(curl -s -o /dev/null -m 15 -w '%{http_code}' "https://$HOST/readyz" || true)
+[ "$ZP" = 404 ] || { echo "HEALTH1_NOT_DONE: the public route answers /readyz with $ZP, not 404: ask; nothing changed"; exit 1; }
+echo "the public route refuses /readyz: 404"
+for F in "${KEPT[@]}"; do
+  [ -e "$F" ] || continue
+  case "$(grep -c health_headers "$F" || true)" in
+    0) echo "kept copy ${F#"$M"/}: no health_headers line";;
+    1) hstrip "$F" > /dev/null || { echo "HEALTH1_NOT_DONE: the kept copy ${F#"$M"/} has its health_headers line in another shape than the live file's: ask; nothing changed"; exit 1; }
+       echo "kept copy ${F#"$M"/}: one health_headers block (HEALTH2 takes it out there too)";;
+    *) echo "HEALTH1_NOT_DONE: the kept copy ${F#"$M"/} has more than one line naming health_headers: ask; nothing changed"; exit 1;;
+  esac
+done
+install -d -o root -g root -m 0700 "$H"
+if [ -e "$HB" ] || [ -e "$HA" ]; then
+  [ -s "$HB" ] && cmp -s "$C" "$HB" || { echo "HEALTH1_NOT_DONE: $HB is there and is not the live Caddyfile (look first); nothing changed"; exit 1; }
+  mv "$HB" "$HB.$TS"; if [ -e "$HA" ]; then mv "$HA" "$HA.$TS"; fi
+  echo "an earlier HEALTH1's copies moved aside (.$TS)"
+fi
+cp -p "$C" "$HB"
+{ hstrip "$HB" > "$HA.new" && mv "$HA.new" "$HA"; } || { rm -f "$HA.new"; echo "HEALTH1_NOT_DONE: the copy without the secret was not written: ask; the live Caddyfile is unchanged"; exit 1; }
+SH=$(hshape "$HB" "$HA"); echo "the edit, on the copy only: $SH"
+[ "$SH" = "$HS" ] || { rm -f "$HA"; echo "HEALTH1_NOT_DONE: the edit would change more than those three lines: ask; the live Caddyfile is unchanged"; exit 1; }
+# The shared rules without the secret, against this release's own file; only the names of the settings that differ are printed.
+R=$CAPI/dialectical-engine/deploy/preview-release/v1/caddy/debateai-slots.caddy
+snip() { awk '$0 == "(debateai_slots) {" { s = 1 } s { t = $0; sub(/^[ \t]+/, "", t); print t } s && $0 == "}" { exit }' "$1"; }
+if [ -f "$R" ]; then
+  D=$(diff <(snip "$HA") <(snip "$R") | sed -n 's/^[<>] \([^ ]*\).*/\1/p' | sort -u | tr '\n' ' ' || true)
+  if [ -z "$D" ]; then echo "the shared rules without the secret are this release's debateai-slots.caddy: yes"; else echo "the shared rules without the secret are this release's debateai-slots.caddy: no; the settings that differ: ${D% } (HEALTH2 changes none of them)"; fi
+else
+  echo "this release carries no debateai-slots.caddy: not compared"
+fi
+echo "the copies are in $H; the live Caddyfile is unchanged. Next: HEALTH2, with the owner's yes, at a quiet minute"
+echo HEALTH1_DONE
+exit 0
+```
+
+Expect `health_headers: one block of three lines …`, `proxies: <n>; their header_up lines with the edge secret: <n>,
+from 1 file` (the same number twice; a read-only look at this server found four such lines), this release's website
+answering `200` and naming this release, the other slot's `000`, the listener and the public `/readyz` lines, one line
+per kept copy, `the edit, on the copy only: taken out: 3 lines
+(health_headers {, the secret's line, }); added: 0; places: 1`, the comparison with the repository's rules, then
+`HEALTH1_DONE`. The comparison is a note, never a stop: `no; the settings that differ: health_fails health_interval
+health_timeout` is what the transition's rules give (above). Any other setting named there: ask before HEALTH2.
+
+Run HEALTH1 again at any time before HEALTH2: it moves its earlier copies aside and makes them anew.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# HEALTH2: HEALTH1's copy checked again, validated and put in place; Caddy restarts (about a second); then the checks, and on any failed check the file before goes back. Then the kept copies get the same edit.
+H=$M/health; HB=$H/Caddyfile.before-health; HA=$H/Caddyfile.health; TS=$(date -u +%Y%m%dT%H%M%SZ)
+# The health check's secret (the same lines in HEALTH1 and HEALTH2). It is the one health_headers block of the shared rules (debateai_slots): three lines, "health_headers {", one line naming X-Debateai-Edge-Secret and its file, and "}". hstrip prints the file without those three lines, and fails unless the file has exactly that block and no other line naming health_headers.
+hstrip() { awk '{ t = $0; sub(/^[ \t]+/, "", t) } index(t, "health_headers") { n++ } $0 == "(debateai_slots) {" { s = 1 } s && !g && t == "health_headers {" { g = 1; next } g == 1 { g = 2; if (t ~ /^X-Debateai-Edge-Secret [{]file[.][^} \t]+[}]$/) next; bad = 1 } g == 2 { g = 3; if (t == "}") { k++; next } bad = 1 } s && $0 == "}" { s = 0 } { print } END { if (n != 1 || k != 1 || bad) exit 1 }' "$1"; }
+# What an edit took out, as shapes, never a line's content; HS is the one shape both steps accept.
+hshape() { local R N F S L A P; R=$(diff "$1" "$2" | sed -n 's/^<[[:space:]]*//p' || true); N=$(grep -c . <<<"$R" || true); F=$(sed -n 1p <<<"$R"); [ "$F" = 'health_headers {' ] || F=other; S=$(sed -n 2p <<<"$R"); if grep -qxE 'X-Debateai-Edge-Secret [{]file[.][^} ]+[}]' <<<"$S"; then S="the secret's line"; else S=other; fi; L=$(sed -n '$p' <<<"$R"); [ "$L" = '}' ] || L=other; A=$(diff "$1" "$2" | grep -c '^>' || true); P=$(diff "$1" "$2" | grep -c '^[0-9]' || true); printf 'taken out: %s lines (%s, %s, %s); added: %s; places: %s\n' "$N" "$F" "$S" "$L" "$A" "$P"; }
+HS="taken out: 3 lines (health_headers {, the secret's line, }); added: 0; places: 1"
+# The kept copies that later steps compare the live file with, or put back (5.10).
+KEPT=("$M/name/Caddyfile.before-dezbatere" "$M/name/Caddyfile.phase1" "$M/name/Caddyfile.main" "$M/password/Caddyfile.before-open" "$M/password/Caddyfile.open")
+# A slot's website asked as Caddy's health check asks it once the secret is out: straight at its port, with no secret. Prints the status (000: nothing listens) and the release key it names.
+rz() { local r c k; r=$(curl -s -m 5 -w '\n%{http_code}' "http://127.0.0.1:$1/readyz" || true); c=${r##*$'\n'}; k=$(jq -r '.releaseKey // empty' <<<"${r%$'\n'*}" 2>/dev/null || true); printf '%s %s\n' "${c:-000}" "${k:-none}"; }
+# The guards (the same lines in HEALTH1 and HEALTH2): no detached step, no maintenance, Caddy running, the review window closed, no SIGNUPS copy waiting, and PWOFF1's copies only as PWOFF2 left them.
+hguards() {
+  [ -z "$(systemctl list-units 'ms-step-*' --no-legend --state=active,activating,deactivating)" ] || { echo "$1_NOT_DONE: a detached step still runs (read its log first); nothing changed"; exit 1; }
+  [ ! -e /etc/debateai-v3-preview/lifecycle/maintenance-pending ] || { echo "$1_NOT_DONE: the maintenance flag is there (a restart of the server, or other maintenance, is under way): wait until it is over; nothing changed"; exit 1; }
+  [ "$(systemctl is-active caddy || true)" = active ] || { echo "$1_NOT_DONE: Caddy does not run now: look; nothing changed"; exit 1; }
+  ! grep -qE 'review_locked|review_quiet|review window begin' "$C" || { echo "$1_NOT_DONE: the NETOPIA review window is open: REVIEW_CLOSE (5.8) first, then HEALTH1 and HEALTH2, then REVIEW_OPEN again; nothing changed"; exit 1; }
+  [ ! -e "$M/password/Caddyfile.signups" ] || { echo "$1_NOT_DONE: an edited copy for SIGNUPS waits: finish SIGNUPS (6.5 (c)), or move $M/password/Caddyfile.signups aside; nothing changed"; exit 1; }
+  if [ -e "$M/password/Caddyfile.before-open" ] || [ -e "$M/password/Caddyfile.open" ]; then
+    [ -s "$M/password/Caddyfile.before-open" ] && [ -s "$M/password/Caddyfile.open" ] && cmp -s "$C" "$M/password/Caddyfile.open" && ! cmp -s "$C" "$M/password/Caddyfile.before-open" || { echo "$1_NOT_DONE: PWOFF1's copies are there, but the live Caddyfile is not the one PWOFF2 put in place (between PWOFF1 and PWOFF2?): finish PWOFF2, or run PWON; nothing changed"; exit 1; }
+    echo "the site password is off (PWOFF2's file is live): PWOFF1's two copies get the same edit"
+  fi
+}
+hguards HEALTH2
+[ -s "$HB" ] && [ -s "$HA" ] || { echo "HEALTH2_NOT_DONE: HEALTH1's two copies are missing (HEALTH1 first); nothing changed"; exit 1; }
+if cmp -s "$C" "$HA"; then echo "HEALTH2_NOT_DONE: the copy without the secret is live already (HEALTH2 ran before); nothing changed"; exit 1; fi
+cmp -s "$C" "$HB" || { echo "HEALTH2_NOT_DONE: the live Caddyfile changed since HEALTH1: run HEALTH1 again; nothing changed"; exit 1; }
+{ hstrip "$HB" > "$H/Caddyfile.check" && cmp -s "$H/Caddyfile.check" "$HA"; } || { rm -f "$H/Caddyfile.check"; echo "HEALTH2_NOT_DONE: the copy is not the file before with only the health_headers block taken out (edited since HEALTH1?): run HEALTH1 again; nothing changed"; exit 1; }
+rm -f "$H/Caddyfile.check"
+SH=$(hshape "$HB" "$HA"); echo "the edit: $SH"
+[ "$SH" = "$HS" ] || { echo "HEALTH2_NOT_DONE: the edit is not those three lines alone: ask; nothing changed"; exit 1; }
+cad validate --config "$HA" --adapter caddyfile >/dev/null 2>&1 || { echo "HEALTH2_NOT_DONE: caddy validate refused the copy: ask; nothing changed"; exit 1; }
+# Caddy's own reading of both files, as the release guide's TA-caddy reads it: the health check's address, passes, fails, and whether it sends the secret. The adapted file holds the password's hash, so only these fields leave jq.
+hc() { cad adapt --config "$1" --adapter caddyfile 2>/dev/null | jq -r '[.. | objects | select(has("health_checks")) | .health_checks.active | "\(.uri) passes \(.passes) fails \(.fails) secret \((.headers // {} | keys | map(ascii_downcase) | index("x-debateai-edge-secret")) != null)"] | unique | join(",")'; }
+HC0=$(hc "$HB" || true); HC1=$(hc "$HA" || true)
+echo "the health check as Caddy reads it, before: ${HC0:-none}; after: ${HC1:-none}"
+case "$HC0" in *,*|'') echo "HEALTH2_NOT_DONE: Caddy reads not one health check in the file before: ask; nothing changed"; exit 1;; *' secret true') ;; *) echo "HEALTH2_NOT_DONE: Caddy reads no secret in the health check of the file before: ask; nothing changed"; exit 1;; esac
+[ "$HC1" = "${HC0% secret true} secret false" ] || { echo "HEALTH2_NOT_DONE: in the copy, Caddy does not read the same health check without the secret: ask; nothing changed"; exit 1; }
+# Each kept copy that has the line gets the same edit, made here and checked, and put in place only after the checks below; each copy as it was stays in KD.
+KD=$H/kept-$TS; install -d -o root -g root -m 0700 "$KD"; : > "$KD/list"
+for F in "${KEPT[@]}"; do
+  [ -e "$F" ] && [ "$(grep -c health_headers "$F" || true)" != 0 ] || continue
+  T=$(tr / - <<<"${F#"$M"/}")
+  cp -p "$F" "$KD/$T.before"
+  { hstrip "$KD/$T.before" > "$KD/$T.after" && [ "$(hshape "$KD/$T.before" "$KD/$T.after")" = "$HS" ]; } || { echo "HEALTH2_NOT_DONE: the kept copy ${F#"$M"/} does not take the same edit: ask; nothing changed"; exit 1; }
+  printf '%s %s\n' "$F" "$T" >> "$KD/list"
+done
+echo "kept copies that get the same edit after the checks: $(grep -c . "$KD/list" || true)"
+# The site's answers before, to compare after: the loopback listener's release, the Log in page (with the site open: which release serves it), the public /readyz, a test NETOPIA notice, the failed units.
+code() { curl -s -o /dev/null -m 15 -w '%{http_code}' "$1" || true; }
+pubkey() { { curl -s -m 15 -o /dev/null -D - "https://$HOST/login" || true; } | tr -d '\r' | awk 'tolower($1) == "x-debateai-release:" { k = $2 } END { print (k == "" ? "none" : k) }'; }
+failed() { { systemctl list-units --failed --no-legend --plain || true; } | awk '{ print $1 }' | sort; }
+EK0=$(edgekey); L0=$(code "https://$HOST/login"); Z0=$(code "https://$HOST/readyz"); N0=$(notify "$HOST"); P0=none; [ "$L0" != 200 ] || P0=$(pubkey); F0=$(failed)
+echo "before: the loopback listener $([ "$EK0" = "200 $KEY" ] && echo '200 from this release' || echo 'not 200 from this release'); /login $L0; /readyz $Z0; a test NETOPIA notice $N0; failed units $(grep -c . <<<"$F0" || true)"
+[ "$EK0" = "200 $KEY" ] && [ "$Z0" = 404 ] && [ "$(rz "$UIP")" = "200 $KEY" ] && { [ "$L0" != 200 ] || [ "$P0" = "$KEY" ]; } || { echo "HEALTH2_NOT_DONE: the site is not as HEALTH2 needs it before the change (the line above; this release's website must answer its readiness 200 with no secret): ask; nothing changed"; exit 1; }
+{ install -o root -g root -m 0644 "$HA" "$C.new" && mv "$C.new" "$C" && cmp -s "$HA" "$C"; } || { echo "HEALTH2_NOT_DONE: the copy was not put in place; Caddy was not restarted, so visitors saw nothing: ask"; exit 1; }
+systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; sleep 3
+EK1='000 none'; for i in $(seq 1 15); do EK1=$(edgekey); [ "$EK1" = "200 $KEY" ] && break; sleep 1; done
+BAD=''
+[ "$(systemctl is-active caddy || true)" = active ] || BAD="$BAD caddy"
+[ "$EK1" = "200 $KEY" ] || BAD="$BAD edge"
+[ "$(rz "$UIP")" = "200 $KEY" ] || BAD="$BAD website"
+[ "$(code "https://$HOST/login")" = "$L0" ] || BAD="$BAD login"
+[ "$L0" != 200 ] || [ "$(pubkey)" = "$KEY" ] || BAD="$BAD release"
+[ "$(code "https://$HOST/readyz")" = 404 ] || BAD="$BAD readyz"
+[ "$(notify "$HOST")" = "$N0" ] || BAD="$BAD notify"
+NF=$(comm -13 <(printf '%s\n' "$F0") <(failed) | grep -c . || true); [ "$NF" = 0 ] || BAD="$BAD failed-units"
+[ "$(grep -c health_headers "$C" || true)" = 0 ] || BAD="$BAD file"
+if [ -n "$BAD" ]; then
+  { install -o root -g root -m 0644 "$HB" "$C.new" && mv "$C.new" "$C"; } || { echo "HEALTH2_NOT_DONE: a check failed ($BAD), and the file before could not be put back (it is $HB): ask at once"; exit 1; }
+  systemctl restart caddy || true; sleep 3
+  [ "$(systemctl is-active caddy || true)" = active ] || { echo "HEALTH2_NOT_DONE: a check failed ($BAD); the file before is back, but Caddy did not start on it: the site is DOWN: ask at once"; exit 1; }
+  echo "HEALTH2_NOT_DONE: a check failed ($BAD); the file before is back, Caddy restarted on it, and the kept copies are unchanged: ask"; exit 1
+fi
+printf '%s\n' "$KD" > "$H/last-kept"
+KB=''
+while read -r F T; do
+  { cmp -s "$F" "$KD/$T.before" && install -o root -g root -m 0644 "$KD/$T.after" "$F.new" && mv "$F.new" "$F" && cmp -s "$KD/$T.after" "$F"; } || KB="$KB ${F#"$M"/}"
+done < "$KD/list"
+[ -z "$KB" ] || { echo "HEALTH2_NOT_DONE: Caddy's health check sends no secret now and every check passed, but these kept copies did not get the edit:$KB; a step that puts one back would bring the secret back: ask"; exit 1; }
+echo "kept copies changed: $(grep -c . "$KD/list" || true) (each one as it was is in $KD)"
+echo "Caddy's health check sends no secret now; the file before is $HB (HEALTHBACK puts it back)"
+echo HEALTH2_DONE
+exit 0
+```
+
+Expect `the edit: taken out: 3 lines (health_headers {, the secret's line, }); added: 0; places: 1`, then `the health
+check as Caddy reads it, before: /readyz passes 1 fails 1 secret true; after: /readyz passes 1 fails 1 secret false`
+(the numbers as this server has them), the number of kept copies, the `before:` line, then `kept copies changed: …`
+and `HEALTH2_DONE`. The words in a failed check's brackets: `caddy` (Caddy is not active), `edge` (the loopback
+listener does not answer 200 from this release within about 15 seconds), `website` (this release's website no longer
+answers its readiness 200 with no secret), `login` (the Log in page answers otherwise than before), `release` (with
+the site open: the Log in page is served by another release), `readyz` (the public route no longer refuses
+`/readyz`), `notify` (a test NETOPIA notice is answered otherwise than before), `failed-units` (a unit failed that had
+not), `file` (the live file still names health_headers). On any of them the file before is back and Caddy restarted on
+it: the site is as before HEALTH2, and nothing else changed. Ask.
+
+**To confirm later, at any time** (it only reads): `grep -c health_headers /etc/debateai-v3-preview/public/Caddyfile`
+prints `0`.
+
+**The way back** (HEALTHBACK). It puts back the Caddyfile HEALTH1 kept, and the kept copies as HEALTH2 found them, and
+restarts Caddy (about a second, as above). It reads no names file, so it works at any time, during an upload too. It
+works only while the live Caddyfile is still the one HEALTH2 put in place and the kept copies are still HEALTH2's: once
+a later step changed one (PWOFF2, PWON, SIGNUPS, REVIEW_OPEN, NAME5, or a hand edit), it refuses with nothing changed;
+ask then.
+
+```sh
+set -euo pipefail
+# HEALTHBACK: the edge secret back in Caddy's health check: the Caddyfile HEALTH1 kept goes back, and the kept copies HEALTH2 changed go back with it; Caddy restarts (about a second). It reads no names file, so it works at any time.
+C=/etc/debateai-v3-preview/public/Caddyfile; M=/root/preview-archive/main-site; H=$M/health
+HB=$H/Caddyfile.before-health; HA=$H/Caddyfile.health; TS=$(date -u +%Y%m%dT%H%M%SZ)
+[ -s "$HB" ] && [ -s "$HA" ] || { echo "HEALTHBACK_NOT_DONE: HEALTH1's copies are not there (HEALTHBACK ran already, or HEALTH1 never did); nothing changed"; exit 1; }
+if cmp -s "$C" "$HB"; then echo "the live Caddyfile is the one from before HEALTH2 already (HEALTH2 did not run, or put it back itself); nothing changed"; echo HEALTHBACK_DONE; exit 0; fi
+cmp -s "$C" "$HA" || { echo "HEALTHBACK_NOT_DONE: the live Caddyfile is not the one HEALTH2 put in place (a later step changed it); nothing changed: ask"; exit 1; }
+KD=$(cat "$H/last-kept" 2>/dev/null || true); KL=$KD/list
+[ -n "$KD" ] && [ -f "$KL" ] || { echo "HEALTHBACK_NOT_DONE: HEALTH2's list of kept copies is missing; nothing changed: ask"; exit 1; }
+# Each kept copy HEALTH2 changed must still be its edit, or be gone (PWON moves PWOFF1's copies aside).
+while read -r F T; do [ ! -e "$F" ] || cmp -s "$F" "$KD/$T.after" || { echo "HEALTHBACK_NOT_DONE: the kept copy ${F#"$M"/} changed since HEALTH2; nothing changed: ask"; exit 1; }; done < "$KL"
+cp -p "$C" "$H/Caddyfile.before-healthback-$TS"
+{ install -o root -g root -m 0644 "$HB" "$C.new" && mv "$C.new" "$C" && cmp -s "$HB" "$C"; } || { echo "HEALTHBACK_NOT_DONE: the file before HEALTH2 was not put in place; Caddy was not restarted: ask"; exit 1; }
+systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; sleep 3
+EC=000; for i in $(seq 1 15); do EC=$(curl -s -o /dev/null -m 15 -w '%{http_code}' http://127.0.0.1:3090/readyz || true); [ "$EC" = 200 ] && break; sleep 1; done
+if [ "$(systemctl is-active caddy || true)" != active ] || [ "$EC" != 200 ]; then
+  { install -o root -g root -m 0644 "$HA" "$C.new" && mv "$C.new" "$C"; } || true; systemctl restart caddy || true; sleep 3
+  echo "HEALTHBACK_NOT_DONE: Caddy did not come back on the file before (its readiness listener answered $EC); the file without the secret is back and Caddy is $(systemctl is-active caddy || true) (active: as after HEALTH2; anything else: the site is DOWN): ask at once"; exit 1
+fi
+KB=''
+while read -r F T; do if [ -e "$F" ]; then { install -o root -g root -m 0644 "$KD/$T.before" "$F.new" && mv "$F.new" "$F" && cmp -s "$KD/$T.before" "$F"; } || KB="$KB ${F#"$M"/}"; fi; done < "$KL"
+mv "$HB" "$HB.back-$TS"; mv "$HA" "$HA.back-$TS"
+[ -z "$KB" ] || { echo "HEALTHBACK_NOT_DONE: Caddy's health check sends the secret again, but these kept copies did not go back:$KB: ask"; exit 1; }
+echo "Caddy's health check sends the edge secret again, as before HEALTH1; the kept copies are as they were"
+echo HEALTHBACK_DONE
+exit 0
+```
+
+Expect `Caddy's health check sends the edge secret again …`, then `HEALTHBACK_DONE`. HEALTH1 can then run again.
+
 ---
 
 ## 6. Friends' test, with test payments
@@ -4219,8 +4512,8 @@ set -euo pipefail
 # GATESTATE: the four spending gates, each with its state and whether its window is open; never an amount (read-only).
 for G in deepinfra anthropic perplexity bedrock; do
   case "$G" in deepinfra) F=$GD; P=$PD;; anthropic) F=$GAN; P=$PAN;; perplexity) F=$GPX; P=$PPX;; *) F=$GBR; P=$PBR;; esac
-  # Only these two fields are read from the gate's status; its amounts never leave jq.
-  echo "$G gate: $(gs "$F" "$P" 2>/dev/null | jq -r '"state \(.state); window open \(.window_open)"' 2>/dev/null || echo unread)"
+  # Only these two fields are read from the gate's status, and a status without them reads as unread; its amounts never leave jq.
+  echo "$G gate: $(gs "$F" "$P" 2>/dev/null | jq -r 'if (.state | type) == "string" and (.window_open | type) == "boolean" then "state \(.state); window open \(.window_open)" else error("unread") end' 2>/dev/null || echo unread)"
 done
 echo GATESTATE_DONE
 exit 0
@@ -4497,8 +4790,9 @@ the Team page; BUYERS is left only to take off an account an earlier BUYERS run 
   under the question box and the Terms tell people that a finished Free debate is public; while publishing is off,
   none is, and the Report button has nothing to act on.
 - NETOPIA's logo shows (LOGOCHECK, part 2).
-- The security review's host-side fixes (NV-51, NV-55's port reservation, NV-56, NV-57) are applied or recorded, as
-  part 7's "Before you start" says: the site meets strangers as it will in part 8.
+- The security review's host-side fixes (NV-51, NV-55's port reservation and its health check without the edge
+  secret, NV-56, NV-57) are applied or recorded, as part 7's "Before you start" says: the site meets strangers as it
+  will in part 8.
 - No friends' test is open. If part 6's value is set, run ASKS_CLOSE (6.3) first, at a quiet moment: the waiting
   debates of accounts not on the team are recorded failed. Friends keep their accounts; you list the ones who may
   buy.
@@ -4688,8 +4982,9 @@ quiet minutes.
 8. OPENCHECK (6b.4).
 9. NETOPIA: 5.8b, steps 1 to 4, with 6b's words. List its tester (6b.3) if you chose that.
 
-Every morning while 6b is open: OPENCHECK, GATES (6.2; its amounts stay on your screen; GATESTATE when an assistant
-runs the look), AICHECK (6b.1), the Public tab and the report mails.
+Every morning while 6b is open: OPENCHECK, the four spending gates (6.2), AICHECK (6b.1), the Public tab and the report
+mails. An assistant that runs the morning look uses GATESTATE, which prints no amount; you may use GATES, whose amounts
+stay on your screen.
 
 ### 6b.3 Add or remove a buyer on the Team page
 
@@ -5049,10 +5344,12 @@ Privacy Policy reaches them: ask before an upload that changes either.
   PAY_BACK check the password on the Log in page, which the window never opens.
 - Never during an upload, and never while a second release runs or drains: two APIs on different payment systems on one
   database would end each other's billing jobs.
-- Each host-side fix of the security review (NV-51, NV-55's port reservation, NV-56, NV-57) is read on this server
-  (Hatchet's container: its user, capabilities and mounts; the `preview_root` map of the database's access file) and
-  either applied by a reviewed step or recorded as not needed here, with the reason. A read of the container may
-  already show it in the shape the fixes ask for: then record that.
+- Each host-side fix of the security review (NV-51, NV-55's port reservation, NV-55's health check without the edge
+  secret, NV-56, NV-57) is read on this server (Hatchet's container: its user, capabilities and mounts; the
+  `preview_root` map of the database's access file; the Caddyfile's shared rules) and either applied by a reviewed step
+  or recorded as not needed here, with the reason. A read of the container may already show it in the shape the fixes
+  ask for: then record that. The health check's step is HEALTH1 and HEALTH2 (5.10); it is applied when
+  `grep -c health_headers /etc/debateai-v3-preview/public/Caddyfile` prints `0`.
 - The notify alarm (the release guide's H10) watches dezbatere.ro's notify address: install it before the first real
   payment.
 - Decide whether real payments start with the billing notice spool. The release guide's H9, as written, targets the old

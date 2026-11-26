@@ -591,7 +591,7 @@ Read the `NOTE:` lines too (below). Otherwise the last line is
   last started (and likewise the API file, the mail plan, the Caddyfile and `caddy.env`). The boot would start it on a
   file that never ran. Either restart that one service now, at a quiet time, through its guide's step and on the
   owner's yes, or put the file back; then RESTART_LOOK again. A `NOTE` says when a file changed in the same second as
-  the start: the guides restart Caddy right after they move its file (PWOFF2, REVIEW_OPEN), so read whether that start
+  the start: the guides restart Caddy right after they move its file (PWOFF2, REVIEW_OPEN, HEALTH2), so read whether that start
   ran on it.
 - `database`: a PostgreSQL setting waits for a restart, or one of its settings files has an error.
 - `tmpfiles`, `socket-folder`: nothing makes the gates' folder `/run/debateai-v3-preview` at boot; or the boot would
