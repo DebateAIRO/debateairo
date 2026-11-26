@@ -11,7 +11,8 @@ export type AdmissionScope = "asks" | "publicReads" | "recoveryStart"
   | "billingCheckout" | "billingNotify" | "billingCancelLink" | "askRoomReads" | "staffRequests"
   | "startStepCalls"
   | "publishChecks"
-  | "languageChecks";
+  | "languageChecks"
+  | "publicVotes";
 
 export const SUPPORT_SWEPT_SCOPES = Object.freeze([
   "supportReads", "supportSessions", "supportModelCalls", "geoAvailability"
@@ -41,7 +42,8 @@ interface AdmissionBucket {
     | AdmissionPolicy["billingCancelLink"] | AdmissionPolicy["askRoomReads"]
     | AdmissionPolicy["staffRequests"] | AdmissionPolicy["startStepCalls"]
     | AdmissionPolicy["publishChecks"]
-    | AdmissionPolicy["languageChecks"]>;
+    | AdmissionPolicy["languageChecks"]
+    | AdmissionPolicy["publicVotes"]>;
   readonly entries: Map<string, AdmissionEntry>;
 }
 
@@ -108,6 +110,9 @@ export class AdmissionLimiter {
       ["publishChecks", { policy: policy.publishChecks, entries: new Map() }],
       // NV-47: always present, the question-language owner budget; owner-keyed, fail-closed (not in EVICTING_SCOPES).
       ["languageChecks", { policy: policy.languageChecks, entries: new Map() }],
+      // Public debate upvotes (design 2026-11-26): always present (the parser's default when the version carries none);
+      // keyed by account, fail-closed (not in EVICTING_SCOPES).
+      ["publicVotes", { policy: policy.publicVotes, entries: new Map() }],
       // DL1-F2: present only when the resolved register version carries them.
       ...(policy.supportReads === null ? [] : [[
         "supportReads", { policy: policy.supportReads, entries: new Map() }

@@ -49,6 +49,8 @@ describe("B10 sealed admission-policy register row", () => {
       publishChecks: { key: "owner", limit: 10, windowMs: 86_400_000, capacity: 196_608 },
       // NV-47: the parser's default; the sealed row carries no such member.
       languageChecks: { key: "owner", limit: 120, windowMs: 86_400_000, capacity: 196_608 },
+      // Public debate upvotes (design 2026-11-26): the parser's default; the sealed row carries no such member.
+      publicVotes: { key: "owner", limit: 60, windowMs: 60_000, capacity: 65_536 },
       sourceRef: ADMISSION_POLICY_REGISTER_ROW.sourceRef
     });
     expect(Object.isFrozen(policy)).toBe(true);
