@@ -73,7 +73,7 @@ const code = (line: string) => !line.trimStart().startsWith('#');
 /** The steps, in the order the guide runs them. */
 const STEPS = Object.freeze([
   'TA0', 'TA1', 'TA8', 'TA_UNITS', 'TA_CADDY', 'TA_ENV', 'TA_OP', 'TB0', 'TB1', 'TB2', 'TB3', 'TB4', 'TB5', 'TB6', 'TB7', 'TB8', 'TB9', 'RBA_T', 'RBB_T',
-  'SB1', 'SB1B', 'SB3', 'SB3B', 'SB3C', 'SB4', 'SB5', 'SB5B', 'SB5C', 'SB5D', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'LOGOCHECK', 'SB14', 'SB14B', 'SB15',
+  'SB1', 'SB1B', 'SB3', 'SB3B', 'SB3C', 'SB4', 'SB5', 'SB5B', 'SB5C', 'SB5D', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'LOGOCHECK', 'SB14', 'SB14B', 'SB15', 'CLEARLOOK', 'CLEAR1',
   'WB1', 'WB2', 'WB3', 'WB4', 'DR1', 'PRECHECK', 'DR2', 'DR3', 'DBBACK', 'DR4', 'DR4AGAIN', 'SWAP', 'DR5', 'DR5RESUME', 'DR6', 'DR6TAIL',
   'AFTERDR6', 'LATELINES', 'DR6AGAIN', 'RBD_A', 'RBD_B', 'AGAINSAME', 'MT1', 'MT2', 'PM1', 'PM2'
 ]);
@@ -643,13 +643,17 @@ describe('the preview release guide: transition T, side by side, the way back, t
     expect(scriptOf('WB1').lines.join('\n')).not.toContain('systemctl stop');
   });
 
-  it('nothing is removed: no rm, no unlink, no shred in the new sections', () => {
+  it('nothing is removed: no rm, no unlink, no shred in the new sections, but for CLEAR1\'s one guarded rm (SB15b)', () => {
+    const clear1 = scriptOf('CLEAR1');
     for (const block of allBlocks) {
       for (const line of block.lines.filter(code)) {
-        expect(line, line).not.toMatch(/(^|[\s;&|(`])(rm|rmdir|unlink|shred|truncate)(\s|$)/);
         expect(line, line).not.toMatch(/\s-delete(\s|$)/);
+        if (block === clear1 && line === '  rm -rf --one-file-system --preserve-root=all -- "$X" || GONE=no') continue;
+        expect(line, line).not.toMatch(/(^|[\s;&|(`])(rm|rmdir|unlink|shred|truncate)(\s|$)/);
       }
     }
+    // The one rm is CLEAR1's, on the owner's yes, and its tests run it on scratch folders (release-clear-out.test.ts).
+    expect(clear1.lines.filter(line => line.includes('rm -rf'))).toEqual(['  rm -rf --one-file-system --preserve-root=all -- "$X" || GONE=no']);
   });
 
   it('nothing is overwritten: a unit file or the boot target goes in only after the one in its place moved into S', () => {

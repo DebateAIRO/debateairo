@@ -4,7 +4,9 @@
 // stood in for: each block parses and names itself; the edit takes out the three health_headers lines of the shared rules
 // and nothing else, and refuses every other shape; it prints shapes, never the secret's line; HEALTH2 changes the kept
 // copies that later steps compare with or put back, so that PWON brings back a file without the secret; a failed check
-// puts the file before back; HEALTHBACK puts everything back. Last, the runbook's words around it, and GATESTATE.
+// puts the file before back, says what was checked after it, and comes within about a minute; a run cut off at any point
+// is finished by HEALTH2 again or undone by HEALTHBACK, which keeps the guards a way back needs. Last, the runbook's
+// words around it, the morning look's count of the secret's lines, and GATESTATE.
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -192,15 +194,19 @@ type Setup = Readonly<{
   repository?: boolean;
   window?: boolean; signups?: boolean; maintenance?: boolean;
   answers?: Readonly<Record<string, string>>;
-  /** Answers after Caddy's first restart (`after/<name>`). */
+  /** Answers from Caddy's first restart on (`after1/<name>`), and from its second (`after2/<name>`); else `ans/<name>`. */
   after?: Readonly<Record<string, string>>;
+  after2?: Readonly<Record<string, string>>;
 }>;
 type World = Readonly<{ dir: string; file: (path: string) => string; has: (path: string) => boolean; live: () => string }>;
 
-/** The server's commands, stood in for; `after/<name>` answers replace `ans/<name>` once Caddy has restarted. */
+/**
+ * The server's commands, stood in for. An answer comes from `after<n>/<name>` once Caddy has restarted n times, else from
+ * `ans/<name>`: a put-back's restart (the second) answers as before the change unless a test says otherwise.
+ */
 const STUBS = [
   `C=$D/Caddyfile; M=$D/m; KEY=${KEY}; UIP=3100; HOST=dezbatere.ro; CAPI=$D/capi`,
-  'ans() { if [ -s "$D/restarts" ] && [ -e "$D/after/$1" ]; then cat "$D/after/$1"; else cat "$D/ans/$1"; fi; }',
+  'ans() { local n; n=$(grep -c . "$D/restarts" 2>/dev/null || true); if [ -e "$D/after${n:-0}/$1" ]; then cat "$D/after${n:-0}/$1"; else cat "$D/ans/$1"; fi; }',
   'sleep() { :; }',
   'systemctl() { case "$1" in',
   '  list-units) case "$*" in *ms-step*) cat "$D/ms-steps" 2>/dev/null || true;; *) ans failed;; esac;;',
@@ -209,10 +215,11 @@ const STUBS = [
   '  esac; }',
   'edgekey() { printf \'%s\\n\' "$(ans edge)"; }',
   'notify() { ans notify; }',
-  'install() { local d=no; local -a x; x=(); while [ $# -gt 0 ]; do case "$1" in -d) d=yes; shift;; -o|-g|-m) shift 2;; *) x+=("$1"); shift;; esac; done; if [ "$d" = yes ]; then mkdir -p "${x[@]}"; else cp "${x[0]}" "${x[1]}"; fi; }',
+  'install() { local d=no; local -a x; x=(); while [ $# -gt 0 ]; do case "$1" in -d) d=yes; shift;; -o|-g|-m) shift 2;; *) x+=("$1"); shift;; esac; done; if [ "$d" = yes ]; then mkdir -p "${x[@]}"; elif grep -qxF "${x[1]%.new}" "$D/install-fails" 2>/dev/null; then return 1; else cp "${x[0]}" "${x[1]}"; fi; }',
   'curl() { local a p="" u="" w="" h=no k c; for a; do [ "$p" = -w ] && w=$a; [ "$p" = -D ] && h=yes; case "$a" in http*) u=$a;; esac; p=$a; done',
-  '  case "$u" in http://127.0.0.1:3100/readyz) k=slot-3100;; http://127.0.0.1:3200/readyz) k=slot-3200;; http://127.0.0.1:3090/readyz) k=listener;; */login) k=login;; */readyz) k=public-readyz;; */) k=home;; *) k=other;; esac',
-  '  if [ "$h" = yes ]; then printf \'HTTP/2 200\\r\\nx-debateai-release: %s\\r\\n\\r\\n\' "$(ans release)"; return 0; fi',
+  '  case "$u" in http://127.0.0.1:3100/readyz) k=slot-3100;; http://127.0.0.1:3200/readyz) k=slot-3200;; http://127.0.0.1:3090/readyz) k=listener;; */login) k=login;; */readyz) k=public-readyz;; */notify) k=notify;; */) k=home;; *) k=other;; esac',
+  // With -D (headers): the loopback listener's status and release, as `edge` says (000: no answer), or the Log in page's release.
+  '  if [ "$h" = yes ]; then if [ "$k" = listener ]; then c=$(ans edge); [ "${c%% *}" != 000 ] || return 7; printf \'HTTP/1.1 %s\\r\\nx-debateai-release: %s\\r\\n\\r\\n\' "${c%% *}" "${c#* }"; else printf \'HTTP/2 200\\r\\nx-debateai-release: %s\\r\\n\\r\\n\' "$(ans release)"; fi; return 0; fi',
   '  c=$(ans "$k")',
   '  case "$w" in \'\\n%{http_code}\') if [ "$c" = 000 ]; then printf \'\\n000\'; else printf \'{"releaseKey":"%s","reasons":[]}\\n%s\' "$(ans "$k-key")" "$c"; fi;; *) printf \'%s\' "$c";; esac; }',
   'cad() { local f=$3 hh=""; case "$1" in validate) [ ! -e "$D/cad-refuses" ];; adapt) if grep -q health_headers "$f"; then hh=\',"headers":{"X-Debateai-Edge-Secret":["x"]}\'; fi; printf \'{"apps":{"http":{"servers":{"a":{"routes":[{"handle":[{"handler":"reverse_proxy","health_checks":{"active":{"uri":"/readyz","passes":1,"fails":1%s}}}]}]},"b":{"routes":[{"handle":[{"handler":"reverse_proxy","health_checks":{"active":{"uri":"/readyz","passes":1,"fails":1%s}}}]}]}}}}}\' "$hh" "$hh";; esac; }'
@@ -223,7 +230,7 @@ const NAME_COPIES = ['before-dezbatere', 'phase1', 'main'] as const;
 
 function world(setup: Setup): World {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'main-site-health-')));
-  for (const sub of ['m/name', 'm/password', 'ans', 'after', 'capi/dialectical-engine/deploy/preview-release/v1/caddy']) mkdirSync(join(dir, sub), { recursive: true });
+  for (const sub of ['m/name', 'm/password', 'ans', 'after1', 'after2', 'capi/dialectical-engine/deploy/preview-release/v1/caddy']) mkdirSync(join(dir, sub), { recursive: true });
   cpSync(resolve(ROOT, 'deploy/preview-release/v1/caddy/debateai-slots.caddy'), join(dir, 'capi/dialectical-engine/deploy/preview-release/v1/caddy/debateai-slots.caddy'));
   const password = setup.password ?? 'on';
   const repository = setup.repository ?? false;
@@ -244,8 +251,11 @@ function world(setup: Setup): World {
     'public-readyz': '404', notify: '400', release: KEY, failed: '', ...setup.answers
   };
   for (const [name, text] of Object.entries(answers)) writeFileSync(join(dir, 'ans', name), text);
-  for (const [name, text] of Object.entries(setup.after ?? {})) writeFileSync(join(dir, 'after', name), text);
+  for (const [name, text] of Object.entries(setup.after ?? {})) writeFileSync(join(dir, 'after1', name), text);
+  for (const [name, text] of Object.entries(setup.after2 ?? {})) writeFileSync(join(dir, 'after2', name), text);
   writeFileSync(join(dir, 'caddy-state'), 'active\n');
+  // The release table, as release-check.mjs status prints it (HEALTHBACK reads it itself).
+  writeFileSync(join(dir, 'status.json'), JSON.stringify({ releases: [{ label: 'old-r32-v1', state: 'RETIRED' }, { label: 'cur-r33-v1', state: 'CURRENT' }] }));
   return {
     dir, file: path => readFileSync(join(dir, path), 'utf8'), has: path => existsSync(join(dir, path)),
     live: () => readFileSync(join(dir, 'Caddyfile'), 'utf8')
@@ -258,11 +268,11 @@ const withWorld = <T>(setup: Setup, body: (w: World) => T): T => {
 
 /** Runs a step in the world: the names file (or a step's own paths) replaced by the stand-ins, the maintenance flag in the world. */
 function run(lines: readonly string[], w: World, swap: Readonly<Record<string, string>> = {}) {
-  let text = lines.join('\n').replace(NAMES_LINE, [`D='${w.dir}'`, ...STUBS].join('\n'))
+  let text = lines.join('\n').replace(NAMES_LINE, () => [`D='${w.dir}'`, ...STUBS].join('\n'))
     .replaceAll('/etc/debateai-v3-preview/lifecycle/maintenance-pending', '$D/maintenance-pending');
   for (const [from, to] of Object.entries(swap)) {
     expect(text, from).toContain(from);
-    text = text.replace(from, to);
+    text = text.replace(from, () => to);
   }
   const result = bash(text);
   // Nothing the steps print names the secret's line or its file.
@@ -273,6 +283,8 @@ function run(lines: readonly string[], w: World, swap: Readonly<Record<string, s
 /** HEALTHBACK and PWON read no names file: their own paths go to the world, with the stand-ins before them. */
 const OWN_PATHS = 'C=/etc/debateai-v3-preview/public/Caddyfile; M=/root/preview-archive/main-site';
 const own = (w: World) => ({ [OWN_PATHS]: [`D='${w.dir}'`, ...STUBS].join('\n') });
+/** HEALTHBACK also reads the release table itself, through the lifecycle tools: stood in for by the world's status.json. */
+const ownBack = (w: World) => ({ ...own(w), [lineOf(HEALTHBACK, 'lc() {')]: 'lc() { [ "$1 $2" = \'release-check.mjs status\' ] || return 9; cat "$D/status.json"; }' });
 
 describe('HEALTH1 and HEALTH2 on the server\'s shape', () => {
   it('with the password on: the live file and NAME1\'s and NAME2\'s copies lose the three lines, and nothing else', () => withWorld({}, w => {
@@ -298,9 +310,10 @@ describe('HEALTH1 and HEALTH2 on the server\'s shape', () => {
     expect(w.file('m/name/Caddyfile.phase1')).toBe(caddyfile({ secret: false, mark: 'phase1' }));
     // REVIEW_OPEN's guard: the live file is still the one NAME3 put in place.
     expect(w.file('m/name/Caddyfile.main')).toBe(w.live());
-    // The kept copies as they were stay beside the list HEALTHBACK reads.
+    // The kept copies as they were stay beside the list HEALTHBACK reads, with the answers before the change and the mark
+    // that every check passed (a run again reads how far this one got).
     const kept = w.file('m/health/last-kept').trim();
-    expect(readdirSync(kept).sort()).toEqual(['list', ...NAME_COPIES.flatMap(copy => [`name-Caddyfile.${copy}.after`, `name-Caddyfile.${copy}.before`])].sort());
+    expect(readdirSync(kept).sort()).toEqual(['before', 'checked', 'failed-before', 'list', ...NAME_COPIES.flatMap(copy => [`name-Caddyfile.${copy}.after`, `name-Caddyfile.${copy}.before`])].sort());
     expect(readFileSync(join(kept, 'name-Caddyfile.phase1.before'), 'utf8')).toBe(caddyfile({ mark: 'phase1' }));
 
     // Run again: nothing to do, nothing changed.
@@ -322,7 +335,7 @@ describe('HEALTH1 and HEALTH2 on the server\'s shape', () => {
 
     // PWON, as the runbook has it: the password back, from the kept copy, and no secret in the health check.
     rmSync(join(w.dir, 'restarts'));
-    writeFileSync(join(w.dir, 'after/login'), '401');
+    writeFileSync(join(w.dir, 'after1/login'), '401');
     const pwon = run(script('PWON'), w, own(w));
     expect(pwon.last).toBe('PWON_DONE');
     expect(w.live()).toBe(caddyfile({ repository: true, secret: false }));
@@ -345,19 +358,38 @@ describe('HEALTH1 and HEALTH2 on the server\'s shape', () => {
       expect(run(HEALTH1, w).last).toBe('HEALTH1_DONE');
       const two = run(HEALTH2, w);
       expect(two.status, word).toBe(1);
-      expect(two.last, word).toBe(`HEALTH2_NOT_DONE: a check failed ( ${word}); the file before is back, Caddy restarted on it, and the kept copies are unchanged: ask`);
+      const asks = setup.password === 'off' ? '200' : '401';
+      expect(two.last, word).toBe(`HEALTH2_NOT_DONE: a check failed (${word}); the file before is back (the live file is the file before: yes), Caddy restarted on it and is active, the loopback listener answers 200 from this release: yes, the Log in page answers as before (${asks}): yes; the kept copies are unchanged: ask`);
       expect(w.file('restarts')).toBe('restart\nrestart\n');
       expect(w.live()).toBe(before);
       expect(w.file('m/name/Caddyfile.phase1')).toBe(caddyfile({ mark: 'phase1' }));
-      expect(w.has('m/health/last-kept')).toBe(false);
+      // The record was written before the copy went live; HEALTHBACK finds nothing to put back.
+      expect(w.has('m/health/last-kept')).toBe(true);
+      expect(run(HEALTHBACK, w, ownBack(w)).lines.slice(-2)).toEqual(['the live Caddyfile is the one from before HEALTH2 already, and no kept copy has HEALTH2\'s edit (HEALTH2 did not get that far, or put the file back itself); nothing changed', 'HEALTHBACK_DONE']);
     });
+  });
+
+  it('after a put-back it says plainly what it checked: the file, Caddy, the listener and the Log in page', () => withWorld({ after: { edge: '000 none' }, after2: { edge: '000 none', login: '502' } }, w => {
+    run(HEALTH1, w);
+    expect(run(HEALTH2, w).last).toBe('HEALTH2_NOT_DONE: a check failed (edge); the file before is back (the live file is the file before: yes), Caddy restarted on it and is active, the loopback listener answers 200 from this release: no, the Log in page answers as before (401): no; the kept copies are unchanged: ask');
+  }));
+
+  it('after the restart every question is cut short, so the file before is back within about a minute', () => {
+    const after = HEALTH2.slice(HEALTH2.findIndex(line => line.trim().startsWith('systemctl restart caddy')));
+    // The helpers ask with the limit CM, 15 before the restart and 4 after it; the listener is asked for at most about 30 seconds.
+    for (const name of ['code() {', 'pubkey() {', 'ek() {', 'nt() {']) expect(lineOf(HEALTH2, name), name).toContain('-m "$CM"');
+    expect(HEALTH2).toContain('CM=15');
+    expect(after[1]).toBe('  CM=4; T1=$(( $(date +%s) + 30 ))');
+    expect(after[2]).toBe('  EK1=\'000 none\'; for i in $(seq 1 15); do EK1=$(ek); [ "$EK1" != "200 $KEY" ] || break; [ "$(date +%s)" -lt "$T1" ] || break; sleep 1; done');
+    // No question after the restart goes through a helper without a limit.
+    for (const line of after.slice(0, after.findIndex(line => line.includes('if [ -n "$BAD" ]')))) expect(line, line).not.toMatch(/\$\((edgekey|notify)\b/);
   });
 
   it('says the site is down when Caddy does not start on the file before either', () => withWorld({ after: { edge: '000 none' } }, w => {
     run(HEALTH1, w);
     writeFileSync(join(w.dir, 'caddy-dies'), '');
     const two = run(HEALTH2, w);
-    expect(two.last).toBe('HEALTH2_NOT_DONE: a check failed ( caddy edge); the file before is back, but Caddy did not start on it: the site is DOWN: ask at once');
+    expect(two.last).toBe('HEALTH2_NOT_DONE: a check failed (caddy edge); the file before is back (the live file is the file before: yes), but Caddy did not start on it: the site is DOWN: ask at once');
   }));
 
   it('refuses before the change, with nothing changed and Caddy not restarted', () => {
@@ -413,7 +445,7 @@ describe('HEALTHBACK', () => {
   it('puts back the file and the kept copies, and HEALTH1 can run again', () => withWorld({ password: 'off' }, w => {
     run(HEALTH1, w);
     expect(run(HEALTH2, w).last).toBe('HEALTH2_DONE');
-    const back = run(HEALTHBACK, w, own(w));
+    const back = run(HEALTHBACK, w, ownBack(w));
     expect(back.last).toBe('HEALTHBACK_DONE');
     expect(w.live()).toBe(caddyfile({ password: false }));
     expect(w.file('m/password/Caddyfile.open')).toBe(w.live());
@@ -427,29 +459,33 @@ describe('HEALTHBACK', () => {
     withWorld({}, w => {
       run(HEALTH1, w); run(HEALTH2, w);
       writeFileSync(join(w.dir, 'Caddyfile'), `${w.live()}# a later step\n`);
-      expect(run(HEALTHBACK, w, own(w)).last).toBe('HEALTHBACK_NOT_DONE: the live Caddyfile is not the one HEALTH2 put in place (a later step changed it); nothing changed: ask');
+      expect(run(HEALTHBACK, w, ownBack(w)).last).toBe('HEALTHBACK_NOT_DONE: the live Caddyfile is neither the one HEALTH2 put in place nor the one before it (a later step changed it); nothing changed: ask');
     });
     withWorld({}, w => {
       run(HEALTH1, w); run(HEALTH2, w);
       writeFileSync(join(w.dir, 'm/name/Caddyfile.phase1'), 'changed\n');
-      expect(run(HEALTHBACK, w, own(w)).last).toBe('HEALTHBACK_NOT_DONE: the kept copy name/Caddyfile.phase1 changed since HEALTH2; nothing changed: ask');
+      expect(run(HEALTHBACK, w, ownBack(w)).last).toBe('HEALTHBACK_NOT_DONE: the kept copy name/Caddyfile.phase1 changed since HEALTH2; nothing changed: ask');
       expect(w.live()).toBe(caddyfile({ secret: false }));
     });
   });
 
   it('when Caddy does not come back on the file before, the file without the secret goes back', () => withWorld({}, w => {
     run(HEALTH1, w); run(HEALTH2, w);
-    writeFileSync(join(w.dir, 'after/public-readyz'), '000');
-    const back = run(HEALTHBACK, w, own(w));
-    expect(back.last).toBe('HEALTHBACK_NOT_DONE: Caddy did not come back on the file before (Caddy active; the public /readyz 000, where Caddy\'s own refusal is 404); the file without the secret is back and Caddy is active (active: as after HEALTH2; anything else: the site is DOWN): ask at once');
+    // HEALTHBACK's restart is Caddy's second; the third, on the file without the secret, answers as before.
+    writeFileSync(join(w.dir, 'after2/public-readyz'), '000');
+    const back = run(HEALTHBACK, w, ownBack(w));
+    expect(back.last).toBe('HEALTHBACK_NOT_DONE: Caddy did not come back on the file before (Caddy active; the public /readyz 000, where Caddy\'s own refusal is 404); the file without the secret is back (the live file is HEALTH2\'s copy: yes), and Caddy is active and refuses /readyz itself: yes (active and yes: as after HEALTH2; anything else: the site is DOWN): ask at once');
     expect(w.live()).toBe(caddyfile({ secret: false }));
+    expect(w.file('restarts')).toBe('restart\nrestart\nrestart\n');
+    // Everything is still there for a run again.
+    expect(w.has('m/health/Caddyfile.before-health') && w.has('m/health/last-kept')).toBe(true);
   }));
 
   it('judges Caddy by its own answer, so it works while the website is stopped (the listener only as information)', () => withWorld({}, w => {
     run(HEALTH1, w); run(HEALTH2, w);
     // The website stopped, as in the drained upload's downtime: the listener passes the request on and gets no answer.
-    writeFileSync(join(w.dir, 'after/listener'), '503');
-    const back = run(HEALTHBACK, w, own(w));
+    writeFileSync(join(w.dir, 'after2/listener'), '503');
+    const back = run(HEALTHBACK, w, ownBack(w));
     expect(back.lines).toContain('after the restart: Caddy active; the public /readyz 404 (404: Caddy\'s own refusal); the loopback listener 503 (through Caddy to the website: 200 while the website runs; information only)');
     expect(back.last).toBe('HEALTHBACK_DONE');
     expect(w.live()).toBe(caddyfile());
@@ -458,8 +494,154 @@ describe('HEALTHBACK', () => {
   it('says the site is down when Caddy does not run after the restart', () => withWorld({}, w => {
     run(HEALTH1, w); run(HEALTH2, w);
     writeFileSync(join(w.dir, 'caddy-dies'), '');
-    const back = run(HEALTHBACK, w, own(w));
-    expect(back.last).toBe('HEALTHBACK_NOT_DONE: Caddy did not come back on the file before (Caddy failed; the public /readyz 404, where Caddy\'s own refusal is 404); the file without the secret is back and Caddy is failed (active: as after HEALTH2; anything else: the site is DOWN): ask at once');
+    const back = run(HEALTHBACK, w, ownBack(w));
+    expect(back.last).toBe('HEALTHBACK_NOT_DONE: Caddy did not come back on the file before (Caddy failed; the public /readyz 404, where Caddy\'s own refusal is 404); the file without the secret is back (the live file is HEALTH2\'s copy: yes), and Caddy is failed and refuses /readyz itself: yes (active and yes: as after HEALTH2; anything else: the site is DOWN): ask at once');
+  }));
+
+  it('keeps the guards a way back needs, and refuses with nothing changed', () => {
+    const refusals: Readonly<Record<string, readonly [(w: World) => void, string]>> = {
+      'detached step': [w => writeFileSync(join(w.dir, 'ms-steps'), 'ms-step-101500.service loaded active running /bin/bash /root/ms-step.sh\n'), 'HEALTHBACK_NOT_DONE: a detached step still runs (read its log first); nothing changed'],
+      maintenance: [w => writeFileSync(join(w.dir, 'maintenance-pending'), ''), 'HEALTHBACK_NOT_DONE: the maintenance flag is there (a restart of the server, or other maintenance, is under way): wait until it is over; nothing changed'],
+      upload: [w => writeFileSync(join(w.dir, 'status.json'), JSON.stringify({ releases: [{ label: 'new-r34-v1', state: 'STAGED' }, { label: 'cur-r33-v1', state: 'CURRENT' }] })), 'HEALTHBACK_NOT_DONE: a release is staged or draining (an upload is under way): wait until it is over; nothing changed'],
+      'release table': [w => writeFileSync(join(w.dir, 'status.json'), ''), 'HEALTHBACK_NOT_DONE: a release is staged or draining (an upload is under way): wait until it is over; nothing changed'],
+      signups: [w => writeFileSync(join(w.dir, 'm/password/Caddyfile.signups'), 'x\n'), 'HEALTHBACK_NOT_DONE: an edited copy for SIGNUPS waits: finish SIGNUPS (6.5 (c)), or move $M/password/Caddyfile.signups aside; nothing changed'],
+      window: [w => writeFileSync(join(w.dir, 'Caddyfile'), `${w.live()}# review window begin: stand-in\n`), 'HEALTHBACK_NOT_DONE: the NETOPIA review window is open: REVIEW_CLOSE (5.8) first, then HEALTHBACK; nothing changed']
+    };
+    for (const [name, [make, last]] of Object.entries(refusals)) withWorld({}, w => {
+      run(HEALTH1, w); run(HEALTH2, w);
+      make(w);
+      const live = w.live();
+      const out = run(HEALTHBACK, w, ownBack(w));
+      expect(out.status, name).toBe(1);
+      expect(out.last?.replace(`${w.dir}/m/`, '$M/'), name).toBe(last);
+      expect(w.live(), name).toBe(live);
+      expect(w.file('restarts'), name).toBe('restart\n');
+      expect(w.file('m/name/Caddyfile.phase1'), name).toBe(caddyfile({ secret: false, mark: 'phase1' }));
+    });
+    // It does not ask for Caddy running: a Caddy that does not run is a reason to go back.
+    withWorld({}, w => {
+      run(HEALTH1, w); run(HEALTH2, w);
+      writeFileSync(join(w.dir, 'caddy-state'), 'failed\n');
+      expect(run(HEALTHBACK, w, ownBack(w)).last).toBe('HEALTHBACK_DONE');
+      expect(w.live()).toBe(caddyfile());
+    });
+    // PWOFF1's copies made after HEALTH2 are not on its record: PWON first.
+    withWorld({}, w => {
+      run(HEALTH1, w); run(HEALTH2, w);
+      writeFileSync(join(w.dir, 'm/password/Caddyfile.before-open'), w.live());
+      writeFileSync(join(w.dir, 'm/password/Caddyfile.open'), caddyfile({ secret: false, password: false }));
+      expect(run(HEALTHBACK, w, ownBack(w)).last).toBe('HEALTHBACK_NOT_DONE: PWOFF1\'s copies were made after HEALTH2 (they are not on its record): run PWON first (the password still asks, so it only moves them aside), then HEALTHBACK; nothing changed');
+      expect(w.live()).toBe(caddyfile({ secret: false }));
+    });
+  });
+});
+
+/** A step cut off right before one of its lines (the window lost, or the server restarted, there). */
+const cutAt = (line: string) => ({ [line]: 'exit 9' });
+const RESTART_LINE = "  systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; sleep 3";
+
+describe('a run cut off at any point is finished by HEALTH2 again, or undone by HEALTHBACK', () => {
+  it('cut after the copy went live, before the restart: HEALTH1 and PWON refuse, HEALTH2 again restarts, checks and finishes', () => withWorld({ password: 'off' }, w => {
+    run(HEALTH1, w);
+    expect(run(HEALTH2, w, cutAt(RESTART_LINE)).status).toBe(9);
+    // The record of the kept copies and the answers before the change were written before the copy went live.
+    expect(w.live()).toBe(caddyfile({ password: false, secret: false }));
+    const kept = w.file('m/health/last-kept').trim();
+    expect(readFileSync(join(kept, 'before'), 'utf8')).toBe('200\n' + KEY + '\n400\n');
+    expect(w.has('restarts')).toBe(false);
+    expect(run(HEALTH1, w).last).toBe('HEALTH1_NOT_DONE: HEALTH2 was cut off after its copy without the secret went live: run HEALTH2 again (it finishes), or HEALTHBACK (it puts everything back); nothing changed');
+    // PWON refuses here (the live file is not PWOFF2's any more): the reason this run must be finished first.
+    expect(run(script('PWON'), w, own(w)).last).toMatch(/^PWON_NOT_DONE: the live Caddyfile is not the one PWOFF2 put in place/);
+    const again = run(HEALTH2, w);
+    expect(again.lines).toContain('HEALTH2 was cut off after its copy went live, before every check after the restart had passed: Caddy restarts again on it, and the checks run against the answers kept before the change');
+    expect(again.lines).toContain('kept copies on the record of the run that was cut off: 5');
+    expect(again.last).toBe('HEALTH2_DONE');
+    expect(w.file('restarts')).toBe('restart\n');
+    expect(w.file('m/password/Caddyfile.open')).toBe(w.live());
+    expect(w.file('m/name/Caddyfile.phase1')).toBe(caddyfile({ secret: false, mark: 'phase1' }));
+    expect(run(HEALTH2, w).last).toBe('HEALTH2_NOT_DONE: the copy without the secret is live already (HEALTH2 ran before); nothing changed');
+  }));
+
+  it('cut there, a failed check on the run again still puts the file before back', () => withWorld({ after: { login: '502' } }, w => {
+    run(HEALTH1, w);
+    run(HEALTH2, w, cutAt(RESTART_LINE));
+    expect(run(HEALTH2, w).last).toBe('HEALTH2_NOT_DONE: a check failed (login); the file before is back (the live file is the file before: yes), Caddy restarted on it and is active, the loopback listener answers 200 from this release: yes, the Log in page answers as before (401): yes; the kept copies are unchanged: ask');
+    expect(w.live()).toBe(caddyfile());
+  }));
+
+  it('cut there, HEALTHBACK undoes it: the file before back, the kept copies as they were', () => withWorld({ password: 'off' }, w => {
+    run(HEALTH1, w);
+    run(HEALTH2, w, cutAt(RESTART_LINE));
+    const back = run(HEALTHBACK, w, ownBack(w));
+    expect(back.last).toBe('HEALTHBACK_DONE');
+    expect(w.live()).toBe(caddyfile({ password: false }));
+    expect(w.file('m/password/Caddyfile.open')).toBe(w.live());
+    expect(w.file('m/name/Caddyfile.phase1')).toBe(caddyfile({ mark: 'phase1' }));
+    expect(run(HEALTH1, w).last).toBe('HEALTH1_DONE');
+  }));
+
+  it('cut after every check passed, before the kept copies: HEALTH2 again only gives them the edit', () => withWorld({ password: 'off' }, w => {
+    run(HEALTH1, w);
+    expect(run(HEALTH2, w, cutAt("KB=''")).status).toBe(9);
+    expect(w.file('m/password/Caddyfile.open')).toBe(caddyfile({ password: false }));
+    const again = run(HEALTH2, w);
+    expect(again.lines).toContain('HEALTH2 was cut off after every check had passed: the kept copies still as they were get the edit now');
+    expect(again.last).toBe('HEALTH2_DONE');
+    // No second restart.
+    expect(w.file('restarts')).toBe('restart\n');
+    expect(w.file('m/password/Caddyfile.open')).toBe(w.live());
+  }));
+
+  it('cut half way through the kept copies: HEALTH2 again finishes them, or HEALTHBACK takes a copy still as it was as one HEALTH2 never changed', () => {
+    const cutHalfWay = (w: World) => {
+      run(HEALTH1, w);
+      expect(run(HEALTH2, w).last).toBe('HEALTH2_DONE');
+      const kept = w.file('m/health/last-kept').trim();
+      // As if the run had stopped after NAME1's copy: phase1 and main are still as they were.
+      for (const copy of ['phase1', 'main']) writeFileSync(join(w.dir, `m/name/Caddyfile.${copy}`), readFileSync(join(kept, `name-Caddyfile.${copy}.before`), 'utf8'));
+    };
+    withWorld({}, w => {
+      cutHalfWay(w);
+      expect(run(HEALTH1, w).last).toMatch(/^HEALTH1_NOT_DONE: HEALTH2 was cut off after its copy without the secret went live/);
+      const again = run(HEALTH2, w);
+      expect(again.last).toBe('HEALTH2_DONE');
+      expect(w.file('restarts')).toBe('restart\n');
+      expect(w.file('m/name/Caddyfile.phase1')).toBe(caddyfile({ secret: false, mark: 'phase1' }));
+    });
+    withWorld({}, w => {
+      cutHalfWay(w);
+      expect(run(HEALTHBACK, w, ownBack(w)).last).toBe('HEALTHBACK_DONE');
+      for (const copy of NAME_COPIES) expect(w.file(`m/name/Caddyfile.${copy}`), copy).toBe(caddyfile(copy === 'main' ? {} : { mark: copy }));
+      expect(w.live()).toBe(caddyfile());
+    });
+  });
+
+  it('a kept copy that does not take the edit: the line names it, says PWON refuses meanwhile, and HEALTH2 again repairs it', () => withWorld({ password: 'off' }, w => {
+    run(HEALTH1, w);
+    writeFileSync(join(w.dir, 'install-fails'), `${w.dir}/m/password/Caddyfile.open\n`);
+    const two = run(HEALTH2, w);
+    expect(two.last).toBe('HEALTH2_NOT_DONE: Caddy\'s health check sends no secret now and every check passed, but these kept copies did not get the edit: password/Caddyfile.open. Until they do, a step that puts one back would bring the secret back, and while password/Caddyfile.open is among them PWON refuses and OPENCHECK and SIGNUPS fail (the live file is no longer that copy). The repair: run HEALTH2 again, which changes only the kept copies still as they were; or HEALTHBACK, which puts everything back. If HEALTH2 names a copy again: ask');
+    rmSync(join(w.dir, 'install-fails'));
+    expect(run(HEALTH2, w).last).toBe('HEALTH2_DONE');
+    expect(w.file('m/password/Caddyfile.open')).toBe(w.live());
+    expect(w.file('restarts')).toBe('restart\n');
+  }));
+
+  it('HEALTHBACK cut after the file before went back: run again, it puts back the kept copies, and only then moves its copies aside', () => withWorld({}, w => {
+    run(HEALTH1, w); run(HEALTH2, w);
+    const copiesBack = HEALTHBACK.find(line => line.startsWith('while read -r F T; do if [ -e "$F" ] && cmp -s "$F" "$KD/$T.after"; then'))!;
+    expect(run(HEALTHBACK, w, { ...ownBack(w), ...cutAt(copiesBack) }).status).toBe(9);
+    expect(w.live()).toBe(caddyfile());
+    expect(w.file('m/name/Caddyfile.phase1')).toBe(caddyfile({ secret: false, mark: 'phase1' }));
+    const again = run(HEALTHBACK, w, ownBack(w));
+    expect(again.lines).toContain('the live Caddyfile is the one from before HEALTH2 already: only the kept copies go back');
+    expect(again.last).toBe('HEALTHBACK_DONE');
+    expect(w.file('m/name/Caddyfile.phase1')).toBe(caddyfile({ mark: 'phase1' }));
+    expect(w.has('m/health/Caddyfile.before-health') || w.has('m/health/last-kept')).toBe(false);
+    // The check that every copy is back comes before the moves aside.
+    const check = HEALTHBACK.findIndex(line => line.startsWith("KB=''; while read -r F T; do"));
+    expect(check).toBeGreaterThan(HEALTHBACK.indexOf(copiesBack));
+    expect(check).toBeLessThan(HEALTHBACK.findIndex(line => line.startsWith('mv "$HB" "$HB.back-$TS"')));
   }));
 });
 
@@ -480,10 +662,29 @@ describe('the runbook\'s words', () => {
     expect(kept).toEqual(['name/Caddyfile.before-dezbatere', 'name/Caddyfile.phase1', 'name/Caddyfile.main', 'password/Caddyfile.before-open', 'password/Caddyfile.open']);
     for (const path of kept) expect(section, path).toContain(`\`${path}\``);
     const text = flat(section);
-    expect(text).toContain('For about a second a page may not load; reloading it helps.');
+    expect(text).toContain('A restart usually takes about a second: Caddy stops once the requests still open have ended (or its unit\'s stop limit has passed), and starts again from the Caddyfile and the certificates it keeps on disk. For that time a page may not load; reloading it helps.');
+    expect(text).toContain('So the file before is back at most about a minute after the restart, and HEALTH2\'s last line comes at most about half a minute after that');
+    expect(text).toContain('**If HEALTH2 was cut off**');
+    expect(text).toContain('It skips two of their guards: it does not need Caddy running');
     expect(text).toContain('Run HEALTH2 only with the owner\'s yes, at a quiet minute.');
     expect(text).toContain('If they kept the secret, PWON or NAME5 would bring it back');
     expect(text).toContain('`grep -c health_headers /etc/debateai-v3-preview/public/Caddyfile` prints `0`.');
+  });
+
+  it('the morning look of 6b counts the secret\'s lines in the live Caddyfile, so an older copy put back by hand is noticed', () => {
+    const line = 'echo "health_headers lines in the live Caddyfile: $(grep -c health_headers /etc/debateai-v3-preview/public/Caddyfile || true)"';
+    expect(runbook).toContain(`\`${line}\``);
+    const daily = flat(runbook.slice(runbook.indexOf('Every morning while 6b is open: OPENCHECK'), runbook.indexOf('### 6b.3 Add or remove a buyer on the Team page')));
+    expect(daily).toContain('Once HEALTH2 has run (5.10), the morning look also counts the health check\'s secret lines in the live Caddyfile');
+    expect(daily).toContain('It must print `0`.');
+    // The line reads only, and prints a count.
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'main-site-health-daily-')));
+    try {
+      writeFileSync(join(dir, 'Caddyfile'), caddyfile());
+      expect(bash(line.replace('/etc/debateai-v3-preview/public/Caddyfile', `${dir}/Caddyfile`)).out).toBe('health_headers lines in the live Caddyfile: 1\n');
+      writeFileSync(join(dir, 'Caddyfile'), caddyfile({ secret: false }));
+      expect(bash(line.replace('/etc/debateai-v3-preview/public/Caddyfile', `${dir}/Caddyfile`)).out).toBe('health_headers lines in the live Caddyfile: 0\n');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
   it('every word a failed check of HEALTH2 can print is explained under the block', () => {
