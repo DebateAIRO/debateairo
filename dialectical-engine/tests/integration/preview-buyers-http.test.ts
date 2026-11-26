@@ -172,18 +172,32 @@ describe("adding and removing", () => {
     expect(s.intents).toEqual([expect.objectContaining({ event: "PREVIEW_BUYER_ADDED", reason: { code: "GRANT_CHANGE" }, keyUserId: account.authenticated.userId })]);
     expect(JSON.stringify([s.calls, s.intents, s.bindings])).not.toContain("@");
   });
-  it("an addition while the team tools are locked is refused before any ceremony or look-up; a removal goes on without the alert", async () => {
-    const s = server({ locked: true }), { proof_handle: _unused, ...fields } = addBody();
+  it("while the team tools are locked an addition and a removal take the key alone: the ceremony runs, and each change goes on without an alert", async () => {
+    const s = server({ locked: true }), body = addBody(), { proof_handle: _unused, ...fields } = body;
     const options = await s.built.inject({ method: "POST", url: "/v1/admin/webauthn/action/options", headers: headers(true), payload: { intent: { action: "PREVIEW_BUYER_ADD", ...fields } } });
-    expect([options.statusCode, options.json()]).toEqual([503, { error: "STAFF_ALERT_UNAVAILABLE" }]);
-    const added = await s.built.inject({ method: "POST", url: "/v1/admin/preview-buyers", headers: headers(true), payload: addBody() });
-    expect([added.statusCode, added.json()]).toEqual([503, { error: "STAFF_ALERT_UNAVAILABLE" }]);
-    expect(s.reads).toEqual([]);
-    expect(s.bindings).toEqual([]);
-    expect(s.calls).toEqual([]);
+    expect(options.statusCode, options.body).toBe(200);
+    expect(s.bindings).toEqual([canonicalPreviewBuyerBinding("PREVIEW_BUYER_ADD", NEW.userId, 4, fields.operation_id)]);
+    const added = await s.built.inject({ method: "POST", url: "/v1/admin/preview-buyers", headers: headers(true), payload: body });
+    expect([added.statusCode, added.json()], added.body).toEqual([200, { operation_id: body.operation_id, outcome: "COMPLETED", recorded_at: "2026-11-24T00:00:00.000Z" }]);
+    expect(s.calls).toEqual([expect.objectContaining({ intent: "PREVIEW_BUYER_ADD", targetUserId: NEW.userId, expectedRevision: 4, operationId: body.operation_id, alertIntent: null })]);
     const removed = await s.built.inject({ method: "DELETE", url: `/v1/admin/preview-buyers/${REF_ANA}`, headers: headers(true), payload: removeBody() });
     expect(removed.statusCode, removed.body).toBe(200);
-    expect(s.calls).toEqual([expect.objectContaining({ intent: "PREVIEW_BUYER_REMOVE", targetUserId: ANA.userId, alertIntent: null })]);
+    expect(s.calls.at(-1)).toEqual(expect.objectContaining({ intent: "PREVIEW_BUYER_REMOVE", targetUserId: ANA.userId, alertIntent: null }));
+    expect(s.intents).toEqual([]);
+    expect(s.asked).toContain("TEAM_GRANT");
+  });
+  it("while the team tools are locked every other Team page change still waits for them: refused before any ceremony", async () => {
+    const s = server({ locked: true }), operation = () => randomUUID(), reason = { code: "GRANT_CHANGE" };
+    for (const intent of [
+      { action: "RECOVERY_PERMIT_APPROVE", request_ref: randomUUID(), expected_revision: 1, operation_id: operation() },
+      { action: "TEAM_GRANT", target_staff_id: randomUUID(), capabilities: ["TEAM_READ"], expected_revision: 1, operation_id: operation(), reason },
+      { action: "TEAM_INVITE", target_user_id: randomUUID(), capabilities: ["TEAM_READ"], expected_revision: 1, operation_id: operation(), reason }
+    ]) {
+      const options = await s.built.inject({ method: "POST", url: "/v1/admin/webauthn/action/options", headers: headers(true), payload: { intent } });
+      expect([options.statusCode, options.json()], intent.action).toEqual([503, { error: "STAFF_ALERT_UNAVAILABLE" }]);
+    }
+    expect(s.bindings).toEqual([]);
+    expect(s.calls).toEqual([]);
     expect(s.intents).toEqual([]);
   });
   it("a removal while unlocked sends its alert; a ref not on the list is refused by name", async () => {
