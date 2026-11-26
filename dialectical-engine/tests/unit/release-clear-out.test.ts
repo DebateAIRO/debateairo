@@ -49,8 +49,11 @@ const CUR = 'a00000034-r34-v1', BEF = 'a00000033-r33-v1', R32 = 'a00000032-r32-v
 const R29 = 'a00000029-r29-v1-20261126T052817Z', R30 = 'a00000030-r30-v1-20261126T141010Z', R28 = 'a00000028-r28-v1-20261125T170420Z';
 const R23 = 'b00000023-r23-v1', R24 = 'b00000024-r24-v1', RELAY = 'f00000000-fiveai-v1';
 const S_NAME = 'r34-20261126T130530Z';
-const KINDS = ['candidate', 'fallback'].flatMap(kind => ['api', 'runner', 'ui'].map(service => `releases/auth-dev-${kind}-%-${service}`));
-const sevenOf = (label: string) => [...KINDS.map(path => path.replace('%', label)), `artifacts/auth-dev-${label}`];
+/** A label's seven folders: its six release folders, then its artifacts folder. */
+const sevenOf = (label: string) => [
+  ...['candidate', 'fallback'].flatMap(kind => ['api', 'runner', 'ui'].map(service => `releases/auth-dev-${kind}-${label}-${service}`)),
+  `artifacts/auth-dev-${label}`
+];
 const MIB = 1024 * 1024;
 
 type World = Readonly<{ dir: string; opt: (path: string) => string; file: (path: string) => string }>;
