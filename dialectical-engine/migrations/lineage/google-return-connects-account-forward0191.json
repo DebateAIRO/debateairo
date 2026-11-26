@@ -1,0 +1,18 @@
+{
+  "version": "google-return-connects-account-forward0191-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0190_check_deletes_public_debate.sql",
+    "manifestSha256": "e54a4c0267d9e5542874cbe2d9f1906acaeed829e75e80ef95c90587d02b9a81",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0191_google_return_connects_account.sql",
+    "sha256": "59f7ef56fc61388bf418ca060f10f003ced59a2337e7f7d6c756b6a63953b39a"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": []
+}

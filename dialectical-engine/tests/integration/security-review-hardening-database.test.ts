@@ -2292,6 +2292,9 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     // 0178's four, each gated as its older twin is: the mailed verification token, the social flow's proof and state, and the step-up grant's token.
     "identity.consume_verification_set_password(text,timestamp with time zone,jsonb,text)",
     "identity.create_social_account_v2(jsonb,jsonb)", "identity.finish_social_callback_v2(jsonb,jsonb)",
+    // 0191's return beside 0178's, gated as it is (the flow's state, cookie, claim and provider configuration); the account it may connect is
+    // found from the address the provider's verified proof names, never from an owner or account the caller hands it.
+    "identity.finish_social_callback_v3(jsonb,jsonb)",
     "identity.request_email_change_bounded(uuid,uuid,text,uuid,bytea,jsonb,text,text,timestamp with time zone,jsonb,integer,bigint)",
   ] as const;
   const PUBLIC = [
