@@ -15,7 +15,7 @@ const NAME = "0193_google_return_connects_account.sql";
 const VERSION = "google-return-connects-account-forward0193-v1";
 const MANIFEST_PATH = "lineage/google-return-connects-account-forward0193.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
-const PREVIOUS = "0190_check_deletes_public_debate.sql";
+const PREVIOUS = "0192_registration_country_read.sql";
 const FUNCTIONS: readonly string[] = ["identity.finish_social_callback_v3(jsonb,jsonb)"];
 const AMENDS: readonly never[] = [];
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0193_${detail}`); };

@@ -45,9 +45,9 @@ export const testBillingPlans: BillingPlans = Object.freeze({
     { planId: "PLUS", tier: "premium", netPrices: { USD: 20_000_000, EUR: 20_000_000, RON: 100_000_000 },
       monthlyCreditMicros: 6_600_000, dayBasisPoints: 1_100, weekBasisPoints: 4_400, finishBasisPoints: 12_100, finishOverflowMicros: null, reserveMicros: null, reserveHeld: null, fixedGauges: null },
     { planId: "PRO", tier: "premium", netPrices: { USD: 50_000_000, EUR: 50_000_000, RON: 250_000_000 },
-      monthlyCreditMicros: 33_000_000, dayBasisPoints: 1_100, weekBasisPoints: 4_400, finishBasisPoints: 12_100, finishOverflowMicros: null, reserveMicros: null, reserveHeld: null, fixedGauges: null },
+      monthlyCreditMicros: 19_800_000, dayBasisPoints: 1_100, weekBasisPoints: 4_400, finishBasisPoints: 12_100, finishOverflowMicros: null, reserveMicros: null, reserveHeld: null, fixedGauges: null },
     { planId: "MAX", tier: "premium", netPrices: { USD: 200_000_000, EUR: 200_000_000, RON: 1_000_000_000 },
-      monthlyCreditMicros: 220_000_000, dayBasisPoints: 1_100, weekBasisPoints: 4_400, finishBasisPoints: 12_100, finishOverflowMicros: null, reserveMicros: null, reserveHeld: null, fixedGauges: null }
+      monthlyCreditMicros: 99_000_000, dayBasisPoints: 1_100, weekBasisPoints: 4_400, finishBasisPoints: 12_100, finishOverflowMicros: null, reserveMicros: null, reserveHeld: null, fixedGauges: null }
   ])
 }) as BillingPlans;
 

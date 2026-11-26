@@ -140,7 +140,7 @@ export function personWindowsFor(
 
 /**
  * The pricing page's "N x the Plus allowance" (spec §1.2), as a plain decimal
- * with at most two places and no trailing zeros: "0.04", "1", "4", "30". It is
+ * with at most two places and no trailing zeros: "0.05", "1", "3", "15". It is
  * rounded down, and shows no dollar figure of credit.
  */
 export function allowanceVsPlus(plans: BillingPlans, id: PlanId): string {

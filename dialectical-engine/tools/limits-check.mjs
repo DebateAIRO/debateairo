@@ -29,7 +29,7 @@ const MARK = "limits-check-ok";
 
 /** The marked made-up values: what an example file may hold. Plainly fake, multiples of eleven; they say nothing about the real ones. */
 export const MADE_UP_MEMBER_VALUES = Object.freeze({
-  monthly_credit_micros: [330_000, 6_600_000, 33_000_000, 220_000_000],
+  monthly_credit_micros: [330_000, 6_600_000, 19_800_000, 99_000_000],
   finish_overflow_micros: [220_000],
   reserve_micros: [88_000, 440_000],
   day_bp: [1_100],

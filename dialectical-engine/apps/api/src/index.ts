@@ -453,7 +453,12 @@ import { RUN_EVENT_STREAM_REFUSAL, RunEventStreamSlots } from "./run-event-strea
 
 type RouteAuthPolicy = "public" | "user" | "operator" | "staff";
 type RouteOriginPolicy = "trusted";
-type RouteSessionPolicy = "optional";
+/**
+ * How a public route looks at a session. "optional": a presented session is checked, and a failed lookup fails the
+ * request. "best-effort" (GET only): a presented session is used when it can be read, and the request is otherwise
+ * answered as a visitor's; it never fails the request and never refreshes the cookie.
+ */
+type RouteSessionPolicy = "optional" | "best-effort";
 
 // ─── BEGIN OPERATIONAL DIAGNOSTIC ALPHABET ─────────────────────────────────────
 // TWIN COPY. This block is byte-identical in apps/api/src/index.ts and
@@ -1655,7 +1660,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/runs/{id}/reopen", auth: "user", resource: "run-owner", action: "reopen-investigation" },
   { route: "POST /v1/runs/{id}/researched", auth: "user", resource: "run-owner", action: "add-researched" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
-  { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
+  { route: "GET /v1/billing/plans", auth: "public", session: "best-effort", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
   { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
   { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" },
@@ -3010,6 +3015,23 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           }
         }
         request.cookieRefresh = Object.freeze({ sessionToken, csrfToken: csrfCookieToken });
+      }
+      if (request.routeOptions.config.session === "best-effort" && request.method === "GET") {
+        // The plans list prices a signed-in account for its own country, but never fails over a session: no token, an
+        // unknown one or a lookup that throws all leave the request a visitor's. No cookie is refreshed, since the
+        // answer may be kept by the browser. Only GET looks at a session here, so no CSRF check is needed and any
+        // other method stays a visitor's.
+        const sessionToken = exactCookie(request.headers.cookie, SESSION_COOKIE_NAME);
+        if (sessionToken === null || options.sessions === undefined) return;
+        try {
+          const authenticated = await options.sessions.authenticate(sessionToken, sourceFor(request));
+          if (authenticated === null) return;
+          setRequestCredential(sessionToken);
+          request.authenticatedSession = authenticated;
+          request.session = authenticated.session;
+        } catch {
+          return;
+        }
       }
       return;
     }

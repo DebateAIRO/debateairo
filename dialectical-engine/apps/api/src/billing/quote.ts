@@ -13,6 +13,7 @@ import {
   type CountryPolicy,
   type PlanId
 } from "@debateai/register";
+import type { AccountCountryPort } from "./account-country.js";
 import type { BillingAudit } from "./audit.js";
 import { decidePaymentPlace, decidePaymentRegion, placeRefusal, regionRefusal } from "./place.js";
 import { sealQuoteLocation, taxLocationOf, type QuoteLocation } from "./records.js";
@@ -25,7 +26,7 @@ export type QuoteInput = Readonly<{
   ownerRef: string;
   ip: string;
   planId: Exclude<PlanId, "FREE">;
-  /** Null: the connection's country (P19's pre-fill). */
+  /** Null: the account's sign-up country, else the connection's. */
   country: string | null;
   /** Older pages' single name; ignored when both firstName and lastName are given. */
   name: string | null;
@@ -102,6 +103,8 @@ export class QuoteService implements QuoteServicePort {
     plans: BillingPlans;
     recordsKey: Buffer;
     audit: BillingAudit;
+    /** The sign-up country of the request's account; absent: the connection's. */
+    accountCountry?: AccountCountryPort;
   }>) {}
 
   private refused(refusal: BillingRefusal): BillingRefusal {
@@ -136,8 +139,20 @@ export class QuoteService implements QuoteServicePort {
       throw this.refused(new BillingRefusal(409, "ALREADY_SUBSCRIBED"));
     }
     const plan = planById(this.deps.plans, input.planId);
+    // The pricing page's first quote names no country: it starts from the one the account chose at sign-up. A read that
+    // fails is the same 503 "try again in a minute" as the tax service's, never a guess from the connection (no quote
+    // is stored); only a clean "no sign-up country" falls back to the connection.
+    let declaredCountry = input.country;
+    if (declaredCountry === null && this.deps.accountCountry !== undefined) {
+      try {
+        declaredCountry = await this.deps.accountCountry.read(input.ownerRef);
+      } catch {
+        this.deps.audit("billing.quote.refused", { code: "TAX_SERVICE_UNAVAILABLE", reason: "ACCOUNT_COUNTRY_UNREADABLE" });
+        throw new BillingRefusal(503, "TAX_SERVICE_UNAVAILABLE");
+      }
+    }
     const place = decidePaymentPlace({
-      geo: this.deps.geo, policy: this.deps.countryPolicy, ip: input.ip, declaredCountry: input.country
+      geo: this.deps.geo, policy: this.deps.countryPolicy, ip: input.ip, declaredCountry
     });
     if (place.kind === "REFUSE") throw this.refused(placeRefusal(place, this.deps.audit));
     // Payment region blocks (spec 2026-10-20 §8): the pricing page's first quote has no address, so nothing to check;

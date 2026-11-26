@@ -432,11 +432,11 @@ describe("P2-M39 four more journeys on the fake stack", () => {
       announcedTotalMicros: 59_500_000
     });
     const credit = upgradeMonthCreditOverrideMicros({
-      currentMonthCreditMicros: 6_600_000, oldPlanCreditMicros: 6_600_000, newPlanCreditMicros: 33_000_000,
+      currentMonthCreditMicros: 6_600_000, oldPlanCreditMicros: 6_600_000, newPlanCreditMicros: 19_800_000,
       periodStart: before.currentPeriodStart!, periodEnd: before.currentPeriodEnd!, at: quote.createdAt
     });
     expect(credit).toBeGreaterThan(6_600_000);
-    expect(credit).toBeLessThan(33_000_000);
+    expect(credit).toBeLessThan(19_800_000);
     expect(await new EntitlementRepository(stack.database.pool).current(person.ownerRef, stack.now())).toMatchObject({
       planId: "PRO", cause: "UPGRADED", paidThrough: before.currentPeriodEnd, monthCreditOverrideMicros: credit
     });

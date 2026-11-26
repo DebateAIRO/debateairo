@@ -47,14 +47,14 @@ describe("P12c what the UPGRADE settlement writes when an upgrade is paid", () =
       data: { announced_total_micros: 60_500_000, quote_ref: "q-1", recurring_net_micros: 50_000_000 }
     });
     expect(writes.entitlement).toEqual({
-      planId: "PRO", periodAnchorAt: START, cause: "UPGRADED", paidThrough: END, monthCreditOverrideMicros: 19_800_000
+      planId: "PRO", periodAnchorAt: START, cause: "UPGRADED", paidThrough: END, monthCreditOverrideMicros: 13_200_000
     });
   });
 
   it("counts the stored credit in the numbers this month has, when an upload lowered a plan's credit since it started", () => {
-    // Made-up numbers. The month started with PLUS at 6,600,000 and PRO at 33,000,000; an upload since then halved
+    // Made-up numbers. The month started with PLUS at 6,600,000 and PRO at 19,800,000; an upload since then halved
     // both. The upgrade is paid at mid-month: the month keeps PLUS's 6,600,000 and adds half of the difference between
-    // the two credits it started with, (33,000,000 - 6,600,000) / 2, as before the upload.
+    // the two credits it started with, (19,800,000 - 6,600,000) / 2, as before the upload.
     const halved = Object.freeze({
       ...testBillingPlans,
       plans: Object.freeze(testBillingPlans.plans.map((plan) => Object.freeze({ ...plan, monthlyCreditMicros: plan.monthlyCreditMicros / 2 })))
@@ -63,8 +63,8 @@ describe("P12c what the UPGRADE settlement writes when an upgrade is paid", () =
     const input = {
       state: state(), charge: charge(), quote, plans: halved, currentMonthCreditOverrideMicros: null, now, recurringNetMicros: 50_000_000
     };
-    expect(upgradeSucceededWrites(input).entitlement.monthCreditOverrideMicros).toBe(9_900_000);
-    expect(upgradeSucceededWrites({ ...input, creditPlans: [testBillingPlans, halved] }).entitlement.monthCreditOverrideMicros).toBe(19_800_000);
+    expect(upgradeSucceededWrites(input).entitlement.monthCreditOverrideMicros).toBe(6_600_000);
+    expect(upgradeSucceededWrites({ ...input, creditPlans: [testBillingPlans, halved] }).entitlement.monthCreditOverrideMicros).toBe(13_200_000);
     // The price the next renewals charge is the monthly quote's, whatever the month's credits are counted in.
     expect(upgradeSucceededWrites({ ...input, creditPlans: [testBillingPlans, halved] }).subscriptionEvent.data)
       .toMatchObject({ recurring_net_micros: 50_000_000 });

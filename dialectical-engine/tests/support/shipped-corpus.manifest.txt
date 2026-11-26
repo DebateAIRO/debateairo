@@ -24,6 +24,7 @@ apps/api/src/ask-billing.ts
 apps/api/src/ask-clarify.ts
 apps/api/src/ask-model-picker.ts
 apps/api/src/ask-room.ts
+apps/api/src/billing/account-country.ts
 apps/api/src/billing/account-email.ts
 apps/api/src/billing/audit.ts
 apps/api/src/billing/cancel-link.ts
@@ -1354,6 +1355,8 @@ packages/db/src/migration-forward0187.ts
 packages/db/src/migration-forward0188.ts
 packages/db/src/migration-forward0189.ts
 packages/db/src/migration-forward0190.ts
+packages/db/src/migration-forward0191.ts
+packages/db/src/migration-forward0192.ts
 packages/db/src/migration-forward0193.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
@@ -1386,6 +1389,7 @@ packages/db/src/recovery-candidate.ts
 packages/db/src/recovery-email.ts
 packages/db/src/recovery-permits.ts
 packages/db/src/recovery.ts
+packages/db/src/registration-country.ts
 packages/db/src/release-state.ts
 packages/db/src/restore-fence.ts
 packages/db/src/run-cost-substitution.ts

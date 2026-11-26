@@ -10,7 +10,7 @@ import { isBillingPlanId } from "@/lib/billing/plans";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
-import { createServerContractClient, readTrustedClientIp } from "@/lib/serverApi";
+import { createServerContractClient, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
 
 type PlaceParams = Readonly<{ country?: string | string[]; postal_code?: string | string[] }>;
 
@@ -27,7 +27,7 @@ function single(value: string | string[] | undefined): string | undefined {
 
 /**
  * The plans for a place (Terms §12: the prices include its tax): the country the visitor chose on this page, and in
- * the US and Canada the postal code, else the connection's country; with the currency that place pays in (spec
+ * the US and Canada the postal code, else the signed-in account's sign-up country, else the connection's country; with the currency that place pays in (spec
  * 2026-10-05 §2.16.1). `testMode`: the answer says card payments run on NETOPIA's sandbox; an answer that names no
  * environment shows no note.
  */
@@ -36,11 +36,14 @@ async function readPlans(params: PlaceParams): Promise<Readonly<{
   testMode: boolean;
 }> | null> {
   const headerStore = await headers();
+  // The session cookie this page already has, so the API can price for a signed-in account's country; none when
+  // signed out or when the cookie is not a session.
+  const sessionCookie = readSessionCookie(await cookies()) ?? undefined;
   const country = single(params.country);
   const postalCode = single(params.postal_code);
   try {
     const answer = await createServerContractClient(
-      fetch, undefined, headerStore.get("user-agent") ?? undefined, readTrustedClientIp(headerStore)
+      fetch, sessionCookie, headerStore.get("user-agent") ?? undefined, readTrustedClientIp(headerStore)
     ).getBillingPlans({
       ...(country === undefined ? {} : { country }), ...(postalCode === undefined ? {} : { postalCode })
     });
