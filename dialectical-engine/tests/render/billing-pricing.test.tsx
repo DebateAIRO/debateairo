@@ -6,17 +6,28 @@ import { REGION_COUNTRIES } from "@debateai/kernel";
 
 const mocks = vi.hoisted(() => ({
   locale: "en",
+  session: null as string | null,
+  client: vi.fn(),
   getBillingPlans: vi.fn()
 }));
 
 vi.mock("@/lib/serverApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/serverApi.js")>()),
-  createServerContractClient: () => ({ getBillingPlans: mocks.getBillingPlans })
+  createServerContractClient: (...args: unknown[]) => {
+    mocks.client(...args);
+    return { getBillingPlans: mocks.getBillingPlans };
+  }
 }));
 vi.mock("next/headers", async () => {
   const { LOCALE_COOKIE } = await import("../../apps/ui/lib/i18n/locales.js");
   return {
-    cookies: async () => ({ get: (name: string) => (name === LOCALE_COOKIE ? { value: mocks.locale } : undefined) }),
+    cookies: async () => ({
+      get: (name: string) => {
+        if (name === LOCALE_COOKIE) return { value: mocks.locale };
+        if (name === "__Host-debateai-session" && mocks.session !== null) return { value: mocks.session };
+        return undefined;
+      }
+    }),
     headers: async () => new Headers({ "user-agent": "billing-pricing-test" })
   };
 });
@@ -75,7 +86,27 @@ const taxLine = (card: Element | null) => card?.querySelector(".pricingPrice + .
 describe("P18 /pricing", () => {
   beforeEach(() => {
     mocks.locale = "en";
+    mocks.session = null;
+    mocks.client.mockReset();
     mocks.getBillingPlans.mockReset();
+  });
+
+  it("asks for the plans as the signed-in person, so the answer is for their account's country", async () => {
+    const token = "s".repeat(43);
+    mocks.session = token;
+    mocks.getBillingPlans.mockResolvedValue(ROMANIA);
+    const document = await renderPricing();
+    expect(mocks.client.mock.calls.at(-1)?.[1]).toBe(token);
+    expect(document.querySelector('[data-plan="PLUS"] .pricingPrice')?.textContent).toBe(`${formatMoney("en", "121.00", "RON")} a month`);
+  });
+
+  it("asks with no session when signed out, and when the cookie is not a session", async () => {
+    mocks.getBillingPlans.mockResolvedValue(GERMANY);
+    for (const session of [null, "short", `${"s".repeat(43)}x`]) {
+      mocks.session = session;
+      await renderPricing();
+      expect(mocks.client.mock.calls.at(-1)?.[1]).toBeUndefined();
+    }
   });
 
   it("shows the four plans in price order with prices, the quota as a multiple, and the right next step", async () => {

@@ -28,6 +28,7 @@ type JSDOMModule = {
 
 const routeMocks = vi.hoisted(() => ({
   sessionCookie: null as string | null,
+  client: vi.fn(),
   readPublicDebates: vi.fn(async () => ({ items: [], total: 0 })),
   listDebatesPageServer: vi.fn(async () => ({ summaries: [], shown: 0, total: 0 })),
   getBillingPlans: vi.fn(async (): Promise<unknown> => {
@@ -37,7 +38,10 @@ const routeMocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/serverApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/serverApi.js")>()),
-  createServerContractClient: () => ({ readPublicDebates: routeMocks.readPublicDebates, getBillingPlans: routeMocks.getBillingPlans }),
+  createServerContractClient: (...args: unknown[]) => {
+    routeMocks.client(...args);
+    return { readPublicDebates: routeMocks.readPublicDebates, getBillingPlans: routeMocks.getBillingPlans };
+  },
   listDebatesPageServer: routeMocks.listDebatesPageServer
 }));
 
@@ -539,8 +543,12 @@ describe("T9-C4 landing content", () => {
     // each paid price first as the total with the visitor's country's tax in it, then under it, smaller, our price
     // and that tax apart, placed after the closing title and lede and before the "Ask a question" button.
     routeMocks.getBillingPlans.mockClear();
+    routeMocks.client.mockClear();
     routeMocks.getBillingPlans.mockResolvedValueOnce(GERMANY_PLANS);
     const pricing = (await renderRoute(null)).querySelector('[data-landing-section="pricing"]');
+    // The landing's plans request sends no session.
+    expect(routeMocks.client.mock.calls.length).toBeGreaterThan(0);
+    for (const call of routeMocks.client.mock.calls) expect(call[1]).toBeUndefined();
     const plans = pricing?.querySelector("[data-landing-plans]");
     const cards = [...(plans?.querySelectorAll("[data-pricing-cards] > article") ?? [])];
     expect(cards.map((card) => card.getAttribute("data-plan"))).toEqual(["FREE", "PLUS", "PRO", "MAX"]);
