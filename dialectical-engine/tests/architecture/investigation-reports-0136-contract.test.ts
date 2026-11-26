@@ -242,7 +242,8 @@ describe("0136: the final report over an investigation", () => {
     const exporter = read("packages/db/src/data-export.ts");
     expect(exporter.indexOf(`"${EXPORT_READER}",`)).toBeGreaterThan(exporter.indexOf('"identity.read_data_export_dig_picks(uuid,uuid)",'));
     // V4 start step, Task 39e: 0162's export reader is the twenty-fifth worker function (after 0157's moderation reader).
-    expect(exporter).toContain("worker.worker_count !== 25");
+    // Public debate upvotes: 0193's export reader is the twenty-sixth.
+    expect(exporter).toContain("worker.worker_count !== 26");
     expect(read("packages/db/src/investigation-reports.ts")).toContain(`export const READ_DATA_EXPORT_INVESTIGATION_REPORTS = "${EXPORT_READER}" as const;`);
   });
 

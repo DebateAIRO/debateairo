@@ -1035,4 +1035,38 @@ describe("data export over a real database and encrypted file store", () => {
         { event_no: 2, kind: "USED", amount_micros: 440_000, investigation_id: closed, report_version: 1 }]);
     } finally { await seedPool.end(); }
   });
+
+  it("E16 (0193) a vote the person cast is in their account.json, by the debate's public reference and the UTC time, and nobody else's is", async () => {
+    const me = await account("upvoter@example.test"), other = await account("other-upvoter@example.test");
+    const ref = randomUUID(), seedPool = createPool(db.connectionString);
+    try {
+      // The other account's debate, started as E2 starts its published one: under a content key, so 0040's barrier admits its page
+      // (a debate seedRuns starts carries no key, and serve.publication_snapshot refuses it with PRIVATE_CONTENT_ERASED).
+      const users = new FileUserDekStore(join(root, randomUUID()), loadKek(generateDek()));
+      await users.store(other.userId, generateDek());
+      configureContentEncryption(seedPool, new ContentCipher(new FileRunContentKeyStore(join(root, randomUUID()), users, async () => other.userId)));
+      const run = await new RunRepository(seedPool).startRun({
+        questionLine: "e16-upvoted-question", askContract: { audience: "data-export-test" },
+        principal: { kind: "server", userId: other.userId, ownerRef: other.ownerRef },
+        sessionId: other.sessionId, callerScope: "ASKER", asOf: new Date(),
+        askerRiskTier: "casual", effectiveRiskTier: "casual", tierSource: "ASKER",
+        tierProvenanceRef: "data-export-test", compositionBudgetTier: "low",
+        depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1),
+        strangerSampleRate: 1, envelopeBasis: { source: "data-export-test" },
+        registerVersion: 1, batteryVersion: "data-export-test", batteryRows: []
+      });
+      // A page of its own, written as E2 writes one. The reader answers a vote whatever the debate's state, so no visibility event is needed.
+      await db.pool.query(`INSERT INTO serve.publication_snapshot(publication_ref,run_id,format_version,content_ciphertext,created_at)
+        VALUES($1,$2,1,$3::jsonb,clock_timestamp())`, [ref, run, JSON.stringify({ v: 1, keyId: `publication-snapshot:${ref}:v1`, nonce: "AA", ct: "AA", tag: "AA" })]);
+      // Two votes on the same debate, written as 0193's cast writes them: mine and another account's.
+      await db.pool.query("INSERT INTO identity.public_debate_upvote(publication_ref,owner_ref) VALUES($1,$2),($1,$3)", [ref, me.ownerRef, other.ownerRef]);
+      const { store, row } = await completed(me);
+      const archive = entries(await store.read(row.export_id, me.userId));
+      const accountJson = JSON.parse(archive["account.json"]!) as Record<string, unknown>;
+      expect(accountJson.debates_you_upvoted).toEqual([{ debate_reference: ref, upvoted_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3,6}Z$/u) }]);
+      expect(Object.keys(accountJson).at(-1)).toBe("debates_you_upvoted");
+      const all = JSON.stringify(archive);
+      for (const absent of [other.ownerRef, other.email, other.userId]) expect(all, absent).not.toContain(absent);
+    } finally { await seedPool.end(); }
+  });
 });

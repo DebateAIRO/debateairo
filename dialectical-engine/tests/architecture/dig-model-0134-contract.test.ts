@@ -276,7 +276,8 @@ describe("0134: the dig model and the month pause", () => {
     const exporter = read("packages/db/src/data-export.ts");
     expect(exporter).toContain(`"${EXPORT_READER}",`);
     // V4 start step, Task 39e: 0162's export reader is the twenty-fifth worker function (after 0157's moderation reader).
-    expect(exporter).toContain("worker.worker_count !== 25");
+    // Public debate upvotes: 0193's export reader is the twenty-sixth.
+    expect(exporter).toContain("worker.worker_count !== 26");
   });
 
   it("C-R is documented as the twenty-fourth step", () => {
