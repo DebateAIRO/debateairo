@@ -5323,6 +5323,7 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 | SB14 | later: the old release retired; its receipt | up | WB2 (its runner restarts in database-ahead mode) |
 | SB14b | only after a reboot or a runner crash during the drain: the runners start again | up | – |
 | SB15 | later, on the owner's yes: the release before the old one, archived | up | move its folders back |
+| CLEARLOOK, CLEAR1 | later, when the disk is short, on the owner's yes: one archive folder, or the seven folders of one unused label, deleted for good (SB15b) | up | none: NOTHING is kept |
 
 After SB8 the online backup is a last resort only (spec §11): going back is the switch the other way, never a restore.
 
@@ -5929,23 +5930,34 @@ Turnstile relay's unit runs its program from or has as its working folder (SB15)
 the pnpm store this upload's A3 started from (`OSTORE`, SB1): if this upload is undone and staged again from
 `OLABEL`, that staging starts from the same store. When no release is left to name, its line says so: ask.
 
+**`DISK`** reads the free space on `/` and wants 15 GB. SB4 runs after the staging, which takes about 4 GB (A3 wants 15
+GB free before it), so the disk needs about 19 GB free before SB1. SB15 frees nothing: it only moves a release into the
+archive. When the disk is short, CLEARLOOK and CLEAR1 (SB15b) say which archive folders and given-up stagings may go,
+and delete them, one name per run, on the owner's yes; then SB4 again. They never take this upload's own release, or
+what its lock copy pins, while the upload may still be taken back.
+
 **`NO_MAINTENANCE`** says which of two things it found. `maintenance pending` is MT1's flag ("Infrastructure
 maintenance"); the switch refuses while it is there. `reboot required` is Ubuntu's own flag `/run/reboot-required`: a
 system update is installed that takes effect only after a restart. The release check is the only step that reads that
 flag: no other step of the upload reads it, and neither does the switch (SB13 and DR6 read only MT1's flag), so every
 step runs the same with it. On the side-by-side path it alone makes the verdict `NOT_READY`; on the drained path it is
 named with the other BAD checks. Whether to go on with the upload with the restart still owed, or to restart the
-server first and run SB4 again, is the owner's decision:
+server first and begin the upload again from SB3, is the owner's decision:
 - **To go on**, run SB4 again with `REBOOT='later'` at its top. That run prints `NO_MAINTENANCE: reboot required is
   not counted …` and then ends as it would without the flag: `SB4_DONE` on the side-by-side path (then SB5), the
   expected `DRAINED_PATH` line on the drained path. `REBOOT='later'` passes only the restart flag: `maintenance
   pending`, alone or with it, still stops.
-- **To restart first**: ask; no step of these guides restarts the server. The restart comes at a quiet time while no
-  release drains (and on the upload that brings the Amazon gate, not between piece 2 and the yes:
-  `deploy/preview-auth-dev/v1/MAIN-SITE.md`, part 2). After it, what comes back by itself and what must be started by
-  hand is the lifecycle guide's "Boot sequence" (`deploy/preview-lifecycle/v1/README.md`): no runner starts by itself,
+- **To restart first**: the lifecycle guide's "Restarting the server" (`deploy/preview-lifecycle/v1/README.md`), on
+  the owner's yes: RESTART_LOOK reads whether now is a safe time, RESTART_GO restarts, RESTART_UP starts by hand what
+  the boot does not start and proves the state before. The restart stops the API and restarts the gates, so it is no
+  brake, and the order rules of `deploy/preview-auth-dev/v1/MAIN-SITE.md` keep it out of an upload from SB3 to the
+  end of DR6 (or SB13). SB4 comes after SB3: to restart first, leave this upload before it changes anything live
+  (before SB8, or DR2 on the drained path), restart at a quiet time, and begin the upload again from SB3 (SB3b sets
+  SB3's plan aside; ask first). On the upload that brings the Amazon gate the restart also never comes between piece
+  2 and the yes (`deploy/preview-auth-dev/v1/MAIN-SITE.md`, part 2). After it, what comes back by itself and what must
+  be started by hand is the lifecycle guide's "Boot sequence" (`deploy/preview-lifecycle/v1/README.md`): no runner starts by itself,
   during a drain SB14b starts the runners again, and an installed Amazon gate that is not switched on yet does not
-  start by itself either ("After a reboot it is not running", above). Then run SB4 again.
+  start by itself either ("After a reboot it is not running", above). SB4 then runs again in its place, after SB3.
 
 Whether the system's daily upgrade (the timer PRECHECK reads) also restarts the server by itself is its
 unattended-upgrades setting `Unattended-Upgrade::Automatic-Reboot`, which these guides do not set:
@@ -5977,9 +5989,9 @@ MX=$(sed -n 's/^const MAX_RELEASES = \([1-9][0-9]*\);.*$/\1/p' "$CAPI/dialectica
 NL=$(jq -r '.releases | length' "$LOCK")
 ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB4_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 if [ "$(jq -r --arg l "$LABEL" '.releases | has($l)' "$LOCK")" = false ] && [ "$NL" -ge "$MX" ]; then
-  RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=$(readlink -f "$RP" 2>/dev/null || true)
+  RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=''; if [ -n "$RP" ]; then RR=$(readlink -f "$RP" 2>/dev/null || true); fi
   [ -n "$RR" ] || { echo "SB4_NOT_DONE: the release lock is full ($NL of $MX releases), and the Turnstile relay's program path is unread, so no release can be named for SB15: ask"; exit 1; }
-  RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RW=$(readlink -f "${RW#!}" 2>/dev/null || true)
+  RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RW=${RW#!}; if [ -n "$RW" ]; then RW=$(readlink -f "$RW" 2>/dev/null || true); fi
   # The release folders the relay's program and its working folder lie in: those releases stay.
   RF=''; for RX in "$RR" "$RW"; do case "$RX" in /opt/debateai-v3-preview/releases/*) RX=${RX#/opt/debateai-v3-preview/releases/}; RF="$RF ${RX%%/*}";; esac; done
   # The release whose folder holds the store this upload's A3 started from: a staging again from OLABEL starts from it too.
@@ -6753,6 +6765,357 @@ echo SB15_DONE
 To undo an archive, move its folders back from the two paths the line names (`to`, `configTo`) and pin its three plans
 again.
 
+SB15 frees no room: the archive keeps every release it moved there (about 4.5 GB each) until CLEAR1 deletes it for
+good, one at a time, on the owner's yes (SB15b, next).
+
+### SB15b. When the disk is short: old folders deleted for good (CLEARLOOK, CLEAR1)
+
+**Why.** Nothing else in these guides deletes a release. SB15 moves one into
+`/opt/debateai-v3-preview/archive/<label>-<UTC time>` at every upload, and a staging given up before it was pinned (an
+upload left before SB10, or before DR5 on the drained path) stays where A2 made it: six folders under
+`/opt/debateai-v3-preview/releases` (`auth-dev-candidate-<label>-api`, `-runner` and `-ui`, and the same three with
+`fallback`) and `/opt/debateai-v3-preview/artifacts/auth-dev-<label>`. The release check wants 15 GB free on `/` when SB4
+runs (`DISK`), after the staging, and a staging takes about 4 GB. So before SB1 the disk needs about 19 GB free. When it
+has less, these two steps make room.
+
+- **CLEARLOOK** only reads. It lists every entry under the archive, and every label under `releases` and `artifacts`
+  that the release lock does not pin, one line each: what deleting it would free, everything that may still need it,
+  and a last word, `may be cleared` or `KEEP: <reasons>`. Its first line says how much is free and what the release
+  check needs. It takes a few minutes: it reads every file of those folders, every running process and every link on
+  the root disk.
+- **CLEAR1** deletes ONE name that CLEARLOOK printed: one archive folder, or the seven folders of one unused label.
+  NOTHING of it is kept, and it cannot be undone. One name per run, on purpose: each deletion is its own decision, with
+  the owner's yes for that name.
+
+**What CLEARLOOK reads for each name** (CLEAR1 reads the same again, for its one name, right before it deletes):
+- what deleting it frees, in MB. A file that has another name (a hard link) outside the folders stays, so it is not
+  counted: two releases that installed from one pnpm store share their files, and each frees less alone than both
+  together;
+- whether the release lock pins it, and whether it is the current release or the one before it (the way back);
+- what the release table holds for its commit: `unknown`, or the states found. Only `RETIRED`, or `unknown`, may go;
+- how many systemd unit files, drop-ins and enabled instances name it (in their text or their name), and how many
+  units that are not inactive carry it in their name;
+- how many paths of running processes lie in it: a program, a working folder, an argument, an open file or a mapped
+  file;
+- how many symbolic links outside it, on the root disk or under `/run`, point into it. A pnpm store's record of the
+  projects it installed (`<store>/v11/projects/<id>`) is counted apart and keeps nothing: nothing runs from it, and a
+  record that points nowhere is harmless;
+- whether the Turnstile relay runs from it: its program or its working folder, read as SB4 reads them. The relay runs
+  from `releases/auth-dev-candidate-4d98f597a-fiveai-v1-api`, so the label `4d98f597a-fiveai-v1` stays: without it
+  sign-up stops. Moving the relay out of the release folders is a reviewed step of its own. An unread relay keeps
+  every name;
+- whether its numbers record (`site-inputs.json`, SB3) names a change of numbers. The first half of the way back from
+  published numbers, SB3c, reads the plan that record names, so the folder that holds it stays; the line names that
+  upload's label;
+- whether the newest upload's lock copy (`$S/release-lock.before.json`, the lock rbD-B puts back) pins it, and whether
+  it is the newest upload's own release while that is not the current one (that upload may still be under way). These
+  two keep it only until the owner declares the newest upload over: no way back will be taken any more. CLEAR1 then
+  takes `OVER='yes'`;
+- whether it holds the pnpm store the next staging starts from (SB1: the store this names file names, and the one the
+  current release's own upload names);
+- that its folders are real folders, with no link on the way to them, nothing of another file system inside, and no
+  mount point on them or inside them (read from the mount table: `rm` tells another disk only by its device number, and
+  a bind mount from the same disk has the same one, so `rm` would go through it and delete what it shows); for a label,
+  exactly its seven folders, and no other entry under `releases` or `artifacts` naming it.
+
+Both steps read the newest upload's names file (fill in its `rNN`), and stop when another upload's archive folder is
+newer. CLEARLOOK runs at any time. CLEAR1 runs with the owner's yes for its one name, and refuses, with nothing
+deleted, while an upload is under way as the other steps tell it: a release staged or draining, the maintenance flag,
+or a detached step still running. Before SB10 (or DR5 on the drained path) none of these shows, so CLEAR1 also runs
+in an upload's preparation, or when SB4 stops on `DISK`: that upload's own release, and every release its lock copy
+pins, stay until the owner declares that upload over (`OVER='yes'`), so `OVER` stays empty while an upload is being
+prepared. Run both steps the ordinary way, not detached: a detached CLEAR1 sees its own unit as a detached step still
+running, and refuses.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# CLEARLOOK: every archive folder, and every label under releases and artifacts that the release lock does not pin, with what deleting it would free and what may still need it, then may be cleared or KEEP. Read-only: nothing is moved or deleted.
+OVER=''                                                   # the look never takes an upload as declared over, whatever the shell that runs it holds: only CLEAR1's own OVER line does
+# The clear-out's facts (the same lines in CLEARLOOK and CLEAR1). A name is held to one strict pattern before any path is made from it, and CLEAR1 reads every fact again, for its one name, right before it deletes.
+export LC_ALL=C; shopt -s nullglob dotglob
+O=/opt/debateai-v3-preview; PA=/root/preview-archive; MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending; PROC=/proc; UD='/etc/systemd/system /run/systemd/system /run/systemd/transient /usr/lib/systemd/system'; WALK='/ /run'; MI=/proc/self/mountinfo
+# An archive folder's name is a release label, a dash and the UTC second SB15 archived it; a label is what SB1 makes. Both are lower-case letters, digits and dashes only.
+LRE='^[a-z0-9][a-z0-9-]{0,70}[a-z0-9]$'; ARE='^[a-z0-9][a-z0-9-]{0,70}[a-z0-9]-[0-9]{8}T[0-9]{6}Z$'; SRE='^[0-9]+ [0-9]+$'
+# The folders a name stands for, one per line: the archive folder, or a label's six release folders and its artifacts folder. Nothing for any other name.
+cpaths() { local K V; case "$1" in ''|*[!a-zA-Z0-9-]*) return 0;; esac; if [[ $1 =~ $ARE ]]; then printf '%s\n' "$O/archive/$1"; elif [[ $1 =~ $LRE ]]; then for K in candidate fallback; do for V in api runner ui; do printf '%s\n' "$O/releases/auth-dev-$K-$1-$V"; done; done; printf '%s\n' "$O/artifacts/auth-dev-$1"; fi; }
+# Whether a path is one of a name's folders, or lies in one.
+cin() { local P; while IFS= read -r P; do if [ -n "$P" ]; then case "$1" in "$P"|"$P"/*) return 0;; esac; fi; done <<<"$(cpaths "$2")"; return 1; }
+# Whether a link's target has one of a name's folders as a part of its path: any way into a folder, relative or not, names it.
+cpoints() { local P; while IFS= read -r P; do if [ -n "$P" ]; then case "/$1/" in *"/${P##*/}/"*) return 0;; esac; fi; done <<<"$(cpaths "$2")"; return 1; }
+# How many lines on stdin name a path in one of a name's folders, anywhere in the line (an argument may carry it after an = sign).
+ccount() { awk -v l="$(cpaths "$1" | tr '\n' ' ')" 'BEGIN { n = split(l, p, " ") } { for (i = 1; i <= n; i++) if (index($0, p[i] "/") || substr($0, length($0) - length(p[i]) + 1) == p[i]) { c++; break } } END { print c + 0 }'; }
+# What deleting the folders frees, in MB, then how many entries in them lie on another file system. A file with another name (a hard link) outside the folders stays, so it is not counted; no link is followed.
+csize() { "$N" -e 'const fs = require("fs"); let dev = null, blocks = 0n, other = 0; const shared = new Map(), todo = []; for (const p of process.argv.slice(1)) { const s = fs.lstatSync(p, { bigint: true }); if (dev === null) dev = s.dev; todo.push([p, s]); } while (todo.length > 0) { const [p, s] = todo.pop(); if (s.dev !== dev) { other++; continue; } if (!s.isDirectory() && s.nlink > 1n) { const e = shared.get(s.ino); if (e) e.seen++; else shared.set(s.ino, { seen: 1n, all: s.nlink, blocks: s.blocks }); } else blocks += s.blocks; if (s.isDirectory()) for (const n of fs.readdirSync(p)) { const c = p + "/" + n; todo.push([c, fs.lstatSync(c, { bigint: true })]); } } for (const e of shared.values()) if (e.seen === e.all) blocks += e.blocks; console.log(String((blocks * 512n + 524288n) / 1048576n) + " " + other);' "$@"; }
+# Every path the running processes use: program, working folder, arguments, open files and mapped files.
+ppaths() { local p; for p in "$PROC"/[0-9]*; do if [ -d "$p" ]; then readlink "$p/exe" "$p/cwd" "$p"/fd/* 2>/dev/null || true; tr '\0' '\n' 2>/dev/null < "$p/cmdline" || true; awk '$6 ~ /^\// { print $6 }' "$p/maps" 2>/dev/null || true; fi; done; }
+# The symbolic links on the root disk and under /run whose target names one of the names given, in one search: the link, a tab, its target.
+clinks() { local n m=$#; [ "$m" -gt 0 ] || return 0; for n in "$@"; do set -- "$@" -o -lname "*$n*"; done; shift "$m"; shift; { find $WALK -xdev -type l \( "$@" \) -print 2>/dev/null || true; } | while IFS= read -r n; do printf '%s\t%s\n' "$n" "$(readlink "$n" 2>/dev/null || true)"; done; }
+# How many unit files, drop-ins and enabled-instance links name it, in their text or their name, and how many units that are not inactive carry it in their name.
+cunits() { local n=0 U; for U in $UD; do if [ -d "$U" ]; then n=$(( n + $( { grep -rlF -e "$1" "$U" 2>/dev/null || true; } | wc -l) + $( { find "$U" -name "*$1*" 2>/dev/null || true; } | wc -l) )); fi; done; n=$(( n + $( { systemctl list-units --all --plain --no-legend 2>/dev/null || true; } | awk -v x="$1" '$3 != "inactive" && index($1, x) { c++ } END { print c + 0 }') )); echo "$n"; }
+# The facts every name is judged on, read once: this names file is the newest upload's; the current release and the one before it; the lock, and the newest upload's lock copy; the release table; the pnpm stores a staging starts from; the Turnstile relay's folders; the running processes' paths.
+cfacts() {
+  local F X
+  for F in "$PA"/r*-S.txt; do X=$(head -n 1 "$F" 2>/dev/null || true); if [ "${X##*-}" \> "${S##*-}" ]; then echo "$1_NOT_DONE: ${F##*/} names a newer upload's archive folder: fill in that upload's rNN; nothing changed"; exit 1; fi; done
+  CUR=$(jq -r '[.releases[] | select(.state == "CURRENT") | .label] | if length == 1 then .[0] else "" end' <<<"$ST")
+  [ -n "$CUR" ] || { echo "$1_NOT_DONE: the release table names no one current release: ask; nothing changed"; exit 1; }
+  PIN=$(jq -r '.releases | keys[]' "$LOCK") || { echo "$1_NOT_DONE: the release lock is unread: ask; nothing changed"; exit 1; }
+  LCOPY=$(jq -r '.releases | keys[]' "$S/release-lock.before.json") || { echo "$1_NOT_DONE: the newest upload's lock copy ($S/release-lock.before.json) is unread: ask; nothing changed"; exit 1; }
+  # The release before the current one: this upload's old release while its own release is the current one; and, by commit, the release that took the traffic last before the current one.
+  BEFL=''; if [ "$LABEL" = "$CUR" ]; then BEFL=$OLABEL; fi
+  RT=$(psqlq "SELECT release_key||' '||coalesce(state, 'none')||' '||coalesce(to_char(take_traffic_from AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS'), '-') FROM core.release_state_v ORDER BY 1" 2>/dev/null) || RT=unread
+  CURC=$(awk '$2 == "CURRENT" { print substr($1, index($1, "-") + 1, 9) }' <<<"$RT"); BEFC=$(awk '$2 != "CURRENT" && $3 != "-" { print $3, substr($1, index($1, "-") + 1, 9) }' <<<"$RT" | sort | tail -n 1 | cut -d ' ' -f 2)
+  # The pnpm stores the next staging starts from (SB1): the one this names file names, and the one the current release's own upload names.
+  STORES=$OSTORE; for F in "$PA"/r*-names.sh; do if grep -qx "LABEL=$CUR" "$F" 2>/dev/null; then STORES="$STORES"$'\n'"$(sed -n 's/^OSTORE=//p' "$F")"; fi; done
+  # The Turnstile relay's program and working folder, read as SB4 reads them. An empty path is never resolved: this server's readlink answers the folder it runs in for one, which would read as a relay that runs elsewhere.
+  RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=''; if [ -n "$RP" ]; then RR=$(readlink -f "$RP" 2>/dev/null || true); fi
+  RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RW=${RW#!}; if [ -n "$RW" ]; then RW=$(readlink -f "$RW" 2>/dev/null || true); fi
+  PP=$(ppaths | sort -u)
+}
+# One name judged, on one line: its facts, then "may be cleared" or "KEEP: <reasons>". CV says which (ok or keep), and CZ what it frees in MB. The newest upload's lock copy, and its own release while not current, keep a name only until the owner declares that upload over (OVER=yes).
+cjudge() {
+  local NM=$1 LB CM P X K='' W='' NF=0 NE=0 SZ=unread OT=0 RS U PR=0 LI=0 LR=0 RY=no CH=no LC=no PN=no KIND='archive folder'
+  LB=$NM; if [[ $NM =~ $ARE ]]; then LB=${NM%-*}; else KIND='unused label'; fi
+  CM=''; if [[ $LB =~ ^[0-9a-f]{9}- ]]; then CM=${LB:0:9}; fi
+  # The folders: real folders, with no link on the way; an archive folder directly under the archive, a label exactly its seven (or what a cut-off CLEAR1 left of them, once its record says it started).
+  set --
+  while IFS= read -r P; do if [ -n "$P" ]; then NF=$((NF + 1)); if [ -d "$P" ] && [ ! -L "$P" ] && [ "$(cd -P -- "$P" 2>/dev/null && pwd -P)" = "$P" ]; then NE=$((NE + 1)); set -- "$@" "$P"; elif [ -e "$P" ] || [ -L "$P" ]; then K="$K; ${P#"$O"/} is a link, or no real folder"; fi; fi; done <<<"$(cpaths "$NM")"
+  if [ "$NF" = 1 ]; then
+    [ "$NE" = 1 ] || K="$K; no real folder directly under the archive"
+  elif [ "$NF" = 7 ]; then
+    if [ "$NE" != 7 ] && ! awk -v n="$NM" '$2 == n && $3 == "started:" { f = 1 } END { exit !f }' "$PA/clear-out.log" 2>/dev/null; then K="$K; $NE of its 7 folders are there"; fi
+    [ "$NE" -gt 0 ] || K="$K; none of its folders is there"
+    X=''; for P in "$O"/releases/*"$LB"* "$O"/artifacts/*"$LB"*; do if ! cin "$P" "$NM"; then X="$X ${P#"$O"/}"; fi; done
+    [ -z "$X" ] || K="$K; other entries name it:$X"
+  else
+    K="$K; not a name CLEAR1 takes"
+  fi
+  if [ "$NE" -gt 0 ]; then X=$(csize "$@" 2>/dev/null || true); if [[ $X =~ $SRE ]]; then SZ=${X% *}; OT=${X#* }; fi; else SZ=0; fi
+  [ "$SZ" != unread ] || K="$K; what it frees is unread"
+  [ "$OT" = 0 ] || K="$K; $OT entries in it lie on another file system"
+  # Mount points on one of its folders or inside one, from the mount table. rm and the count above tell another disk only by its device number, and a bind mount from the same disk has the same one: rm would go through it and delete what it shows, which lives elsewhere.
+  X=unread; if [ -r "$MI" ]; then X=$(awk -v l="$(cpaths "$NM" | tr '\n' ' ')" 'BEGIN { n = split(l, p, " ") } { for (i = 1; i <= n; i++) if ($5 == p[i] || index($5, p[i] "/") == 1) { c++; break } } END { print c + 0 }' "$MI" 2>/dev/null || echo unread); fi
+  case "$X" in 0) ;; [1-9]*) K="$K; $X mount points on it or in it (the deletion would go through them)";; *) K="$K; the mount table is unread";; esac
+  if grep -qxF -e "$LB" <<<"$PIN"; then PN=yes; K="$K; pinned in the release lock"; fi
+  if [ "$LB" = "$CUR" ] || { [ -n "$CM" ] && [ "$CM" = "$CURC" ]; }; then K="$K; the current release"; fi
+  if [ "$LB" = "$BEFL" ] || { [ -n "$CM" ] && [ "$CM" = "$BEFC" ]; }; then K="$K; the release before the current one (the way back)"; fi
+  if [ "$RT" = unread ]; then RS=unread; K="$K; the release table is unread"
+  elif [ -z "$CM" ]; then RS=unread; K="$K; its label names no commit, so the release table cannot be read for it"
+  else
+    RS=$(awk -v c="$CM" 'substr($1, index($1, "-") + 1, 9) == c { print $2 }' <<<"$RT" | sort -u | tr '\n' ' '); RS=${RS% }; RS=${RS:-unknown}
+    case " $RS " in *" STAGED "*|*" CURRENT "*|*" DRAINING "*|*" none "*) K="$K; the release table holds its commit as $RS";; esac
+  fi
+  U=$(cunits "$LB"); if [ "$NM" != "$LB" ]; then U=$(( U + $(cunits "$NM") )); fi
+  [ "$U" = 0 ] || K="$K; systemd names it ($U unit files, drop-ins, enabled instances or units not inactive)"
+  if [ "$NE" -gt 0 ]; then PR=$(ccount "$NM" <<<"$PP"); fi
+  [ "$PR" = 0 ] || K="$K; running processes use it ($PR paths)"
+  while IFS=$'\t' read -r P X; do if [ -n "$P" ] && ! cin "$P" "$NM" && cpoints "$X" "$NM"; then case "$P" in */pnpm-store/v[0-9]*/projects/*) LR=$((LR + 1));; *) LI=$((LI + 1));; esac; fi; done <<<"$LK"
+  [ "$LI" = 0 ] || K="$K; $LI links outside it point into it"
+  if [ -z "$RR" ]; then RY=unread; K="$K; the Turnstile relay's program path is unread"
+  elif cin "$RR" "$NM" || { [ -n "$RW" ] && cin "$RW" "$NM"; }; then RY=yes; K="$K; the Turnstile relay runs from it (sign-up needs it)"; fi
+  for P in "$@"; do for X in "$P"/site-inputs.json "$P"/*/site-inputs.json; do if [ -f "$X" ] && ! jq -e '(.change // []) | length == 0' "$X" > /dev/null 2>&1; then CH=yes; fi; done; done
+  [ "$CH" = no ] || K="$K; its numbers record names a change of numbers: SB3c, the first half of the way back from them, reads the plan that record names (upload $LB)"
+  while IFS= read -r X; do if [ -n "$X" ] && cin "$X" "$NM"; then K="$K; it holds the pnpm store the next staging starts from"; fi; done <<<"$STORES"
+  if grep -qxF -e "$LB" <<<"$LCOPY"; then LC=yes; W="$W; the newest upload's lock copy pins it (rbD-B would put that lock back)"; fi
+  if [ "$LB" = "$LABEL" ] && [ "$LABEL" != "$CUR" ]; then W="$W; the newest upload's own release, not current (that upload may be under way)"; fi
+  K=${K#; }; W=${W#; }; CZ=$SZ
+  if [ -n "$K" ]; then CV=keep; X="KEEP: $K${W:+; $W}"
+  elif [ -n "$W" ] && [ "${OVER:-}" != yes ]; then CV=keep; X="KEEP: $W (until the owner declares the newest upload over: OVER=yes in CLEAR1)"
+  else CV=ok; X='may be cleared'; [ -z "$W" ] || X='may be cleared (the owner declared the newest upload over)'; fi
+  P=''; [ "$NF" = 1 ] || P="folders $NE of 7; "
+  echo "$KIND $NM: ${P}frees $SZ MB; pinned $PN; release table $RS; systemd names it $U; process paths in it $PR; links into it $LI (pnpm store records $LR); the Turnstile relay runs from it $RY; a change of numbers recorded $CH; the newest upload's lock copy names it $LC; $X"
+}
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "CLEARLOOK_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
+cfacts CLEARLOOK
+# The names: every entry directly under the archive, and every label with folders under releases or artifacts that the release lock does not pin.
+RRE='^auth-dev-(candidate|fallback)-(.+)-(api|runner|ui)$'
+AN=$(for P in "$O"/archive/*; do printf '%s\n' "${P##*/}"; done)
+LN=$( { for P in "$O"/releases/*; do if [[ ${P##*/} =~ $RRE ]]; then printf '%s\n' "${BASH_REMATCH[2]}"; fi; done; for P in "$O"/artifacts/auth-dev-*; do printf '%s\n' "${P##*/auth-dev-}"; done; } | sort -u | grep -vxF -e "$PIN" || true)
+set --; while IFS= read -r X; do if [[ $X =~ $ARE ]] || [[ $X =~ $LRE ]]; then set -- "$@" "$X"; fi; done <<<"$AN"$'\n'"$LN"
+LK=$(clinks "$@")
+FREE=$(df -Pk / | awk 'NR == 2 { print $4 }'); NEED=$(sed -n 's/^export const MIN_DISK_FREE_BYTES = \([0-9e.]*\),.*$/\1/p' "$L/release-check.mjs" 2>/dev/null || true)
+echo "free on /: $(awk -v k="${FREE:-0}" 'BEGIN { printf "%.1f", k * 1024 / 1e9 }') GB; the release check (DISK, at SB4, after the staging) needs $(awk -v b="${NEED:-x}" 'BEGIN { if (b ~ /^[0-9.e]+$/) printf "%.1f", b / 1e9; else printf "unread" }') GB; a staging takes about 4 GB"
+echo "the current release: $CUR; the one before it: ${BEFL:-unread (the release of the newest upload is not the current one)}; pinned in the release lock (not listed below): $(tr '\n' ' ' <<<"$PIN")"
+echo "the newest upload: ${S##*/}, its own release $LABEL ($([ "$LABEL" = "$CUR" ] && echo current || echo 'not current')); its lock copy pins: $(tr '\n' ' ' <<<"$LCOPY")"
+echo "the Turnstile relay runs from: ${RR:-unread} (working folder ${RW:-none})"
+echo "an upload under way: releases staged or draining $(jq '[.releases[] | select(.state == "STAGED" or .state == "DRAINING")] | length' <<<"$ST"); the maintenance flag $([ -e "$MF" ] && echo yes || echo no); a detached step running $([ -z "$(systemctl list-units 'ms-step-*' --no-legend --state=active,activating,deactivating)" ] && echo no || echo yes) (CLEAR1 refuses while any of these is there)"
+NOK=0; TOK=0
+while IFS= read -r X; do if [ -z "$X" ]; then continue; elif [[ $X =~ $ARE ]]; then cjudge "$X"; if [ "$CV" = ok ]; then NOK=$((NOK + 1)); TOK=$((TOK + CZ)); fi; else echo "archive entry $(printf '%q' "$X"): not an archive folder's name (CLEAR1 does not take it); KEEP: ask"; fi; done <<<"$AN"
+while IFS= read -r X; do if [ -z "$X" ]; then continue; elif [[ $X =~ $LRE ]]; then cjudge "$X"; if [ "$CV" = ok ]; then NOK=$((NOK + 1)); TOK=$((TOK + CZ)); fi; else echo "label $(printf '%q' "$X") under releases or artifacts: not a release label (CLEAR1 does not take it); KEEP: ask"; fi; done <<<"$LN"
+echo "may be cleared: $NOK names, $TOK MB in all (each counted alone; names that share files free more together)"
+echo CLEARLOOK_DONE
+```
+
+Expect the free-space line, the current release and the one before it, the pinned releases, the newest upload and what
+its lock copy pins, the relay's folder, the line on an upload under way, then one line per name, the sum, and
+`CLEARLOOK_DONE`. A name's line ends `may be cleared`, or `KEEP:` and every reason. A read-only look on the server on
+26 November 2026 (before these steps) found ten archive folders of about 4.5 GB each, the unused labels
+`6bc78eff1-r23-v1` and `47bc87fd1-r24-v1` (stagings given up before they were pinned) and the October release
+`ca61cbe00-r21-v1` (on the old layout), nothing linking into the archive from outside it, no numbers record with a
+change, and the relay running from `4d98f597a-fiveai-v1`; upload r34's lock copy still pinned `3226cf2ae-r30-v1`, which
+was archived that day. So CLEARLOOK is expected to keep `4d98f597a-fiveai-v1` (the relay) and the archive folder of
+`3226cf2ae-r30-v1` (until the owner declares upload r34 over), and to say the others may be cleared, unless it finds
+more. A `KEEP` it gives for any other reason: ask before anything else.
+
+**CLEAR1.** Fill in `NAME` with one name exactly as CLEARLOOK printed it (the archive folder's whole name, with its
+time, or the label), `YES` with the same name again once the owner said yes to deleting it, and `OVER='yes'` only when
+the owner has declared the newest upload over. It refuses, with nothing deleted, while an upload is under way (a release
+staged or draining, the maintenance flag, a detached step running); when `NAME` is empty, holds a slash, a dot, a glob,
+a space or a line break, or is neither an archive folder's name nor a label; when `YES` is not the same name; when a
+folder is a link, has a link on the way to it, or is not where the name says (directly under the archive, or a label's
+seven folders under `releases` and `artifacts`); and when CLEARLOOK's line for the name, read again now, does not end
+`may be cleared`. Then it prints each folder it deletes with its size, says that NOTHING is kept, and writes a first line
+to the root-only record `/root/preview-archive/clear-out.log` (the time, the name, `started`, the MB it expects to free).
+It deletes each folder with `rm -rf --one-file-system --preserve-root=all`, which removes a link inside as a link and
+never what it points to, does not go into another disk, and refuses `/`; a bind mount from the same disk would not stop
+it, which is why a name with a mount point on it or inside it is never cleared. It reads the free space before and after,
+and writes a second line (the time, the name, `deleted` or `not wholly deleted`, the MB freed). So each run adds two
+lines: the first lets a run cut off half way take what is left of a label's folders.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# CLEAR1: deletes ONE archive folder, or the seven folders of ONE unused label, that CLEARLOOK said may be cleared, on the owner's yes. NOTHING is kept: it cannot be undone.
+NAME=''                                                   # one name exactly as CLEARLOOK printed it: an archive folder's whole name, or an unused label
+YES=''                                                    # the same name again, typed once the owner said yes to deleting it
+OVER=''                                                   # yes, only once the owner declared the newest upload over (no way back will be taken any more); else empty
+# The clear-out's facts (the same lines in CLEARLOOK and CLEAR1). A name is held to one strict pattern before any path is made from it, and CLEAR1 reads every fact again, for its one name, right before it deletes.
+export LC_ALL=C; shopt -s nullglob dotglob
+O=/opt/debateai-v3-preview; PA=/root/preview-archive; MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending; PROC=/proc; UD='/etc/systemd/system /run/systemd/system /run/systemd/transient /usr/lib/systemd/system'; WALK='/ /run'; MI=/proc/self/mountinfo
+# An archive folder's name is a release label, a dash and the UTC second SB15 archived it; a label is what SB1 makes. Both are lower-case letters, digits and dashes only.
+LRE='^[a-z0-9][a-z0-9-]{0,70}[a-z0-9]$'; ARE='^[a-z0-9][a-z0-9-]{0,70}[a-z0-9]-[0-9]{8}T[0-9]{6}Z$'; SRE='^[0-9]+ [0-9]+$'
+# The folders a name stands for, one per line: the archive folder, or a label's six release folders and its artifacts folder. Nothing for any other name.
+cpaths() { local K V; case "$1" in ''|*[!a-zA-Z0-9-]*) return 0;; esac; if [[ $1 =~ $ARE ]]; then printf '%s\n' "$O/archive/$1"; elif [[ $1 =~ $LRE ]]; then for K in candidate fallback; do for V in api runner ui; do printf '%s\n' "$O/releases/auth-dev-$K-$1-$V"; done; done; printf '%s\n' "$O/artifacts/auth-dev-$1"; fi; }
+# Whether a path is one of a name's folders, or lies in one.
+cin() { local P; while IFS= read -r P; do if [ -n "$P" ]; then case "$1" in "$P"|"$P"/*) return 0;; esac; fi; done <<<"$(cpaths "$2")"; return 1; }
+# Whether a link's target has one of a name's folders as a part of its path: any way into a folder, relative or not, names it.
+cpoints() { local P; while IFS= read -r P; do if [ -n "$P" ]; then case "/$1/" in *"/${P##*/}/"*) return 0;; esac; fi; done <<<"$(cpaths "$2")"; return 1; }
+# How many lines on stdin name a path in one of a name's folders, anywhere in the line (an argument may carry it after an = sign).
+ccount() { awk -v l="$(cpaths "$1" | tr '\n' ' ')" 'BEGIN { n = split(l, p, " ") } { for (i = 1; i <= n; i++) if (index($0, p[i] "/") || substr($0, length($0) - length(p[i]) + 1) == p[i]) { c++; break } } END { print c + 0 }'; }
+# What deleting the folders frees, in MB, then how many entries in them lie on another file system. A file with another name (a hard link) outside the folders stays, so it is not counted; no link is followed.
+csize() { "$N" -e 'const fs = require("fs"); let dev = null, blocks = 0n, other = 0; const shared = new Map(), todo = []; for (const p of process.argv.slice(1)) { const s = fs.lstatSync(p, { bigint: true }); if (dev === null) dev = s.dev; todo.push([p, s]); } while (todo.length > 0) { const [p, s] = todo.pop(); if (s.dev !== dev) { other++; continue; } if (!s.isDirectory() && s.nlink > 1n) { const e = shared.get(s.ino); if (e) e.seen++; else shared.set(s.ino, { seen: 1n, all: s.nlink, blocks: s.blocks }); } else blocks += s.blocks; if (s.isDirectory()) for (const n of fs.readdirSync(p)) { const c = p + "/" + n; todo.push([c, fs.lstatSync(c, { bigint: true })]); } } for (const e of shared.values()) if (e.seen === e.all) blocks += e.blocks; console.log(String((blocks * 512n + 524288n) / 1048576n) + " " + other);' "$@"; }
+# Every path the running processes use: program, working folder, arguments, open files and mapped files.
+ppaths() { local p; for p in "$PROC"/[0-9]*; do if [ -d "$p" ]; then readlink "$p/exe" "$p/cwd" "$p"/fd/* 2>/dev/null || true; tr '\0' '\n' 2>/dev/null < "$p/cmdline" || true; awk '$6 ~ /^\// { print $6 }' "$p/maps" 2>/dev/null || true; fi; done; }
+# The symbolic links on the root disk and under /run whose target names one of the names given, in one search: the link, a tab, its target.
+clinks() { local n m=$#; [ "$m" -gt 0 ] || return 0; for n in "$@"; do set -- "$@" -o -lname "*$n*"; done; shift "$m"; shift; { find $WALK -xdev -type l \( "$@" \) -print 2>/dev/null || true; } | while IFS= read -r n; do printf '%s\t%s\n' "$n" "$(readlink "$n" 2>/dev/null || true)"; done; }
+# How many unit files, drop-ins and enabled-instance links name it, in their text or their name, and how many units that are not inactive carry it in their name.
+cunits() { local n=0 U; for U in $UD; do if [ -d "$U" ]; then n=$(( n + $( { grep -rlF -e "$1" "$U" 2>/dev/null || true; } | wc -l) + $( { find "$U" -name "*$1*" 2>/dev/null || true; } | wc -l) )); fi; done; n=$(( n + $( { systemctl list-units --all --plain --no-legend 2>/dev/null || true; } | awk -v x="$1" '$3 != "inactive" && index($1, x) { c++ } END { print c + 0 }') )); echo "$n"; }
+# The facts every name is judged on, read once: this names file is the newest upload's; the current release and the one before it; the lock, and the newest upload's lock copy; the release table; the pnpm stores a staging starts from; the Turnstile relay's folders; the running processes' paths.
+cfacts() {
+  local F X
+  for F in "$PA"/r*-S.txt; do X=$(head -n 1 "$F" 2>/dev/null || true); if [ "${X##*-}" \> "${S##*-}" ]; then echo "$1_NOT_DONE: ${F##*/} names a newer upload's archive folder: fill in that upload's rNN; nothing changed"; exit 1; fi; done
+  CUR=$(jq -r '[.releases[] | select(.state == "CURRENT") | .label] | if length == 1 then .[0] else "" end' <<<"$ST")
+  [ -n "$CUR" ] || { echo "$1_NOT_DONE: the release table names no one current release: ask; nothing changed"; exit 1; }
+  PIN=$(jq -r '.releases | keys[]' "$LOCK") || { echo "$1_NOT_DONE: the release lock is unread: ask; nothing changed"; exit 1; }
+  LCOPY=$(jq -r '.releases | keys[]' "$S/release-lock.before.json") || { echo "$1_NOT_DONE: the newest upload's lock copy ($S/release-lock.before.json) is unread: ask; nothing changed"; exit 1; }
+  # The release before the current one: this upload's old release while its own release is the current one; and, by commit, the release that took the traffic last before the current one.
+  BEFL=''; if [ "$LABEL" = "$CUR" ]; then BEFL=$OLABEL; fi
+  RT=$(psqlq "SELECT release_key||' '||coalesce(state, 'none')||' '||coalesce(to_char(take_traffic_from AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISS'), '-') FROM core.release_state_v ORDER BY 1" 2>/dev/null) || RT=unread
+  CURC=$(awk '$2 == "CURRENT" { print substr($1, index($1, "-") + 1, 9) }' <<<"$RT"); BEFC=$(awk '$2 != "CURRENT" && $3 != "-" { print $3, substr($1, index($1, "-") + 1, 9) }' <<<"$RT" | sort | tail -n 1 | cut -d ' ' -f 2)
+  # The pnpm stores the next staging starts from (SB1): the one this names file names, and the one the current release's own upload names.
+  STORES=$OSTORE; for F in "$PA"/r*-names.sh; do if grep -qx "LABEL=$CUR" "$F" 2>/dev/null; then STORES="$STORES"$'\n'"$(sed -n 's/^OSTORE=//p' "$F")"; fi; done
+  # The Turnstile relay's program and working folder, read as SB4 reads them. An empty path is never resolved: this server's readlink answers the folder it runs in for one, which would read as a relay that runs elsewhere.
+  RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=''; if [ -n "$RP" ]; then RR=$(readlink -f "$RP" 2>/dev/null || true); fi
+  RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RW=${RW#!}; if [ -n "$RW" ]; then RW=$(readlink -f "$RW" 2>/dev/null || true); fi
+  PP=$(ppaths | sort -u)
+}
+# One name judged, on one line: its facts, then "may be cleared" or "KEEP: <reasons>". CV says which (ok or keep), and CZ what it frees in MB. The newest upload's lock copy, and its own release while not current, keep a name only until the owner declares that upload over (OVER=yes).
+cjudge() {
+  local NM=$1 LB CM P X K='' W='' NF=0 NE=0 SZ=unread OT=0 RS U PR=0 LI=0 LR=0 RY=no CH=no LC=no PN=no KIND='archive folder'
+  LB=$NM; if [[ $NM =~ $ARE ]]; then LB=${NM%-*}; else KIND='unused label'; fi
+  CM=''; if [[ $LB =~ ^[0-9a-f]{9}- ]]; then CM=${LB:0:9}; fi
+  # The folders: real folders, with no link on the way; an archive folder directly under the archive, a label exactly its seven (or what a cut-off CLEAR1 left of them, once its record says it started).
+  set --
+  while IFS= read -r P; do if [ -n "$P" ]; then NF=$((NF + 1)); if [ -d "$P" ] && [ ! -L "$P" ] && [ "$(cd -P -- "$P" 2>/dev/null && pwd -P)" = "$P" ]; then NE=$((NE + 1)); set -- "$@" "$P"; elif [ -e "$P" ] || [ -L "$P" ]; then K="$K; ${P#"$O"/} is a link, or no real folder"; fi; fi; done <<<"$(cpaths "$NM")"
+  if [ "$NF" = 1 ]; then
+    [ "$NE" = 1 ] || K="$K; no real folder directly under the archive"
+  elif [ "$NF" = 7 ]; then
+    if [ "$NE" != 7 ] && ! awk -v n="$NM" '$2 == n && $3 == "started:" { f = 1 } END { exit !f }' "$PA/clear-out.log" 2>/dev/null; then K="$K; $NE of its 7 folders are there"; fi
+    [ "$NE" -gt 0 ] || K="$K; none of its folders is there"
+    X=''; for P in "$O"/releases/*"$LB"* "$O"/artifacts/*"$LB"*; do if ! cin "$P" "$NM"; then X="$X ${P#"$O"/}"; fi; done
+    [ -z "$X" ] || K="$K; other entries name it:$X"
+  else
+    K="$K; not a name CLEAR1 takes"
+  fi
+  if [ "$NE" -gt 0 ]; then X=$(csize "$@" 2>/dev/null || true); if [[ $X =~ $SRE ]]; then SZ=${X% *}; OT=${X#* }; fi; else SZ=0; fi
+  [ "$SZ" != unread ] || K="$K; what it frees is unread"
+  [ "$OT" = 0 ] || K="$K; $OT entries in it lie on another file system"
+  # Mount points on one of its folders or inside one, from the mount table. rm and the count above tell another disk only by its device number, and a bind mount from the same disk has the same one: rm would go through it and delete what it shows, which lives elsewhere.
+  X=unread; if [ -r "$MI" ]; then X=$(awk -v l="$(cpaths "$NM" | tr '\n' ' ')" 'BEGIN { n = split(l, p, " ") } { for (i = 1; i <= n; i++) if ($5 == p[i] || index($5, p[i] "/") == 1) { c++; break } } END { print c + 0 }' "$MI" 2>/dev/null || echo unread); fi
+  case "$X" in 0) ;; [1-9]*) K="$K; $X mount points on it or in it (the deletion would go through them)";; *) K="$K; the mount table is unread";; esac
+  if grep -qxF -e "$LB" <<<"$PIN"; then PN=yes; K="$K; pinned in the release lock"; fi
+  if [ "$LB" = "$CUR" ] || { [ -n "$CM" ] && [ "$CM" = "$CURC" ]; }; then K="$K; the current release"; fi
+  if [ "$LB" = "$BEFL" ] || { [ -n "$CM" ] && [ "$CM" = "$BEFC" ]; }; then K="$K; the release before the current one (the way back)"; fi
+  if [ "$RT" = unread ]; then RS=unread; K="$K; the release table is unread"
+  elif [ -z "$CM" ]; then RS=unread; K="$K; its label names no commit, so the release table cannot be read for it"
+  else
+    RS=$(awk -v c="$CM" 'substr($1, index($1, "-") + 1, 9) == c { print $2 }' <<<"$RT" | sort -u | tr '\n' ' '); RS=${RS% }; RS=${RS:-unknown}
+    case " $RS " in *" STAGED "*|*" CURRENT "*|*" DRAINING "*|*" none "*) K="$K; the release table holds its commit as $RS";; esac
+  fi
+  U=$(cunits "$LB"); if [ "$NM" != "$LB" ]; then U=$(( U + $(cunits "$NM") )); fi
+  [ "$U" = 0 ] || K="$K; systemd names it ($U unit files, drop-ins, enabled instances or units not inactive)"
+  if [ "$NE" -gt 0 ]; then PR=$(ccount "$NM" <<<"$PP"); fi
+  [ "$PR" = 0 ] || K="$K; running processes use it ($PR paths)"
+  while IFS=$'\t' read -r P X; do if [ -n "$P" ] && ! cin "$P" "$NM" && cpoints "$X" "$NM"; then case "$P" in */pnpm-store/v[0-9]*/projects/*) LR=$((LR + 1));; *) LI=$((LI + 1));; esac; fi; done <<<"$LK"
+  [ "$LI" = 0 ] || K="$K; $LI links outside it point into it"
+  if [ -z "$RR" ]; then RY=unread; K="$K; the Turnstile relay's program path is unread"
+  elif cin "$RR" "$NM" || { [ -n "$RW" ] && cin "$RW" "$NM"; }; then RY=yes; K="$K; the Turnstile relay runs from it (sign-up needs it)"; fi
+  for P in "$@"; do for X in "$P"/site-inputs.json "$P"/*/site-inputs.json; do if [ -f "$X" ] && ! jq -e '(.change // []) | length == 0' "$X" > /dev/null 2>&1; then CH=yes; fi; done; done
+  [ "$CH" = no ] || K="$K; its numbers record names a change of numbers: SB3c, the first half of the way back from them, reads the plan that record names (upload $LB)"
+  while IFS= read -r X; do if [ -n "$X" ] && cin "$X" "$NM"; then K="$K; it holds the pnpm store the next staging starts from"; fi; done <<<"$STORES"
+  if grep -qxF -e "$LB" <<<"$LCOPY"; then LC=yes; W="$W; the newest upload's lock copy pins it (rbD-B would put that lock back)"; fi
+  if [ "$LB" = "$LABEL" ] && [ "$LABEL" != "$CUR" ]; then W="$W; the newest upload's own release, not current (that upload may be under way)"; fi
+  K=${K#; }; W=${W#; }; CZ=$SZ
+  if [ -n "$K" ]; then CV=keep; X="KEEP: $K${W:+; $W}"
+  elif [ -n "$W" ] && [ "${OVER:-}" != yes ]; then CV=keep; X="KEEP: $W (until the owner declares the newest upload over: OVER=yes in CLEAR1)"
+  else CV=ok; X='may be cleared'; [ -z "$W" ] || X='may be cleared (the owner declared the newest upload over)'; fi
+  P=''; [ "$NF" = 1 ] || P="folders $NE of 7; "
+  echo "$KIND $NM: ${P}frees $SZ MB; pinned $PN; release table $RS; systemd names it $U; process paths in it $PR; links into it $LI (pnpm store records $LR); the Turnstile relay runs from it $RY; a change of numbers recorded $CH; the newest upload's lock copy names it $LC; $X"
+}
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "CLEAR1_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
+# No upload under way, as the other steps tell it: no release staged or draining (the names file's guard in MAIN-SITE.md), no maintenance flag, no detached step running.
+[ "$(jq '[.releases[] | select(.state == "STAGED" or .state == "DRAINING")] | length' <<<"$ST")" = 0 ] || { echo "CLEAR1_NOT_DONE: a release is staged or draining (an upload is under way): wait until it is over; nothing deleted"; exit 1; }
+[ ! -e "$MF" ] || { echo "CLEAR1_NOT_DONE: the maintenance flag is there (a restart of the server, or other maintenance, is under way): wait until it is over; nothing deleted"; exit 1; }
+[ -z "$(systemctl list-units 'ms-step-*' --no-legend --state=active,activating,deactivating)" ] || { echo "CLEAR1_NOT_DONE: a detached step still runs (read its log first); nothing deleted"; exit 1; }
+# The name: one, exactly as CLEARLOOK printed it, never a path, and the owner's yes for it.
+[ -n "$NAME" ] || { echo "CLEAR1_NOT_DONE: NAME is empty: fill in one name as CLEARLOOK printed it; nothing deleted"; exit 1; }
+case "$NAME" in */*) echo "CLEAR1_NOT_DONE: NAME holds a slash: it is a name, never a path; nothing deleted"; exit 1;; esac
+case "$NAME" in *[!a-zA-Z0-9-]*) echo "CLEAR1_NOT_DONE: NAME holds a character no name has (a name is letters, digits and dashes: never . or .., a glob, a space or a line break); nothing deleted"; exit 1;; esac
+if [[ $NAME =~ $ARE ]] || [[ $NAME =~ $LRE ]]; then :; else echo "CLEAR1_NOT_DONE: NAME is neither an archive folder's name nor a release label; nothing deleted"; exit 1; fi
+[ "$YES" = "$NAME" ] || { echo "CLEAR1_NOT_DONE: YES is not the same name again (the owner's yes for this one name); nothing deleted"; exit 1; }
+case "$OVER" in ''|yes) ;; *) echo "CLEAR1_NOT_DONE: OVER is yes or empty; nothing deleted"; exit 1;; esac
+# The three roots are real folders, with no link on the way to them.
+for X in "$O" "$O/archive" "$O/releases" "$O/artifacts"; do [ -d "$X" ] && [ ! -L "$X" ] && [ "$(cd -P -- "$X" && pwd -P)" = "$X" ] || { echo "CLEAR1_NOT_DONE: $X is not a real folder (a link on the way to it?): ask; nothing deleted"; exit 1; }; done
+cfacts CLEAR1
+LK=$(clinks "$NAME")
+cjudge "$NAME"
+[ "$CV" = ok ] || { echo "CLEAR1_NOT_DONE: $NAME may not be cleared now (the line above says why); nothing deleted"; exit 1; }
+# What goes: each folder, with its size as it stands, then the free space before.
+set --; while IFS= read -r X; do if [ -n "$X" ] && [ -d "$X" ] && [ ! -L "$X" ]; then set -- "$@" "$X"; echo "to delete: ${X#"$O"/}, $(du -sm "$X" 2>/dev/null | cut -f 1) MB as it stands"; fi; done <<<"$(cpaths "$NAME")"
+[ "$#" -gt 0 ] || { echo "CLEAR1_NOT_DONE: none of the folders of $NAME is there; nothing deleted"; exit 1; }
+F0=$(df -Pk / | awk 'NR == 2 { print $4 }')
+echo "NOTHING of $NAME is kept, and this cannot be undone; it frees about $CZ MB"
+{ ( umask 077; printf '%s %s started: about %s MB to free\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$NAME" "$CZ" >> "$PA/clear-out.log" ) && chmod 0600 "$PA/clear-out.log"; } || { echo "CLEAR1_NOT_DONE: the record $PA/clear-out.log could not be written: ask; nothing deleted"; exit 1; }
+# One rm per folder, each checked against the three roots first: rm removes a link inside as a link, never what it points to, does not go into another disk, and refuses /. It tells a disk only by its device number, so a bind mount from the same disk would not stop it: cjudge keeps every name with a mount point on it or in it.
+GONE=yes
+for X in "$@"; do
+  case "$X" in "$O"/archive/?*|"$O"/releases/auth-dev-?*|"$O"/artifacts/auth-dev-?*) ;; *) echo "CLEAR1_NOT_DONE: $X lies outside the archive, releases and artifacts: nothing more deleted: ask"; exit 1;; esac
+  rm -rf --one-file-system --preserve-root=all -- "$X" || GONE=no
+  if [ -e "$X" ] || [ -L "$X" ]; then GONE=no; fi
+done
+F1=$(df -Pk / | awk 'NR == 2 { print $4 }'); MB=$(( (${F1:-0} - ${F0:-0}) / 1024 ))
+( umask 077; printf '%s %s %s: %s MB freed\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$NAME" "$([ "$GONE" = yes ] && echo deleted || echo 'not wholly deleted')" "$MB" >> "$PA/clear-out.log" ) || true
+[ "$GONE" = yes ] || { echo "CLEAR1_NOT_DONE: $NAME is not wholly deleted ($MB MB freed; what was removed is not kept, and the rest is still there): run CLEARLOOK, then CLEAR1 again with the same name for what is left; if it stops again: ask"; exit 1; }
+echo "deleted for good: $NAME; $MB MB freed; free on / now $(awk -v k="$F1" 'BEGIN { printf "%.1f", k * 1024 / 1e9 }') GB (before: $(awk -v k="$F0" 'BEGIN { printf "%.1f", k * 1024 / 1e9 }') GB); two lines added to $PA/clear-out.log (started, then deleted)"
+echo CLEAR1_DONE
+```
+
+Expect CLEARLOOK's line for the name again (ending `may be cleared`), one `to delete:` line per folder, the `NOTHING of
+<name> is kept` line, then `deleted for good: <name>; <n> MB freed; free on / now …` and `CLEAR1_DONE`. Then run
+CLEARLOOK again before the next name: its first line says whether the disk has room now. If the window is lost while
+CLEAR1 deletes, the folders are partly gone: run CLEARLOOK, then CLEAR1 again with the same name. Its record's
+`started` line lets it take what is left of a label's seven folders.
+
 ### The way back, side by side
 
 Going back is the same switch in the other direction (spec §11): no restore and no outage. Which script depends on where
@@ -7013,15 +7376,21 @@ SB5d when this upload needs them, then PRECHECK, GATEREADY and GATELIVE ("The or
 It only reads, and it runs right before GATEREADY and GATELIVE, after every step that writes the new release's env
 files. It asks, with the site still up, what DR2 to DR6 and the way back will need: the three new env files (root's
 `0640`, no key twice) and the old release's files as SB1 copied them; the UI-to-API proof lines and copies (SB5c); the
-fence line, folder and drop-in (FENCEDIR, H11 step 2); that no key store or key file folder sits at or above the
-fence folder (the new API refuses that, `restore-fence-path`); the publication settings' state (`A` with
-`PUBLICATION_ENABLED=true`, once MAIN-SITE.md 5.9 switched publishing on and DR1 copied its four lines; `C` without
-both path lines, before it: nothing new can refuse; `B`, both paths without the true line, as MAIN-SITE.md's PUBOFF
+fence line, folder and drop-in (FENCEDIR, H11 step 2), read for the upload it is: on the first upload with the fence
+(the old release's api file has no `RESTORE_FENCE_PATH` line) the folder FENCEDIR made, still empty; on every later
+upload the old API's own fence file in it (a plain `0600` file of the API's user, not empty) and the database's fence
+row (a token, no public hold, moved on in the last three minutes while the old API runs); that no key store or key file
+folder sits at or above the fence folder (the new API refuses that, `restore-fence-path`); the publication settings'
+state (`A` with `PUBLICATION_ENABLED=true`, once MAIN-SITE.md 5.9 switched publishing on and DR1 copied its four
+lines; `C` without both path lines, before it: nothing new can refuse; `B`, both paths without the true line, as MAIN-SITE.md's PUBOFF
 leaves the file once a debate was public: stop, the corpus key, the store and the cleanup login need a reviewed check
 first); the database folder (no link
-in or around it, no extra tablespace) and the free space DR3 needs; the four functions migration 0178 asks about (the
-three that must share the ledger's owner, and the one whose owner must be a superuser) and that no schema
-`erasure_reconcile` exists; that none of the API's, the runner's and the scheduler's logins has a connection limit
+in or around it, no extra tablespace) and the free space DR3 needs; migration 0178, read from the ledger: while it is
+not there, the four functions it asks about (the three that must share the ledger's owner, and the one whose owner must
+be a superuser) and that no schema `erasure_reconcile` exists; once it is there, that the schema `erasure_reconcile`
+exists, that it and the two functions 0178 made in it with the ledger's owner keep that owner (the runner checks 0178's
+recorded evidence again at DR4), and that the fence's settle function keeps a superuser owner; that none of the API's,
+the runner's and the scheduler's logins has a connection limit
 (other logins, such as Hatchet's, the migrator's and the staff readiness writer's, have theirs on purpose and are not
 read); that no session has sat idle in a transaction for a minute; that the Terms and the Privacy Policy of this release
 carry the right effective day (today, Bucharest, for a version the live release does not carry yet; the day it has in
@@ -7047,10 +7416,27 @@ UU=$(systemctl show -p User --value "debateai-preview-ui@$OLABEL")
 [ "$(grep -c '^DIALECTICAL_UI_API_PROOF_PATH=' "$U" || true)" = 1 ] && grep -qxF "DIALECTICAL_UI_API_PROOF_PATH=$PRF/ui.secret" "$U" || bad proof "ui-$LABEL.env does not hold DIALECTICAL_UI_API_PROOF_PATH exactly once (SB5c)"
 [ -n "$UU" ] && [ "$(stat -c '%a %U' "$PRF/ui.secret" 2>/dev/null || true)" = "400 $UU" ] && [ "$(stat -c '%a %U' "$PRF/api/proof.secret" 2>/dev/null || true)" = "600 $AU" ] && [ "$(stat -c '%a %U' "$PRF/api" 2>/dev/null || true)" = "700 $AU" ] && cmp -s "$PRF/ui.secret" "$PRF/api/proof.secret" || bad proof "a proof copy is missing, the two differ, or a copy or its folder has the wrong mode or owner (SB5c)"
 echo "proof: read"
-# The restore fence (FENCEDIR, H11 step 2), and no key store or key file folder at or above its folder.
-[ "$(grep -c '^RESTORE_FENCE_PATH=' "$A" || true)" = 1 ] && grep -qxF "RESTORE_FENCE_PATH=$FENCE" "$A" || bad fence "api-$LABEL.env does not hold RESTORE_FENCE_PATH exactly once (H11 step 2)"
-[ "$(stat -c '%a %U %G' "${FENCE%/*}" 2>/dev/null || true)" = "700 $AU $AGRP" ] && [ ! -e "$FENCE" ] || bad fence "the fence folder is not the API's empty 0700 folder (FENCEDIR)"
-cmp -s "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/debateai-preview-api-restore-fence.conf" /etc/systemd/system/debateai-preview-api@.service.d/zzzzzzzzzz-fence-restore.conf && systemctl show -p ReadWritePaths "debateai-preview-api@$OLABEL" | grep -qF -- "-${FENCE%/*}" || bad fence "the fence drop-in is not this release's, or the API's unit does not list the folder (FENCEDIR)"
+# The restore fence (FENCEDIR, H11 step 2), and no key store or key file folder at or above its folder. The old
+# release's api file says which upload this is. Without a RESTORE_FENCE_PATH line it is the first upload with the fence:
+# FENCEDIR made the folder and left it empty. With one, the old API runs with the fence: its own 0600 file sits in the
+# folder (a token it rewrites every minute, in step with the database's row), and FENCEDIR and H11 step 2 do not run
+# again. Never empty, delete or rewrite that file to make this check pass: an empty file is the restore mark and a
+# missing one does not match the row, so the new API would sign everyone out and hold the public library at its first
+# start (RESTORE_REVOKED), and a file not the API's own 0600 file stops it (RESTORE_FENCE_FILE_INSECURE).
+if grep -q '^RESTORE_FENCE_PATH=' "$E/api-$OLABEL.env"; then FOLD=yes; FH11='DR1 copies it from the old api file: ask'; FDIR='ask: FENCEDIR runs only before the first upload with the fence'; else FOLD=no; FH11='H11 step 2'; FDIR='FENCEDIR'; fi
+echo "fence: the old release's api file names RESTORE_FENCE_PATH: $FOLD ($([ "$FOLD" = yes ] && echo 'a later upload: the old API keeps the fence file' || echo 'the first upload with the fence: the folder is empty'))"
+[ "$(grep -c '^RESTORE_FENCE_PATH=' "$A" || true)" = 1 ] && grep -qxF "RESTORE_FENCE_PATH=$FENCE" "$A" || bad fence "api-$LABEL.env does not hold RESTORE_FENCE_PATH exactly once ($FH11)"
+if [ "$FOLD" = no ]; then
+  [ "$(stat -c '%a %U %G' "${FENCE%/*}" 2>/dev/null || true)" = "700 $AU $AGRP" ] && [ ! -e "$FENCE" ] || bad fence "the fence folder is not the API's empty 0700 folder (FENCEDIR)"
+else
+  [ "$(stat -c '%a %U %G' "${FENCE%/*}" 2>/dev/null || true)" = "700 $AU $AGRP" ] && [ -f "$FENCE" ] && [ "$(stat -c '%a %U' "$FENCE" 2>/dev/null || true)" = "600 $AU" ] && [ -s "$FENCE" ] || bad fence "the fence folder is not the API's 0700 folder, or the fence file in it is missing, empty, not a plain file, or not the API's 0600 file: leave it as it is and ask"
+  OAPI=$(systemctl is-active "debateai-preview-api@$OLABEL" 2>/dev/null || true)
+  FROW=$(psqlq "SELECT CASE WHEN fence_token IS NULL THEN 'no' ELSE 'yes' END||' '||CASE WHEN public_hold_since IS NULL THEN 'no' ELSE 'yes' END||' '||CASE WHEN now() - interval '3 minutes' < advanced_at THEN 'yes' ELSE 'no' END FROM identity.restore_fence WHERE singleton" || echo unread)
+  read -r FTOK FHOLD FMOVED <<<"$FROW"
+  echo "fence row: token ${FTOK:-unread}; public hold ${FHOLD:-unread}; moved on in the last three minutes ${FMOVED:-unread}; the old API ${OAPI:-unread}"
+  [ "$OAPI" = active ] && [ "${FTOK:-} ${FHOLD:-} ${FMOVED:-}" = 'yes no yes' ] || bad fence "the old API is not running, or the database's fence row holds no token, holds the public library, or has not moved on in three minutes (H11 step 4 reads a hold): ask"
+fi
+cmp -s "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/debateai-preview-api-restore-fence.conf" /etc/systemd/system/debateai-preview-api@.service.d/zzzzzzzzzz-fence-restore.conf && systemctl show -p ReadWritePaths "debateai-preview-api@$OLABEL" | grep -qF -- "-${FENCE%/*}" || bad fence "the fence drop-in is not this release's, or the API's unit does not list the folder ($FDIR)"
 NO=0
 for K in USER_DEK_STORE_PATH PUBLICATION_KEY_STORE_PATH AUDIT_KEY_STORE_PATH DATA_EXPORT_STORE_PATH BILLING_NOTICE_SPOOL_PATH; do V=$(sed -n "s/^$K=//p" "$A"); [ -n "$V" ] || continue; case "${FENCE%/*}/" in "${V%/}"/*) echo "OVERLAP $K"; NO=$((NO + 1));; esac; done
 for K in KEK_PATH BLIND_INDEX_KEY_PATH AUDIT_SOURCE_IP_SALT_PATH SUPPORT_KEK_PATH RECORDS_KEY_PATH CORPUS_KEK_PATH CONTENT_BLIND_INDEX_KEY_PATH KEK_PREVIOUS_PATH CORPUS_KEK_PREVIOUS_PATH SUPPORT_KEK_PREVIOUS_PATH NETOPIA_API_KEY_PATH NETOPIA_IPN_KEYS_PATH QUADERNO_API_KEY_PATH SMARTBILL_CREDENTIALS_PATH OWNER_REPORT_EMAIL_PATH; do V=$(sed -n "s/^$K=//p" "$A"); [ -n "$V" ] || continue; KD=$(dirname "$V"); case "${FENCE%/*}/" in "${KD%/}"/*) echo "OVERLAP $K"; NO=$((NO + 1));; esac; done
@@ -7068,12 +7454,30 @@ SIZE=$(du -sm "$PGP/v3-preview" 2>/dev/null | cut -f1 || true); AVAIL=$(df --out
 echo "data folder: $SIZE MB, links in it $NL, extra tablespaces $NT; free $AVAIL MB"
 [ ! -L "$PGP/v3-preview" ] && ! findmnt -n "$PGP/v3-preview" > /dev/null && [ "$NL" = 0 ] && [ "$NT" = 0 ] || bad data-folder "the data folder is a link or a mount point, holds a link, or the cluster has another tablespace: DR3's copy would miss it"
 [ "$AVAIL" -gt $((SIZE * 2 + 2048)) ] || bad space "not enough free space for DR3's copy"
-# The database: the four functions 0178 asks about, the schema it makes, the logins' connection limits, open transactions.
-OWN=$(psqlq "SELECT p.oid::regprocedure||' '||CASE WHEN p.proowner = (SELECT relowner FROM pg_class WHERE oid = 'public.debateai_schema_migration'::regclass) THEN 'same' ELSE 'DIFFERENT' END FROM pg_proc p WHERE p.oid IN (to_regprocedure('core.claim_run_key_provision_cleanup(integer)'), to_regprocedure('core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)'), to_regprocedure('core.private_erasure_run_chain(uuid)')) ORDER BY 1" || echo unread)
-echo "$OWN" | sed 's/^/owner against the ledger owner: /'
-[ "$(grep -c ' same$' <<<"$OWN" || true)" = 3 ] || bad database-roles "a function 0178 checks is missing, or its owner is not the ledger's owner"
-[ "$(psqlq "SELECT coalesce((SELECT r.rolsuper FROM pg_proc p JOIN pg_roles r ON r.oid = p.proowner WHERE p.oid = to_regprocedure('identity.authenticate_session_t9(text,text,timestamptz,timestamptz)'))::text, 'missing')")" = true ] || bad database-roles "identity.authenticate_session_t9's owner is not a superuser (0178 refuses RESTORE_FENCE_OWNER_NOT_SUPERUSER)"
-[ "$(psqlq "SELECT to_regnamespace('erasure_reconcile') IS NULL")" = t ] || bad database-roles "a schema erasure_reconcile exists already (0178 makes it)"
+# The database: migration 0178 (read from the ledger), the logins' connection limits, open transactions. While 0178 is
+# not in the ledger, DR4 runs it, and it asks once: three functions that share the ledger's owner, one whose owner is a
+# superuser, and no schema erasure_reconcile before it makes one. Once 0178 is in the ledger it never asks that again;
+# the runner instead compares 0178's recorded evidence at every migrate (DR4 too), which names the schema
+# erasure_reconcile, its owner and the functions in it. So after it, the schema must be there, it and the two functions
+# 0178 made in it under the ledger's owner keep that owner, and the fence's settle, which 0178 gave a superuser owner
+# because a detected restore revokes staff sessions and closes recoveries, keeps one.
+M178=$(psqlq "SELECT count(*) FROM public.debateai_schema_migration WHERE name = '0178_security_fixes_run3.sql'" || echo unread)
+echo "migration 0178 in the ledger: $([ "$M178" = 0 ] && echo no || { [ "$M178" = 1 ] && echo yes || echo unread; })"
+if [ "$M178" = 0 ]; then
+  OWN=$(psqlq "SELECT p.oid::regprocedure||' '||CASE WHEN p.proowner = (SELECT relowner FROM pg_class WHERE oid = 'public.debateai_schema_migration'::regclass) THEN 'same' ELSE 'DIFFERENT' END FROM pg_proc p WHERE p.oid IN (to_regprocedure('core.claim_run_key_provision_cleanup(integer)'), to_regprocedure('core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)'), to_regprocedure('core.private_erasure_run_chain(uuid)')) ORDER BY 1" || echo unread)
+  echo "$OWN" | sed 's/^/owner against the ledger owner: /'
+  [ "$(grep -c ' same$' <<<"$OWN" || true)" = 3 ] || bad database-roles "a function 0178 checks is missing, or its owner is not the ledger's owner"
+  [ "$(psqlq "SELECT coalesce((SELECT r.rolsuper FROM pg_proc p JOIN pg_roles r ON r.oid = p.proowner WHERE p.oid = to_regprocedure('identity.authenticate_session_t9(text,text,timestamptz,timestamptz)'))::text, 'missing')" || true)" = true ] || bad database-roles "identity.authenticate_session_t9's owner is not a superuser (0178 refuses RESTORE_FENCE_OWNER_NOT_SUPERUSER)"
+  [ "$(psqlq "SELECT to_regnamespace('erasure_reconcile') IS NULL" || true)" = t ] || bad database-roles "a schema erasure_reconcile exists already (0178 makes it)"
+elif [ "$M178" = 1 ]; then
+  [ "$(psqlq "SELECT to_regnamespace('erasure_reconcile') IS NOT NULL" || true)" = t ] || bad database-roles "0178 is in the ledger and the schema erasure_reconcile is missing (0178's recorded evidence names it; every migrate, DR4 too, checks it again)"
+  OWN=$(psqlq "SELECT o FROM (SELECT 'schema erasure_reconcile '||CASE WHEN n.nspowner = (SELECT relowner FROM pg_class WHERE oid = 'public.debateai_schema_migration'::regclass) THEN 'same' ELSE 'DIFFERENT' END FROM pg_namespace n WHERE n.oid = to_regnamespace('erasure_reconcile') UNION ALL SELECT p.oid::regprocedure||' '||CASE WHEN p.proowner = (SELECT relowner FROM pg_class WHERE oid = 'public.debateai_schema_migration'::regclass) THEN 'same' ELSE 'DIFFERENT' END FROM pg_proc p WHERE p.oid IN (to_regprocedure('erasure_reconcile.claim_run_key_provision_cleanup(integer)'), to_regprocedure('erasure_reconcile.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)'))) AS x(o) ORDER BY 1" || echo unread)
+  echo "$OWN" | sed 's/^/owner against the ledger owner: /'
+  [ "$(grep -c ' same$' <<<"$OWN" || true)" = 3 ] || bad database-roles "the schema erasure_reconcile or a function 0178 made in it is missing, or its owner is not the ledger's owner (0178's recorded evidence names that owner; DR4 checks it again)"
+  [ "$(psqlq "SELECT coalesce((SELECT r.rolsuper FROM pg_proc p JOIN pg_roles r ON r.oid = p.proowner WHERE p.oid = to_regprocedure('identity.restore_fence_settle_v1(text,text)'))::text, 'missing')" || true)" = true ] || bad database-roles "identity.restore_fence_settle_v1's owner is not a superuser (a detected restore could not revoke staff sessions or close recoveries)"
+else
+  bad database-roles "the ledger's row for 0178 is unread"
+fi
 CL=$(psqlq "SELECT coalesce(string_agg(rolname, ' ' ORDER BY rolname), '') FROM pg_roles WHERE rolcanlogin AND rolconnlimit <> -1 AND (rolname LIKE 'debateai_prod_api%' OR rolname LIKE 'debateai_prod_runner%' OR rolname LIKE 'debateai_prod_scheduler%')" || echo unread)
 echo "connection limits of the API, runner and scheduler logins: ${CL:-no limit set}"
 [ -z "$CL" ] || bad database-roles "these API, runner or scheduler logins have a connection limit: $CL"
@@ -7116,15 +7520,26 @@ echo "the system's daily upgrade next runs: ${UP:-not scheduled}"
 echo PRECHECK_DONE
 ```
 
-What to expect: the read lines above, `key places at or above the fence folder: 0`, `publication state A` (publishing
-on, MAIN-SITE.md 5.9) or `C` (before it),
-`connection limits of the API, runner and scheduler logins: no limit set`, `sessions idle in a transaction for a minute
-or more: 0`, three `owner against the ledger owner: ... same` lines, the time the system's daily upgrade next runs, and
-then `PRECHECK_DONE`. Do not give the yes within an hour before that upgrade time: an upgrade during the downtime can
-restart Docker or the database under DR3 to DR6 (DR2 also refuses to start while one runs). On `PRECHECK_NOT_DONE` the
-last line names each subject that is not ready, and a `BAD (<subject>)` line above it says what. Nothing has changed and
-the site is up: give no yes. `proof`, `fence` and `payment-marks` name the step that makes them (SB5c, FENCEDIR or H11
-step 2, PM2); before the launch plans exist those steps can still run. `legal-date` means a text with a new version
+What to expect: the read lines above; the `fence:` line, which says which upload it read (`no`: the first upload with
+the fence, its folder still empty; `yes`: a later upload, where the old API keeps its fence file), and on a later upload
+`fence row: token yes; public hold no; moved on in the last three minutes yes; the old API active`; `key places at or
+above the fence folder: 0`; `publication state A` (publishing on, MAIN-SITE.md 5.9) or `C` (before it); `migration 0178
+in the ledger: no` with three `owner against the ledger owner: core.… same` lines, or `yes` with three such lines for
+`erasure_reconcile.claim_run_key_provision_cleanup(integer)`, `erasure_reconcile.prepare_private_run_erasure(…)` and
+`schema erasure_reconcile`; `connection limits of the API, runner and scheduler logins: no limit set`; `sessions idle in
+a transaction for a minute or more: 0`; the time the system's daily upgrade next runs; and then `PRECHECK_DONE`. Do not
+give the yes within an hour before that upgrade time: an upgrade during the downtime can restart Docker or the database
+under DR3 to DR6 (DR2 also refuses to start while one runs). On `PRECHECK_NOT_DONE` the last line names each subject
+that is not ready, and a `BAD (<subject>)` line above it says what. Nothing has changed and the site is up: give no yes.
+`proof` and `payment-marks` name the step that makes them (SB5c, PM2). `fence` does too on the first upload with the
+fence (FENCEDIR or H11 step 2); before the launch plans exist those steps can still run. On a later upload neither runs
+(FENCEDIR refuses a folder with the fence file in it, and H11 step 2 a file that has the line already), so a `fence`
+line there means stop and ask: a missing, empty or foreign fence file, or a fence row that holds the library or has
+stopped moving, would make the new API sign everyone out and hold the public library at its first start, or refuse to
+start. Never empty, delete or rewrite the fence file to make PRECHECK pass: an empty file is the restore mark, and a
+missing one reads as a restore. `database-roles` on a database 0178 has not reached means DR4 would refuse it; once
+0178 is in the ledger, a missing schema `erasure_reconcile` or a changed owner means DR4's check of 0178's recorded
+evidence would refuse: stop and ask either way. `legal-date` means a text with a new version
 does not carry the upload day, or a text the live release already carries does not keep its day there: stop, a new
 day needs a new commit ("The legal texts' day", before SB1). The `legal day:` lines say how each text was read.
 `open-transactions` names the program that holds the transaction: close it, then PRECHECK again. `release-lock`: run SB4
