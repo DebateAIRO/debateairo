@@ -8,6 +8,8 @@ import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import composeEnglish from "@/messages/en/compose.json";
 import { RESET_TIME_MARK, ResetSentence } from "@/components/billing/ResetSentence";
+import { LibraryVote } from "@/components/LibraryVote";
+import { upvoteMessageCatalog } from "@/lib/upvoteWords";
 
 /* The published verdict, in the reader's locale (it used to be the enum title-cased in English). */
 // OWNER WORDING — approve before R2b's upload (Q1 ships live, engine 1 included). Q1 option 1: CONTESTED's word becomes the locale's
@@ -49,6 +51,7 @@ function LibraryRow({
   flagged = false,
   flagLabel,
   confidenceBand,
+  claimId,
   catalog,
   composeCatalog
 }: {
@@ -63,6 +66,7 @@ function LibraryRow({
   flagged?: boolean;
   flagLabel?: string;
   confidenceBand?: string | null;
+  claimId?: string;
   catalog: MessageCatalog;
   composeCatalog: MessageCatalog;
 }) {
@@ -75,7 +79,7 @@ function LibraryRow({
       <div className="libRowCore" data-bezel="core">
         <div className="libRowBody">
           {flagged ? <div className="libFlag"><span className="libFlagMark" aria-hidden /><span className="libFlagLabel">{flagLabel ?? t(catalog, "home.flag.flagged")}</span></div> : null}
-          <div className="libRowClaim">{claim}</div>
+          <div className="libRowClaim" id={claimId}>{claim}</div>
           <p className="libRowMeta">
             {by === undefined ? null : <>{byBefore}<span className="libRowBy">{by}</span>{byAfter} · </>}
             {meta}
@@ -176,7 +180,8 @@ export function PublicDebatesBuffer({
   catalog,
   timeCatalog,
   locale,
-  composeCatalog = composeEnglish
+  composeCatalog = composeEnglish,
+  votes
 }: {
   readonly debates: readonly PublicDebateSummary[];
   catalog: MessageCatalog;
@@ -184,10 +189,14 @@ export function PublicDebatesBuffer({
   locale: string;
   /** The reader's `compose` catalogue: model family names on the row dots. */
   composeCatalog?: MessageCatalog;
+  /** The home page's reader, for the vote boxes; absent everywhere else, and then no row has a box. */
+  votes?: Readonly<{ signedIn: boolean; voted: ReadonlySet<string>; signInHref: string }>;
 }) {
   if (debates.length === 0) {
     return <div className="libEmpty">{t(catalog, "home.noPublishedDebates")}</div>;
   }
+  // Picked once, and only for the home page: other callers mount the list with no catalogue at all.
+  const upvoteWords = votes === undefined ? null : upvoteMessageCatalog(catalog);
   return debates.map((debate) => {
     const models = debate.models ?? [];
     const modelCount = models.length > 0
@@ -200,7 +209,12 @@ export function PublicDebatesBuffer({
     const verdict = label === null
       ? t(catalog, "home.verdictUnavailable")
       : t(catalog, VERDICT_KEYS[label]);
-    return (
+    // Upvotes (design of 26 Nov 2026, section 4): a row is boxed only on the home page and only when the API sent its
+    // count; a row with no count comes from an API before the upvotes and is not a zero.
+    const count = debate.vote_count;
+    const boxed = votes !== undefined && upvoteWords !== null && count !== undefined;
+    const claimId = boxed ? `lib-claim-${debate.public_ref}` : undefined;
+    const row = (
       <LibraryRow
         key={debate.public_ref}
         href={`/public/debate/${encodeURIComponent(debate.public_ref)}`}
@@ -215,9 +229,18 @@ export function PublicDebatesBuffer({
         status={verdict}
         generatedStatus={label !== null}
         state={label === null ? "generating" : VERDICT_PILL_STATES[label]}
+        claimId={claimId}
         catalog={catalog}
         composeCatalog={composeCatalog}
       />
+    );
+    if (!boxed) return row;
+    return (
+      <LibraryVote key={debate.public_ref} publicRef={debate.public_ref} initialCount={count}
+        initialVoted={votes.voted.has(debate.public_ref)} signedIn={votes.signedIn} signInHref={votes.signInHref}
+        catalog={upvoteWords} locale={locale} describedBy={claimId}>
+        {row}
+      </LibraryVote>
     );
   });
 }

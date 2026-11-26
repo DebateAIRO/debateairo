@@ -117,6 +117,54 @@ describe("public library rows name the verdict from the locale catalogue", () =>
   });
 });
 
+// Upvotes (design 2026-11-26, sections 4 and 7.4): the list hands each row that carries a count to the vote box, with the
+// reader's own words. The box itself is tests/render/library-vote.test.tsx's; this is the hand-over.
+describe("public library rows carry the vote box in the reader's language", () => {
+  const SIGN_IN = "/login?next=%2F%3Ftab%3Dpublic";
+  const COUNTS = [0, 1, 2, 20, 1234];
+  const plain = COUNTS.map((_, index) => publicRow("SUPPORTED", index));
+  const counted = plain.map((row, index) => ({ ...row, vote_count: COUNTS[index]! }));
+  const noneVoted = { signedIn: true, voted: new Set<string>(), signInHref: SIGN_IN };
+
+  async function library(debates: readonly PublicDebateSummary[], votes?: typeof noneVoted): Promise<HTMLElement> {
+    const [home, chrome, time, compose] = await Promise.all([
+      loadNamespace("ro", "home"), loadNamespace("ro", "chrome"), loadNamespace("ro", "time"), loadNamespace("ro", "compose")
+    ]);
+    const container = document.createElement("div");
+    container.innerHTML = renderToStaticMarkup(
+      <PublicDebatesBuffer debates={debates} catalog={{ ...home, ...chrome }} timeCatalog={time} locale="ro" composeCatalog={compose}
+        {...(votes === undefined ? {} : { votes })} />
+    );
+    return container;
+  }
+
+  it("names each box with the Romanian form for its count and writes 1234 as 1,2k", async () => {
+    const list = await library(counted, { ...noneVoted, voted: new Set([counted[2]!.public_ref]) });
+    const buttons = [...list.querySelectorAll("button[data-library-vote]")];
+    // one: 1. few: 0 and 2. other: 20 and 1234 (the "de" form). The spoken name holds the whole number.
+    expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Votați. 0 voturi", "Votați. 1 vot", "Votați. 2 voturi", "Votați. 20 de voturi", "Votați. 1234 de voturi"
+    ]);
+    expect(buttons.map((button) => button.querySelector(".libVoteCount")?.textContent)).toEqual(["0", "1", "2", "20", "1,2k"]);
+    expect(buttons.map((button) => button.getAttribute("aria-pressed"))).toEqual(["false", "false", "true", "false", "false"]);
+    expect(buttons.map((button) => button.getAttribute("aria-describedby"))).toEqual(counted.map((row) => `lib-claim-${row.public_ref}`));
+    expect(list.querySelector("a button")).toBeNull();
+    expect(list.querySelectorAll(".libVoteRow > a.libRow[data-library-row]")).toHaveLength(5);
+    // MUT: hand the box the English catalogue, or "en" as its locale -> RED.
+    expect(list.innerHTML).not.toContain("Upvote");
+  });
+
+  it("draws a box only for a row with a count, in a list that was given the votes", async () => {
+    const before = (await library(plain)).innerHTML;
+    expect(before).not.toMatch(/libVote|lib-claim-|<button/);
+    // A count without the votes (every caller but the home page), and the votes without a count (an older API): the old row.
+    expect((await library(counted)).innerHTML).toBe(before);
+    expect((await library(plain, noneVoted)).innerHTML).toBe(before);
+    // An empty list stays the one empty line.
+    expect((await library([], noneVoted)).innerHTML).toBe((await library([])).innerHTML);
+  });
+});
+
 describe("consent copy paints in the reader's locale on its first render", () => {
   let root: Root | null = null;
   let container: HTMLDivElement | null = null;

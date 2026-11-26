@@ -27,15 +27,40 @@ type JSDOMModule = {
 
 const routeMocks = vi.hoisted(() => ({
   sessionCookie: "t".repeat(43) as string | null,
-  readPublicDebates: vi.fn(async () => ({ items: [] as PublicDebateSummary[], total: 0 })),
-  listDebatesPageServer: vi.fn(async () => ({ summaries: [] as DebateSummary[], shown: 0, total: 0 }))
+  readPublicDebates: vi.fn(async (_limit: number, _offset: number) => ({ items: [] as PublicDebateSummary[], total: 0 })),
+  readOwnPublicVotes: vi.fn(async (_refs: readonly string[]) => ({ voted: [] as string[] })),
+  listDebatesPageServer: vi.fn(async () => ({ summaries: [] as DebateSummary[], shown: 0, total: 0 })),
+  // Each server read, with the session its client was made with ("none" for the anonymous client), in order.
+  serverReads: [] as string[],
+  // The props the list hands each vote box, in row order (a static render cannot press the box).
+  voteProps: [] as Record<string, unknown>[]
 }));
 
 vi.mock("@/lib/serverApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/serverApi.js")>()),
-  createServerContractClient: () => ({ readPublicDebates: routeMocks.readPublicDebates }),
+  createServerContractClient: (_fetch?: unknown, session?: string) => ({
+    readPublicDebates: (limit: number, offset: number) => {
+      routeMocks.serverReads.push(`readPublicDebates:${session ?? "none"}`);
+      return routeMocks.readPublicDebates(limit, offset);
+    },
+    readOwnPublicVotes: (refs: readonly string[]) => {
+      routeMocks.serverReads.push(`readOwnPublicVotes:${session ?? "none"}`);
+      return routeMocks.readOwnPublicVotes(refs);
+    }
+  }),
   listDebatesPageServer: routeMocks.listDebatesPageServer
 }));
+
+// The real vote box, with the props it was handed kept for the assertions.
+vi.mock("@/components/LibraryVote", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../apps/ui/components/LibraryVote.js")>();
+  return {
+    LibraryVote: (props: Parameters<typeof actual.LibraryVote>[0]) => {
+      routeMocks.voteProps.push(props);
+      return <actual.LibraryVote {...props} />;
+    }
+  };
+});
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({
@@ -317,7 +342,17 @@ describe("lists", () => {
       items: publicDebates,
       total: 37
     });
+    routeMocks.readOwnPublicVotes.mockReset().mockResolvedValue({ voted: [] });
+    routeMocks.serverReads.length = 0;
+    routeMocks.voteProps.length = 0;
   });
+
+  // Upvotes (design 2026-11-26, sections 4 and 7.4): the same three rows as an API that has the feature sends them.
+  const VOTE_COUNTS = [0, 1, 1249] as const;
+  const countedDebates = publicDebates.map((debate, at) => ({ ...debate, vote_count: VOTE_COUNTS[at]! }));
+  const countedRefs = countedDebates.map((debate) => debate.public_ref);
+  const SIGN_IN = "/login?next=%2F%3Ftab%3Dpublic";
+  const voteButtons = (rendered: Document) => [...rendered.querySelectorAll<HTMLButtonElement>("button[data-library-vote]")];
 
   function expectLiveCount(document: Document, exact: string): void {
     const navigation = document.querySelector('.sectionHead[aria-label="Debate library"]');
@@ -394,6 +429,107 @@ describe("lists", () => {
     expect(publicMatches.length).toBe(1);
     expect(publicList.querySelector(".recentList")?.nextElementSibling === publicMatches[0]).toBe(true);
     expect(yoursMatches.length).toBe(0);
+  });
+
+  it("gives each public row that carries a count one vote box beside its link, never inside it", async () => {
+    routeMocks.readPublicDebates.mockResolvedValue({ items: countedDebates, total: 37 });
+    routeMocks.readOwnPublicVotes.mockResolvedValue({ voted: [countedRefs[1]!] });
+    const rendered = await renderRoute("t".repeat(43), "public");
+    const buttons = voteButtons(rendered);
+
+    expect(buttons).toHaveLength(3);
+    expect(rendered.querySelector("a button")).toBeNull();
+    expect(buttons.map((button) => button.getAttribute("aria-pressed"))).toEqual(["false", "true", "false"]);
+    expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual(["Upvote. 0 votes", "Upvote. 1 vote", "Upvote. 1249 votes"]);
+    expect(buttons.map((button) => button.querySelector(".libVoteCount")?.textContent)).toEqual(["0", "1", "1.2k"]);
+    buttons.forEach((button, at) => {
+      const box = button.parentElement!;
+      const link = box.querySelector<HTMLAnchorElement>(':scope > a.libRow[data-library-row][data-bezel="shell"]');
+      const claim = link?.querySelector(".libRowClaim");
+      expect(box.className).toBe("libVoteRow");
+      expect(box.parentElement?.classList.contains("recentList")).toBe(true);
+      expect(box.hasAttribute("data-library-row") || box.hasAttribute("data-bezel")).toBe(false);
+      expect(button.hasAttribute("data-library-row") || button.hasAttribute("data-bezel")).toBe(false);
+      expect(button.hasAttribute("disabled")).toBe(false);
+      expect(link?.getAttribute("href")).toBe(`/public/debate/${countedRefs[at]}`);
+      expect(claim?.textContent).toBe(countedDebates[at]!.question);
+      expect(claim?.id).toBe(`lib-claim-${countedRefs[at]}`);
+      expect(button.getAttribute("aria-describedby")).toBe(claim?.id);
+    });
+    // The chip still counts rows, not boxes, and the indexing note still follows the list.
+    expectLiveCount(rendered, "3 TOTAL");
+    expect(rendered.querySelector(".recentList")?.nextElementSibling?.textContent?.trim()).toBe(disclosure);
+  });
+
+  it("asks once which rows the account upvoted, with its session, and still reads the list without one", async () => {
+    routeMocks.readPublicDebates.mockResolvedValue({ items: countedDebates, total: 37 });
+    routeMocks.readOwnPublicVotes.mockResolvedValue({ voted: [countedRefs[1]!] });
+    await renderRoute("t".repeat(43), "public");
+
+    expect(routeMocks.readPublicDebates.mock.calls).toEqual([[50, 0]]);
+    expect(routeMocks.readOwnPublicVotes.mock.calls).toEqual([[countedRefs]]);
+    expect(routeMocks.serverReads).toEqual(["readPublicDebates:none", `readOwnPublicVotes:${"t".repeat(43)}`]);
+    expect(routeMocks.voteProps.map(({ publicRef, initialCount, initialVoted, signedIn, signInHref, locale, describedBy }) =>
+      ({ publicRef, initialCount, initialVoted, signedIn, signInHref, locale, describedBy }))).toEqual(countedDebates.map((debate, at) => ({
+      publicRef: debate.public_ref, initialCount: VOTE_COUNTS[at], initialVoted: at === 1, signedIn: true,
+      signInHref: SIGN_IN, locale: "en", describedBy: `lib-claim-${debate.public_ref}`
+    })));
+    for (const props of routeMocks.voteProps) {
+      // Only the vote box's own words cross to the browser, and the box keeps its own way of sending.
+      expect(Object.isFrozen(props.catalog)).toBe(true);
+      expect(Object.keys(props.catalog as object).sort()).toEqual(
+        ["home.upvote.failed", "home.upvote.label.one", "home.upvote.label.other", "home.upvote.signedOut"]);
+      expect("send" in props).toBe(false);
+    }
+  });
+
+  it("draws no vote box and asks nothing on Your debates", async () => {
+    routeMocks.readPublicDebates.mockResolvedValue({ items: countedDebates, total: 37 });
+    const rendered = await renderRoute("t".repeat(43), "yours");
+
+    expect(rendered.querySelectorAll("[data-library-vote], .libVoteRow")).toHaveLength(0);
+    expect(rendered.querySelectorAll("[data-library-row]")).toHaveLength(4);
+    expect(routeMocks.readOwnPublicVotes).not.toHaveBeenCalled();
+    expect(routeMocks.voteProps).toEqual([]);
+  });
+
+  it("renders a row that carries no count exactly as before, and asks only about the rows that carry one", async () => {
+    // An API from before the upvotes sends no count: no box, no wrapper, no id, and nothing asked.
+    const plain = await renderRoute("t".repeat(43), "public");
+    expect(plain.querySelectorAll('[data-library-vote], .libVoteRow, [id^="lib-claim-"]')).toHaveLength(0);
+    expect([...plain.querySelector(".recentList")!.children].every((child) => child.matches("a.libRow[data-library-row]"))).toBe(true);
+    expect(routeMocks.readOwnPublicVotes).not.toHaveBeenCalled();
+
+    routeMocks.readPublicDebates.mockResolvedValue({ items: [countedDebates[0]!, publicDebates[1]!, countedDebates[2]!], total: 37 });
+    const mixed = await renderRoute("t".repeat(43), "public");
+    const bare = mixed.querySelectorAll("[data-library-row]")[1]!;
+    expect(voteButtons(mixed)).toHaveLength(2);
+    expect(bare.outerHTML).toBe(plain.querySelectorAll("[data-library-row]")[1]!.outerHTML);
+    expect(bare.parentElement?.classList.contains("recentList")).toBe(true);
+    expect(routeMocks.readOwnPublicVotes.mock.calls).toEqual([[[countedRefs[0], countedRefs[2]]]]);
+    expectLiveCount(mixed, "3 TOTAL");
+  });
+
+  it("keeps every row and its box, none pressed, when the account's votes cannot be read", async () => {
+    routeMocks.readPublicDebates.mockResolvedValue({ items: countedDebates, total: 37 });
+    routeMocks.readOwnPublicVotes.mockRejectedValue(new Error("the votes read is down"));
+    const rendered = await renderRoute("t".repeat(43), "public");
+
+    expect(voteButtons(rendered).map((button) => button.getAttribute("aria-pressed"))).toEqual(["false", "false", "false"]);
+    expect(routeMocks.voteProps.map((props) => props.signedIn)).toEqual([true, true, true]);
+    expect(rendered.querySelector(".error")).toBeNull();
+  });
+
+  it("shows the counts to a session that could not be confirmed, as signed out, and asks nothing", async () => {
+    routeMocks.readPublicDebates.mockResolvedValue({ items: countedDebates, total: 37 });
+    routeMocks.listDebatesPageServer.mockRejectedValue(new Error("the session could not be confirmed"));
+    const rendered = await renderRoute("t".repeat(43), "public");
+
+    expect(voteButtons(rendered).map((button) => button.querySelector(".libVoteCount")?.textContent)).toEqual(["0", "1", "1.2k"]);
+    expect(routeMocks.voteProps.map(({ signedIn, initialVoted, signInHref }) => ({ signedIn, initialVoted, signInHref }))).toEqual(
+      Array.from({ length: 3 }, () => ({ signedIn: false, initialVoted: false, signInHref: SIGN_IN })));
+    expect(routeMocks.readOwnPublicVotes).not.toHaveBeenCalled();
+    expect(routeMocks.serverReads).toEqual(["readPublicDebates:none"]);
   });
 
 });

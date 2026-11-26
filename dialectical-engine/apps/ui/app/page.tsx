@@ -26,6 +26,7 @@ import { composerRoomCatalog } from "@/lib/billing/roomCatalog";
 import { formatMoney, pricedTax, type PricedTax } from "@/lib/billing/format";
 import { availablePaymentMarks, netopiaLogoAddress } from "@/lib/billing/paymentMarks";
 import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
+import { signInHref } from "@/lib/returnPath";
 
 export const dynamic = "force-dynamic";
 
@@ -203,6 +204,20 @@ export default async function HomePage({
       legalGateCatalog = null;
     }
   }
+  // Upvotes (design of 26 Nov 2026, section 7.4): which rows of this page the account upvoted, asked once for the page of
+  // rows, with the session; the list itself stays anonymous above. A row without a count comes from an API without the
+  // vote routes, so nothing is asked about it. A failed read leaves every box unpressed.
+  let voted: ReadonlySet<string> = new Set();
+  const refs = tab === "public" && sessionConfirmed
+    ? published.items.filter((debate) => debate.vote_count !== undefined).map((debate) => debate.public_ref)
+    : [];
+  if (refs.length > 0) {
+    try {
+      voted = new Set((await createServerContractClient(fetch, token, userAgent, clientIp).readOwnPublicVotes(refs)).voted);
+    } catch {
+      voted = new Set();
+    }
+  }
 
   // V's ruling of 2026-09-20: the chip counts what is on screen. It used to
   // show the account-wide or corpus-wide aggregate, so a reader saw "41 TOTAL"
@@ -280,7 +295,8 @@ export default async function HomePage({
           <>
             {publishedError ? <div className="error">{publishedError}</div> : null}
             <div className="libList recentList">
-              <PublicDebatesBuffer debates={published.items} catalog={catalog} timeCatalog={timeCatalog} locale={locale} composeCatalog={composeCatalog} />
+              <PublicDebatesBuffer debates={published.items} catalog={catalog} timeCatalog={timeCatalog} locale={locale} composeCatalog={composeCatalog}
+                votes={{ signedIn: sessionConfirmed, voted, signInHref: signInHref("/?tab=public") }} />
             </div>
             <p className="libPublicNote">
               {t(catalog, "home.publicIndexingNotice")}
