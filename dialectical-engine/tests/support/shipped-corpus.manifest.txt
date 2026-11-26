@@ -24,6 +24,7 @@ apps/api/src/ask-billing.ts
 apps/api/src/ask-clarify.ts
 apps/api/src/ask-model-picker.ts
 apps/api/src/ask-room.ts
+apps/api/src/billing/account-country.ts
 apps/api/src/billing/account-email.ts
 apps/api/src/billing/audit.ts
 apps/api/src/billing/cancel-link.ts

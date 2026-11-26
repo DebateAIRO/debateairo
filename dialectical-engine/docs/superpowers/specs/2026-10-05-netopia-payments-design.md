@@ -1169,6 +1169,9 @@ SDD briefs) and C5 (the controller's review and records); §2.25 is the decision
   and do not change. (Since the owner's decision of 16 November 2026 the credit share is the only measure of a
   withdrawal's refund, so the refund is the same share of the price in RON, EUR or USD.)
 
+25 November 2026: for a signed-in account with a sign-up country, that country comes before the connection's on the
+pricing page and at the first quote. See `2026-11-25-account-country-pricing-design.md`.
+
 #### 2.16.2 The price list in the register (`billingPlans` v2)
 
 The rule and the prices live together in the `billingPlans` row (`packages/register/src/billing-plans.ts`), the
