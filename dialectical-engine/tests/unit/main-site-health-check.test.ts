@@ -216,6 +216,11 @@ const STUBS = [
   `C=$D/Caddyfile; M=$D/m; KEY=${KEY}; UIP=3100; HOST=dezbatere.ro; CAPI=$D/capi`,
   'ans() { local n; n=$(grep -c . "$D/restarts" 2>/dev/null || true); if [ -e "$D/after${n:-0}/$1" ]; then cat "$D/after${n:-0}/$1"; else cat "$D/ans/$1"; fi; }',
   'sleep() { :; }',
+  // The server's sort (uutils) orders by the session's language when LANG names one (en_US.UTF-8: letters first, a
+  // hyphen or a capital told apart last), and by bytes under LC_ALL=C; its comm compares bytes whatever the language.
+  // GNU's sort and comm both follow the language, so the two agree there; here they agree only under LC_ALL=C.
+  'sort() { if [ "${LC_ALL-}" = C ]; then command sort "$@"; else LC_ALL=C command sort -df "$@"; fi; }',
+  'comm() { LC_ALL=C command comm "$@"; }',
   'systemctl() { case "$1" in',
   '  list-units) case "$*" in *ms-step*) cat "$D/ms-steps" 2>/dev/null || true;; *) ans failed;; esac;;',
   '  is-active) cat "$D/caddy-state";;',
@@ -355,6 +360,29 @@ describe('HEALTH1 and HEALTH2 on the server\'s shape', () => {
     expect(w.live()).toBe(caddyfile({ repository: true, secret: false }));
     expect(w.live()).not.toContain('health_headers');
   }));
+
+  it('a unit that was failed before and still is does not read as newly failed, whatever order the session\'s language sorts in', () => {
+    // The two names sort one way by bytes (the hyphen first) and the other way by letters: a list sorted by letters,
+    // compared by bytes, would name the second as new once the first has recovered.
+    const WAIT = 'systemd-networkd-wait-online.service', GENERATOR = 'systemd-network-generator.service';
+    withWorld({ answers: { failed: `${GENERATOR}\n${WAIT}\n` }, after: { failed: `${GENERATOR}\n` } }, w => {
+      expect(run(HEALTH1, w).last).toBe('HEALTH1_DONE');
+      const two = run(HEALTH2, w);
+      expect(two.lines.find(line => line.startsWith('before: '))).toMatch(/; failed units 2$/);
+      expect(two.last, two.err).toBe('HEALTH2_DONE');
+      expect(w.file('restarts')).toBe('restart\n');
+      expect(w.live()).not.toContain('health_headers');
+    });
+    // A unit that fails only after the restart is still caught, between the two.
+    withWorld({ answers: { failed: `${GENERATOR}\n${WAIT}\n` }, after: { failed: `${GENERATOR}\nsystemd-networkd.service\n${WAIT}\n` } }, w => {
+      expect(run(HEALTH1, w).last).toBe('HEALTH1_DONE');
+      expect(run(HEALTH2, w).last).toMatch(/^HEALTH2_NOT_DONE: a check failed \(failed-units\); the file before is back /);
+    });
+    // The list a run cut off before this comparison kept is sorted again when it is read, whatever order it was written in.
+    const cut = lineOf(HEALTH2, '  NF=$(');
+    expect(cut).toContain('<(printf \'%s\\n\' "$F0" | LC_ALL=C sort) <(failed)');
+    expect(lineOf(HEALTH2, 'failed() {')).toMatch(/\| LC_ALL=C sort; \}$/);
+  });
 
   it('a failed check after the restart puts the file before back, and leaves the kept copies as they were', () => {
     const failures: Readonly<Record<string, Setup>> = {

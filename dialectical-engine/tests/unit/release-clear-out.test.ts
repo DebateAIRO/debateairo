@@ -141,8 +141,10 @@ function stubs(w: World, names: Names = {}): string[] {
     'lc() { [ "$1 $2" = \'release-check.mjs status\' ] || return 9; cat "$D/status.json"; }',
     'psqlq() { [ ! -e "$D/table-unread" ] || return 1; cat "$D/release-table"; }',
     'systemctl() { case "$1" in show) case "$3" in ExecStart) cat "$D/relay-exec";; WorkingDirectory) cat "$D/relay-wd";; esac;; list-units) case "$*" in *ms-step*) cat "$D/ms-steps";; *) cat "$D/units";; esac;; esac; }',
-    // The server's readlink (uutils) answers the folder it runs in for an empty path, where GNU's and BSD's fail: the steps must never ask it one.
-    'readlink() { if [ "$1" = -f ] && [ -z "${2-}" ]; then pwd; else command readlink "$@"; fi; }',
+    // The server's readlink (uutils) differs from GNU's and BSD's in two answers. For an empty path it answers the folder
+    // it runs in, where they fail: the steps must never ask it one. Given several paths it stops at the first it cannot
+    // read and prints none of the rest, where they read on: the steps must ask it one path at a time.
+    'readlink() { local f=no a; if [ "${1-}" = -f ]; then f=yes; shift; fi; for a in "$@"; do if [ "$f" = yes ]; then if [ -z "$a" ]; then pwd; else command readlink -f "$a" || return 1; fi; else command readlink "$a" || return 1; fi; done; }',
     'df() { printf \'Filesystem 1024-blocks Used Available Capacity Mounted on\\nscratch 100000000 1 %s 1%% /\\n\' "$(cat "$D/avail")"; }',
     'rm() { printf \'%s\\n\' "$*" >> "$D/rm-calls"; [ ! -e "$D/rm-refuses" ] || return 1; if [ "$#" = 5 ] && [ "$1 $2 $3 $4" = \'-rf --one-file-system --preserve-root=all --\' ]; then echo $(( $(cat "$D/avail") + 1024 )) > "$D/avail"; command rm -rf -- "$5"; else return 97; fi; }'
   ];
@@ -432,6 +434,18 @@ describe('CLEAR1 refuses, with nothing deleted', () => {
     symlinkSync(w.opt(`archive/${R29}`), join(proc, 'cwd'));
     writeFileSync(join(proc, 'cmdline'), '-bash\0');
     expect(refused(w, `'${R29}'`, /may not be cleared now/).of(R29)).toContain('running processes use it (1 paths)');
+    // A process whose program is unread (it is ending) still has its working folder and its open files read, and a
+    // file closed between the listing and the reading does not hide the open files after it.
+    rmSync(join(proc, 'exe'));
+    expect(refused(w, `'${R29}'`, /may not be cleared now/).of(R29)).toContain('running processes use it (1 paths)');
+    symlinkSync('/usr/bin/bash', join(proc, 'exe'));
+    rmSync(join(proc, 'cwd'));
+    symlinkSync('/', join(proc, 'cwd'));
+    writeFileSync(join(proc, 'fd', '3'), '');
+    symlinkSync(w.opt(`archive/${R28}/auth-dev-a00000028-r28-v1/shared`), join(proc, 'fd', '4'));
+    expect(refused(w, `'${R28}'`, /may not be cleared now/).of(R28)).toContain('running processes use it (1 paths)');
+    rmSync(join(proc, 'fd', '3'));
+    rmSync(join(proc, 'fd', '4'));
     // An argument with the path after an = sign, or a mapped file, counts too.
     rmSync(join(proc, 'cwd'));
     writeFileSync(join(proc, 'cmdline'), ['node', `--root=${w.opt(`releases/auth-dev-fallback-${R23}-api`)}`, ''].join('\0'));
