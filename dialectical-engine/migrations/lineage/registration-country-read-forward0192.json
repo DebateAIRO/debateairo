@@ -1,14 +1,14 @@
 {
-  "version": "registration-country-read-forward0191-v1",
+  "version": "registration-country-read-forward0192-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0190_check_deletes_public_debate.sql",
-    "manifestSha256": "e54a4c0267d9e5542874cbe2d9f1906acaeed829e75e80ef95c90587d02b9a81",
+    "name": "0191_preview_buyer_add_key_only.sql",
+    "manifestSha256": "3283292abf64644251d7c92a3b275133e3e398c3ca3b11c93d70acf00d240e5c",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {
-    "name": "0191_registration_country_read.sql",
-    "sha256": "525876690bbe19c32ce306edd175af2332e5d2e29dd9fc40faff91a9810d74a0"
+    "name": "0192_registration_country_read.sql",
+    "sha256": "3439be5367c9e4f01ab3b39ac7d74ac5f8daf88b40339052fea91fc6605a919a"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

@@ -1,5 +1,5 @@
-// tests/integration/registration-country-0191.test.ts
-// Migration 0191 on real PostgreSQL: the API's billing role reads the country an account chose at sign-up, for that account's own
+// tests/integration/registration-country-0192.test.ts
+// Migration 0192 on real PostgreSQL: the API's billing role reads the country an account chose at sign-up, for that account's own
 // request only, and learns nothing else about the region (never the US state). The reader runs on the API's request login inside the
 // account's own request, as the billing routes run it. The region rows are written by the superuser, as the sign-up would leave them.
 // Data is made up.
@@ -47,7 +47,7 @@ afterAll(async () => {
   await database?.stop();
 });
 
-describe("0191: the sign-up country, read for the request's own account", () => {
+describe("0192: the sign-up country, read for the request's own account", () => {
   it("answers the country of the request's own account, null with no sign-up region, and never the US state", async () => {
     expect(await asked(request, ana.token, ana.ownerRef)).toBe("RO");
     expect(await asked(request, tex.token, tex.ownerRef)).toBe("US");

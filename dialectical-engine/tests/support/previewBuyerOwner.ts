@@ -31,7 +31,7 @@ export function previewBuyerOwner(pool: Pool) {
     const context = (await pool.query("SELECT staff.read_context($1,$2,$3) AS context", [userId, sessionId, hash(privilegeId)])).rows[0].context as Record<string, unknown>;
     return { userId, sessionId, staffId, privilegeId, context };
   }
-  /** One change through the door at the list's current revision; an addition with its alert, a removal with or without (`locked`). */
+  /** One change through the door at the list's current revision; each with its alert, or without one while the team tools are locked (`locked`). */
   async function change(intent: "PREVIEW_BUYER_ADD" | "PREVIEW_BUYER_REMOVE", userId: string, options: Readonly<{ locked?: boolean }> = {}): Promise<void> {
     const owner = await (made ??= make());
     const at = (await pool.query("SELECT COALESCE(max(revision),0)::int AS r FROM staff.preview_buyer_event")).rows[0].r as number;

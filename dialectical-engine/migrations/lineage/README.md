@@ -10,13 +10,13 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first, the team's one limit (0142, below) the thirty-second, the hand-over (0143, below) the thirty-third, the small AI's quota charge (0144, below) the thirty-fourth, the pages waiting after "Add to researched" (0145, below) the thirty-fifth, the Owner's allowances for team members (0146, below) the thirty-sixth, the public tree (0147, below) the thirty-seventh, an erased account keeping its public debates (0148, below) the thirty-eighth, a funded person's public report in the team's month (0149, below) the thirty-ninth, a public debate under review (0150, below) the fortieth, the Report button with the sealed originals' six months (0151, below) the forty-first and a reporter's own reports in their export with what the AI checks on public rows used (0152, below) the forty-second, a finished dig's mark (0153, below) the forty-third, Iceland and Liechtenstein in the Region list (0154, below) the forty-fourth, the owner's two writes on their own answer (0155, below) the forty-fifth, the moderation notice (0156, below) the forty-sixth, the moderation statements (0157, below) the forty-seventh, the small AIs before Start in the person's quota (0158, below) the forty-eighth, the chosen paths sealed per run (0159, below) the forty-ninth, the path results per run (0160, below) the fiftieth, the path progress per run (0161, below) the fifty-first, the saved questions (0162, below) the fifty-second, the carry-on digs without a live sign-in (0163, below) the fifty-third, a dig under the main question updating the main answer (0164, below) the fifty-fourth, a failed question giving back its path-list charge (0165, below) the fifty-fifth, a later main-answer version revising the newest one, whichever table holds it (0166, below) the fifty-sixth, a visitor's report of a public debate carried by a run of their own (0167, below) the fifty-seventh, a debate an update set aside continuing where it stopped (0168, below) the fifty-eighth, the runner reading which settings are switched on (0169, below) the fifty-ninth, the daily outbound mail limit (0170, below) the sixtieth, the security review's fixes in the database (0171, below) the sixty-first, the moderation notice fixes (0172, below) the sixty-second, the check's answer on a report a person already closed (0173, below) the sixty-third, 0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth, the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth, everyone told "until the review ends" hearing how it ended (0176, below) the sixty-sixth, an erased account's owner reference leaving its debates (0177, below) the sixty-seventh, the security fixes of audit run 3 (0178, below) the sixty-eighth, the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, the MFA recovery control user index (0182, below) the seventy-second, a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third, and the staff re-key permit (0184, below) the seventy-fourth, and the reader of the release switches (0185, below) the seventy-fifth, and the preview's approved buyers (0186, below) the seventy-sixth, and the passkeys a sign-in after the first step may use (0187, below) the seventy-seventh, and the recovery permit (0188, below) the seventy-eighth, and a Free debate the publication check kept private (0189, below) the seventy-ninth, and the check deleting a public debate with the Free sweep reading past waiting debates (0190, below) the eightieth, and the sign-up country read for prices (0191, below) the eighty-first. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first, the team's one limit (0142, below) the thirty-second, the hand-over (0143, below) the thirty-third, the small AI's quota charge (0144, below) the thirty-fourth, the pages waiting after "Add to researched" (0145, below) the thirty-fifth, the Owner's allowances for team members (0146, below) the thirty-sixth, the public tree (0147, below) the thirty-seventh, an erased account keeping its public debates (0148, below) the thirty-eighth, a funded person's public report in the team's month (0149, below) the thirty-ninth, a public debate under review (0150, below) the fortieth, the Report button with the sealed originals' six months (0151, below) the forty-first and a reporter's own reports in their export with what the AI checks on public rows used (0152, below) the forty-second, a finished dig's mark (0153, below) the forty-third, Iceland and Liechtenstein in the Region list (0154, below) the forty-fourth, the owner's two writes on their own answer (0155, below) the forty-fifth, the moderation notice (0156, below) the forty-sixth, the moderation statements (0157, below) the forty-seventh, the small AIs before Start in the person's quota (0158, below) the forty-eighth, the chosen paths sealed per run (0159, below) the forty-ninth, the path results per run (0160, below) the fiftieth, the path progress per run (0161, below) the fifty-first, the saved questions (0162, below) the fifty-second, the carry-on digs without a live sign-in (0163, below) the fifty-third, a dig under the main question updating the main answer (0164, below) the fifty-fourth, a failed question giving back its path-list charge (0165, below) the fifty-fifth, a later main-answer version revising the newest one, whichever table holds it (0166, below) the fifty-sixth, a visitor's report of a public debate carried by a run of their own (0167, below) the fifty-seventh, a debate an update set aside continuing where it stopped (0168, below) the fifty-eighth, the runner reading which settings are switched on (0169, below) the fifty-ninth, the daily outbound mail limit (0170, below) the sixtieth, the security review's fixes in the database (0171, below) the sixty-first, the moderation notice fixes (0172, below) the sixty-second, the check's answer on a report a person already closed (0173, below) the sixty-third, 0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth, the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth, everyone told "until the review ends" hearing how it ended (0176, below) the sixty-sixth, an erased account's owner reference leaving its debates (0177, below) the sixty-seventh, the security fixes of audit run 3 (0178, below) the sixty-eighth, the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, the MFA recovery control user index (0182, below) the seventy-second, a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third, and the staff re-key permit (0184, below) the seventy-fourth, and the reader of the release switches (0185, below) the seventy-fifth, and the preview's approved buyers (0186, below) the seventy-sixth, and the passkeys a sign-in after the first step may use (0187, below) the seventy-seventh, and the recovery permit (0188, below) the seventy-eighth, and a Free debate the publication check kept private (0189, below) the seventy-ninth, and the check deleting a public debate with the Free sweep reading past waiting debates (0190, below) the eightieth, and the Owner adding a buyer with the security key alone (0191, below) the eighty-first, and the sign-up country read for prices (0192, below) the eighty-second. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0191: 0191,
-   `registration-country-read-forward0191.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's,
-   which 0112 to 0129 keep; 0131 to 0191 keep 0130's),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0192: 0192,
+   `registration-country-read-forward0192.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's,
+   which 0112 to 0129 keep; 0131 to 0192 keep 0130's),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -1397,7 +1397,7 @@ meaning; the list counts only under that value with the sandbox's payments, and 
   the API counts the team line too) and the removal of an account not listed (`PREVIEW_BUYER_NOT_LISTED`), then uses the
   proof (0085's `staff.consume_action`), writes the row and, with an alert, 0085's `staff.record_mutation`
   (`PREVIEW_BUYER_ADDED` or `PREVIEW_BUYER_REMOVED`, reason `GRANT_CHANGE`, the Owner as actor and subject: the audit row
-  names no account). A removal while the team tools are locked writes its row with `alerted` false and nothing else.
+  names no account). A removal while the team tools are locked writes its row with `alerted` false and nothing else. Since 0191 an addition while they are locked does the same (its section below).
 - `staff.read_audit_page_v2(jsonb,text,integer,timestamptz,uuid)`: 0150's audit page with the two events left out, as it
   leaves out the team limit's. The API's staff repository calls it; the release before keeps calling 0150's, which shows
   the two events as no event, so its audit list answers 503 while such rows exist (`GET /v1/admin/audit`).
@@ -1701,15 +1701,60 @@ Until the step is applied anywhere its SQL may still change; after an SQL edit r
 every file and constant that carries the number, set `previous` to the step then before it, recompute the manifest, re-pin
 the chain lists).
 
-## The sign-up country, read for prices (0191)
+## The Owner adds a buyer with the security key alone (0191)
 
-The eighty-first chain step, after the check deleting a public debate and the Free sweep reading past waiting debates
-(0190). A person chooses their country at sign-up (0095's Region field, `identity.registration_region`), and a signed-in
+The eighty-first chain step, after the check deleting a public debate (0190). 0186's list of accounts that may buy while
+payments are in test mode took a removal with the Owner's fresh hardware-key proof alone, also while the team tools were
+locked, but refused an addition then: the door `staff.preview_buyer_act(jsonb,uuid,jsonb,jsonb,jsonb)` answered
+`STAFF_ALERT_UNAVAILABLE` to an addition without the independent alert, and the table's CHECK `(kind='REMOVED' OR alerted)`,
+which Postgres named `preview_buyer_event_check`, refused such a row as well. The Owner decided that an addition works as a
+removal does. This step drops that CHECK and restates the door with 0186's body but for the one line that refused an
+addition without an alert. So:
+
+- With the team tools unlocked, an addition is as before: the row with `alerted` true, 0085's `staff.record_mutation`
+  (`PREVIEW_BUYER_ADDED`, reason `GRANT_CHANGE`) and the independent alert.
+- With them locked, the API hands the door no alert (`apps/api/src/staff/preview-buyers.ts`, and `actionAuthority` in
+  `apps/api/src/staff/routes.ts` lets `PREVIEW_BUYER_ADD` through as it lets `PREVIEW_BUYER_REMOVE`), and the door writes
+  the row with `alerted` false, uses the proof, and writes no audit row and no alert, exactly as for a locked removal. The
+  `alerted` column keeps its meaning: whether an audit row and an alert went with the change. The record of a quiet
+  addition is that row alone.
+- Everything else is 0186's: the Owner alone (`TEAM_GRANT`), the proof bound to the change, the account, the revision and
+  the operation, the cap, the stale-revision check, the readers. An addition that does come with an alert whose operation
+  was never opened is still refused (0088's guards on `staff.audit_event` and `staff.alert_outbox`). Every other Team page
+  action still needs the team tools unlocked.
+- The release before always sends an alert with an addition. The door accepts that as before and writes `alerted` true.
+
+Its files: `0191_preview_buyer_add_key_only.sql`, `preview-buyer-add-key-only-forward0191.json` and
+`packages/db/src/migration-forward0191.ts` (`loadForward0191`, appended last to `STEPS`, `MIGRATION_FORWARD0191_*`
+refusals). Its header declares `-- n1: drained` and `-- n1: keeps-verifier`. Drained because 0186's postcondition digests
+both the door and every constraint of its table, so the step declares one amendment of 0186 (`function_definition` with
+`relations` and `constraints`), and the release before, at a restart on a database that holds this step, refuses an
+amendment by a step it does not know (`AMENDMENT_BINDING_DRIFT`): the release that carries it is a drained upload. The
+door keeps its signature, owner, grants and result, so calls the release before makes while it still runs work as before.
+Keeps-verifier because it adds no billing relation or billing function, so its manifest names 0130's verifier
+(`verify-effective-capabilities-130.sql`) as both `previous.verifierSha256` and its own. No `replayVerifierSql`: its check
+is its postcondition digest (the door's owner, definer flag, settings, volatility, body and ACL, and the table's whole list
+of constraints, which pins that the dropped CHECK stays gone). `DROP CONSTRAINT` takes ACCESS EXCLUSIVE on
+`staff.preview_buyer_event` until the step commits; the step is short. 0186's own file keeps its old comments, as an
+applied step must; this section and 0191's header say what holds now. Its tests are
+`tests/integration/preview-buyers-0186.test.ts` (the door on real rows, locked and unlocked),
+`tests/integration/preview-buyers-http.test.ts` (the routes) and `tests/architecture/preview-buyers-0191-contract.test.ts`
+(the restated body is 0186's minus the one refusal).
+
+Its `previous` is 0190, so its `previous.manifestSha256` is the SHA-256 of `check-deletes-public-debate-forward0190.json`.
+Until the step is applied anywhere its SQL may still change; after an SQL edit recompute `migration.sha256` in its manifest
+(the one-liner of 0184's section, with this step's manifest). If `origin/dev` takes 0191 first, renumber this step (rename
+every file and constant that carries the number, set `previous` to the step then before it, recompute the manifest, re-pin
+the chain lists).
+
+## The sign-up country, read for prices (0192)
+
+The eighty-second chain step, after the Owner adding a buyer with the security key alone (0191). A person chooses their country at sign-up (0095's Region field, `identity.registration_region`), and a signed-in
 person's prices start from that country, not from where their connection seems to come from. The API's request login may
 not read the region table, which only the sign-up writes. This step adds the one question the billing routes need.
 
-- `0191_registration_country_read.sql`, `registration-country-read-forward0191.json`,
-  `packages/db/src/migration-forward0191.ts` (`loadForward0191`, appended last to `STEPS`, `MIGRATION_FORWARD0191_*`
+- `0192_registration_country_read.sql`, `registration-country-read-forward0192.json`,
+  `packages/db/src/migration-forward0192.ts` (`loadForward0192`, appended last to `STEPS`, `MIGRATION_FORWARD0192_*`
   refusals): `identity.read_registration_country(uuid)`, a STABLE definer with the owner and search path of
   `identity.read_age_check_outcome(uuid)`, another reader of one account's own record (the step refuses to apply,
   `REGISTRATION_COUNTRY_READ_OWNER_UNABLE`, where that owner could not read `identity.registration_region` or
@@ -1724,7 +1769,7 @@ not read the region table, which only the sign-up writes. This step adds the one
   `PostgresRegistrationCountryReader` (`packages/db/src/registration-country.ts`) asks it on the request login inside the
   account's own request. The census of what the request logins may call names it among those that ask the connection
   (`tests/integration/security-review-hardening-database.test.ts`). Its behaviour on real rows, on the dev and the
-  production logins, is `tests/integration/registration-country-0191.test.ts`.
+  production logins, is `tests/integration/registration-country-0192.test.ts`.
 
 Its header declares `-- n1: expand` and `-- n1: keeps-verifier`: one new function the release before never calls, no
 table, no earlier function and no grant of an earlier object changed, and no billing relation or function, so its
@@ -1737,8 +1782,8 @@ The database step goes first: a release's start refuses while one of its steps i
 the API that calls the function never runs on a database without it. The release before never calls it, so the step can
 stay applied if the site goes back to that release.
 
-Its `previous` is 0190, so its `previous.manifestSha256` is the SHA-256 of `check-deletes-public-debate-forward0190.json`.
+Its `previous` is 0191, so its `previous.manifestSha256` is the SHA-256 of `preview-buyer-add-key-only-forward0191.json`.
 Until the step is applied anywhere its SQL may still change; after an SQL edit recompute `migration.sha256` in its
-manifest (the one-liner of 0184's section, with this step's manifest). If `origin/dev` takes 0191 first, renumber this
+manifest (the one-liner of 0184's section, with this step's manifest). If `origin/dev` takes 0192 first, renumber this
 step (rename every file and constant that carries the number, set `previous` to the step then before it, recompute the
 manifest, re-pin the chain lists).

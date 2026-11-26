@@ -1,4 +1,4 @@
--- 0191 · The sign-up country, read for prices (migrations/lineage/README.md "The sign-up country, read for prices (0191)").
+-- 0192 · The sign-up country, read for prices (migrations/lineage/README.md "The sign-up country, read for prices (0192)").
 --
 -- Plain words. A signed-in person's prices start from the country they chose at sign-up (0095's Region field), not from
 -- where their connection seems to come from. The API's request login may not read identity.registration_region, which

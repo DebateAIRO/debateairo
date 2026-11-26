@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Note, 2026-11-26:** this plan calls the database step 0191. `origin/dev` took 0191 for another change before this branch was pushed, so the step shipped as **0192** (`0192_registration_country_read.sql`, `registration-country-read-forward0192.json`, `migration-forward0192.ts`, `tests/integration/registration-country-0192.test.ts`), chained after dev's 0191. Read every 0191 below as 0192.
+
 **Goal:** A signed-in person with a sign-up country sees that country's price on the pricing page and starts checkout from it, wherever they connect from; everyone else is priced by their connection, as today.
 
 **Architecture:** One rule in the API. A new database function lets the API read the sign-up country of the request's own account. `GET /v1/billing/plans` looks at a session when one is presented (a new route policy that can never fail the request) and gives that country to `pricingPlace` between "chosen on the page" and "the connection's". `POST /v1/billing/quote` uses the same read when the body names no country. The pricing page only forwards the session cookie.

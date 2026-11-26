@@ -27,8 +27,8 @@ const widenLoader = "packages/db/src/migration-forward0154.ts";
 // digests the writer; neither reads nor writes the table.
 const securityReviewMigration = "migrations/0171_security_review_hardening.sql";
 const securityReviewLoader = "packages/db/src/migration-forward0171.ts";
-// 0191 reads one account's country for its prices, for that account's own request: the country only, never the state, and no write.
-const countryReadMigration = "migrations/0191_registration_country_read.sql";
+// 0192 reads one account's country for its prices, for that account's own request: the country only, never the state, and no write.
+const countryReadMigration = "migrations/0192_registration_country_read.sql";
 
 function productionFiles(): string[] {
   return execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "--", "migrations", "apps", "packages"], {
@@ -65,7 +65,7 @@ describe("registration region scope", () => {
       expect(source(path), path).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
       expect(source(path), path).toContain("identity.record_registration_region(uuid,text,text)");
     }
-    // 0191 reads the country column once, in its one function, and never the state; it writes no region row.
+    // 0192 reads the country column once, in its one function, and never the state; it writes no region row.
     expect(source(countryReadMigration).match(/FROM identity\.registration_region/g)).toHaveLength(1);
     expect(source(countryReadMigration)).not.toMatch(/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
     expect(source(countryReadMigration)).not.toContain("us_state");

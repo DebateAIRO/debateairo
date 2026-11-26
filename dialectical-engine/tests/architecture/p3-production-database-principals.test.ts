@@ -1818,11 +1818,11 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION identity.read_free_debates_to_publish_after(integer,timestamptz,uuid)"
   ]
 },
-// 0191: the country the request's own account chose at sign-up, never the US state. The API's billing role's alone: the billing
+// 0192: the country the request's own account chose at sign-up, never the US state. The API's billing role's alone: the billing
 // routes ask it on the request login, inside the account's own request.
 {
   "roleName": "debateai_billing_runtime",
-  "source": "migrations/0191_registration_country_read.sql",
+  "source": "migrations/0192_registration_country_read.sql",
   "grants": ["EXECUTE ON FUNCTION identity.read_registration_country(uuid)"]
 }
 ]);
@@ -2418,9 +2418,9 @@ it("discloses exactly 0190's grants: the takedown and the Free list read from a 
   ]);
 });
 
-it("discloses exactly 0191's grant: the sign-up country of the request's own account, to the API's billing role alone", async () => {
+it("discloses exactly 0192's grant: the sign-up country of the request's own account, to the API's billing role alone", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
-  const sql = await readFile("migrations/0191_registration_country_read.sql", "utf8");
+  const sql = await readFile("migrations/0192_registration_country_read.sql", "utf8");
   const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_authorization_runtime|debateai_rls_all_accounts|debateai_erasure_runtime";
   // As for 0189: every GRANT line naming one of the disclosed roles names it alone.
   expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
@@ -2428,7 +2428,7 @@ it("discloses exactly 0191's grant: the sign-up country of the request's own acc
       && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
   const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
     .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
-  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0191_registration_country_read.sql")
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0192_registration_country_read.sql")
     .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
   expect(actual).toEqual(declared);
   // One function, the billing role's alone: no runtime, no marker, no table grant.
