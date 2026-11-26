@@ -2251,10 +2251,11 @@ done
 [ "$(systemctl cat debateai-preview-turnstile | grep -cE '^[[:space:]]*EnvironmentFile=' || true)" = 0 ] || { echo "NAME2_NOT_DONE: the installed relay unit reads an EnvironmentFile, which would win over the drop-in: look"; exit 1; }
 [ "$(systemctl cat debateai-preview-turnstile | grep -cE '^[[:space:]]*Environment=.*PUBLIC_APP_URL=' || true)" = 1 ] || { echo "NAME2_NOT_DONE: the relay unit does not set PUBLIC_APP_URL in exactly one Environment= line: look"; exit 1; }
 [ "$(relay)" = 'PUBLIC_APP_URL=https://v3-preview.dezbatere.ro' ] || { echo "NAME2_NOT_DONE: the running relay does not answer as the test name today: look"; exit 1; }
-RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=$(readlink -f "$RP" 2>/dev/null || true)
+# The relay's program and working folder. An empty path is never resolved: this server's readlink answers the folder it runs in for one, which would be printed as the relay's own.
+RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=''; if [ -n "$RP" ]; then RR=$(readlink -f "$RP" 2>/dev/null || true); fi
 [ -n "$RP" ] && [ -n "$RR" ] && [ "$(stat -c '%U %F' "$RR" 2>/dev/null || true)" = 'root regular file' ] && [ $(( 0$(stat -c %a "$RR") & 022 )) = 0 ] || { echo "NAME2_NOT_DONE: the relay's program (${RP:-not named in its unit}) is missing, not root's regular file, or writable by others; NAME3 and NAME5 restart the relay: ask"; exit 1; }
 [ "$RR" = "$RP" ] || case "$RR" in /opt/debateai-v3-preview/releases/*) echo "NAME2_NOT_DONE: the relay reaches its program through a link into a release folder ($RR): ask"; exit 1;; esac
-RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RWR=$(readlink -f "${RW#!}" 2>/dev/null || true)
+RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RWR=''; if [ -n "${RW#!}" ]; then RWR=$(readlink -f "${RW#!}" 2>/dev/null || true); fi
 [ -z "$RW" ] || { [ -n "$RWR" ] && [ -d "$RWR" ]; } || { echo "NAME2_NOT_DONE: the relay's working folder ($RW) is missing; NAME3 and NAME5 restart the relay: ask"; exit 1; }
 echo "the Turnstile relay runs $RR${RWR:+, in $RWR}: never archive or remove the folders that hold them"
 ( umask 022; printf '[Service]\nEnvironment=PUBLIC_APP_URL=https://dezbatere.ro\n' > "$M/name/20-public-origin.conf" )
@@ -4382,11 +4383,11 @@ if [ "$STAGE" = new ]; then
 else
   KD=$(cat "$H/last-kept"); echo "kept copies on the record of the run that was cut off: $(grep -c . "$KD/list" || true)"
 fi
-# The site's answers, to compare before and after the change: the loopback listener's release, the Log in page (with the site open: which release serves it), the public /readyz, a test NETOPIA notice, the failed units. Before the restart a question may take 15 seconds; after it, 4 (5 for the website's own port), and the listener is asked for at most about 30 seconds, so that on a failed check the file before is back about a minute after the restart at most: while Caddy runs but does not see the website as ready, a request through it waits about 12 seconds (its lb_try_duration) before it fails.
+# The site's answers, to compare before and after the change: the loopback listener's release, the Log in page (with the site open: which release serves it), the public /readyz, a test NETOPIA notice, the failed units. Before the restart a question may take 15 seconds; after it, 4 (5 for the website's own port), and the listener is asked for at most about 30 seconds, so that on a failed check the file before is back about a minute after the restart at most: while Caddy runs but does not see the website as ready, a request through it waits about 12 seconds (its lb_try_duration) before it fails. The failed units are sorted and compared in byte order (LC_ALL=C) each time: this server's sort follows the session's language when LANG names one, and its comm compares bytes, so a unit that was failed before would read as newly failed.
 CM=15
 code() { curl -s -o /dev/null -m "$CM" -w '%{http_code}' "$1" || true; }
 pubkey() { { curl -s -m "$CM" -o /dev/null -D - "https://$HOST/login" || true; } | tr -d '\r' | awk 'tolower($1) == "x-debateai-release:" { k = $2 } END { print (k == "" ? "none" : k) }'; }
-failed() { { systemctl list-units --failed --no-legend --plain || true; } | awk '{ print $1 }' | sort; }
+failed() { { systemctl list-units --failed --no-legend --plain || true; } | awk '{ print $1 }' | LC_ALL=C sort; }
 ek() { { curl -s -m "$CM" -o /dev/null -D - http://127.0.0.1:3090/readyz || true; } | tr -d '\r' | awk 'NR == 1 { s = $2 } tolower($1) == "x-debateai-release:" { k = $2 } END { print (s == "" ? "000" : s) " " (k == "" ? "none" : k) }'; }
 nt() { curl -s -o /dev/null -m "$CM" -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' "https://$1/api/v1/billing/netopia/notify" || true; }
 if [ "$STAGE" = new ]; then
@@ -4412,7 +4413,7 @@ if [ "$STAGE" != copies ]; then
   [ "$L0" != 200 ] || [ "$(pubkey)" = "$KEY" ] || BAD="$BAD release"
   [ "$(code "https://$HOST/readyz")" = 404 ] || BAD="$BAD readyz"
   [ "$(nt "$HOST")" = "$N0" ] || BAD="$BAD notify"
-  NF=$(comm -13 <(printf '%s\n' "$F0") <(failed) | grep -c . || true); [ "$NF" = 0 ] || BAD="$BAD failed-units"
+  NF=$(LC_ALL=C comm -13 <(printf '%s\n' "$F0" | LC_ALL=C sort) <(failed) | grep -c . || true); [ "$NF" = 0 ] || BAD="$BAD failed-units"
   [ "$(grep -c health_headers "$C" || true)" = 0 ] || BAD="$BAD file"
   if [ -n "$BAD" ]; then
     { install -o root -g root -m 0644 "$HB" "$C.new" && mv "$C.new" "$C"; } || { echo "HEALTH2_NOT_DONE: a check failed (${BAD# }), and the file before could not be put back (it is $HB): ask at once"; exit 1; }

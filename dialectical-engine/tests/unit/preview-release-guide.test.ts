@@ -6,7 +6,7 @@
 // the server. Only the new sections are read; the R19 recipe above them stays as it ran.
 import { describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -3050,7 +3050,25 @@ describe('before the downtime: room in the release lock, the package store, and 
     const text = sectionOf(guide, '### SB15. Later, on the owner\'s yes: the archive').replace(/\s+/g, ' ');
     expect(text).toContain('`systemctl show -p WorkingDirectory --value debateai-preview-turnstile`');
     const name2 = read('deploy/preview-auth-dev/v1/MAIN-SITE.md');
-    expect(name2).toContain('RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RWR=$(readlink -f "${RW#!}" 2>/dev/null || true)');
+    expect(name2).toContain('RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RWR=\'\'; if [ -n "${RW#!}" ]; then RWR=$(readlink -f "${RW#!}" 2>/dev/null || true); fi');
+    // NAME2's relay lines, run with the server's readlink (uutils), which answers the folder it runs in for an empty
+    // path where GNU's and BSD's fail: a unit that names no working folder must not have that folder printed as its own.
+    const relayLines = between(name2.split('\n'), line => line.startsWith("# The relay's program and working folder."), line => line.startsWith('echo "the Turnstile relay runs '));
+    const name2Relay = (o: { exec?: string; workdir?: string }) => {
+      const dir = realpathSync(mkdtempSync(join(tmpdir(), 'guide-name2-relay-')));
+      try {
+        writeFileSync(join(dir, 'siteverify-relay.mjs'), '// relay\n');
+        mkdirSync(join(dir, 'work'));
+        return run(['set -euo pipefail', `cd '${dir}'`,
+          `systemctl() { case "$3" in ExecStart) printf '%s\\n' '${o.exec ?? `{ path=/usr/bin/node ; argv[]=/usr/bin/node ${dir}/siteverify-relay.mjs ; ignore_errors=no }`}';; WorkingDirectory) printf '%s\\n' '${(o.workdir ?? '').replace('DIR', dir)}';; esac; }`,
+          'readlink() { if [ -z "$2" ]; then pwd; else printf \'%s\\n\' "$2"; fi; }',
+          'stat() { case "$2" in "%U %F") echo "root regular file";; %a) echo 644;; esac; }', ...relayLines]).replaceAll(dir, 'DIR');
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    };
+    expect(name2Relay({})).toBe('the Turnstile relay runs DIR/siteverify-relay.mjs: never archive or remove the folders that hold them');
+    expect(name2Relay({ workdir: '!DIR/work' })).toBe('the Turnstile relay runs DIR/siteverify-relay.mjs, in DIR/work: never archive or remove the folders that hold them');
+    expect(name2Relay({ workdir: 'DIR/gone' })).toBe('NAME2_NOT_DONE: the relay\'s working folder (DIR/gone) is missing; NAME3 and NAME5 restart the relay: ask');
+    expect(name2Relay({ exec: '{ path=/usr/bin/node ; argv[]=/usr/bin/node /srv/other.mjs }' })).toMatch(/^NAME2_NOT_DONE: the relay's program \(not named in its unit\) is missing, /);
     // A full lock found at DR5 after all: the text names the way on.
     expect(sectionOf(guide, '#### DR5. Publish, verify plan, first proof, launch plans, pins, drop-ins, stage').replace(/\s+/g, ' '))
       .toContain('A pin refused with `RELEASE_LOCK_INVALID` (and nothing pinned) means the lock was full after all');
