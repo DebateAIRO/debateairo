@@ -30,7 +30,7 @@ const NETS = Object.freeze({
   FREE: { USD: "0.00", EUR: "0.00", RON: "0.00" }, PLUS: { USD: "20.00", EUR: "20.00", RON: "100.00" },
   PRO: { USD: "50.00", EUR: "50.00", RON: "250.00" }, MAX: { USD: "200.00", EUR: "200.00", RON: "1000.00" }
 });
-const ALLOWANCE = Object.freeze({ FREE: "0.05", PLUS: "1", PRO: "5", MAX: "33" });
+const ALLOWANCE = Object.freeze({ FREE: "0.05", PLUS: "1", PRO: "3", MAX: "15" });
 type PlanId = keyof typeof NETS;
 const PLAN_IDS: readonly PlanId[] = ["FREE", "PLUS", "PRO", "MAX"];
 type Place = Readonly<{ country: string | null; postal_code: string | null; status: string }>;
@@ -94,8 +94,8 @@ describe("P18 /pricing", () => {
     expect(plus.textContent).toContain("The Plus quota");
     expect(plus.querySelector("a")?.getAttribute("href")).toBe("/checkout?plan=PLUS");
     expect(plus.querySelector("a")?.textContent).toBe("Choose Plus");
-    expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain("5× the Plus quota");
-    expect(document.querySelector('[data-plan="MAX"]')?.textContent).toContain("33× the Plus quota");
+    expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain("3× the Plus quota");
+    expect(document.querySelector('[data-plan="MAX"]')?.textContent).toContain("15× the Plus quota");
     const free = document.querySelector('[data-plan="FREE"]')!;
     expect(free.textContent).toContain("A small monthly quota");
     expect(free.querySelector("a")?.getAttribute("href")).toBe("/sign-up");

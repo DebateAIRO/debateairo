@@ -48,8 +48,8 @@ describe("BillingPersonAllowanceSource (spec §2.4.1)", () => {
 
   it("gives Free its month only, passes the A6 override through, and has no windows without an entitlement", async () => {
     expect((await source("FREE").allowance.read(OWNER, now)).map((window) => window.scope)).toEqual(["PERSON_MONTH"]);
-    expect((await source("PRO", 19_800_000).allowance.read(OWNER, now)).map((window) => window.limitMicros))
-      .toEqual([3_630_000, 14_520_000, 19_800_000]);
+    expect((await source("PRO", 13_200_000).allowance.read(OWNER, now)).map((window) => window.limitMicros))
+      .toEqual([2_178_000, 8_712_000, 13_200_000]);
     expect(await source(null).allowance.read(OWNER, now)).toEqual([]);
   });
 

@@ -243,14 +243,14 @@ export const BILLING_PLANS_DEPLOYMENT_REGISTER_ROW = Object.freeze({
       }),
       Object.freeze({
         plan_id: "PRO" as const, tier: "premium" as const, net_prices: Object.freeze({ USD: 50_000_000, EUR: 50_000_000, RON: 250_000_000 }),
-        monthly_credit_micros: 33_000_000,
+        monthly_credit_micros: 19_800_000,
         day_bp: 1_100, week_bp: 4_400, finish_bp: 10_000, finish_overflow_micros: 220_000,
         reserve_micros: 440_000, reserve_held: "INSIDE_LIMITS" as const,
         fixed_gauges: null
       }),
       Object.freeze({
         plan_id: "MAX" as const, tier: "premium" as const, net_prices: Object.freeze({ USD: 200_000_000, EUR: 200_000_000, RON: 1_000_000_000 }),
-        monthly_credit_micros: 220_000_000,
+        monthly_credit_micros: 99_000_000,
         day_bp: 1_100, week_bp: 4_400, finish_bp: 10_000, finish_overflow_micros: 220_000,
         reserve_micros: 440_000, reserve_held: "INSIDE_LIMITS" as const,
         fixed_gauges: null
