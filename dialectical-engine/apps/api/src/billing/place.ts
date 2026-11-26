@@ -59,15 +59,18 @@ export type PricingPlace = Readonly<{
 }>;
 
 /**
- * Terms §12: the place the plans list prices for. The country the visitor chose, as the checkout's declared country,
- * else the connection's; none known is COUNTRY_NEEDED. In the US and Canada the state's or province's tax comes from
- * the postal code, so a price there waits for one that fits the country's format (the kernel's own check, as the
- * checkout's); elsewhere a postal code is not used.
+ * Terms §12: the place the plans list prices for. Three sources in order: the country the visitor chose (the checkout's
+ * declared country), else the signed-in account's sign-up country, else the connection's; none known is COUNTRY_NEEDED.
+ * In the US and Canada the state's or province's tax comes from the postal code, so a price there waits for one that
+ * fits the country's format (the kernel's own check, as the checkout's); elsewhere a postal code is not used.
  */
 export function pricingPlace(input: Readonly<{
-  geo: GeoLookup | undefined; ip: string; country: string | undefined; postalCode: string | undefined;
+  geo: GeoLookup | undefined; ip: string; country: string | undefined;
+  /** The signed-in account's sign-up country; null or absent when there is none. */
+  accountCountry?: string | null;
+  postalCode: string | undefined;
 }>): PricingPlace {
-  const country = input.country ?? connectionCountry({ geo: input.geo, ip: input.ip });
+  const country = input.country ?? input.accountCountry ?? connectionCountry({ geo: input.geo, ip: input.ip });
   if (country === null) return Object.freeze({ country: null, postalCode: null, status: "COUNTRY_NEEDED" as const });
   if (!PRICED_REGION_COUNTRIES.has(country)) return Object.freeze({ country, postalCode: null, status: "READY" as const });
   if (input.postalCode === undefined) return Object.freeze({ country, postalCode: null, status: "POSTAL_CODE_NEEDED" as const });

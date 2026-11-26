@@ -96,6 +96,7 @@ import type { PreparedPublicationCipher } from "@debateai/crypto";
 import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, PostgresPreviewBuyerRepository, PostgresRecoveryPermitRepository, PostgresRecoveryPermitStaffRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportShredRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository, PostgresCheckDeletedPublicPageRepository } from "@debateai/db";
 import { recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
+import { PostgresRegistrationCountryReader } from "@debateai/db";
 // FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
 // by tools/orphan-audit; the module's state is process-global, so this instance routes the same pools).
 import { assertAccountContextLogins, attestEveryRoute, onOwnConnections } from "../../../packages/db/src/account-context.js";
@@ -1999,6 +2000,9 @@ const billingRuntime = billingConnectors === null
       pool: crossAccountPool(pool, "X11"), connectors: runtimeConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
       ...(askRoomReadiness?.plansInForce === undefined ? {} : { plansInForce: askRoomReadiness.plansInForce }),
       geo: geoLookup, legal, dekStore,
+      // The sign-up country is read on `pool` itself, not the cross-account target given above: the database answers it only
+      // inside the account's own request.
+      accountCountry: new PostgresRegistrationCountryReader(pool),
       // P17 (spec §2.5.10): the EMAIL jobs send through the same sendmail path, sender and timeout as the mail above.
       mail: {
         sender: new TemplatedMailSender({

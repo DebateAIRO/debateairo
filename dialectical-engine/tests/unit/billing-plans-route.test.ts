@@ -21,7 +21,11 @@ import { COUNTRY_CODES } from "../../apps/ui/lib/billing/countries.js";
 import { FakeTaxEngine } from "../support/fake-tax-engine.js";
 import { testNetopiaKeys } from "../support/netopia-notice.js";
 import { startFakeQuaderno } from "../support/fake-quaderno.js";
-import { TEST_APP_ORIGIN } from "../support/httpSession.js";
+import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { createPool } from "@debateai/db";
+import { accountContextRoute } from "../../packages/db/src/account-context.js";
+import type { AccountCountryPort } from "../../apps/api/src/billing/account-country.js";
+import type { SessionApplication } from "../../apps/api/src/sessions.js";
 
 const NOW = new Date("2026-10-01T10:00:00.000Z");
 /** testBillingPlans' prices (the regional fixture shares them): every plan in every currency; no country's tax. */
@@ -131,7 +135,7 @@ describe("P8a GET /v1/billing/plans", () => {
 
   it("is declared public in the one policy table and in the contract, beside B7a's usage route", () => {
     expect(authorizationPolicyInventory).toContainEqual(
-      { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" }
+      { route: "GET /v1/billing/plans", auth: "public", session: "best-effort", resource: "billing", action: "read-plans" }
     );
     expect(contractInventory.routes).toContain("GET /v1/billing/plans");
     const paths = BILLING_ROUTE_PATHS as readonly string[];
@@ -586,6 +590,14 @@ describe("P8a the API root hands the billing runtime's routes to buildApi", () =
     const returnOpen = (returns[0] ?? 0) + (returned?.[0].length ?? 0) - 1;
     expect(topLevelMembers(runtime, returnOpen)).toContainEqual(expect.stringMatching(/^routes(?:\s*:\s*routes)?$/u));
   });
+
+  it("gives the billing runtime the sign-up country reader on the request pool, and the runtime gives it to the routes and the quote", async () => {
+    const main = code(await readFile("apps/api/src/main.ts", "utf8"));
+    const members = topLevelMembers(main, braceAfter(main, /\bcreateBillingRuntime\(\s*\{/u)).filter((member) => /^accountCountry\b/u.test(member));
+    expect(members).toEqual(["accountCountry: new PostgresRegistrationCountryReader(pool)"]);
+    const runtime = code(await readFile("apps/api/src/billing/runtime.ts", "utf8"));
+    expect(runtime.match(/accountCountry:\s*deps\.accountCountry/gu)?.length).toBe(2);
+  });
 });
 
 /** The billing runtime as main.ts composes it, over the given pool and connectors; composing it starts nothing. */
@@ -760,5 +772,146 @@ describe("GET /v1/billing/plans names the payment system, so the pages know when
       expect(response.json<Record<string, unknown>>().environment, base).toBe(expected);
       await api.close();
     }
+  });
+});
+
+describe("GET /v1/billing/plans starts from the signed-in account's sign-up country", () => {
+  const OWNER = testHttpIdentity("plans-account-country");
+  // The lookup answers DE here, a Tor exit at 198.51.100.40, and XX (no known country) everywhere else.
+  const DE = "198.51.100.20";
+  const PLACES: Readonly<Record<string, Readonly<{ country: string; tor: boolean }>>> = {
+    [DE]: { country: "DE", tor: false },
+    "198.51.100.40": { country: "RO", tor: true }
+  };
+  const geo: GeoLookup = { lookup: (ip) => PLACES[ip] ?? { country: "XX", tor: false }, close: () => undefined };
+  const opened: Array<ReturnType<typeof buildApi>> = [];
+  afterEach(async () => { await Promise.all(opened.splice(0).map((api) => api.close())); });
+  const plansApi = (over: { read?: AccountCountryPort["read"]; sessions?: SessionApplication } = {}) => {
+    const read = vi.fn(over.read ?? (async () => "RO"));
+    const api = buildApi({
+      application: unusedAskApplication(), sessions: over.sessions ?? testSessionApplication([OWNER]),
+      billing: { ...billing(), plans: testRegionalPlans, geo, accountCountry: { read } }
+    });
+    opened.push(api);
+    return { api, read };
+  };
+  const get = (api: ReturnType<typeof buildApi>, headers: Readonly<Record<string, string>> = {},
+    url = "/v1/billing/plans", remoteAddress = DE) => api.inject({ method: "GET", url, remoteAddress, headers });
+  const seen = (response: Awaited<ReturnType<typeof get>>) => {
+    const body = response.json<{ currency: string; place: { country: string | null } }>();
+    return [response.statusCode, body.currency, body.place.country];
+  };
+  /** Sessions whose store is down: every lookup throws. */
+  const throwingSessions = (): SessionApplication => ({
+    ...testSessionApplication([OWNER]), authenticate: async () => { throw new Error("SESSION_STORE_DOWN"); }
+  });
+
+  it("prices a signed-in account for its sign-up country before the connection's", async () => {
+    const { api, read } = plansApi({ read: async () => "RO" });
+    expect(seen(await get(api, testSessionHeaders(OWNER)))).toEqual([200, "RON", "RO"]);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledWith(OWNER.authenticated.ownerRef);
+  });
+
+  it("falls back to the connection's country when the account chose none", async () => {
+    const { api } = plansApi({ read: async () => null });
+    expect(seen(await get(api, testSessionHeaders(OWNER)))).toEqual([200, "EUR", "DE"]);
+  });
+
+  it("asks for a country when neither the account nor the connection names one", async () => {
+    const { api } = plansApi({ read: async () => null });
+    const response = await get(api, testSessionHeaders(OWNER), "/v1/billing/plans", "203.0.113.9");
+    expect(seen(response)).toEqual([200, "USD", null]);
+    expect(response.json<{ place: { status: string } }>().place.status).toBe("COUNTRY_NEEDED");
+  });
+
+  it("answers a visitor with no cookie by the connection, without reading", async () => {
+    const { api, read } = plansApi();
+    expect(seen(await get(api))).toEqual([200, "EUR", "DE"]);
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("answers a malformed session cookie as a visitor, without reading", async () => {
+    const { api, read } = plansApi();
+    expect(seen(await get(api, { cookie: "__Host-debateai-session=short" }))).toEqual([200, "EUR", "DE"]);
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("answers a well-formed token no identity has as a visitor, without reading", async () => {
+    const { api, read } = plansApi();
+    expect(seen(await get(api, testSessionHeaders(testHttpIdentity("stranger"))))).toEqual([200, "EUR", "DE"]);
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("answers as a visitor when the session lookup throws, without reading", async () => {
+    const { api, read } = plansApi({ sessions: throwingSessions() });
+    expect(seen(await get(api, testSessionHeaders(OWNER)))).toEqual([200, "EUR", "DE"]);
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("answers by the connection when the country read fails", async () => {
+    const { api } = plansApi({ read: async () => { throw new Error("down"); } });
+    expect(seen(await get(api, testSessionHeaders(OWNER)))).toEqual([200, "EUR", "DE"]);
+  });
+
+  it("answers by the connection when the database refuses the read as another account's", async () => {
+    const { api } = plansApi({
+      read: async () => { throw Object.assign(new Error("REQUEST_OWNER_MISMATCH"), { code: "42501" }); }
+    });
+    expect(seen(await get(api, testSessionHeaders(OWNER)))).toEqual([200, "EUR", "DE"]);
+  });
+
+  it("keeps the country the person chose before the account's, without reading", async () => {
+    const { api, read } = plansApi({ read: async () => "RO" });
+    expect(seen(await get(api, testSessionHeaders(OWNER), "/v1/billing/plans?country=FR"))).toEqual([200, "EUR", "FR"]);
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("treats a query that does not parse as no choice, so the account's country applies", async () => {
+    const { api } = plansApi({ read: async () => "RO" });
+    expect(seen(await get(api, testSessionHeaders(OWNER), "/v1/billing/plans?country=zz9"))).toEqual([200, "RON", "RO"]);
+  });
+
+  it("uses a postal code with the account's country, as with a chosen one", async () => {
+    const { api } = plansApi({ read: async () => "US" });
+    const response = await get(api, testSessionHeaders(OWNER), "/v1/billing/plans?postal_code=75201");
+    expect(seen(response)).toEqual([200, "USD", "US"]);
+    expect(response.json<{ place: { postal_code: string | null } }>().place.postal_code).toBe("75201");
+  });
+
+  it("prices by the account's country even over a Tor exit", async () => {
+    const { api } = plansApi({ read: async () => "RO" });
+    expect(seen(await get(api, testSessionHeaders(OWNER), "/v1/billing/plans", "198.51.100.40"))).toEqual([200, "RON", "RO"]);
+  });
+
+  it("says the answer depends on who asks, and never sets a cookie on an answer a browser may keep", async () => {
+    const { api } = plansApi();
+    const signedIn = await get(api, testSessionHeaders(OWNER));
+    expect([signedIn.headers["cache-control"], signedIn.headers.vary]).toEqual(["private, max-age=60", "Cookie"]);
+    expect(signedIn.headers["set-cookie"]).toBeUndefined();
+    expect((await get(api)).headers.vary).toBe("Cookie");
+  });
+
+  it("reads the country inside the account's own request, on the request login", async () => {
+    // A pool shaped as main.ts's request pool; it never connects. createPool and accountContextRoute are @debateai/db's.
+    const target = createPool("postgres://127.0.0.1:1/unused", { max: 1 });
+    const routed = createPool("postgres://127.0.0.1:1/unused", { max: 1, crossAccount: target });
+    let route: unknown;
+    const { api } = plansApi({ read: async () => { route = accountContextRoute(routed); return "RO"; } });
+    await get(api, testSessionHeaders(OWNER));
+    expect(route).toEqual({ kind: "own", credential: OWNER.rawSessionToken });
+    await Promise.all([routed.end(), target.end()]);
+  });
+
+  it("leaves the optional-session routes as they were: a session lookup that throws still fails them", async () => {
+    const { api } = plansApi({ sessions: throwingSessions() });
+    const status = await api.inject({ method: "GET", url: "/v1/support/status", headers: testSessionHeaders(OWNER) });
+    expect(status.statusCode).toBe(500);
+    expect(status.json()).toEqual({ error: "INTERNAL_ERROR", message: "INTERNAL_ERROR" });
+    // Control: with working sessions the same request reaches the handler, which answers that support is not composed.
+    const control = plansApi({}).api;
+    const answered = await control.inject({ method: "GET", url: "/v1/support/status", headers: testSessionHeaders(OWNER) });
+    expect(answered.statusCode).toBe(503);
+    expect(answered.json()).toMatchObject({ error: "SUPPORT_NOT_COMPOSED" });
   });
 });

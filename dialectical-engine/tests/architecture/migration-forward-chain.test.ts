@@ -1132,9 +1132,11 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains the Owner adding a buyer with the security key alone 0191 after 0190, drained, declaring 0186's door and CHECK, and documents it", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
-    // The chain head: 0186's door restated without one refusal, and 0186's CHECK on its table dropped.
-    expect(names.slice(-2)).toEqual(["0190_check_deletes_public_debate.sql", "0191_preview_buyer_add_key_only.sql"]);
-    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    // 0186's door restated without one refusal, and 0186's CHECK on its table dropped. Found by name: the sign-up country
+    // read for prices (0192) follows it.
+    const at = names.indexOf("0191_preview_buyer_add_key_only.sql");
+    expect(names.slice(at - 1, at + 1)).toEqual(["0190_check_deletes_public_debate.sql", "0191_preview_buyer_add_key_only.sql"]);
+    const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
     const amendment = { step: "0186_preview_buyers.sql", functions: ["staff.preview_buyer_act(jsonb,uuid,jsonb,jsonb,jsonb)"], field: "function_definition",
       relations: ["staff.preview_buyer_event"], constraints: ["preview_buyer_event_check"] };
     expect(JSON.parse((await bytesOf("lineage/preview-buyer-add-key-only-forward0191.json")).toString("utf8"))).toEqual({
@@ -1174,6 +1176,56 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     ]) expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
       "and the check deleting a public debate with the Free sweep reading past waiting debates (0190, below) the eightieth, and the Owner adding a buyer with the security key alone (0191, below) the eighty-first");
+  });
+
+  it("chains the sign-up country read for prices 0192 after 0191 as an expand step that keeps 0130's verifier, and documents it", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    // The chain head: one function of the API's billing role, its owner set by one reviewed DO block.
+    expect(names.slice(-2)).toEqual(["0191_preview_buyer_add_key_only.sql", "0192_registration_country_read.sql"]);
+    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    expect(JSON.parse((await bytesOf("lineage/registration-country-read-forward0192.json")).toString("utf8"))).toEqual({
+      version: "registration-country-read-forward0192-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: { name: "0191_preview_buyer_add_key_only.sql", manifestSha256: sha256(await bytesOf("lineage/preview-buyer-add-key-only-forward0191.json")), verifierSha256: previous.verifierSha256 },
+      migration: { name: "0192_registration_country_read.sql", sha256: sha256(await bytesOf("0192_registration_country_read.sql")) },
+      verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) },
+      amendsPostconditionsOf: []
+    });
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/registration-country-read-forward0192.json")));
+    expect(step.previousName).toBe(previous.name);
+    expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+    expect(step.previousVerifierSha256).toBe(previous.verifierSha256);
+    expect(step.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
+    expect(step.replayVerifierSql).toBeUndefined();
+    expect(step.amendsPostconditionsOf ?? []).toEqual([]);
+    // One new function, its owner, its revoke and its one grant; nothing earlier replaced, nothing of billing.
+    const statements = step.sql.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("--")).join("\n");
+    expect(statements.match(/^(?:CREATE|ALTER|REVOKE|GRANT|DROP|INSERT|UPDATE|DELETE|DO)\b.*$/gmu)).toEqual([
+      "CREATE OR REPLACE FUNCTION identity.read_registration_country(p_owner_ref uuid) RETURNS text",
+      "DO $registration_country_read_owner$",
+      "REVOKE ALL ON FUNCTION identity.read_registration_country(uuid)",
+      "GRANT EXECUTE ON FUNCTION identity.read_registration_country(uuid) TO debateai_billing_runtime;"
+    ]);
+    expect(statements).not.toMatch(/\bbilling\./u);
+    const earlier = (await readdir(MIGRATIONS)).filter((name) => /^\d{4}_.*\.sql$/u.test(name) && name < step.name);
+    for (const name of earlier) expect((await bytesOf(name)).toString("utf8"), name).not.toContain("read_registration_country");
+    const lines = step.sql.split("\n");
+    const reviewed = lines.findIndex((line) => line.startsWith("-- n1: reviewed "));
+    expect(lines.filter((line) => line.startsWith("-- n1: reviewed "))).toHaveLength(1);
+    expect(lines[reviewed + 1]).toBe("DO $registration_country_read_owner$");
+    const loader = await readFile(new URL("migration-forward0192.ts", DB_SOURCE), "utf8");
+    expect(loader).toContain('"identity.read_registration_country(uuid)"');
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The sign-up country, read for prices (0192)"));
+    expect(section.startsWith("## The sign-up country, read for prices (0192)")).toBe(true);
+    for (const needle of ["0191", "0192_registration_country_read.sql", "registration-country-read-forward0192.json", "packages/db/src/migration-forward0192.ts",
+      "MIGRATION_FORWARD0192_", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "REQUEST_OWNER_MISMATCH", "debateai_billing_runtime",
+      "tests/integration/registration-country-0192.test.ts"
+    ]) expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "(0191, below) the eighty-first, and the sign-up country read for prices (0192, below) the eighty-second");
   });
 
   // The release before refuses, at its restart on a database ahead of it, an amendment recorded by a step it does not
