@@ -98,6 +98,7 @@ import { recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
 import { PostgresRegistrationCountryReader } from "@debateai/db";
 import { PostgresPublicDebateUpvoteRepository } from "@debateai/db";
+import { PostgresPublicDebateUpvoteSweepRepository } from "@debateai/db";
 // FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
 // by tools/orphan-audit; the module's state is process-global, so this instance routes the same pools).
 import { assertAccountContextLogins, attestEveryRoute, onOwnConnections } from "../../../packages/db/src/account-context.js";
@@ -190,6 +191,7 @@ import {
 import { TimeShiftedCardPayments } from "./billing/time-shifted-payments.js";
 import { createRetentionPurge } from "./retention-purge.js";
 import { createUnfinishedSignupExpiry, UNFINISHED_SIGNUP_EXPIRY_EVERY_MS } from "./unfinished-signup-expiry.js";
+import { sweepGonePublicDebateUpvotes } from "./public-vote-sweep.js";
 import {
   assertNoRecordsDatedAhead, assertOtherSystemRecordsClosed, assertProviderOnlyNotifySealed, billingCustodyPaths,
   billingModeOf, incompleteNetopiaKey, loadBillingConnectors, loadNetopiaConnectors, type BillingConnectors, type BillingMode, type NetopiaConnectors
@@ -1621,8 +1623,15 @@ const retentionPurgeTimer=gatedInterval(releaseWatcher,triggerRetentionPurge,86_
 // The security review's 0171 (F5): the clarify reservations no charge took (a refused, skipped or abandoned call) go hourly, and once each time this
 // release becomes current (below), whether or not anyone reserves again, so none outlives about two hours. Outside any request, so `pool` sends it to
 // the API's system login, which holds the cross-account marker the sweep is granted to. Whatever the route: rows may predate a change of it.
+// 0193: the upvotes of a public debate that is gone for good (made private again, or deleted by the end-of-debate check) go on the same hourly
+// pass, in their own try, so neither sweep ever skips the other. Outside any request, so `pool` sends it to the API's system login, which holds the
+// cross-account marker 0193's sweep is granted to. The database decides from the rows alone; a debate that is only held keeps its votes.
+const publicDebateUpvoteSweep = new PostgresPublicDebateUpvoteSweepRepository(pool);
 const triggerAskClarifyReservationSweep=createSingleFlightErasureReconciler(
-  async ()=>{ await sweepAskClarifyReservations((limit)=>deleteAskClarifyReservationsDue(pool,limit)); },
+  async ()=>{
+    try{await sweepGonePublicDebateUpvotes({ repository: publicDebateUpvoteSweep, log: (line) => console.error(line) });}catch{console.error("[PUBLIC_DEBATE_UPVOTE_SWEEP_PENDING]");}
+    await sweepAskClarifyReservations((limit)=>deleteAskClarifyReservationsDue(pool,limit));
+  },
   ()=>console.error("[ASK_CLARIFY_RESERVATION_SWEEP_PENDING]")
 );
 const askClarifyReservationSweepTimer=gatedInterval(releaseWatcher,triggerAskClarifyReservationSweep,ASK_CLARIFY_RESERVATION_SWEEP_EVERY_MS);

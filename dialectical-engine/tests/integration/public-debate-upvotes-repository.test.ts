@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { type AuditContextHasher } from "../../packages/crypto/src/index.js";
-import { migrate, PostgresPublicDebateUpvoteRepository, PostgresPublicationRepository, type Pool } from "@debateai/db";
+import { migrate, PostgresPublicDebateUpvoteRepository, PostgresPublicDebateUpvoteSweepRepository, PostgresPublicationRepository, type Pool } from "@debateai/db";
 import { inAccountRequest, provisionRlsLogins, seedSessionAccount, type RlsLogins, type RlsTestAccount } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -171,5 +171,36 @@ describe("PostgresPublicationRepository.listPublicRefs with the counts", () => {
     expect(await new PostgresPublicationRepository(fakePool(query), HASHER).listPublicRefs(2, 0)).toEqual({ refs: [a, b], total: 2, upvotes: { [a]: 4 } });
     expect(query).toHaveBeenCalledTimes(2);
     expect(query.mock.calls[1]).toEqual([expect.stringContaining("identity.read_public_debate_upvote_counts($1::uuid[])"), [[a, b]]]);
+  });
+});
+
+describe("PostgresPublicDebateUpvoteSweepRepository on the API's pool, as main.ts builds it", () => {
+  it("outside any request it deletes the votes of a debate that is gone for good, at most the limit a call, and leaves a public debate's", async () => {
+    const sweep = new PostgresPublicDebateUpvoteSweepRepository(request);
+    while (await sweep.deleteGone(1000) > 0) { /* what the cases above left on debates made private */ }
+    const [ana, dan, eva] = [await person("ana"), await person("dan"), await person("eva")];
+    const [gone, kept] = [await publish(ana.runId), await publish(dan.runId)];
+    for (const who of [ana, dan, eva]) {
+      await asking(who, () => upvotes.cast(who.ownerRef, gone));
+      await asking(who, () => upvotes.cast(who.ownerRef, kept));
+    }
+    expect(await sweep.deleteGone(1000)).toBe(0);
+    await unpublish(ana.runId, gone);
+    expect(await sweep.deleteGone(2)).toBe(2);
+    expect(await rows(gone)).toBe(1);
+    expect(await sweep.deleteGone(1000)).toBe(1);
+    expect(await sweep.deleteGone(1000)).toBe(0);
+    expect([await rows(gone), await rows(kept)]).toEqual([0, 3]);
+  });
+  it("inside a request the same call is refused by the database, whoever asks; a limit outside 1 to 1000 is refused as the database said it", async () => {
+    const sweep = new PostgresPublicDebateUpvoteSweepRepository(request);
+    const ana = await person("ana");
+    for (const who of [ana, null]) {
+      expect(await refused(() => asking(who, () => sweep.deleteGone(1))))
+        .toMatchObject({ code: "42501", message: "permission denied for function delete_gone_public_debate_upvotes" });
+    }
+    for (const limit of [0, 1001]) {
+      expect(await refused(() => sweep.deleteGone(limit)), String(limit)).toMatchObject({ code: "22023", message: "PUBLIC_DEBATE_UPVOTE_INVALID" });
+    }
   });
 });

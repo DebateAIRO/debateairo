@@ -40,3 +40,22 @@ export class PostgresPublicDebateUpvoteRepository {
     return Object.freeze([...await this.one("SELECT identity.read_own_public_debate_upvotes($1::uuid,$2::uuid[]) AS value", [ownerRef, [...publicationRefs]]) as readonly string[]]);
   }
 }
+
+/**
+ * 0193's sweep of the votes of debates gone for good (identity.delete_gone_public_debate_upvotes). It is the cross-account marker's alone, so it
+ * is called outside any request, where the API's pool reaches its system login; inside a request the request login is refused. A count only:
+ * no ref and no owner reaches this class.
+ */
+export class PostgresPublicDebateUpvoteSweepRepository {
+  constructor(private readonly pool: Pick<Pool, "query">) {}
+
+  /** Deletes at most `limit` votes (the database refuses a limit outside 1 to 1000) and answers how many went. */
+  async deleteGone(limit: number): Promise<number> {
+    const result = await this.pool.query<{ deleted: unknown }>(
+      "SELECT identity.delete_gone_public_debate_upvotes($1::integer) AS deleted", [limit]
+    );
+    const deleted = result.rows[0]?.deleted;
+    if (typeof deleted !== "number" || !Number.isInteger(deleted) || deleted < 0) throw new TypeError("PUBLIC_DEBATE_UPVOTE_SWEEP_ANSWER_INVALID");
+    return deleted;
+  }
+}
