@@ -202,7 +202,7 @@ describe("Accounts S8 publication architecture", () => {
     const summarySchema = contract.slice(summaryStart, summaryEnd);
     expect(summarySchema).toContain(".strict()");
     expect([...summarySchema.matchAll(/^  ([a-z_]+):/gmu)].map((match) => match[1]))
-      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "models", "verdict", "confidence_band", "floor_verdict"]);
+      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "models", "verdict", "confidence_band", "floor_verdict", "vote_count"]);
     for (const forbidden of [...ownerOnly, "leading_node_id", "basis_incomplete", "floor_reason"]) {
       expect(summarySchema).not.toContain(forbidden);
     }
