@@ -114,8 +114,9 @@ day's spend of each spending gate), each gate's own `status` lines, POTS and the
 part 2), the practice (its closing line `team limit: … charged …`, the gate and ceiling lines of its `report.md`, the
 `PRE_START` lines of its `start-month.jsonl`, and S-7's two status lines), WITHDRAWOTHER, REFUNDDONE, and the tax
 summary of EFACTURA. The practice's folder `$P` on your Mac holds your figures from the server too: keep it private.
-When you ask for help, give the step's last line, and say which step it was. For the practice, give its verdict words
-only (for example `PRACTICE_VERDICT PASS`), also where the practice guide says to report in the chat.
+GATESTATE (6.2) prints the gates' states without an amount. When you ask for help, give the step's last line, and say
+which step it was. For the practice, give its verdict words only (for example `PRACTICE_VERDICT PASS`), also where the
+practice guide says to report in the chat.
 
 **`<…>` in a block** is a value you fill in before you run it. `rNN` is the upload's number, as in the release guide.
 
@@ -1131,8 +1132,10 @@ Two other stops can come in either run:
   with any other name there, that name is the stop: ask. To go on, type `later` between the quotes of `REBOOT=''` at
   the top of SB4 and run it again: it prints `NO_MAINTENANCE: reboot required is not counted …`, and its last line is
   the expected one, with `but NO_MAINTENANCE (reboot required), not counted (REBOOT=later)` before `: use`. To restart
-  first: ask (no step here restarts the server, and after a restart some services must be started by hand). Before you
-  choose, read whether the server restarts by itself after its daily upgrade: in a root shell,
+  first: the lifecycle guide's "Restarting the server" (`deploy/preview-lifecycle/v1/README.md`) has the steps
+  (RESTART_LOOK, RESTART_GO, RESTART_UP), on your yes, before this upload stages its release (SB10); after the restart
+  RESTART_UP starts by hand what the boot does not start. Before you choose, read whether the server restarts by
+  itself after its daily upgrade: in a root shell,
   `apt-config shell AR Unattended-Upgrade::Automatic-Reboot` (it changes nothing) prints `AR='true'` when it does, and
   then it may restart on its own with the restart owed: ask. `maintenance pending` instead, or any other new name: stop
   and ask.
@@ -4206,6 +4209,26 @@ echo GATES_DONE
 exit 0
 ```
 
+GATES shows each gate's spend, which stays on your screen. When an assistant runs the look for you, or you want lines
+you may paste into a chat, use GATESTATE instead: for each of the four gates it prints only its state and whether its
+window is open, never an amount.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# GATESTATE: the four spending gates, each with its state and whether its window is open; never an amount (read-only).
+for G in deepinfra anthropic perplexity bedrock; do
+  case "$G" in deepinfra) F=$GD; P=$PD;; anthropic) F=$GAN; P=$PAN;; perplexity) F=$GPX; P=$PPX;; *) F=$GBR; P=$PBR;; esac
+  # Only these two fields are read from the gate's status; its amounts never leave jq.
+  echo "$G gate: $(gs "$F" "$P" 2>/dev/null | jq -r '"state \(.state); window open \(.window_open)"' 2>/dev/null || echo unread)"
+done
+echo GATESTATE_DONE
+exit 0
+```
+
+Expect four lines like `deepinfra gate: state active; window open true`, then `GATESTATE_DONE`. `unread` means the
+gate's status could not be read: run GATES yourself, or ask.
+
 ### 6.3 Close asks (always before real payments)
 
 ```sh
@@ -4665,8 +4688,8 @@ quiet minutes.
 8. OPENCHECK (6b.4).
 9. NETOPIA: 5.8b, steps 1 to 4, with 6b's words. List its tester (6b.3) if you chose that.
 
-Every morning while 6b is open: OPENCHECK, GATES (6.2; its amounts stay on your screen), AICHECK (6b.1), the Public tab
-and the report mails.
+Every morning while 6b is open: OPENCHECK, GATES (6.2; its amounts stay on your screen; GATESTATE when an assistant
+runs the look), AICHECK (6b.1), the Public tab and the report mails.
 
 ### 6b.3 Add or remove a buyer on the Team page
 

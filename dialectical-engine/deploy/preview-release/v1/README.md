@@ -5940,10 +5940,12 @@ server first and run SB4 again, is the owner's decision:
   not counted …` and then ends as it would without the flag: `SB4_DONE` on the side-by-side path (then SB5), the
   expected `DRAINED_PATH` line on the drained path. `REBOOT='later'` passes only the restart flag: `maintenance
   pending`, alone or with it, still stops.
-- **To restart first**: ask; no step of these guides restarts the server. The restart comes at a quiet time while no
-  release drains (and on the upload that brings the Amazon gate, not between piece 2 and the yes:
-  `deploy/preview-auth-dev/v1/MAIN-SITE.md`, part 2). After it, what comes back by itself and what must be started by
-  hand is the lifecycle guide's "Boot sequence" (`deploy/preview-lifecycle/v1/README.md`): no runner starts by itself,
+- **To restart first**: the lifecycle guide's "Restarting the server" (`deploy/preview-lifecycle/v1/README.md`), on
+  the owner's yes: RESTART_LOOK reads whether now is a safe time, RESTART_GO restarts, RESTART_UP starts by hand what
+  the boot does not start and proves the state before. The restart comes at a quiet time while no release drains,
+  before this upload's SB10 stages its release (and on the upload that brings the Amazon gate, not between piece 2
+  and the yes: `deploy/preview-auth-dev/v1/MAIN-SITE.md`, part 2). After it, what comes back by itself and what must
+  be started by hand is the lifecycle guide's "Boot sequence" (`deploy/preview-lifecycle/v1/README.md`): no runner starts by itself,
   during a drain SB14b starts the runners again, and an installed Amazon gate that is not switched on yet does not
   start by itself either ("After a reboot it is not running", above). Then run SB4 again.
 
