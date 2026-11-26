@@ -1176,14 +1176,22 @@ line, then `UNFINISHED_DONE`.
 
 **14. PRECHECK, as a detached run** (the release guide's drained section, after DR1). It only reads everything the new
 release, the database steps and the way back need that can be read with the site up: the new files' proof and fence
-lines and their modes, the fence folder against every key store and key file (`overlaps: 0`), publication's state,
-the logins, owners and schema the database steps expect, the data folder (no links, no part outside it), free space
-for the cold copy, that the API's, the runner's and the scheduler's logins have no connection limit, and the texts'
-date. Run it detached: that also shows, before the downtime, that the database tools (`runuser`, `psql`) work in a
-detached run. Expect one line per subject, then `PRECHECK_DONE`. On `PRECHECK_NOT_DONE`, the line names the subject:
-nothing changed and the site is up. Give no yes; ask. PRECHECK also prints when the system's daily upgrade timer fires
-next: do not give the yes within an hour before that time. DR2 refuses while a system upgrade runs (wait, then DR2
-again).
+lines and their modes, the fence folder against every key store and key file (`key places at or above the fence
+folder: 0`), publication's state, the logins, owners and schema the database steps expect, the data folder (no links,
+no part outside it), free space for the cold copy, that the API's, the runner's and the scheduler's logins have no
+connection limit, and the texts' date. Two of its reads depend on what is already live, and it reads which case it is
+by itself. The fence: its `fence:` line says whether the old release's api file names `RESTORE_FENCE_PATH`. `no` is the
+first upload with the fence, and the folder must still be empty; `yes` is every later upload, where the running API
+keeps its fence file in the folder, and PRECHECK reads that file (the API's own `0600` file, not empty) and the
+database's fence row (`fence row: token yes; public hold no; moved on in the last three minutes yes; the old API
+active`), never the token itself. Never empty or delete that file to get past a `fence` line: the new API would then
+sign everyone out and hold the public library at its first start. Migration 0178: `migration 0178 in the ledger: no`
+means DR4 runs it, and the schema `erasure_reconcile` must not exist yet; `yes` means it ran before, and the schema
+must exist, with the ledger's owner. Run it detached: that also shows, before the downtime, that the database tools
+(`runuser`, `psql`) work in a detached run. Expect one line per subject, then `PRECHECK_DONE`. On `PRECHECK_NOT_DONE`,
+the line names the subject: nothing changed and the site is up. Give no yes; ask. PRECHECK also prints when the
+system's daily upgrade timer fires next: do not give the yes within an hour before that time. DR2 refuses while a
+system upgrade runs (wait, then DR2 again).
 
 **15. GATEREADY** (the release guide's Amazon section). It only reads what is on disk: each gate's files, their
 hashes and their state, the Amazon gate's unit, and the new release's two files. Expect four lines `<gate> gate: code

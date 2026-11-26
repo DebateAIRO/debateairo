@@ -7018,15 +7018,21 @@ SB5d when this upload needs them, then PRECHECK, GATEREADY and GATELIVE ("The or
 It only reads, and it runs right before GATEREADY and GATELIVE, after every step that writes the new release's env
 files. It asks, with the site still up, what DR2 to DR6 and the way back will need: the three new env files (root's
 `0640`, no key twice) and the old release's files as SB1 copied them; the UI-to-API proof lines and copies (SB5c); the
-fence line, folder and drop-in (FENCEDIR, H11 step 2); that no key store or key file folder sits at or above the
-fence folder (the new API refuses that, `restore-fence-path`); the publication settings' state (`A` with
-`PUBLICATION_ENABLED=true`, once MAIN-SITE.md 5.9 switched publishing on and DR1 copied its four lines; `C` without
-both path lines, before it: nothing new can refuse; `B`, both paths without the true line, as MAIN-SITE.md's PUBOFF
+fence line, folder and drop-in (FENCEDIR, H11 step 2), read for the upload it is: on the first upload with the fence
+(the old release's api file has no `RESTORE_FENCE_PATH` line) the folder FENCEDIR made, still empty; on every later
+upload the old API's own fence file in it (a plain `0600` file of the API's user, not empty) and the database's fence
+row (a token, no public hold, moved on in the last three minutes while the old API runs); that no key store or key file
+folder sits at or above the fence folder (the new API refuses that, `restore-fence-path`); the publication settings'
+state (`A` with `PUBLICATION_ENABLED=true`, once MAIN-SITE.md 5.9 switched publishing on and DR1 copied its four
+lines; `C` without both path lines, before it: nothing new can refuse; `B`, both paths without the true line, as MAIN-SITE.md's PUBOFF
 leaves the file once a debate was public: stop, the corpus key, the store and the cleanup login need a reviewed check
 first); the database folder (no link
-in or around it, no extra tablespace) and the free space DR3 needs; the four functions migration 0178 asks about (the
-three that must share the ledger's owner, and the one whose owner must be a superuser) and that no schema
-`erasure_reconcile` exists; that none of the API's, the runner's and the scheduler's logins has a connection limit
+in or around it, no extra tablespace) and the free space DR3 needs; migration 0178, read from the ledger: while it is
+not there, the four functions it asks about (the three that must share the ledger's owner, and the one whose owner must
+be a superuser) and that no schema `erasure_reconcile` exists; once it is there, that the schema `erasure_reconcile`
+exists, that it and the two functions 0178 made in it with the ledger's owner keep that owner (the runner checks 0178's
+recorded evidence again at DR4), and that the fence's settle function keeps a superuser owner; that none of the API's,
+the runner's and the scheduler's logins has a connection limit
 (other logins, such as Hatchet's, the migrator's and the staff readiness writer's, have theirs on purpose and are not
 read); that no session has sat idle in a transaction for a minute; that the Terms and the Privacy Policy of this release
 carry the right effective day (today, Bucharest, for a version the live release does not carry yet; the day it has in
@@ -7052,10 +7058,27 @@ UU=$(systemctl show -p User --value "debateai-preview-ui@$OLABEL")
 [ "$(grep -c '^DIALECTICAL_UI_API_PROOF_PATH=' "$U" || true)" = 1 ] && grep -qxF "DIALECTICAL_UI_API_PROOF_PATH=$PRF/ui.secret" "$U" || bad proof "ui-$LABEL.env does not hold DIALECTICAL_UI_API_PROOF_PATH exactly once (SB5c)"
 [ -n "$UU" ] && [ "$(stat -c '%a %U' "$PRF/ui.secret" 2>/dev/null || true)" = "400 $UU" ] && [ "$(stat -c '%a %U' "$PRF/api/proof.secret" 2>/dev/null || true)" = "600 $AU" ] && [ "$(stat -c '%a %U' "$PRF/api" 2>/dev/null || true)" = "700 $AU" ] && cmp -s "$PRF/ui.secret" "$PRF/api/proof.secret" || bad proof "a proof copy is missing, the two differ, or a copy or its folder has the wrong mode or owner (SB5c)"
 echo "proof: read"
-# The restore fence (FENCEDIR, H11 step 2), and no key store or key file folder at or above its folder.
-[ "$(grep -c '^RESTORE_FENCE_PATH=' "$A" || true)" = 1 ] && grep -qxF "RESTORE_FENCE_PATH=$FENCE" "$A" || bad fence "api-$LABEL.env does not hold RESTORE_FENCE_PATH exactly once (H11 step 2)"
-[ "$(stat -c '%a %U %G' "${FENCE%/*}" 2>/dev/null || true)" = "700 $AU $AGRP" ] && [ ! -e "$FENCE" ] || bad fence "the fence folder is not the API's empty 0700 folder (FENCEDIR)"
-cmp -s "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/debateai-preview-api-restore-fence.conf" /etc/systemd/system/debateai-preview-api@.service.d/zzzzzzzzzz-fence-restore.conf && systemctl show -p ReadWritePaths "debateai-preview-api@$OLABEL" | grep -qF -- "-${FENCE%/*}" || bad fence "the fence drop-in is not this release's, or the API's unit does not list the folder (FENCEDIR)"
+# The restore fence (FENCEDIR, H11 step 2), and no key store or key file folder at or above its folder. The old
+# release's api file says which upload this is. Without a RESTORE_FENCE_PATH line it is the first upload with the fence:
+# FENCEDIR made the folder and left it empty. With one, the old API runs with the fence: its own 0600 file sits in the
+# folder (a token it rewrites every minute, in step with the database's row), and FENCEDIR and H11 step 2 do not run
+# again. Never empty, delete or rewrite that file to make this check pass: an empty file is the restore mark and a
+# missing one does not match the row, so the new API would sign everyone out and hold the public library at its first
+# start (RESTORE_REVOKED), and a file not the API's own 0600 file stops it (RESTORE_FENCE_FILE_INSECURE).
+if grep -q '^RESTORE_FENCE_PATH=' "$E/api-$OLABEL.env"; then FOLD=yes; FH11='DR1 copies it from the old api file: ask'; FDIR='ask: FENCEDIR runs only before the first upload with the fence'; else FOLD=no; FH11='H11 step 2'; FDIR='FENCEDIR'; fi
+echo "fence: the old release's api file names RESTORE_FENCE_PATH: $FOLD ($([ "$FOLD" = yes ] && echo 'a later upload: the old API keeps the fence file' || echo 'the first upload with the fence: the folder is empty'))"
+[ "$(grep -c '^RESTORE_FENCE_PATH=' "$A" || true)" = 1 ] && grep -qxF "RESTORE_FENCE_PATH=$FENCE" "$A" || bad fence "api-$LABEL.env does not hold RESTORE_FENCE_PATH exactly once ($FH11)"
+if [ "$FOLD" = no ]; then
+  [ "$(stat -c '%a %U %G' "${FENCE%/*}" 2>/dev/null || true)" = "700 $AU $AGRP" ] && [ ! -e "$FENCE" ] || bad fence "the fence folder is not the API's empty 0700 folder (FENCEDIR)"
+else
+  [ "$(stat -c '%a %U %G' "${FENCE%/*}" 2>/dev/null || true)" = "700 $AU $AGRP" ] && [ -f "$FENCE" ] && [ "$(stat -c '%a %U' "$FENCE" 2>/dev/null || true)" = "600 $AU" ] && [ -s "$FENCE" ] || bad fence "the fence folder is not the API's 0700 folder, or the fence file in it is missing, empty, not a plain file, or not the API's 0600 file: leave it as it is and ask"
+  OAPI=$(systemctl is-active "debateai-preview-api@$OLABEL" 2>/dev/null || true)
+  FROW=$(psqlq "SELECT CASE WHEN fence_token IS NULL THEN 'no' ELSE 'yes' END||' '||CASE WHEN public_hold_since IS NULL THEN 'no' ELSE 'yes' END||' '||CASE WHEN now() - interval '3 minutes' < advanced_at THEN 'yes' ELSE 'no' END FROM identity.restore_fence WHERE singleton" || echo unread)
+  read -r FTOK FHOLD FMOVED <<<"$FROW"
+  echo "fence row: token ${FTOK:-unread}; public hold ${FHOLD:-unread}; moved on in the last three minutes ${FMOVED:-unread}; the old API ${OAPI:-unread}"
+  [ "$OAPI" = active ] && [ "${FTOK:-} ${FHOLD:-} ${FMOVED:-}" = 'yes no yes' ] || bad fence "the old API is not running, or the database's fence row holds no token, holds the public library, or has not moved on in three minutes (H11 step 4 reads a hold): ask"
+fi
+cmp -s "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/debateai-preview-api-restore-fence.conf" /etc/systemd/system/debateai-preview-api@.service.d/zzzzzzzzzz-fence-restore.conf && systemctl show -p ReadWritePaths "debateai-preview-api@$OLABEL" | grep -qF -- "-${FENCE%/*}" || bad fence "the fence drop-in is not this release's, or the API's unit does not list the folder ($FDIR)"
 NO=0
 for K in USER_DEK_STORE_PATH PUBLICATION_KEY_STORE_PATH AUDIT_KEY_STORE_PATH DATA_EXPORT_STORE_PATH BILLING_NOTICE_SPOOL_PATH; do V=$(sed -n "s/^$K=//p" "$A"); [ -n "$V" ] || continue; case "${FENCE%/*}/" in "${V%/}"/*) echo "OVERLAP $K"; NO=$((NO + 1));; esac; done
 for K in KEK_PATH BLIND_INDEX_KEY_PATH AUDIT_SOURCE_IP_SALT_PATH SUPPORT_KEK_PATH RECORDS_KEY_PATH CORPUS_KEK_PATH CONTENT_BLIND_INDEX_KEY_PATH KEK_PREVIOUS_PATH CORPUS_KEK_PREVIOUS_PATH SUPPORT_KEK_PREVIOUS_PATH NETOPIA_API_KEY_PATH NETOPIA_IPN_KEYS_PATH QUADERNO_API_KEY_PATH SMARTBILL_CREDENTIALS_PATH OWNER_REPORT_EMAIL_PATH; do V=$(sed -n "s/^$K=//p" "$A"); [ -n "$V" ] || continue; KD=$(dirname "$V"); case "${FENCE%/*}/" in "${KD%/}"/*) echo "OVERLAP $K"; NO=$((NO + 1));; esac; done
@@ -7073,12 +7096,30 @@ SIZE=$(du -sm "$PGP/v3-preview" 2>/dev/null | cut -f1 || true); AVAIL=$(df --out
 echo "data folder: $SIZE MB, links in it $NL, extra tablespaces $NT; free $AVAIL MB"
 [ ! -L "$PGP/v3-preview" ] && ! findmnt -n "$PGP/v3-preview" > /dev/null && [ "$NL" = 0 ] && [ "$NT" = 0 ] || bad data-folder "the data folder is a link or a mount point, holds a link, or the cluster has another tablespace: DR3's copy would miss it"
 [ "$AVAIL" -gt $((SIZE * 2 + 2048)) ] || bad space "not enough free space for DR3's copy"
-# The database: the four functions 0178 asks about, the schema it makes, the logins' connection limits, open transactions.
-OWN=$(psqlq "SELECT p.oid::regprocedure||' '||CASE WHEN p.proowner = (SELECT relowner FROM pg_class WHERE oid = 'public.debateai_schema_migration'::regclass) THEN 'same' ELSE 'DIFFERENT' END FROM pg_proc p WHERE p.oid IN (to_regprocedure('core.claim_run_key_provision_cleanup(integer)'), to_regprocedure('core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)'), to_regprocedure('core.private_erasure_run_chain(uuid)')) ORDER BY 1" || echo unread)
-echo "$OWN" | sed 's/^/owner against the ledger owner: /'
-[ "$(grep -c ' same$' <<<"$OWN" || true)" = 3 ] || bad database-roles "a function 0178 checks is missing, or its owner is not the ledger's owner"
-[ "$(psqlq "SELECT coalesce((SELECT r.rolsuper FROM pg_proc p JOIN pg_roles r ON r.oid = p.proowner WHERE p.oid = to_regprocedure('identity.authenticate_session_t9(text,text,timestamptz,timestamptz)'))::text, 'missing')")" = true ] || bad database-roles "identity.authenticate_session_t9's owner is not a superuser (0178 refuses RESTORE_FENCE_OWNER_NOT_SUPERUSER)"
-[ "$(psqlq "SELECT to_regnamespace('erasure_reconcile') IS NULL")" = t ] || bad database-roles "a schema erasure_reconcile exists already (0178 makes it)"
+# The database: migration 0178 (read from the ledger), the logins' connection limits, open transactions. While 0178 is
+# not in the ledger, DR4 runs it, and it asks once: three functions that share the ledger's owner, one whose owner is a
+# superuser, and no schema erasure_reconcile before it makes one. Once 0178 is in the ledger it never asks that again;
+# the runner instead compares 0178's recorded evidence at every migrate (DR4 too), which names the schema
+# erasure_reconcile, its owner and the functions in it. So after it, the schema must be there, it and the two functions
+# 0178 made in it under the ledger's owner keep that owner, and the fence's settle, which 0178 gave a superuser owner
+# because a detected restore revokes staff sessions and closes recoveries, keeps one.
+M178=$(psqlq "SELECT count(*) FROM public.debateai_schema_migration WHERE name = '0178_security_fixes_run3.sql'" || echo unread)
+echo "migration 0178 in the ledger: $([ "$M178" = 0 ] && echo no || { [ "$M178" = 1 ] && echo yes || echo unread; })"
+if [ "$M178" = 0 ]; then
+  OWN=$(psqlq "SELECT p.oid::regprocedure||' '||CASE WHEN p.proowner = (SELECT relowner FROM pg_class WHERE oid = 'public.debateai_schema_migration'::regclass) THEN 'same' ELSE 'DIFFERENT' END FROM pg_proc p WHERE p.oid IN (to_regprocedure('core.claim_run_key_provision_cleanup(integer)'), to_regprocedure('core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)'), to_regprocedure('core.private_erasure_run_chain(uuid)')) ORDER BY 1" || echo unread)
+  echo "$OWN" | sed 's/^/owner against the ledger owner: /'
+  [ "$(grep -c ' same$' <<<"$OWN" || true)" = 3 ] || bad database-roles "a function 0178 checks is missing, or its owner is not the ledger's owner"
+  [ "$(psqlq "SELECT coalesce((SELECT r.rolsuper FROM pg_proc p JOIN pg_roles r ON r.oid = p.proowner WHERE p.oid = to_regprocedure('identity.authenticate_session_t9(text,text,timestamptz,timestamptz)'))::text, 'missing')" || true)" = true ] || bad database-roles "identity.authenticate_session_t9's owner is not a superuser (0178 refuses RESTORE_FENCE_OWNER_NOT_SUPERUSER)"
+  [ "$(psqlq "SELECT to_regnamespace('erasure_reconcile') IS NULL" || true)" = t ] || bad database-roles "a schema erasure_reconcile exists already (0178 makes it)"
+elif [ "$M178" = 1 ]; then
+  [ "$(psqlq "SELECT to_regnamespace('erasure_reconcile') IS NOT NULL" || true)" = t ] || bad database-roles "0178 is in the ledger and the schema erasure_reconcile is missing (0178's recorded evidence names it; every migrate, DR4 too, checks it again)"
+  OWN=$(psqlq "SELECT o FROM (SELECT 'schema erasure_reconcile '||CASE WHEN n.nspowner = (SELECT relowner FROM pg_class WHERE oid = 'public.debateai_schema_migration'::regclass) THEN 'same' ELSE 'DIFFERENT' END FROM pg_namespace n WHERE n.oid = to_regnamespace('erasure_reconcile') UNION ALL SELECT p.oid::regprocedure||' '||CASE WHEN p.proowner = (SELECT relowner FROM pg_class WHERE oid = 'public.debateai_schema_migration'::regclass) THEN 'same' ELSE 'DIFFERENT' END FROM pg_proc p WHERE p.oid IN (to_regprocedure('erasure_reconcile.claim_run_key_provision_cleanup(integer)'), to_regprocedure('erasure_reconcile.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)'))) AS x(o) ORDER BY 1" || echo unread)
+  echo "$OWN" | sed 's/^/owner against the ledger owner: /'
+  [ "$(grep -c ' same$' <<<"$OWN" || true)" = 3 ] || bad database-roles "the schema erasure_reconcile or a function 0178 made in it is missing, or its owner is not the ledger's owner (0178's recorded evidence names that owner; DR4 checks it again)"
+  [ "$(psqlq "SELECT coalesce((SELECT r.rolsuper FROM pg_proc p JOIN pg_roles r ON r.oid = p.proowner WHERE p.oid = to_regprocedure('identity.restore_fence_settle_v1(text,text)'))::text, 'missing')" || true)" = true ] || bad database-roles "identity.restore_fence_settle_v1's owner is not a superuser (a detected restore could not revoke staff sessions or close recoveries)"
+else
+  bad database-roles "the ledger's row for 0178 is unread"
+fi
 CL=$(psqlq "SELECT coalesce(string_agg(rolname, ' ' ORDER BY rolname), '') FROM pg_roles WHERE rolcanlogin AND rolconnlimit <> -1 AND (rolname LIKE 'debateai_prod_api%' OR rolname LIKE 'debateai_prod_runner%' OR rolname LIKE 'debateai_prod_scheduler%')" || echo unread)
 echo "connection limits of the API, runner and scheduler logins: ${CL:-no limit set}"
 [ -z "$CL" ] || bad database-roles "these API, runner or scheduler logins have a connection limit: $CL"
@@ -7121,15 +7162,26 @@ echo "the system's daily upgrade next runs: ${UP:-not scheduled}"
 echo PRECHECK_DONE
 ```
 
-What to expect: the read lines above, `key places at or above the fence folder: 0`, `publication state A` (publishing
-on, MAIN-SITE.md 5.9) or `C` (before it),
-`connection limits of the API, runner and scheduler logins: no limit set`, `sessions idle in a transaction for a minute
-or more: 0`, three `owner against the ledger owner: ... same` lines, the time the system's daily upgrade next runs, and
-then `PRECHECK_DONE`. Do not give the yes within an hour before that upgrade time: an upgrade during the downtime can
-restart Docker or the database under DR3 to DR6 (DR2 also refuses to start while one runs). On `PRECHECK_NOT_DONE` the
-last line names each subject that is not ready, and a `BAD (<subject>)` line above it says what. Nothing has changed and
-the site is up: give no yes. `proof`, `fence` and `payment-marks` name the step that makes them (SB5c, FENCEDIR or H11
-step 2, PM2); before the launch plans exist those steps can still run. `legal-date` means a text with a new version
+What to expect: the read lines above; the `fence:` line, which says which upload it read (`no`: the first upload with
+the fence, its folder still empty; `yes`: a later upload, where the old API keeps its fence file), and on a later upload
+`fence row: token yes; public hold no; moved on in the last three minutes yes; the old API active`; `key places at or
+above the fence folder: 0`; `publication state A` (publishing on, MAIN-SITE.md 5.9) or `C` (before it); `migration 0178
+in the ledger: no` with three `owner against the ledger owner: core.… same` lines, or `yes` with three such lines for
+`erasure_reconcile.claim_run_key_provision_cleanup(integer)`, `erasure_reconcile.prepare_private_run_erasure(…)` and
+`schema erasure_reconcile`; `connection limits of the API, runner and scheduler logins: no limit set`; `sessions idle in
+a transaction for a minute or more: 0`; the time the system's daily upgrade next runs; and then `PRECHECK_DONE`. Do not
+give the yes within an hour before that upgrade time: an upgrade during the downtime can restart Docker or the database
+under DR3 to DR6 (DR2 also refuses to start while one runs). On `PRECHECK_NOT_DONE` the last line names each subject
+that is not ready, and a `BAD (<subject>)` line above it says what. Nothing has changed and the site is up: give no yes.
+`proof` and `payment-marks` name the step that makes them (SB5c, PM2). `fence` does too on the first upload with the
+fence (FENCEDIR or H11 step 2); before the launch plans exist those steps can still run. On a later upload neither runs
+(FENCEDIR refuses a folder with the fence file in it, and H11 step 2 a file that has the line already), so a `fence`
+line there means stop and ask: a missing, empty or foreign fence file, or a fence row that holds the library or has
+stopped moving, would make the new API sign everyone out and hold the public library at its first start, or refuse to
+start. Never empty, delete or rewrite the fence file to make PRECHECK pass: an empty file is the restore mark, and a
+missing one reads as a restore. `database-roles` on a database 0178 has not reached means DR4 would refuse it; once
+0178 is in the ledger, a missing schema `erasure_reconcile` or a changed owner means DR4's check of 0178's recorded
+evidence would refuse: stop and ask either way. `legal-date` means a text with a new version
 does not carry the upload day, or a text the live release already carries does not keep its day there: stop, a new
 day needs a new commit ("The legal texts' day", before SB1). The `legal day:` lines say how each text was read.
 `open-transactions` names the program that holds the transaction: close it, then PRECHECK again. `release-lock`: run SB4
