@@ -4350,16 +4350,17 @@ it: the site is as before HEALTH2, and nothing else changed. Ask.
 prints `0`.
 
 **The way back** (HEALTHBACK). It puts back the Caddyfile HEALTH1 kept, and the kept copies as HEALTH2 found them, and
-restarts Caddy (about a second, as above). It reads no names file, so it works at any time, during an upload too.
-It judges the restart by Caddy's own answer (the public route refuses `/readyz` with 404), so it works while the
-website is stopped too, as in the drained upload's downtime or during a restart of the server; the loopback
-listener's answer, which comes from the website behind Caddy, is printed only as information. It works only while the live Caddyfile is still the one HEALTH2 put in place and the kept copies are still HEALTH2's: once
+restarts Caddy (about a second, as above). Like HEALTH1 and HEALTH2 it is no brake: it runs outside an upload, on
+your yes, never between SB3 and the upload's end (the order rules). It reads no names file, and it judges the restart
+by Caddy's own answer (the public route refuses `/readyz` with 404), so it does not need the website to answer; the
+loopback listener's answer, which comes from the website behind Caddy, is printed only as information. It works only
+while the live Caddyfile is still the one HEALTH2 put in place and the kept copies are still HEALTH2's: once
 a later step changed one (PWOFF2, PWON, SIGNUPS, REVIEW_OPEN, NAME5, or a hand edit), it refuses with nothing changed;
 ask then.
 
 ```sh
 set -euo pipefail
-# HEALTHBACK: the edge secret back in Caddy's health check: the Caddyfile HEALTH1 kept goes back, and the kept copies HEALTH2 changed go back with it; Caddy restarts (about a second). It reads no names file, so it works at any time.
+# HEALTHBACK: the edge secret back in Caddy's health check: the Caddyfile HEALTH1 kept goes back, and the kept copies HEALTH2 changed go back with it; Caddy restarts (about a second). It reads no names file; like HEALTH2 it runs outside an upload.
 C=/etc/debateai-v3-preview/public/Caddyfile; M=/root/preview-archive/main-site; H=$M/health
 HB=$H/Caddyfile.before-health; HA=$H/Caddyfile.health; TS=$(date -u +%Y%m%dT%H%M%SZ)
 [ -s "$HB" ] && [ -s "$HA" ] || { echo "HEALTHBACK_NOT_DONE: HEALTH1's copies are not there (HEALTHBACK ran already, or HEALTH1 never did); nothing changed"; exit 1; }

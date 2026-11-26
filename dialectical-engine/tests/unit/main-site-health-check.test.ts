@@ -109,7 +109,7 @@ describe('the three steps', () => {
         if (line.includes('_NOT_DONE')) expect(`${line}\n${lines[index + 1] ?? ''}`, `${step}: ${line}`).toMatch(/exit 1/);
       }
     }
-    // HEALTH1 and HEALTH2 read the names file; HEALTHBACK reads none, so it works at any time.
+    // HEALTH1 and HEALTH2 read the names file; HEALTHBACK reads none.
     expect(HEALTH1[1]).toBe(NAMES_LINE);
     expect(HEALTH2[1]).toBe(NAMES_LINE);
     expect(HEALTHBACK).not.toContain(NAMES_LINE);
