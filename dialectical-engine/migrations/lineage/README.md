@@ -10,13 +10,13 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first, the team's one limit (0142, below) the thirty-second, the hand-over (0143, below) the thirty-third, the small AI's quota charge (0144, below) the thirty-fourth, the pages waiting after "Add to researched" (0145, below) the thirty-fifth, the Owner's allowances for team members (0146, below) the thirty-sixth, the public tree (0147, below) the thirty-seventh, an erased account keeping its public debates (0148, below) the thirty-eighth, a funded person's public report in the team's month (0149, below) the thirty-ninth, a public debate under review (0150, below) the fortieth, the Report button with the sealed originals' six months (0151, below) the forty-first and a reporter's own reports in their export with what the AI checks on public rows used (0152, below) the forty-second, a finished dig's mark (0153, below) the forty-third, Iceland and Liechtenstein in the Region list (0154, below) the forty-fourth, the owner's two writes on their own answer (0155, below) the forty-fifth, the moderation notice (0156, below) the forty-sixth, the moderation statements (0157, below) the forty-seventh, the small AIs before Start in the person's quota (0158, below) the forty-eighth, the chosen paths sealed per run (0159, below) the forty-ninth, the path results per run (0160, below) the fiftieth, the path progress per run (0161, below) the fifty-first, the saved questions (0162, below) the fifty-second, the carry-on digs without a live sign-in (0163, below) the fifty-third, a dig under the main question updating the main answer (0164, below) the fifty-fourth, a failed question giving back its path-list charge (0165, below) the fifty-fifth, a later main-answer version revising the newest one, whichever table holds it (0166, below) the fifty-sixth, a visitor's report of a public debate carried by a run of their own (0167, below) the fifty-seventh, a debate an update set aside continuing where it stopped (0168, below) the fifty-eighth, the runner reading which settings are switched on (0169, below) the fifty-ninth, the daily outbound mail limit (0170, below) the sixtieth, the security review's fixes in the database (0171, below) the sixty-first, the moderation notice fixes (0172, below) the sixty-second, the check's answer on a report a person already closed (0173, below) the sixty-third, 0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth, the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth, everyone told "until the review ends" hearing how it ended (0176, below) the sixty-sixth, an erased account's owner reference leaving its debates (0177, below) the sixty-seventh, the security fixes of audit run 3 (0178, below) the sixty-eighth, the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, the MFA recovery control user index (0182, below) the seventy-second, a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third, and the staff re-key permit (0184, below) the seventy-fourth, and the reader of the release switches (0185, below) the seventy-fifth, and the preview's approved buyers (0186, below) the seventy-sixth, and the passkeys a sign-in after the first step may use (0187, below) the seventy-seventh, and the recovery permit (0188, below) the seventy-eighth, and a Free debate the publication check kept private (0189, below) the seventy-ninth, and the check deleting a public debate with the Free sweep reading past waiting debates (0190, below) the eightieth, and the Owner adding a buyer with the security key alone (0191, below) the eighty-first, and the sign-up country read for prices (0192, below) the eighty-second. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first, the team's one limit (0142, below) the thirty-second, the hand-over (0143, below) the thirty-third, the small AI's quota charge (0144, below) the thirty-fourth, the pages waiting after "Add to researched" (0145, below) the thirty-fifth, the Owner's allowances for team members (0146, below) the thirty-sixth, the public tree (0147, below) the thirty-seventh, an erased account keeping its public debates (0148, below) the thirty-eighth, a funded person's public report in the team's month (0149, below) the thirty-ninth, a public debate under review (0150, below) the fortieth, the Report button with the sealed originals' six months (0151, below) the forty-first and a reporter's own reports in their export with what the AI checks on public rows used (0152, below) the forty-second, a finished dig's mark (0153, below) the forty-third, Iceland and Liechtenstein in the Region list (0154, below) the forty-fourth, the owner's two writes on their own answer (0155, below) the forty-fifth, the moderation notice (0156, below) the forty-sixth, the moderation statements (0157, below) the forty-seventh, the small AIs before Start in the person's quota (0158, below) the forty-eighth, the chosen paths sealed per run (0159, below) the forty-ninth, the path results per run (0160, below) the fiftieth, the path progress per run (0161, below) the fifty-first, the saved questions (0162, below) the fifty-second, the carry-on digs without a live sign-in (0163, below) the fifty-third, a dig under the main question updating the main answer (0164, below) the fifty-fourth, a failed question giving back its path-list charge (0165, below) the fifty-fifth, a later main-answer version revising the newest one, whichever table holds it (0166, below) the fifty-sixth, a visitor's report of a public debate carried by a run of their own (0167, below) the fifty-seventh, a debate an update set aside continuing where it stopped (0168, below) the fifty-eighth, the runner reading which settings are switched on (0169, below) the fifty-ninth, the daily outbound mail limit (0170, below) the sixtieth, the security review's fixes in the database (0171, below) the sixty-first, the moderation notice fixes (0172, below) the sixty-second, the check's answer on a report a person already closed (0173, below) the sixty-third, 0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth, the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth, everyone told "until the review ends" hearing how it ended (0176, below) the sixty-sixth, an erased account's owner reference leaving its debates (0177, below) the sixty-seventh, the security fixes of audit run 3 (0178, below) the sixty-eighth, the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, the MFA recovery control user index (0182, below) the seventy-second, a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third, and the staff re-key permit (0184, below) the seventy-fourth, and the reader of the release switches (0185, below) the seventy-fifth, and the preview's approved buyers (0186, below) the seventy-sixth, and the passkeys a sign-in after the first step may use (0187, below) the seventy-seventh, and the recovery permit (0188, below) the seventy-eighth, and a Free debate the publication check kept private (0189, below) the seventy-ninth, and the check deleting a public debate with the Free sweep reading past waiting debates (0190, below) the eightieth, and the Owner adding a buyer with the security key alone (0191, below) the eighty-first, and the sign-up country read for prices (0192, below) the eighty-second, and upvotes on public debates (0193, below) the eighty-third. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0192: 0192,
-   `registration-country-read-forward0192.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's,
-   which 0112 to 0129 keep; 0131 to 0192 keep 0130's),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0193: 0193,
+   `public-debate-upvotes-forward0193.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's,
+   which 0112 to 0129 keep; 0131 to 0193 keep 0130's),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -1785,5 +1785,83 @@ stay applied if the site goes back to that release.
 Its `previous` is 0191, so its `previous.manifestSha256` is the SHA-256 of `preview-buyer-add-key-only-forward0191.json`.
 Until the step is applied anywhere its SQL may still change; after an SQL edit recompute `migration.sha256` in its
 manifest (the one-liner of 0184's section, with this step's manifest). If `origin/dev` takes 0192 first, renumber this
+step (rename every file and constant that carries the number, set `previous` to the step then before it, recompute the
+manifest, re-pin the chain lists).
+
+## Upvotes on public debates (0193)
+
+The eighty-third chain step, after the sign-up country read for prices (0192). A signed-in account can upvote a debate
+that is public now, once; pressing again takes the vote back. Each row of the public list shows how many accounts upvoted
+its debate. Nobody is shown who voted: no function of this step returns another account's vote.
+
+- `0193_public_debate_upvotes.sql`, `public-debate-upvotes-forward0193.json`,
+  `packages/db/src/migration-forward0193.ts` (`loadForward0193`, appended last to `STEPS`, `MIGRATION_FORWARD0193_*`
+  refusals).
+- The table `identity.public_debate_upvote`, one row per page and account: `publication_ref` (the page, a key to
+  `serve.publication_snapshot`), `owner_ref` (the account, a key to `identity."user"`) and `created_at`. The primary key
+  `(publication_ref, owner_ref)` is the one-vote rule. There is no counter and no log: the count is counted when it is
+  read, and taking a vote back deletes its row. The account key is `ON DELETE CASCADE`: the votes go when 0110's
+  `identity.finalize_account_erasure` deletes the account row, at the end of the closure grace period, and they count
+  until then. The page key has no delete rule, because a snapshot row is never deleted. An index on
+  `(owner_ref, created_at)` serves the cascade and the export. The table has 0056's truncate guard, no row security and no
+  right for any role: every access goes through the six functions below. The table and the functions are owned by 0115's
+  export owner (the owner of `identity.read_data_export_snapshot(uuid,uuid)`), and the step refuses to apply,
+  `PUBLIC_DEBATE_UPVOTES_OWNER_UNABLE`, where that owner could not ask what the functions ask.
+- Three functions for the API's request login, EXECUTE for `debateai_billing_runtime` alone (the API's own role, never the
+  runtime role the runner and the scheduler share). Each takes the account's owner reference, asks
+  `identity.request_owner_matches` and raises `42501` `REQUEST_OWNER_MISMATCH` unless the connection is the account's own
+  (a request login inside that account's own request, or a system login). A null argument raises `22023`
+  `PUBLIC_DEBATE_UPVOTE_INVALID`.
+  - `identity.cast_public_debate_upvote(uuid,uuid)` answers `{outcome, upvotes}`: `CAST` or `ALREADY` with the page's
+    count, or `NOT_PUBLIC` with a null count when the page is not public now. "Public now" is the list's rule,
+    `core.run_is_published` of the page's debate and the page: the debate's latest visibility event is `PUBLISHED` under
+    this very link and no review holds it. An unknown link, a debate made private again and a held page all answer
+    `NOT_PUBLIC`. An account that is not `active` is refused with `22023` `PUBLIC_DEBATE_UPVOTE_ACCOUNT_INVALID`.
+  - `identity.withdraw_public_debate_upvote(uuid,uuid)` answers `{outcome, upvotes}`: `WITHDRAWN` or `NONE`. It works
+    whatever the page's state, because it asks nothing of the page before it deletes: a person may always take their own
+    vote back. The count is null when the page is not public now.
+  - `identity.read_own_public_debate_upvotes(uuid,uuid[])` answers which of at most 100 asked pages the account upvoted,
+    sorted, and an empty array when none; more than 100 is `PUBLIC_DEBATE_UPVOTE_INVALID`. It does not ask whether a page
+    is public.
+
+  Cast and withdraw answer the fresh count themselves, because the count's reader is the marker's and a request login may
+  not call it.
+- Two functions for the cross-account marker, EXECUTE for `debateai_rls_all_accounts` alone (the API's system login outside
+  any request, as 0190 gave the marker its two). Neither takes an owner.
+  - `identity.read_public_debate_upvote_counts(uuid[])` answers `[{publication_ref, upvotes}]` for at most 100 asked
+    pages: one entry per page that is public now (`core.run_is_published`), 0 when it has no votes, and no entry for any
+    other page; a null list or more than 100 is `22023` `PUBLIC_DEBATE_UPVOTE_INVALID`. The answer is the same for every
+    caller and names no account. The public list reads it.
+  - `identity.delete_gone_public_debate_upvotes(integer)` is the sweep. It deletes the votes of a page that is no longer
+    its debate's current publication (`core.publication_is_current`), in batches of at most 1000, and returns how many it
+    deleted; a return equal to the limit means more may remain, and a limit that is null or outside 1 to 1000 is `22023`
+    `PUBLIC_DEBATE_UPVOTE_INVALID`. Such a page never comes back: the owner's unpublish, the end-of-debate check's
+    takedown (0190) and an account closing each write a `PRIVATE` event under the page's link, and every publish makes a
+    new link. A page under a staff hold (`identity.public_review_held`) is still current, because a hold writes no
+    visibility event: it is never swept, and its votes count again when the hold is lifted. A page that is held and
+    then made private is swept. A vote another transaction holds is skipped and left for the next pass.
+- The export reader `identity.read_data_export_public_debate_upvotes(uuid,uuid)`, EXECUTE for
+  `debateai_data_export_worker` alone, behind 0128's lease gate (`identity.data_export_lease_user`): every vote of the
+  leased export's account as `[{publication_ref, created_at}]`, oldest first, whatever its page's state.
+- `debateai_erasure_runtime` gains nothing: the API counts at its start what that login may run, so one more function
+  there would stop the release before from starting.
+- Where it is tested: `tests/architecture/public-debate-upvotes-0193-contract.test.ts` (the text of the step, with no
+  database) and `tests/integration/public-debate-upvotes-0193.test.ts` (real rows on the dev and the production logins).
+
+Its header declares `-- n1: expand` and `-- n1: keeps-verifier`: one new table and six new functions the release before
+never reads or calls, no earlier table, function, trigger or grant changed, and no billing relation or function, so its
+manifest names 0130's verifier (`verify-effective-capabilities-130.sql`) as both `previous.verifierSha256` and its own.
+One statement carries a `-- n1: reviewed <reason>` line: the `DO` block that gives the table and the six functions their
+owner. It amends no earlier step and has no `replayVerifierSql`: its check is its postcondition digest (the table and the
+six functions, each whole: the table's owner, ACL, columns, constraints, indexes and triggers, and each function's owner,
+definer flag, settings, volatility, body and ACL), which every later `migrate()` compares.
+
+The database step goes first: a release's start refuses while one of its steps is pending (`apply-and-plan`, above), so
+the API that calls the functions never runs on a database without them. The release before never reads the table and
+never calls a function of this step, so the step can stay applied if the site goes back to that release.
+
+Its `previous` is 0192, so its `previous.manifestSha256` is the SHA-256 of `registration-country-read-forward0192.json`.
+Until the step is applied anywhere its SQL may still change; after an SQL edit recompute `migration.sha256` in its
+manifest (the one-liner of 0184's section, with this step's manifest). If `origin/dev` takes 0193 first, renumber this
 step (rename every file and constant that carries the number, set `previous` to the step then before it, recompute the
 manifest, re-pin the chain lists).
