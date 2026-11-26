@@ -134,7 +134,7 @@ if the server shows something else.
 | 5 | the main name, and your staff key on it (5.7) | password on | NAME5 |
 | 5.8 | the NETOPIA review window: the public pages without the password (after NAME4), then NETOPIA's review (5.8b) | public pages open; sign-in, sign-up, debates and buying behind the password | REVIEW_CLOSE (or PWON) |
 | 5.9 | public debates: publishing switched on (after 5.7), still behind the site password | password on; public debates readable by those who know it | PUBOFF stops the public pages; what was public stays recorded (5.9b) |
-| 5.10 | Caddy's health check without the edge secret (at any time outside an upload, on your yes) | as before; Caddy restarts (about a second) | HEALTHBACK |
+| 5.10 | Caddy's health check without the edge secret (at any time outside an upload, on your yes) | as before; Caddy restarts (usually about a second; see 5.10) | HEALTHBACK |
 | 6 | friends' test with test payments (it may run while NETOPIA reviews) | password on | ASKS_CLOSE |
 | 6b | the whole site open while payments are NETOPIA's sandbox: anyone may sign up and ask on the Free plan, only the accounts you list may buy test plans (after part 5 and 5.7, on a release that carries it; before you enrol the point of sale, 5.8b step 3) | open | PWON, then ASKS_CLOSE |
 | 7 | real payments (only after NETOPIA's approval and the signed contract; 6b closed first; if anyone outside the team had the site password, a new one first) | password on | PAY_BACK |
@@ -1128,7 +1128,7 @@ Three other stops can come in either run:
 - **`DISK` is BAD** (less than 15 GB free on `/`, now that the staging is there). Nothing changed. Run the release
   guide's CLEARLOOK, then its CLEAR1 for one archive folder or unused label that CLEARLOOK says may be cleared, on your
   yes (one name per run; NOTHING of it is kept), and SB4 again. Neither takes this upload's own release, or a release
-  its lock copy pins.
+  its lock copy pins, while CLEAR1's `OVER` stays empty, as it does during an upload.
 - **The release lock is full.** Before the release check, SB4 reads whether the lock has room for this release's pin
   (at DR5, inside the downtime). If not, it stops with nothing changed:
   `SB4_NOT_DONE: the release lock is full (…): archive <label> first with SB15 (PREV='<label>', …), then run SB4
@@ -4443,7 +4443,7 @@ Expect `the edit: taken out: 3 lines (health_headers {, the secret's line, }); a
 check as Caddy reads it, before: /readyz passes 1 fails 1 secret true; after: /readyz passes 1 fails 1 secret false`
 (the numbers as this server has them), the number of kept copies, the `before:` line, then `kept copies changed: …`
 and `HEALTH2_DONE`. The words in a failed check's brackets: `caddy` (Caddy is not active), `edge` (the loopback
-listener does not answer 200 from this release within about 15 seconds), `website` (this release's website no longer
+listener does not answer 200 from this release within the half minute it is asked), `website` (this release's website no longer
 answers its readiness 200 with no secret), `login` (the Log in page answers otherwise than before), `release` (with
 the site open: the Log in page is served by another release), `readyz` (the public route no longer refuses
 `/readyz`), `notify` (a test NETOPIA notice is answered otherwise than before), `failed-units` (a unit failed that had

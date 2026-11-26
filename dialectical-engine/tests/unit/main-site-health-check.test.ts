@@ -766,7 +766,7 @@ describe('the runbook\'s words', () => {
   it('5.10 comes after 5.9b and before part 6, in the order table too, and names every kept copy HEALTH2 changes', () => {
     expect(runbook.indexOf('### 5.9b')).toBeLessThan(runbook.indexOf('### 5.10 '));
     expect(runbook.indexOf('### 5.10 ')).toBeLessThan(runbook.indexOf('## 6. Friends\' test'));
-    expect(runbook).toContain('| 5.10 | Caddy\'s health check without the edge secret (at any time outside an upload, on your yes) | as before; Caddy restarts (about a second) | HEALTHBACK |');
+    expect(runbook).toContain('| 5.10 | Caddy\'s health check without the edge secret (at any time outside an upload, on your yes) | as before; Caddy restarts (usually about a second; see 5.10) | HEALTHBACK |');
     const kept = /^KEPT=\((.*)\)$/m.exec(HEALTH1.join('\n'))![1]!.split(' ').map(path => path.replace(/^"\$M\/|"$/g, ''));
     expect(kept).toEqual(['name/Caddyfile.before-dezbatere', 'name/Caddyfile.phase1', 'name/Caddyfile.main', 'password/Caddyfile.before-open', 'password/Caddyfile.open']);
     for (const path of kept) expect(section, path).toContain(`\`${path}\``);

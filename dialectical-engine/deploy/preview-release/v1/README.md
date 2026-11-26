@@ -6823,12 +6823,15 @@ newer. CLEARLOOK runs at any time. CLEAR1 runs with the owner's yes for its one 
 deleted, while an upload is under way as the other steps tell it: a release staged or draining, the maintenance flag,
 or a detached step still running. Before SB10 (or DR5 on the drained path) none of these shows, so CLEAR1 also runs
 in an upload's preparation, or when SB4 stops on `DISK`: that upload's own release, and every release its lock copy
-pins, stay.
+pins, stay until the owner declares that upload over (`OVER='yes'`), so `OVER` stays empty while an upload is being
+prepared. Run both steps the ordinary way, not detached: a detached CLEAR1 sees its own unit as a detached step still
+running, and refuses.
 
 ```sh
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # CLEARLOOK: every archive folder, and every label under releases and artifacts that the release lock does not pin, with what deleting it would free and what may still need it, then may be cleared or KEEP. Read-only: nothing is moved or deleted.
+OVER=''                                                   # the look never takes an upload as declared over, whatever the shell that runs it holds: only CLEAR1's own OVER line does
 # The clear-out's facts (the same lines in CLEARLOOK and CLEAR1). A name is held to one strict pattern before any path is made from it, and CLEAR1 reads every fact again, for its one name, right before it deletes.
 export LC_ALL=C; shopt -s nullglob dotglob
 O=/opt/debateai-v3-preview; PA=/root/preview-archive; MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending; PROC=/proc; UD='/etc/systemd/system /run/systemd/system /run/systemd/transient /usr/lib/systemd/system'; WALK='/ /run'; MI=/proc/self/mountinfo
