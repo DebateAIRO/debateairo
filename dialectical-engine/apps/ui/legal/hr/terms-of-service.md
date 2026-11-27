@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v1.2 · NA SNAZI OD 27. STUDENOGA 2026.
+eyebrow: UVJETI KORIŠTENJA · v1.2 · NA SNAZI OD 28. STUDENOGA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
 endMarker: KRAJ UVJETA · v1.2
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 1.2 · Effective 27. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 1.2 · Effective 28. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Na besplatnom planu vaše su rasprave javne kada završe, nakon provjere umjetnom inteligencijom; na plaćenom planu privatne su osim ako ih objavite. Kada je rasprava javna, svatko je može pročitati i ona ostaje javna. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja, uglavnom pružatelju DeepInfra, u Sjedinjenim Američkim Državama. Uvjeti društava DeepInfra, Anthropic i Amazon ne dopuštaju im treniranje modela na njemu. Pružatelj usluge pretraživanja interneta prima samo kratke izraze za pretraživanje koje pišu modeli (odjeljak 8.). Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 

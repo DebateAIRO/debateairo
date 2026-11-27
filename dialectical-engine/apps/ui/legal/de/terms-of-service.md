@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v1.2 · GÜLTIG AB 27. NOVEMBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v1.2 · GÜLTIG AB 28. NOVEMBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
 endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v1.2
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 1.2 · Effective 27. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 1.2 · Effective 28. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Im kostenlosen Tarif sind Ihre Debatten nach Abschluss öffentlich, nach einer KI-Prüfung; im kostenpflichtigen Tarif sind sie privat, sofern Sie sie nicht veröffentlichen. Sobald eine Debatte öffentlich ist, kann jede Person sie lesen, und sie bleibt öffentlich. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis der KI-Anbieter aufgeführten KI-Anbieter gesendet, hauptsächlich an DeepInfra in den Vereinigten Staaten. Die Bedingungen von DeepInfra, Anthropic und Amazon erlauben es ihnen nicht, damit Modelle zu trainieren. Der Anbieter der Websuche erhält nur die kurzen Suchbegriffe, die die Modelle formulieren (Abschnitt 8). Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 

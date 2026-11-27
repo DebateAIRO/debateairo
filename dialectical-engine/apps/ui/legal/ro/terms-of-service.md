@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: TERMENII SERVICIULUI · v1.2 · ÎN VIGOARE DE LA 27 NOIEMBRIE 2026
+eyebrow: TERMENII SERVICIULUI · v1.2 · ÎN VIGOARE DE LA 28 NOIEMBRIE 2026
 title: Ce acceptați
 lede: Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.
 endMarker: SFÂRȘITUL TERMENILOR · v1.2
@@ -21,7 +21,7 @@ jumps:
 18 LEGEA APLICABILĂ
 -->
 
-**Version 1.2 · Effective 27 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
+**Version 1.2 · Effective 28 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
 
 **In short.** Trebuie să aveți cel puțin 18 ani. Dialectical Engine construiește argumente cu modele de inteligență artificială, iar tot ceea ce generează poate fi greșit — nu constituie consultanță. Pe planul gratuit, dezbaterile dumneavoastră sunt publice după ce se încheie, în urma unei verificări cu IA; pe un plan cu plată, sunt private dacă nu le publicați. Odată publică, o dezbatere poate fi citită de oricine și rămâne publică. Textul pe care îl transmiteți este trimis furnizorilor de IA enumerați în Registrul furnizorilor de IA, în principal DeepInfra, în Statele Unite. Condițiile DeepInfra, Anthropic și Amazon nu le permit să antreneze modele pe baza lui. Furnizorul de căutare pe web primește numai expresiile scurte de căutare pe care le scriu modelele (secțiunea 8). Raportați conținutul ilegal la support@dezbatere.ro, indiferent dacă aveți sau nu un cont. Se aplică legea română, însă protecția locală a consumatorilor de care beneficiați se menține.
 

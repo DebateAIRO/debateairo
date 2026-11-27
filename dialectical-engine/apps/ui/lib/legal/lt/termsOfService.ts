@@ -381,8 +381,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "1.2",
-  sha256: "fe346edc9372eb701adbee37f9e7cf2ef5da1146314b118eeda80bbb120ebd31",
-  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v1.2 · ĮSIGALIOJA 2026 M. LAPKRIČIO 27 D.",
+  sha256: "5c7862658eb9fd9a06f455abe8eccbe380b0a3ebdc1fc84b0edb3a6a3a9481c4",
+  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v1.2 · ĮSIGALIOJA 2026 M. LAPKRIČIO 28 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",
   endMarker: "SĄLYGŲ PABAIGA · v1.2",

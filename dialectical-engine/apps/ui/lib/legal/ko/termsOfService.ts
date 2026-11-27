@@ -381,8 +381,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "1.2",
-  sha256: "ba61ed05916f2ccbcc74b4d190a0d1ab25d9b37ba76a58b6942927145a87beea",
-  eyebrow: "서비스 이용약관 · v1.2 · 시행일 2026년 11월 27일",
+  sha256: "9df952450f86f9224f7dd393550dc37822372c92e7384fc93e7bbe00282ee191",
+  eyebrow: "서비스 이용약관 · v1.2 · 시행일 2026년 11월 28일",
   title: "귀하가 동의하는 사항",
   lede: "귀하와 DMS Merchandise Shop S.R.L. 간의 계약을 알기 쉬운 말로 설명합니다. 19개 조항과 부속서 A가 있으며, 끝까지 스크롤하여 확인하십시오.",
   endMarker: "이용약관 끝 · v1.2",
