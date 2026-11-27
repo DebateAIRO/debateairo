@@ -164,6 +164,8 @@
   "legal.providers.luxembourg": "Luxembourg",
   "legal.providers.retentionAmazon": "Không lưu, trừ một trường hợp: các yêu cầu bị bộ lọc lạm dụng tự động của Amazon đánh dấu được giữ tối đa 30 ngày, và Amazon có thể xem xét chúng. OpenAI, nhà phát triển mô hình, không nhận được văn bản",
   "legal.providers.basisAmazon": "Khung bảo vệ dữ liệu EU–Hoa Kỳ (EU–US Data Privacy Framework): Amazon Web Services, Inc., công ty vận hành các trung tâm dữ liệu tại Hoa Kỳ, được chứng nhận theo khung này. Phụ lục xử lý dữ liệu của Amazon cũng bao gồm các điều khoản hợp đồng tiêu chuẩn của EU",
+  "legal.providers.locationNetopia": "Romania, in general. NETOPIA's privacy policy says it may in some cases send data to other countries in the European Economic Area or outside it, and that it then relies on an EU adequacy decision or the EU standard contractual clauses",
+  "legal.providers.retentionNetopia": "5 years from the date of each payment, to meet its duties on money laundering, fraud, accounting and tax. NETOPIA says it does not store your full card number, expiry date or security code: it passes them to its bank, to Visa or Mastercard and to the bank that issued your card, and keeps only the first 6 and last 4 digits and the cardholder's name",
   "legal.health.eyebrow": "Dữ liệu sức khỏe người tiêu dùng tại Hoa Kỳ",
   "legal.health.title": "Chính sách quyền riêng tư về dữ liệu sức khỏe người tiêu dùng",
   "legal.health.meta": "Dành cho cư dân các tiểu bang Washington, Nevada và Connecticut",

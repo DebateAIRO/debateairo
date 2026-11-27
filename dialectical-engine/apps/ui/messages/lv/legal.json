@@ -164,6 +164,8 @@
   "legal.providers.luxembourg": "Luksemburga",
   "legal.providers.retentionAmazon": "Netiek glabāts, ar vienu izņēmumu: pieprasījumi, ko Amazon automātiskais ļaunprātīgas izmantošanas filtrs atzīmē, tiek glabāti līdz 30 dienām, un Amazon var tos pārskatīt. OpenAI, modeļa izstrādātājs, tekstu nesaņem",
   "legal.providers.basisAmazon": "ES un ASV datu privātuma regulējums: Amazon Web Services, Inc., kas pārvalda Amerikas Savienoto Valstu datu centrus, ir sertificēts saskaņā ar to. Amazon datu apstrādes papildinājumā ir iekļautas arī ES standarta līguma klauzulas",
+  "legal.providers.locationNetopia": "Romania, in general. NETOPIA's privacy policy says it may in some cases send data to other countries in the European Economic Area or outside it, and that it then relies on an EU adequacy decision or the EU standard contractual clauses",
+  "legal.providers.retentionNetopia": "5 years from the date of each payment, to meet its duties on money laundering, fraud, accounting and tax. NETOPIA says it does not store your full card number, expiry date or security code: it passes them to its bank, to Visa or Mastercard and to the bank that issued your card, and keeps only the first 6 and last 4 digits and the cardholder's name",
   "legal.health.eyebrow": "ASV patērētāju veselības dati",
   "legal.health.title": "Patērētāju veselības datu privātuma politika",
   "legal.health.meta": "Vašingtonas, Nevadas un Konektikutas štatu iedzīvotājiem",

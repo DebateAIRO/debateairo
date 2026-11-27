@@ -164,6 +164,8 @@
   "legal.providers.luxembourg": "Luxemburgo",
   "legal.providers.retentionAmazon": "Não armazenados, com uma exceção: os pedidos assinalados pelo filtro automático de abusos da Amazon são guardados até 30 dias, e a Amazon pode analisá-los. A OpenAI, criadora do modelo, não recebe o texto",
   "legal.providers.basisAmazon": "Quadro de Privacidade de Dados UE–EUA: a Amazon Web Services, Inc., que gere os centros de dados dos Estados Unidos, está certificada ao abrigo deste quadro. O aditamento da Amazon relativo ao tratamento de dados inclui também as cláusulas contratuais-tipo da UE",
+  "legal.providers.locationNetopia": "Romania, in general. NETOPIA's privacy policy says it may in some cases send data to other countries in the European Economic Area or outside it, and that it then relies on an EU adequacy decision or the EU standard contractual clauses",
+  "legal.providers.retentionNetopia": "5 years from the date of each payment, to meet its duties on money laundering, fraud, accounting and tax. NETOPIA says it does not store your full card number, expiry date or security code: it passes them to its bank, to Visa or Mastercard and to the bank that issued your card, and keeps only the first 6 and last 4 digits and the cardholder's name",
   "legal.health.eyebrow": "Dados de saúde dos consumidores nos EUA",
   "legal.health.title": "Política de Privacidade de Dados de Saúde dos Consumidores",
   "legal.health.meta": "Para residentes em Washington, no Nevada e no Connecticut",
