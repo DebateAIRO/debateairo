@@ -164,6 +164,8 @@
   "legal.providers.luxembourg": "Λουξεμβούργο",
   "legal.providers.retentionAmazon": "Δεν διατηρείται, με μία εξαίρεση: τα αιτήματα που επισημαίνει το αυτόματο φίλτρο κατάχρησης της Amazon διατηρούνται έως 30 ημέρες, και η Amazon μπορεί να τα εξετάσει. Η OpenAI, η δημιουργός του μοντέλου, δεν λαμβάνει το κείμενο",
   "legal.providers.basisAmazon": "Πλαίσιο Προστασίας Δεδομένων ΕΕ–ΗΠΑ: η Amazon Web Services, Inc., που λειτουργεί τα κέντρα δεδομένων στις Ηνωμένες Πολιτείες, είναι πιστοποιημένη βάσει αυτού. Το προσάρτημα επεξεργασίας δεδομένων της Amazon περιλαμβάνει επίσης τις τυποποιημένες συμβατικές ρήτρες της ΕΕ",
+  "legal.providers.locationNetopia": "Romania, in general. NETOPIA's privacy policy says it may in some cases send data to other countries in the European Economic Area or outside it, and that it then relies on an EU adequacy decision or the EU standard contractual clauses",
+  "legal.providers.retentionNetopia": "5 years from the date of each payment, to meet its duties on money laundering, fraud, accounting and tax. NETOPIA says it does not store your full card number, expiry date or security code: it passes them to its bank, to Visa or Mastercard and to the bank that issued your card, and keeps only the first 6 and last 4 digits and the cardholder's name",
   "legal.health.eyebrow": "Δεδομένα υγείας καταναλωτών στις ΗΠΑ",
   "legal.health.title": "Πολιτική απορρήτου δεδομένων υγείας καταναλωτών",
   "legal.health.meta": "Για κατοίκους των πολιτειών Ουάσινγκτον, Νεβάδα και Κονέκτικατ",

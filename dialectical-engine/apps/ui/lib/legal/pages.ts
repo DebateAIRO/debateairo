@@ -482,13 +482,15 @@ export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
 
 /**
  * Privacy 3.15: the Register also lists the payment provider, NETOPIA Payments, the one row
- * that is not an AI provider. Only what the repo supports is filled in. What it receives with each payment is
+ * that is not an AI provider. What it receives with each payment is
  * `buildHostedStartBody` / `buildSavedCardChargeBody` (packages/payments-netopia/src/requests.ts), the same list as
- * Privacy Policy §5. The legal entity is not recorded in the code: "NETOPIA Financial Services S.A." in Romania is
- * the name Privacy Policy §5 gives, still to be confirmed against the contract, as is NETOPIA's role.
- * Romania is in the EU, so no transfer basis is needed. Where it processes, how long it keeps data and the privacy
- * contact are unknown, so they stay "[to confirm]", and the row has no checked date. Zero data retention and training
- * are facts about AI providers: "not applicable". Listed on every answer, after the AI rows (`legalRegister`).
+ * Privacy Policy §5. Where it processes, how long it keeps data and the privacy contact are what NETOPIA publishes:
+ * its privacy policy (netopia-payments.com/politica-de-confidentialitate, "Transferul datelor") and its notice for
+ * payers (netopia-payments.com/nota-de-informare-gdpr-platitori, "Stocarea datelor" and "Ce date personale
+ * prelucrăm"). Both pages name NETOPIA Financial Services S.A. in Romania and say it acts as a controller when it
+ * processes a payment; the name has not been compared with the contract. Romania is in the EU, so no transfer basis
+ * is needed. Zero data retention and training are facts about AI providers: "not applicable". Listed on every answer,
+ * after the AI rows (`legalRegister`).
  */
 export const NETOPIA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   key: "netopia",
@@ -500,13 +502,13 @@ export const NETOPIA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   homeCountryKey: "legal.providers.romania",
   purposes: Object.freeze<ProviderPurpose[]>(["payments"]),
   purposesConfirmed: true,
-  locationKey: "legal.providers.unconfirmed",
-  retentionKey: "legal.providers.unconfirmed",
+  locationKey: "legal.providers.locationNetopia",
+  retentionKey: "legal.providers.retentionNetopia",
   zeroRetention: "notApplicable",
   training: "notApplicable",
   basisKey: "legal.providers.euBasis",
-  contact: "[…]",
-  checkedOn: null
+  contact: "gdpr@netopia.ro",
+  checkedOn: "2026-11-27"
 });
 
 /**
