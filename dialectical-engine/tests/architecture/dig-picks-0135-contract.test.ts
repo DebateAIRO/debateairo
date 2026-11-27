@@ -279,7 +279,7 @@ describe("0135: a dig's picks and its path rewrite's material", () => {
     expect(exporter).toContain(`"${EXPORT_READER}",`);
     expect(exporter.indexOf(`"${EXPORT_READER}",`)).toBeGreaterThan(exporter.indexOf('"identity.read_data_export_dig_model(uuid,uuid)",'));
     // V4 start step, Task 39e: 0162's export reader is the twenty-fifth worker function (after 0157's moderation reader).
-    // Public debate upvotes: 0193's export reader is the twenty-sixth.
+    // Public debate upvotes: 0194's export reader is the twenty-sixth.
     expect(exporter).toContain("worker.worker_count !== 26");
     expect(read("packages/db/src/dig-picks.ts")).toContain(`export const READ_DATA_EXPORT_DIG_PICKS = "${EXPORT_READER}" as const;`);
   });

@@ -817,7 +817,7 @@ describe('the words of 5.9, and where the rest of the guide points to it', () =>
     expect(flat).toContain('PUBON and PUBOFF) needs its `upfail`');
     const flatGuide = guide.replace(/\s+/g, ' ');
     expect(flatGuide).toContain('**While publishing is on** (MAIN-SITE.md 5.9:');
-    expect(flatGuide).toContain('`publication state A` (publishing on, MAIN-SITE.md 5.9) or `C` (before it),');
+    expect(flatGuide).toContain('`publication state A` (publishing on, MAIN-SITE.md 5.9) or `C` (before it);');
     expect(flatGuide).toContain('as MAIN-SITE.md\'s PUBOFF leaves the file once a debate was public: stop');
   });
 });

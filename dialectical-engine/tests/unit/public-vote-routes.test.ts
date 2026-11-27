@@ -11,8 +11,8 @@ import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionH
  * Upvotes on public debates (design 2026-11-26, sections 5 and 7.2): PUT and DELETE /v1/public/debates/{id}/vote and
  * GET /v1/account/public-debate-votes. One vote per account per debate; the account is the session's; every absence is
  * the one 404 DEBATE_NOT_FOUND; the three routes share the publicVotes budget, charged before the id is looked at. The
- * store here is a fake that keeps the database's rules (0193); the PostgreSQL behaviour is
- * tests/integration/public-debate-upvotes-0193.test.ts.
+ * store here is a fake that keeps the database's rules (0194); the PostgreSQL behaviour is
+ * tests/integration/public-debate-upvotes-0194.test.ts.
  */
 const VOTER = testHttpIdentity("public-vote-voter");
 const OTHER = testHttpIdentity("public-vote-other");

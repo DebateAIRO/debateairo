@@ -704,3 +704,95 @@ describe('NV-14 verification by the inbox holder', () => {
         }
     });
 });
+
+// 0193, owner ruling 2026-11-26: "Continue with Google" with the address an account already signs in with connects
+// Google to that account by itself, and the sign-in goes on to the account's second step.
+describe('a Google sign-in for the address an account already signs in with (0193)', () => {
+    /** An active account as the e-mail sign-up leaves it: a password, an authenticator code, and no Google link. */
+    async function passwordAccount(h: Awaited<ReturnType<typeof harness>>) {
+        const signup = await h.signup();
+        if (!('status' in signup.result))
+            throw new Error('EXPECTED_ENROLLMENT');
+        const options = await h.mfa.beginTotp({ enrollmentToken: signup.result.enrollment_token }, signup.bound), secret = decodeBase32(options.secret), step = Math.floor(Date.now() / 30000);
+        await h.mfa.verifyTotp({ enrollmentToken: signup.result.enrollment_token, code: totpCodeAtStep(secret, step - 1) }, signup.bound);
+        const row = (await db.pool.query('SELECT user_id,state FROM identity."user" WHERE email_blind_index=$1', [createEmailBlindIndex(blindKey, signup.input.email)])).rows[0];
+        expect(row.state).toBe('active');
+        await db.pool.query('UPDATE identity."user" SET password_hash=$1 WHERE user_id=$2', [dummy, row.user_id]);
+        await db.pool.query('DELETE FROM identity.social_identity WHERE user_id=$1', [row.user_id]);
+        return { userId: row.user_id as string, email: signup.input.email, secret, step };
+    }
+    const links = async (userId: string) => (await db.pool.query('SELECT subject,revoked_at FROM identity.social_identity WHERE user_id=$1', [userId])).rows;
+    const counts = async (userId: string) => (await db.pool.query(`SELECT
+        (SELECT count(*)::int FROM identity.audit_event WHERE event_type='identity.social.LINK') link_audit,
+        (SELECT coalesce(sum(revision),0)::int FROM identity.consumer_security_notice WHERE user_id=$1 AND event_kind='METHOD_CHANGED') notices`, [userId])).rows[0];
+
+    it('connects Google to the account, tells its owner, and signs in only after the second step', async () => {
+        const h = await harness();
+        try {
+            const account = await passwordAccount(h), before = await counts(account.userId), subject = randomUUID();
+            const cb = await h.callback({ sub: subject });
+            expect(cb.status).toBe('mfa_required');
+            expect(await links(account.userId)).toEqual([{ subject, revoked_at: null }]);
+            const after = await counts(account.userId);
+            expect(after.link_audit).toBe(before.link_audit + 1);
+            expect(after.notices).toBeGreaterThan(before.notices);
+            // Google alone opened nothing: no session exists until the authenticator code is given.
+            const sessionsBefore = (await db.pool.query('SELECT count(*)::int n FROM identity.session WHERE user_id=$1', [account.userId])).rows[0].n;
+            const source = { ...h.source, socialBrowserHash: socialHash('browser', cb.browserCookie) };
+            const logged = await h.sessions.completeLogin({ challengeToken: cb.token, code: totpCodeAtStep(account.secret, account.step) }, source);
+            expect(logged.status).toBe('authenticated');
+            expect((await db.pool.query('SELECT count(*)::int n FROM identity.session WHERE user_id=$1', [account.userId])).rows[0].n).toBe(sessionsBefore + 1);
+            // The next time it is an ordinary linked sign-in: no second link, no second notice.
+            const again = await h.callback({ sub: subject });
+            expect(again.status).toBe('mfa_required');
+            expect(await links(account.userId)).toHaveLength(1);
+            expect((await counts(account.userId)).link_audit).toBe(after.link_audit);
+        }
+        finally {
+            await h.registration.drainMailDispatches();
+        }
+    });
+
+    it.each([
+        ['an address Google does not itself answer for', async (_h: Awaited<ReturnType<typeof harness>>, _userId: string) => ({ email_verified: false })],
+        ['a held account', async (_h: Awaited<ReturnType<typeof harness>>, userId: string) => { await db.pool.query('INSERT INTO identity.account_security_hold(user_id,held) VALUES($1,true)', [userId]); return {}; }],
+        ['an account the known-password recovery still serves, which any Google link would close for good', async (_h: Awaited<ReturnType<typeof harness>>, userId: string) => { await db.pool.query('INSERT INTO identity.mfa_recovery_legacy_cohort(user_id) VALUES($1)', [userId]); expect((await db.pool.query('SELECT identity.mfa_recovery_eligible($1) eligible', [userId])).rows[0].eligible).toBe(true); return {}; }],
+        ['a staff account', async (_h: Awaited<ReturnType<typeof harness>>, userId: string) => { await db.pool.query('INSERT INTO staff.subject(user_id) VALUES($1)', [userId]); return {}; }],
+        ['a suspended account', async (_h: Awaited<ReturnType<typeof harness>>, userId: string) => { await db.pool.query(`UPDATE identity."user" SET state='suspended' WHERE user_id=$1`, [userId]); return {}; }],
+        ['an account whose Google link was removed', async (_h: Awaited<ReturnType<typeof harness>>, userId: string) => { await db.pool.query(`INSERT INTO identity.social_identity(user_id,provider,issuer,app_scope,subject,configuration,revoked_at) VALUES($1,'google','https://accounts.google.com','journey-client',$2,$3,clock_timestamp())`, [userId, randomUUID(), configurations[0]!.configuration]); return {}; }],
+        ['an account with no second step to ask for', async (_h: Awaited<ReturnType<typeof harness>>, userId: string) => { await db.pool.query(`BEGIN;SELECT set_config('debateai.mail_locale','en',true);UPDATE identity.mfa_factor SET state='revoked' WHERE user_id='${userId}';UPDATE identity.recovery_code SET revoked_at=clock_timestamp() WHERE user_id='${userId}' AND revoked_at IS NULL;COMMIT`); return {}; }]
+    ] as const)('does not connect %s: the return asks for a sign-up, as before', async (_name, arrange) => {
+        const h = await harness();
+        try {
+            const account = await passwordAccount(h), extra = await arrange(h, account.userId);
+            const linksBefore = await links(account.userId), before = await counts(account.userId);
+            const cb = await h.callback({ sub: randomUUID(), ...extra });
+            expect(cb.status).toBe('signup_required');
+            expect(await links(account.userId)).toEqual(linksBefore);
+            expect(await counts(account.userId)).toEqual(before);
+            if (_name.startsWith('an account the known-password recovery'))
+                expect((await db.pool.query('SELECT identity.mfa_recovery_eligible($1) eligible', [account.userId])).rows[0].eligible).toBe(true);
+        }
+        finally {
+            await h.registration.drainMailDispatches();
+        }
+    });
+
+    it('does not connect a sign-up nobody finished: the address is not that account\'s yet', async () => {
+        const h = await harness();
+        try {
+            // A typed address with no proof from Google leaves a pending account waiting for its mail.
+            const pending = await h.signup('unfinished-0193@gmail.com');
+            expect(pending.result).not.toHaveProperty('enrollment_token');
+            const row = (await db.pool.query('SELECT user_id,state FROM identity."user" WHERE email_blind_index=$1', [createEmailBlindIndex(blindKey, 'unfinished-0193@gmail.com')])).rows[0];
+            expect(row.state).toBe('pending_verification');
+            // Its real holder arrives with Google's proof of that address.
+            const cb = await h.callback({ sub: randomUUID(), email: 'unfinished-0193@gmail.com' });
+            expect(cb.status).toBe('signup_required');
+            expect(await links(row.user_id)).toEqual([]);
+        }
+        finally {
+            await h.registration.drainMailDispatches();
+        }
+    });
+});

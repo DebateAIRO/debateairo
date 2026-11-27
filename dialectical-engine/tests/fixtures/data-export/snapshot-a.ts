@@ -43,7 +43,7 @@ export const snapshotA: ExportSnapshot = {
     age_checks: [], erasure_requests: [], kept_questions: [], reading_level: null, debate_visits: [], dig_links: [], investigations: [], reserve_events: [], question_readings: [], before_start_readings: [], reports_you_made: [], moderation_notices: [], earlier_moderation_notices: [],
     // V4 start step, Task 39e: the questions not started yet.
     questions_not_started: [],
-    // 0193: the public debates the person upvoted.
+    // 0194: the public debates the person upvoted.
     debates_you_upvoted: [] },
   security: { mfa_factors: [], passkeys: [], recovery_codes: { unused_count: 4, generated_at: "2024-01-02T00:00:00.000Z" },
     sessions: [], social_identities: [], email_changes: [], recovery_email_changes: [], recovery_requests: [] },

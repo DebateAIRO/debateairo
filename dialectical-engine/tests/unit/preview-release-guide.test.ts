@@ -6,7 +6,7 @@
 // the server. Only the new sections are read; the R19 recipe above them stays as it ran.
 import { describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -73,7 +73,7 @@ const code = (line: string) => !line.trimStart().startsWith('#');
 /** The steps, in the order the guide runs them. */
 const STEPS = Object.freeze([
   'TA0', 'TA1', 'TA8', 'TA_UNITS', 'TA_CADDY', 'TA_ENV', 'TA_OP', 'TB0', 'TB1', 'TB2', 'TB3', 'TB4', 'TB5', 'TB6', 'TB7', 'TB8', 'TB9', 'RBA_T', 'RBB_T',
-  'SB1', 'SB1B', 'SB3', 'SB3B', 'SB3C', 'SB4', 'SB5', 'SB5B', 'SB5C', 'SB5D', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'LOGOCHECK', 'SB14', 'SB14B', 'SB15',
+  'SB1', 'SB1B', 'SB3', 'SB3B', 'SB3C', 'SB4', 'SB5', 'SB5B', 'SB5C', 'SB5D', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'LOGOCHECK', 'SB14', 'SB14B', 'SB15', 'CLEARLOOK', 'CLEAR1',
   'WB1', 'WB2', 'WB3', 'WB4', 'DR1', 'PRECHECK', 'DR2', 'DR3', 'DBBACK', 'DR4', 'DR4AGAIN', 'SWAP', 'DR5', 'DR5RESUME', 'DR6', 'DR6TAIL',
   'AFTERDR6', 'LATELINES', 'DR6AGAIN', 'RBD_A', 'RBD_B', 'AGAINSAME', 'MT1', 'MT2', 'PM1', 'PM2'
 ]);
@@ -643,13 +643,17 @@ describe('the preview release guide: transition T, side by side, the way back, t
     expect(scriptOf('WB1').lines.join('\n')).not.toContain('systemctl stop');
   });
 
-  it('nothing is removed: no rm, no unlink, no shred in the new sections', () => {
+  it('nothing is removed: no rm, no unlink, no shred in the new sections, but for CLEAR1\'s one guarded rm (SB15b)', () => {
+    const clear1 = scriptOf('CLEAR1');
     for (const block of allBlocks) {
       for (const line of block.lines.filter(code)) {
-        expect(line, line).not.toMatch(/(^|[\s;&|(`])(rm|rmdir|unlink|shred|truncate)(\s|$)/);
         expect(line, line).not.toMatch(/\s-delete(\s|$)/);
+        if (block === clear1 && line === '  rm -rf --one-file-system --preserve-root=all -- "$X" || GONE=no') continue;
+        expect(line, line).not.toMatch(/(^|[\s;&|(`])(rm|rmdir|unlink|shred|truncate)(\s|$)/);
       }
     }
+    // The one rm is CLEAR1's, on the owner's yes, and its tests run it on scratch folders (release-clear-out.test.ts).
+    expect(clear1.lines.filter(line => line.includes('rm -rf'))).toEqual(['  rm -rf --one-file-system --preserve-root=all -- "$X" || GONE=no']);
   });
 
   it('nothing is overwritten: a unit file or the boot target goes in only after the one in its place moved into S', () => {
@@ -2345,6 +2349,120 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
+  // The fence's lines, run by bash on a scratch folder. `stat` is a stand-in (the Mac's stat has no -c): it reads the
+  // real mode from `ls -ld` and names the owner `api`, or `someone` when a `<file>.foreign` marker sits beside it.
+  const STAT = 'stat() { local fmt=$2 f=$3 p o=0 i c w=api; p=$(ls -ld "$f" 2>/dev/null) || return 1; p=${p:1:9}; for i in 0 1 2 3 4 5 6 7 8; do c=${p:$i:1}; o=$((o * 2)); [ "$c" = - ] || o=$((o + 1)); done; [ ! -e "$f.foreign" ] || w=someone; fmt=${fmt//%a/$(printf \'%o\' "$o")}; fmt=${fmt//%U/$w}; fmt=${fmt//%G/$w}; printf \'%s\\n\' "$fmt"; }';
+  const BAD_FN = "BAD=''; bad() { echo \"BAD ($1): $2\"; case \" $BAD \" in *\" $1 \"*) ;; *) BAD=\"$BAD $1\";; esac; }";
+
+  it('PRECHECK\'s fence, run by bash: the first upload wants the empty folder, a later one the old API\'s own file and a moving row', () => {
+    const lines = scriptOf('PRECHECK').lines;
+    const first = at(lines, "if grep -q '^RESTORE_FENCE_PATH=' \"$E/api-$OLABEL.env\"; then FOLD=yes;");
+    const last = lines.findIndex((line, index) => index > first && line.startsWith('cmp -s "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/debateai-preview-api-restore-fence.conf"'));
+    expect(last).toBeGreaterThan(first);
+    const fence = lines.slice(first, last);
+    // The comment above says why the file is never emptied or deleted to pass, and the row read prints yes or no only.
+    const comment = lines.slice(0, first).filter(line => line.startsWith('#')).slice(-7).join(' ');
+    expect(comment).toContain('Never empty, delete or rewrite that file to make this check pass: an empty file is the restore mark');
+    expect(comment).toContain('(RESTORE_REVOKED)');
+    expect(comment).toContain('(RESTORE_FENCE_FILE_INSECURE)');
+    const row = fence.find(line => line.includes('FROM identity.restore_fence WHERE singleton'))!;
+    expect(row).not.toMatch(/SELECT fence_token|\|\|\s*fence_token|fence_token\s*\|\|/);
+    for (const column of ['fence_token', 'public_hold_since', 'advanced_at']) expect(read('migrations/0178_security_fixes_run3.sql')).toMatch(new RegExp(`^  ${column} (text|timestamptz)`, 'm'));
+    expect(fence.join('\n')).not.toMatch(/\b(cat|head|tail|cut|xxd|od)\b[^|]*"\$FENCE"/);
+    const TOKEN = 'Q'.repeat(43);
+    const dir = mkdtempSync(join(tmpdir(), 'guide-precheck-fence-'));
+    try {
+      const folder = join(dir, 'restore-fence'), file = join(folder, 'fence');
+      const run = (setup: { oldLine: boolean; file?: { content: string; mode: number; foreign?: boolean }; row?: string; api?: string }) => {
+        rmSync(folder, { recursive: true, force: true });
+        mkdirSync(folder); execFileSync('chmod', ['700', folder]);
+        if (setup.file) {
+          writeFileSync(file, setup.file.content); execFileSync('chmod', [setup.file.mode.toString(8), file]);
+          if (setup.file.foreign) writeFileSync(`${file}.foreign`, '');
+        }
+        writeFileSync(join(dir, 'api-new.env'), `RESTORE_FENCE_PATH=${file}\n`);
+        writeFileSync(join(dir, 'api-old.env'), setup.oldLine ? `RESTORE_FENCE_PATH=${file}\n` : 'OTHER=1\n');
+        return bash(['set -euo pipefail', STAT, BAD_FN, `E='${dir}'; LABEL=new; OLABEL=old; A="$E/api-new.env"; FENCE='${file}'; AU=api; AGRP=api`,
+          `psqlq() { printf '%s\\n' '${setup.row ?? 'yes no yes'}'; }`, `systemctl() { printf '%s\\n' '${setup.api ?? 'active'}'; }`, ...fence, 'echo "BAD=$BAD"']).split('\n');
+      };
+      const FIRST = "fence: the old release's api file names RESTORE_FENCE_PATH: no (the first upload with the fence: the folder is empty)";
+      const LATER = "fence: the old release's api file names RESTORE_FENCE_PATH: yes (a later upload: the old API keeps the fence file)";
+      const LATER_FILE = "BAD (fence): the fence folder is not the API's 0700 folder, or the fence file in it is missing, empty, not a plain file, or not the API's 0600 file: leave it as it is and ask";
+      const GOOD_ROW = 'fence row: token yes; public hold no; moved on in the last three minutes yes; the old API active';
+      const good = { content: `${TOKEN}\n`, mode: 0o600 };
+      // The first upload with the fence: the empty folder passes; a file there (the restore mark, or anything) does not.
+      expect(run({ oldLine: false })).toEqual([FIRST, 'BAD=']);
+      expect(run({ oldLine: false, file: good })).toEqual([FIRST, "BAD (fence): the fence folder is not the API's empty 0700 folder (FENCEDIR)", 'BAD= fence']);
+      // A later upload: the old API's own token file and a row that moved on pass, and the token is never printed.
+      const passed = run({ oldLine: true, file: good });
+      expect(passed).toEqual([LATER, GOOD_ROW, 'BAD=']);
+      expect(passed.join('\n')).not.toContain(TOKEN);
+      // A later upload with no file, an empty file, a wrong mode or another owner: stop, and never sent to FENCEDIR.
+      expect(run({ oldLine: true })).toEqual([LATER, LATER_FILE, GOOD_ROW, 'BAD= fence']);
+      expect(run({ oldLine: true, file: { content: '', mode: 0o600 } })).toEqual([LATER, LATER_FILE, GOOD_ROW, 'BAD= fence']);
+      expect(run({ oldLine: true, file: { ...good, mode: 0o644 } })).toEqual([LATER, LATER_FILE, GOOD_ROW, 'BAD= fence']);
+      expect(run({ oldLine: true, file: { ...good, foreign: true } })).toEqual([LATER, LATER_FILE, GOOD_ROW, 'BAD= fence']);
+      // The row: a public hold, a row that stopped moving, no token, or the old API not running each stop it.
+      const ROW_BAD = "BAD (fence): the old API is not running, or the database's fence row holds no token, holds the public library, or has not moved on in three minutes (H11 step 4 reads a hold): ask";
+      expect(run({ oldLine: true, file: good, row: 'yes yes yes' })).toEqual([LATER, 'fence row: token yes; public hold yes; moved on in the last three minutes yes; the old API active', ROW_BAD, 'BAD= fence']);
+      expect(run({ oldLine: true, file: good, row: 'yes no no' }).slice(-2)).toEqual([ROW_BAD, 'BAD= fence']);
+      expect(run({ oldLine: true, file: good, row: 'no no yes' }).slice(-2)).toEqual([ROW_BAD, 'BAD= fence']);
+      expect(run({ oldLine: true, file: good, api: 'inactive' }).slice(-2)).toEqual([ROW_BAD, 'BAD= fence']);
+      expect(run({ oldLine: true, file: good, row: '' })).toEqual([LATER, 'fence row: token unread; public hold unread; moved on in the last three minutes unread; the old API active', ROW_BAD, 'BAD= fence']);
+      // The env line's own message names the step that writes it only on the first upload.
+      writeFileSync(join(dir, 'probe'), '');
+      const missingLine = (oldLine: boolean) => bash(['set -euo pipefail', STAT, BAD_FN, `E='${dir}'; LABEL=new; OLABEL=old; A="$E/probe"; FENCE='${file}'; AU=api; AGRP=api`,
+        "psqlq() { echo 'yes no yes'; }", 'systemctl() { echo active; }', ...fence]).split('\n').find(line => line.includes('RESTORE_FENCE_PATH exactly once'));
+      execFileSync('chmod', ['700', folder]); rmSync(file, { force: true });
+      writeFileSync(join(dir, 'api-old.env'), 'OTHER=1\n');
+      expect(missingLine(false)).toBe('BAD (fence): api-new.env does not hold RESTORE_FENCE_PATH exactly once (H11 step 2)');
+      writeFileSync(join(dir, 'api-old.env'), `RESTORE_FENCE_PATH=${file}\n`);
+      expect(missingLine(true)).toBe('BAD (fence): api-new.env does not hold RESTORE_FENCE_PATH exactly once (DR1 copies it from the old api file: ask)');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('PRECHECK\'s 0178 reads, run by bash: before 0178 no schema erasure_reconcile; after it the schema, its owner and the fence settle\'s superuser', () => {
+    const lines = scriptOf('PRECHECK').lines;
+    const first = at(lines, "M178=$(psqlq \"SELECT count(*) FROM public.debateai_schema_migration WHERE name = '0178_security_fixes_run3.sql'\" || echo unread)");
+    const last = lines.findIndex((line, index) => index > first && line === 'fi');
+    expect(last).toBeGreaterThan(first);
+    const block = lines.slice(first, last + 1);
+    // The ledger names 0178 by this file name, and 0178's recorded evidence holds the schema and the two functions read after it.
+    expect(existsSync(resolve(import.meta.dirname, '../../migrations/0178_security_fixes_run3.sql'))).toBe(true);
+    const forward = read('packages/db/src/migration-forward0178.ts');
+    expect(forward).toContain("schemas:['erasure_reconcile']");
+    for (const fn of ['erasure_reconcile.claim_run_key_provision_cleanup(integer)', 'erasure_reconcile.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)', 'identity.restore_fence_settle_v1(text,text)']) {
+      expect(forward, fn).toContain(`'${fn}'`);
+      expect(block.join('\n'), fn).toContain(`to_regprocedure('${fn}')`);
+    }
+    const sql = read('migrations/0178_security_fixes_run3.sql');
+    expect(sql).toContain("EXECUTE format('ALTER FUNCTION identity.restore_fence_settle_v1(text,text) OWNER TO %I',v_owner);");
+    expect(sql).toContain("RAISE EXCEPTION 'RESTORE_FENCE_OWNER_NOT_SUPERUSER'");
+    /** The database as a stand-in: the ledger's 0178 count, whether the schema exists, the owner lines, and which function's owner is a superuser. */
+    const run = (m178: string, schema: boolean, owners: string[], superuser: string) => bash(['set -euo pipefail', BAD_FN,
+      `psqlq() { case "$1" in *"debateai_schema_migration WHERE name"*) echo '${m178}';; *"IS NOT NULL"*) echo ${schema ? 't' : 'f'};; *"IS NULL"*) echo ${schema ? 'f' : 't'};; *rolsuper*'${superuser}'*) echo true;; *rolsuper*) echo false;; *) printf '%s\\n' ${owners.map(line => `'${line}'`).join(' ')};; esac; }`,
+      ...block, 'echo "BAD=$BAD"']).split('\n');
+    const CORE = ['core.claim_run_key_provision_cleanup(integer) same', 'core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text) same', 'core.private_erasure_run_chain(uuid) same'];
+    const MADE = ['erasure_reconcile.claim_run_key_provision_cleanup(integer) same', 'erasure_reconcile.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text) same', 'schema erasure_reconcile same'];
+    const label = (rows: string[]) => rows.map(row => `owner against the ledger owner: ${row}`);
+    // Before 0178: the three core functions, authenticate_session_t9's superuser owner, and no schema yet.
+    expect(run('0', false, CORE, 'authenticate_session_t9')).toEqual(['migration 0178 in the ledger: no', ...label(CORE), 'BAD=']);
+    expect(run('0', true, CORE, 'authenticate_session_t9')).toEqual(['migration 0178 in the ledger: no', ...label(CORE),
+      'BAD (database-roles): a schema erasure_reconcile exists already (0178 makes it)', 'BAD= database-roles']);
+    expect(run('0', false, CORE, 'restore_fence_settle_v1').slice(-2)).toEqual(["BAD (database-roles): identity.authenticate_session_t9's owner is not a superuser (0178 refuses RESTORE_FENCE_OWNER_NOT_SUPERUSER)", 'BAD= database-roles']);
+    // After 0178: the schema must be there, with what 0178 made in it, and the settle's owner a superuser.
+    expect(run('1', true, MADE, 'restore_fence_settle_v1')).toEqual(['migration 0178 in the ledger: yes', ...label(MADE), 'BAD=']);
+    expect(run('1', false, MADE.slice(0, 2), 'restore_fence_settle_v1')).toEqual(['migration 0178 in the ledger: yes',
+      "BAD (database-roles): 0178 is in the ledger and the schema erasure_reconcile is missing (0178's recorded evidence names it; every migrate, DR4 too, checks it again)",
+      ...label(MADE.slice(0, 2)),
+      "BAD (database-roles): the schema erasure_reconcile or a function 0178 made in it is missing, or its owner is not the ledger's owner (0178's recorded evidence names that owner; DR4 checks it again)",
+      'BAD= database-roles']);
+    expect(run('1', true, [...MADE.slice(0, 2), 'schema erasure_reconcile DIFFERENT'], 'restore_fence_settle_v1').at(-1)).toBe('BAD= database-roles');
+    expect(run('1', true, MADE, 'authenticate_session_t9').slice(-2)).toEqual(["BAD (database-roles): identity.restore_fence_settle_v1's owner is not a superuser (a detected restore could not revoke staff sessions or close recoveries)", 'BAD= database-roles']);
+    // An unread ledger is a stop, never a guess.
+    expect(run('unread', true, MADE, 'restore_fence_settle_v1')).toEqual(['migration 0178 in the ledger: unread', "BAD (database-roles): the ledger's row for 0178 is unread", 'BAD= database-roles']);
+  });
+
   it('DR2 refuses an earlier cold copy before it stops anything; DR3 records the folders\' modes before its stop and names DBBACK after it', () => {
     const dr2 = scriptOf('DR2').lines;
     const copy = at(dr2, '[ ! -e "$S/pg18-cold.sha256" ] || { echo "DR2_NOT_DONE: an earlier cold copy exists in S (nothing was stopped): AGAINSAME first"');
@@ -2932,7 +3050,25 @@ describe('before the downtime: room in the release lock, the package store, and 
     const text = sectionOf(guide, '### SB15. Later, on the owner\'s yes: the archive').replace(/\s+/g, ' ');
     expect(text).toContain('`systemctl show -p WorkingDirectory --value debateai-preview-turnstile`');
     const name2 = read('deploy/preview-auth-dev/v1/MAIN-SITE.md');
-    expect(name2).toContain('RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RWR=$(readlink -f "${RW#!}" 2>/dev/null || true)');
+    expect(name2).toContain('RW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile || true); RWR=\'\'; if [ -n "${RW#!}" ]; then RWR=$(readlink -f "${RW#!}" 2>/dev/null || true); fi');
+    // NAME2's relay lines, run with the server's readlink (uutils), which answers the folder it runs in for an empty
+    // path where GNU's and BSD's fail: a unit that names no working folder must not have that folder printed as its own.
+    const relayLines = between(name2.split('\n'), line => line.startsWith("# The relay's program and working folder."), line => line.startsWith('echo "the Turnstile relay runs '));
+    const name2Relay = (o: { exec?: string; workdir?: string }) => {
+      const dir = realpathSync(mkdtempSync(join(tmpdir(), 'guide-name2-relay-')));
+      try {
+        writeFileSync(join(dir, 'siteverify-relay.mjs'), '// relay\n');
+        mkdirSync(join(dir, 'work'));
+        return run(['set -euo pipefail', `cd '${dir}'`,
+          `systemctl() { case "$3" in ExecStart) printf '%s\\n' '${o.exec ?? `{ path=/usr/bin/node ; argv[]=/usr/bin/node ${dir}/siteverify-relay.mjs ; ignore_errors=no }`}';; WorkingDirectory) printf '%s\\n' '${(o.workdir ?? '').replace('DIR', dir)}';; esac; }`,
+          'readlink() { if [ -z "$2" ]; then pwd; else printf \'%s\\n\' "$2"; fi; }',
+          'stat() { case "$2" in "%U %F") echo "root regular file";; %a) echo 644;; esac; }', ...relayLines]).replaceAll(dir, 'DIR');
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    };
+    expect(name2Relay({})).toBe('the Turnstile relay runs DIR/siteverify-relay.mjs: never archive or remove the folders that hold them');
+    expect(name2Relay({ workdir: '!DIR/work' })).toBe('the Turnstile relay runs DIR/siteverify-relay.mjs, in DIR/work: never archive or remove the folders that hold them');
+    expect(name2Relay({ workdir: 'DIR/gone' })).toBe('NAME2_NOT_DONE: the relay\'s working folder (DIR/gone) is missing; NAME3 and NAME5 restart the relay: ask');
+    expect(name2Relay({ exec: '{ path=/usr/bin/node ; argv[]=/usr/bin/node /srv/other.mjs }' })).toMatch(/^NAME2_NOT_DONE: the relay's program \(not named in its unit\) is missing, /);
     // A full lock found at DR5 after all: the text names the way on.
     expect(sectionOf(guide, '#### DR5. Publish, verify plan, first proof, launch plans, pins, drop-ins, stage').replace(/\s+/g, ' '))
       .toContain('A pin refused with `RELEASE_LOCK_INVALID` (and nothing pinned) means the lock was full after all');

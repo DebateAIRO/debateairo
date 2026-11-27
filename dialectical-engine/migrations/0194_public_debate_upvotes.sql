@@ -1,4 +1,4 @@
--- 0193 · Upvotes on public debates (migrations/lineage/README.md "Upvotes on public debates (0193)").
+-- 0194 · Upvotes on public debates (migrations/lineage/README.md "Upvotes on public debates (0194)").
 --
 -- Plain words. A signed-in account can upvote a debate that is public now, once; pressing again takes the vote back. Each
 -- public row shows how many accounts upvoted it. Who upvoted is never shown: no reader here returns another account's vote.

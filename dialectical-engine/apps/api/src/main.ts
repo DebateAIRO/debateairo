@@ -1243,7 +1243,7 @@ const readAccountEmail = accountEmailReader(crossAccountPool(pool, "X27"), dekSt
 const teamLimitRepository = new PostgresTeamLimitRepository(pool);
 const publicReviewRepository = new PostgresPublicReviewRepository(pool);
 const publicFlagRepository = new PostgresPublicFlagRepository(pool);
-// 0193: 0193's three request functions, on the request login under the caller's session.
+// 0194: 0194's three request functions, on the request login under the caller's session.
 const publicDebateUpvoteRepository = new PostgresPublicDebateUpvoteRepository(pool);
 // 0186: the preview's approved buyers. The yes or no at the pay button and the Owner's list and changes run on the request
 // login, whose billing role holds 0186's grants. The Owner's look-up of a typed address and the shortened addresses on the
@@ -1623,9 +1623,9 @@ const retentionPurgeTimer=gatedInterval(releaseWatcher,triggerRetentionPurge,86_
 // The security review's 0171 (F5): the clarify reservations no charge took (a refused, skipped or abandoned call) go hourly, and once each time this
 // release becomes current (below), whether or not anyone reserves again, so none outlives about two hours. Outside any request, so `pool` sends it to
 // the API's system login, which holds the cross-account marker the sweep is granted to. Whatever the route: rows may predate a change of it.
-// 0193: the upvotes of a public debate that is gone for good (made private again, or deleted by the end-of-debate check) go on the same hourly
+// 0194: the upvotes of a public debate that is gone for good (made private again, or deleted by the end-of-debate check) go on the same hourly
 // pass, in their own try, so neither sweep ever skips the other. Outside any request, so `pool` sends it to the API's system login, which holds the
-// cross-account marker 0193's sweep is granted to. The database decides from the rows alone; a debate that is only held keeps its votes.
+// cross-account marker 0194's sweep is granted to. The database decides from the rows alone; a debate that is only held keeps its votes.
 const publicDebateUpvoteSweep = new PostgresPublicDebateUpvoteSweepRepository(pool);
 const triggerAskClarifyReservationSweep=createSingleFlightErasureReconciler(
   async ()=>{

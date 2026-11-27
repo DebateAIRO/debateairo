@@ -122,7 +122,7 @@ describe("S2 identity schema on real PostgreSQL", () => {
       // 0152: what the AI checks on public rows used.
       "public_check_usage",
       "public_climb_done", "public_contribution", "public_contribution_check", "public_debate_report", "public_debate_update",
-      // 0193 upvotes on public debates: one row per account per public debate; the row leaves with the account.
+      // 0194 upvotes on public debates: one row per account per public debate; the row leaves with the account.
       "public_debate_upvote",
       "public_dig_input",
       // 0151: a report on a public debate and the queue's log; public_review_purged, below, is the receipt of what six months removed.

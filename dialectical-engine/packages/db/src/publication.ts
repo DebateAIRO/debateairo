@@ -707,7 +707,7 @@ export class PostgresPublicationRepository {
         ? [] : [row.publication_ref]));
       const upvotes: Record<string, number> = {};
       if (refs.length > 0) {
-        // The count is 0193's and the cross-account marker's alone, so it is read here on the system login and not by the request login.
+        // The count is 0194's and the cross-account marker's alone, so it is read here on the system login and not by the request login.
         const counted = await this.pool.query<{ value: readonly Readonly<{ publication_ref: string; upvotes: number }>[] | null }>(
           "SELECT identity.read_public_debate_upvote_counts($1::uuid[]) AS value", [[...refs]]);
         for (const entry of counted.rows[0]?.value ?? []) upvotes[entry.publication_ref] = entry.upvotes;

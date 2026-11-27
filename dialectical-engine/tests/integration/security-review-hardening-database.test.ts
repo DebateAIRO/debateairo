@@ -2176,7 +2176,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "identity.read_age_check_outcome(uuid)",
     // 0192: the country the request's own account chose at sign-up, asked as read_age_check_outcome asks of the account's own record.
     "identity.read_registration_country(uuid)",
-    // 0193: a person's upvote of a public debate, its withdrawal, and which of the listed debates the account upvoted; each asks
+    // 0194: a person's upvote of a public debate, its withdrawal, and which of the listed debates the account upvoted; each asks
     // identity.request_owner_matches before anything else, as 0192's read does.
     "identity.cast_public_debate_upvote(uuid,uuid)", "identity.withdraw_public_debate_upvote(uuid,uuid)",
     "identity.read_own_public_debate_upvotes(uuid,uuid[])",
@@ -2299,6 +2299,9 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     // 0178's four, each gated as its older twin is: the mailed verification token, the social flow's proof and state, and the step-up grant's token.
     "identity.consume_verification_set_password(text,timestamp with time zone,jsonb,text)",
     "identity.create_social_account_v2(jsonb,jsonb)", "identity.finish_social_callback_v2(jsonb,jsonb)",
+    // 0193's return beside 0178's, gated as it is (the flow's state, cookie, claim and provider configuration); the account it may connect is
+    // found from the address the provider's verified proof names, never from an owner or account the caller hands it.
+    "identity.finish_social_callback_v3(jsonb,jsonb)",
     "identity.request_email_change_bounded(uuid,uuid,text,uuid,bytea,jsonb,text,text,timestamp with time zone,jsonb,integer,bigint)",
   ] as const;
   const PUBLIC = [

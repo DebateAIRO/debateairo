@@ -1,5 +1,5 @@
 // tests/unit/public-vote-sweep.test.ts
-// The pass that deletes the upvotes of debates gone for good (0193), its repository on a fake pool, and its place in main.ts.
+// The pass that deletes the upvotes of debates gone for good (0194), its repository on a fake pool, and its place in main.ts.
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { sweepGonePublicDebateUpvotes } from "../../apps/api/src/public-vote-sweep.js";
@@ -22,7 +22,7 @@ function passOver(answer: (limit: number, call: number) => number) {
 const over = (query: (sql: string, values: readonly unknown[]) => Promise<unknown>) =>
   new PostgresPublicDebateUpvoteSweepRepository({ query } as never);
 
-describe("0193 the pass that deletes the upvotes of debates gone for good", () => {
+describe("0194 the pass that deletes the upvotes of debates gone for good", () => {
   it("takes the votes in batches of 500 until one comes back short, and logs the count alone", async () => {
     const left = [500, 500, 7];
     const pass = passOver(() => left.shift() ?? 0);
@@ -55,7 +55,7 @@ describe("0193 the pass that deletes the upvotes of debates gone for good", () =
 });
 
 describe("PostgresPublicDebateUpvoteSweepRepository", () => {
-  it("calls 0193's sweep and nothing else, and answers its count", async () => {
+  it("calls 0194's sweep and nothing else, and answers its count", async () => {
     const queries: Array<Readonly<{ sql: string; values: readonly unknown[] }>> = [];
     const repository = over(async (sql, values) => { queries.push({ sql, values }); return { rows: [{ deleted: 3 }] }; });
     expect(await repository.deleteGone(500)).toBe(3);

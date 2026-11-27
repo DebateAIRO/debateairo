@@ -1,5 +1,5 @@
 // tests/integration/public-debate-upvotes-repository.test.ts
-// Migration 0193 through the database package, on real PostgreSQL: the upvote repository casts, withdraws and reads an account's own
+// Migration 0194 through the database package, on real PostgreSQL: the upvote repository casts, withdraws and reads an account's own
 // upvotes on the API's request login inside that account's own request, as a route runs it, and the public list's read carries each
 // listed debate's count. A debate is made public and private again with seeded rows. Data is made up.
 import { randomUUID } from "node:crypto";

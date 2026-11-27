@@ -1,8 +1,8 @@
 /**
  * Upvotes on public debates (design 2026-11-26 §7.5, §6): THE DEBATES A PERSON UPVOTED IN THE DATA EXPORT.
  * account.json gains `debates_you_upvoted`, its last section: per upvote, the debate's public reference and the time in UTC, oldest
- * first as 0193's reader gives them, and nothing else. The voter's reference never goes out. A reader that answers nothing fails the
- * export; it does not empty the section. The worker reaches 0193's reader: its function count is one more (twenty-six).
+ * first as 0194's reader gives them, and nothing else. The voter's reference never goes out. A reader that answers nothing fails the
+ * export; it does not empty the section. The worker reaches 0194's reader: its function count is one more (twenty-six).
  * Every reference here is made up.
  */
 import { describe, expect, it } from "vitest";
@@ -14,11 +14,11 @@ import type { ExportSnapshot } from "../../apps/api/src/data-export/types.js";
 import { assertDataExportDatabaseRoles, PostgresDataExportSource } from "../../packages/db/src/data-export.js";
 import { readZip } from "../support/zip-reader.js";
 
-const DEBATE_A = "0193a000-0000-4000-8000-000000000001";
-const DEBATE_B = "0193b000-0000-4000-8000-000000000002";
+const DEBATE_A = "0194a000-0000-4000-8000-000000000001";
+const DEBATE_B = "0194b000-0000-4000-8000-000000000002";
 const READER = "identity.read_data_export_public_debate_upvotes(uuid,uuid)";
 const SAVED_READER = "identity.read_data_export_saved_questions(uuid,uuid)";
-// As 0193's reader answers: oldest first. The stray owner_ref stands for anything the reader must never pass on.
+// As 0194's reader answers: oldest first. The stray owner_ref stands for anything the reader must never pass on.
 const TWO = [
   { publication_ref: DEBATE_A, created_at: "2026-11-26T15:00:00.123456+02:00", owner_ref: "secret-owner" },
   { publication_ref: DEBATE_B, created_at: "2026-11-26T13:30:00+00:00" }
@@ -100,7 +100,7 @@ describe("the public debates the person upvoted in account.json", () => {
   });
 });
 
-describe("the worker reads 0193's reader", () => {
+describe("the worker reads 0194's reader", () => {
   it("as the twenty-sixth function of its role witness, listed directly after 0162's reader", async () => {
     const seen: unknown[][] = [];
     const principal = (name: string, workerCount: number) => ({ principal: name, authorization_member: name === "request",

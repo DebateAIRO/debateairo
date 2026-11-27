@@ -1065,7 +1065,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
         ))]),
         verdict: debate.answer.verdict,
         confidence_band: debate.answer.confidence_band,
-        // Upvotes (0193): the count read with the page, in the same cross-account frame. `?.` on purpose: a page from a repository that carries no counts reads as 0.
+        // Upvotes (0194): the count read with the page, in the same cross-account frame. `?.` on purpose: a page from a repository that carries no counts reads as 0.
         vote_count: page.upvotes?.[publicationRef] ?? 0,
         // Task M6: the floor's label only (spec §14.4.4), for the library row.
         ...(debate.floor === undefined ? {} : { floor_verdict: debate.floor.verdict_state })

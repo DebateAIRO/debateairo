@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { PostgresPublicDebateUpvoteRepository } from "@debateai/db";
 
 /**
- * UPVOTES ON PUBLIC DEBATES (design 2026-11-26; migration 0193). One vote per account per debate: casting twice changes
+ * UPVOTES ON PUBLIC DEBATES (design 2026-11-26; migration 0194). One vote per account per debate: casting twice changes
  * nothing, and taking it back removes it. The database decides whether a debate is public right now and whose row it is;
  * the API only hands it the session's account. The three calls run on the request pool under the caller's session, never
  * in a cross-account frame, where the database's "is this connection that owner?" question is answered yes for everyone.

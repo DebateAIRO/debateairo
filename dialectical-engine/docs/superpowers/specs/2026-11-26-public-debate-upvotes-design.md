@@ -106,8 +106,8 @@ Approved by the owner as a light-mode mockup on 26 November 2026.
 
 ## 6. Constraints found in the code
 
-- Migrations are a chain; each step carries a manifest bound to the step before it. `dev` is at 0192, so this is
-  **0193**, previous `0192_registration_country_read.sql`. If another step lands on `dev` first, this one is
+- Migrations are a chain; each step carries a manifest bound to the step before it. `dev` is at 0193, so this is
+  **0194**, previous `0193_google_return_connects_account.sql`. If another step lands on `dev` first, this one is
   renumbered and its manifest redone.
 - Two releases run side by side during an upload. The step is **expand** (additive only) and the new list field
   is **optional**, so an older page reads a newer API and a newer page reads an older API.
@@ -130,7 +130,7 @@ Approved by the owner as a light-mode mockup on 26 November 2026.
 
 ## 7. The slice, layer by layer
 
-### 7.1 Database — step `0193_public_debate_upvotes.sql`
+### 7.1 Database — step `0194_public_debate_upvotes.sql`
 
 Table `identity.public_debate_upvote`:
 `publication_ref uuid NOT NULL REFERENCES serve.publication_snapshot(publication_ref)`,

@@ -12,21 +12,21 @@ import {
 } from "../../tools/orphan-audit/src/index.js";
 
 /**
- * 0193 (design docs/superpowers/specs/2026-11-26-public-debate-upvotes-design.md §5, §7.1): upvotes on public debates. One
+ * 0194 (design docs/superpowers/specs/2026-11-26-public-debate-upvotes-design.md §5, §7.1): upvotes on public debates. One
  * identity table, one row per account and page; three functions for the API's own role, each asking whose connection it
  * is; the count and the sweep for the cross-account marker; the export reader for the export worker; 0115's export owner
- * owns all of it. No database here: the behaviour on real logins is tests/integration/public-debate-upvotes-0193.test.ts.
+ * owns all of it. No database here: the behaviour on real logins is tests/integration/public-debate-upvotes-0194.test.ts.
  */
-const NAME = "0193_public_debate_upvotes.sql";
+const NAME = "0194_public_debate_upvotes.sql";
 const SQL_PATH = `migrations/${NAME}`;
-const MANIFEST_PATH = "migrations/lineage/public-debate-upvotes-forward0193.json";
-const PREVIOUS = "0192_registration_country_read.sql";
-const PREVIOUS_MANIFEST_PATH = "migrations/lineage/registration-country-read-forward0192.json";
+const MANIFEST_PATH = "migrations/lineage/public-debate-upvotes-forward0194.json";
+const PREVIOUS = "0193_google_return_connects_account.sql";
+const PREVIOUS_MANIFEST_PATH = "migrations/lineage/google-return-connects-account-forward0193.json";
 const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const ROOT = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
-/** The SQL without its `--` comments (no literal or body of 0193 contains `--`). */
+/** The SQL without its `--` comments (no literal or body of 0194 contains `--`). */
 const code = (sql: string): string => sql.split("\n").map((line) => line.replace(/--.*$/u, "")).join("\n");
 const TABLE = "identity.public_debate_upvote";
 const CAST = "identity.cast_public_debate_upvote(uuid,uuid)";
@@ -56,11 +56,11 @@ const ASKS_OWNER = "IF NOT identity.request_owner_matches(p_owner_ref) THEN RAIS
 const ASKS_CONNECTION = /identity\.(?:request_owner_matches|page_memory_run_owned)\(|rls\.(?:context_owner_ref|context_user_id|session_credential_hash)\(|staff\.require_http_authority\(|pg_has_role\(|core\.lock_owned_live_runs\(/u;
 const EVERYONE = "PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker,debateai_staff_security_owner;";
 
-describe("0193: upvotes on public debates", () => {
-  it("C-T is the step right after 0192, found by name, with its own loader, no amendment and no verifier of its own", async () => {
+describe("0194: upvotes on public debates", () => {
+  it("C-T is the step right after 0193, found by name, with its own loader, no amendment and no verifier of its own", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("import { loadForward0193 } from './migration-forward0193.js';");
-    expect(chain).toContain("loadForward0192,loadForward0193");
+    expect(chain).toContain("import { loadForward0194 } from './migration-forward0194.js';");
+    expect(chain).toContain("loadForward0193,loadForward0194");
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((step) => step.name);
     // Found by name, never as the chain's last step: a step after it needs no edit here.
@@ -68,25 +68,25 @@ describe("0193: upvotes on public debates", () => {
     const step = plan.forwardChain.find((entry) => entry.name === NAME)!;
     expect(step.amendsPostconditionsOf).toEqual([]);
     expect(step.replayVerifierSql).toBeUndefined();
-    const loader = read("packages/db/src/migration-forward0193.ts");
+    const loader = read("packages/db/src/migration-forward0194.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
-    expect(loader).toContain('const VERSION = "public-debate-upvotes-forward0193-v1";');
-    expect(loader).toContain('const MANIFEST_PATH = "lineage/public-debate-upvotes-forward0193.json";');
+    expect(loader).toContain('const VERSION = "public-debate-upvotes-forward0194-v1";');
+    expect(loader).toContain('const MANIFEST_PATH = "lineage/public-debate-upvotes-forward0194.json";');
     expect(loader).toContain('const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";');
     expect(loader).toContain(`const PREVIOUS = "${PREVIOUS}";`);
     expect(loader).toContain('const TABLES: readonly string[] = ["identity.public_debate_upvote"];');
     for (const signature of FUNCTIONS) expect(loader, signature).toContain(`"${signature}"`);
-    expect(loader).toContain("export async function loadForward0193(anchor: ForwardStepAnchor): Promise<ForwardStepPlan>");
-    expect(loader).toContain("MIGRATION_FORWARD0193_");
-    expect(loader).not.toMatch(/MIGRATION_FORWARD0(?!193_)\d{3}_/u);
+    expect(loader).toContain("export async function loadForward0194(anchor: ForwardStepAnchor): Promise<ForwardStepPlan>");
+    expect(loader).toContain("MIGRATION_FORWARD0194_");
+    expect(loader).not.toMatch(/MIGRATION_FORWARD0(?!194_)\d{3}_/u);
   });
 
-  it("C-M is bound to 0192's manifest and to the verifier in force (0130's, which 0192 keeps)", () => {
+  it("C-M is bound to 0193's manifest and to the verifier in force (0130's, which 0193 keeps)", () => {
     const manifest = JSON.parse(read(MANIFEST_PATH)) as Record<string, unknown>;
     const previous = JSON.parse(read(PREVIOUS_MANIFEST_PATH)) as { baseRecipeSha256: string; verifier: { sha256: string } };
     expect(Object.keys(manifest)).toEqual(["version", "baseRecipeSha256", "previous", "migration", "verifier", "amendsPostconditionsOf"]);
     expect(manifest).toEqual({
-      version: "public-debate-upvotes-forward0193-v1",
+      version: "public-debate-upvotes-forward0194-v1",
       baseRecipeSha256: previous.baseRecipeSha256,
       previous: { name: PREVIOUS, manifestSha256: sha256(read(PREVIOUS_MANIFEST_PATH)), verifierSha256: VERIFIER_130 },
       migration: { name: NAME, sha256: sha256(read(SQL_PATH)) },
@@ -262,9 +262,9 @@ describe("0193: upvotes on public debates", () => {
 
   it("C-R is documented where the chain's steps are, and nothing of it is in the database package's pinned index", () => {
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0192, below) the eighty-second, and upvotes on public debates (0193, below) the eighty-third. A step is added",
-      "(after 0193: 0193, `public-debate-upvotes-forward0193.json`, and", "0131 to 0193 keep 0130's",
-      "## Upvotes on public debates (0193)", "`loadForward0193`", "MIGRATION_FORWARD0193_"]) expect(readme, needle).toContain(needle);
-    expect(read("packages/db/src/index.ts")).not.toMatch(/public[-_]debate[-_]upvote|forward0193/u);
+    for (const needle of ["(0193, below) the eighty-third, and upvotes on public debates (0194, below) the eighty-fourth. A step is added",
+      "(after 0194: 0194, `public-debate-upvotes-forward0194.json`, and", "0131 to 0194 keep 0130's",
+      "## Upvotes on public debates (0194)", "`loadForward0194`", "MIGRATION_FORWARD0194_"]) expect(readme, needle).toContain(needle);
+    expect(read("packages/db/src/index.ts")).not.toMatch(/public[-_]debate[-_]upvote|forward0194/u);
   });
 });

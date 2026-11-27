@@ -1,0 +1,18 @@
+{
+  "version": "public-debate-upvotes-forward0194-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0193_google_return_connects_account.sql",
+    "manifestSha256": "2c4c4072e7cba17fa505c875630d8f6ffdca75528cb224504e1f9b39fd23124c",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0194_public_debate_upvotes.sql",
+    "sha256": "fbbbbe816872ac64ba1e44c0c0182f60bb0dfabd2d5f6daad4c78dc41ea00dd1"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": []
+}

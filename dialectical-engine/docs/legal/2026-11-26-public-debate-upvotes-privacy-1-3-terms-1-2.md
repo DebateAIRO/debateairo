@@ -7,8 +7,8 @@ These notes are not legal advice.
 ## The facts
 
 - A signed-in person can upvote a debate on the home page's list of public debates. What is kept is which debate,
-  which account and when: one row in `identity.public_debate_upvote`, made by database step 0193
-  (`migrations/0193_public_debate_upvotes.sql`).
+  which account and when: one row in `identity.public_debate_upvote`, made by database step 0194
+  (`migrations/0194_public_debate_upvotes.sql`).
 - There is one row per account per debate. Pressing the button again takes the upvote back, and the row is deleted
   at once.
 - An account's rows go with the account row, when the account is deleted after the 7-day closure grace period.

@@ -155,7 +155,7 @@ const WORKER_FUNCTIONS = [
   "identity.read_data_export_moderation(uuid,uuid)",
   // V4 start step, Task 39e: the questions not started yet (0162), each part under its question's own key: wired, into account.json.
   "identity.read_data_export_saved_questions(uuid,uuid)",
-  // The public debates the person upvoted (0193): wired, into account.json, each debate's public reference and the time only.
+  // The public debates the person upvoted (0194): wired, into account.json, each debate's public reference and the time only.
   "identity.read_data_export_public_debate_upvotes(uuid,uuid)",
   "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
   "identity.fail_data_export(uuid,uuid,text)",

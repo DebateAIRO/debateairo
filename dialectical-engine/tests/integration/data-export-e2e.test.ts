@@ -1036,7 +1036,7 @@ describe("data export over a real database and encrypted file store", () => {
     } finally { await seedPool.end(); }
   });
 
-  it("E16 (0193) a vote the person cast is in their account.json, by the debate's public reference and the UTC time, and nobody else's is", async () => {
+  it("E16 (0194) a vote the person cast is in their account.json, by the debate's public reference and the UTC time, and nobody else's is", async () => {
     const me = await account("upvoter@example.test"), other = await account("other-upvoter@example.test");
     const ref = randomUUID(), seedPool = createPool(db.connectionString);
     try {
@@ -1058,7 +1058,7 @@ describe("data export over a real database and encrypted file store", () => {
       // A page of its own, written as E2 writes one. The reader answers a vote whatever the debate's state, so no visibility event is needed.
       await db.pool.query(`INSERT INTO serve.publication_snapshot(publication_ref,run_id,format_version,content_ciphertext,created_at)
         VALUES($1,$2,1,$3::jsonb,clock_timestamp())`, [ref, run, JSON.stringify({ v: 1, keyId: `publication-snapshot:${ref}:v1`, nonce: "AA", ct: "AA", tag: "AA" })]);
-      // Two votes on the same debate, written as 0193's cast writes them: mine and another account's.
+      // Two votes on the same debate, written as 0194's cast writes them: mine and another account's.
       await db.pool.query("INSERT INTO identity.public_debate_upvote(publication_ref,owner_ref) VALUES($1,$2),($1,$3)", [ref, me.ownerRef, other.ownerRef]);
       const { store, row } = await completed(me);
       const archive = entries(await store.read(row.export_id, me.userId));

@@ -179,8 +179,994 @@ launchers still re-check every byte exactly as before.
    during a drain" (SB14b, `deploy/preview-release/v1/README.md`) checks both gates, then starts the draining runner
    (database-ahead mode if needed: it finishes or sets aside its own debates and retires) and then the current one. A
    draining release's backstop timer only asks its runner to retire: it needs a running runner to honour it.
+5. **Caddy starts at boot only when it is enabled.** Caddy is not in `debateai-preview.target`: its own unit starts
+   at boot only while `systemctl is-enabled caddy.service` says `enabled`. On this server it was `disabled` until the
+   first restart with the steps below, and had been started by hand after every earlier boot; it is enabled now
+   (`systemctl enable caddy.service`). Without it the site does not answer, although every service behind it runs.
+   RESTART_LOOK (below) stops when Caddy is not in the boot.
+6. **Hatchet, and its gateway.** The target starts Hatchet's container (`debateai-preview-hatchet`, in Docker) and the
+   gateway (`debateai-preview-hatchet-gateway`). Docker does not give the container a fixed address, and the gateway
+   lets in only the address its allow list names: if the address changes at a boot, Hatchet cannot reach the gateway,
+   debates stay stopped, and no guide step repairs that (DR3 and DBBACK only refuse). After the first restart the
+   address was the same, but the gateway did not run, although the target wants it. RESTART_UP (below) checks the
+   container and its address against the state before, runs the gateway witness, and starts the gateway by hand only
+   when the witness says `PASS`.
+7. **The gates.** The DeepInfra gate and its two watchers are in the target; each other gate starts at boot only when
+   its boot drop-in (`50-<gate>-gate.conf`) is in `debateai-preview.target.d`, which its gate guide's "Switch it on"
+   (or install) step puts there. The Amazon gate before "Switch it on" does not start by itself (the release guide's
+   "After a reboot it is not running"). Each gate runs its own start check at every start, and refuses to start on
+   another server name than its GO's target host.
 
 `TimeoutStartSec=300` covers the wait (60 s), the verifier (hard cap 150 s) and the rest.
+
+After a restart, the server's own steps are "Restarting the server", below: they check before, restart, start by hand
+what the boot does not start, and prove that everything is as before.
+
+## Restarting the server (RESTART_LOOK, RESTART_GO, RESTART_UP)
+
+**What it is for.** Ubuntu installs its security updates by itself, every day. A few of them, a new kernel or a new C
+library (`libc6`), take effect only after a restart. Ubuntu then writes the flag `/run/reboot-required`, and the
+packages that asked for it into `/run/reboot-required.pkgs`; Ubuntu's login message says `*** System restart required
+***`, and the release guide's SB4 names it as `NO_MAINTENANCE` with `reboot required`. The server never restarts by
+itself for it while `Unattended-Upgrade::Automatic-Reboot` is off (SB4's text says how to read that setting). This
+section is that restart, done on purpose, at a quiet hour of a day of its own, while no release drains. It is the
+only place in these guides that restarts the server.
+
+Four steps do it, each built from the guides' own commands:
+- **RESTART_LOOK** only reads. It says whether now is a safe time, and if not, why. The only things it runs are the
+  gates' own start checks, each in a throwaway unit, as the gate guides run them by hand.
+- **RESTART_GO** checks again what can change by the hour, makes a fresh dump of the database, writes a root-only
+  record of the state before, stops the website and the API, stops the runner once nothing is queued or running, sets
+  MT1's maintenance flag, and asks systemd for a clean restart 30 seconds later, so that its own log is complete first.
+- **RESTART_UP** runs once ssh answers again. It starts by hand what the boot does not start: always the runner, once
+  and last; Hatchet's gateway, the Amazon gate and any gate or watcher that ran before, only when the boot did not
+  start them and only after their own checks pass. Then it proves that everything is as before, and moves the
+  maintenance flag into the latest upload's archive folder `$S` (MT2's line).
+- **RESTART_BACK** is for one case only: RESTART_GO stopped after `DOWNTIME START`, with the site down and no restart
+  scheduled. It brings the site back without the restart.
+
+What people see: the site is down for a few minutes, the public pages too. The first time, the server answered ssh
+about two minutes after the restart began, on the newer kernel, and the site answered after about four. If a service
+needs its retries (2. of "Boot sequence", above), it can take up to about 15 minutes. The outside alarm on NETOPIA's
+notify address, where it is installed, may email the owner a "down" and then an "up".
+
+All four steps read the names file of MAIN-SITE.md 3.0 (`/root/preview-archive/main-site/names.sh`, written by
+LOCKS0), and RESTART_GO, RESTART_BACK and RESTART_UP run as detached runs (MAIN-SITE.md, "How to run a server step").
+The names file refuses while a release is staged or draining (`NAMES_NOT_DONE: a release is staged or draining`), so
+none of them runs in the middle of an upload. The restart stops the API and restarts the gates, so it is no brake,
+and MAIN-SITE.md's order rules keep it out of an upload from SB3 to the end of DR6 (or SB13): restart before an
+upload's SB3, or after the upload is over. The record of the state before goes into the root-only folder
+`/root/preview-archive/main-site/restart/<time>/`, and `restart/last` names the newest one; nothing else in these guides
+uses them. RESTART_GO's restart is a transient systemd timer named `restart-go-reboot`.
+
+### What the owner needs at hand
+
+Before anything on the server:
+- **The hosting company's control panel, open**, with this server's console reachable there, and the date and time of
+  its newest automated backup of the whole server read. RESTART_GO's fresh dump lies on the server's own disk: it
+  protects against a damaged database, not against a lost disk. Only the hosting company's backup covers a lost disk.
+- **A quiet hour.** No debate runs or waits, no release drains, not from 02:45 to 03:45 Bucharest time (the nightly
+  dump), and not within the hour before the system's daily upgrade. RESTART_GO refuses at those times.
+- **Someone who can reach the server as root for the hours after**: RESTART_UP, and the brakes of MAIN-SITE.md 6.5,
+  run as root. When the operator's ssh access has an end time, at least 90 minutes of it are left before RESTART_LOOK:
+  that covers the restart and RESTART_UP. Past that end only the owner can reach the server, so for the hours after,
+  the owner, or an operator whose access lasts, is at hand.
+- **The owner's yes.** It names the restart, the runner's one start by RESTART_UP, and any `ACCEPT` word (below) the
+  owner has read and accepts.
+
+### The order
+
+1. RESTART_LOOK, the ordinary way. It only reads, and takes a minute or two.
+2. REKEYCHECK (MAIN-SITE.md 5.7), the ordinary way. Keep its last two lines.
+3. The owner's yes.
+4. RESTART_GO, as a detached run. It refuses to run any other way.
+5. Wait for ssh. "If it does not come back", below, says what to do and when.
+6. RESTART_UP, as a detached run.
+7. REKEYCHECK again: its last two lines must be the same as in 2 (the team unlock, and with it the Team page's buyer
+   approvals, work as before). Then GATELIVE (the release guide, "Right after GATEREADY: GATELIVE", with the current
+   upload's names file as its first line): RESTART_UP asks the gates as root, GATELIVE asks each one the way the API's
+   own user does. While the Amazon gate's service does not run (an `ASK` line of RESTART_UP), its GATELIVE line fails:
+   that one is expected.
+
+Never paste a block a second time without reading `/root/ms-step.log` first.
+
+### RESTART_LOOK (read-only)
+
+The `ACCEPT` line at the top stays empty. Only when the owner has read a `STOP` line of the kind `hatchet-address`,
+`bridge-order` or `boot-config` and accepts that risk for this restart does that word go between its quotes (several
+words separated by spaces); then RESTART_LOOK runs again, and the line shows as `ACCEPTED (<word>): …`. No other kind
+of `STOP` can be accepted.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# RESTART_LOOK: before the owed restart (read-only; the only things it runs are the gates' own start checks, each in a throwaway unit). Ubuntu's flag and its packages, the timers that could fire around the restart, the kernel the restart will boot and the way back to the one before, the disks, the release table, debates at work, the four gates (their start checks run now, the server's name), every unit the site needs and whether the boot starts it, ssh, the firewall, the network and cloud-init files, files the boot would read untried, the database's socket folder and settings, Hatchet, the backups, PWOFF1's inputs. Prints names, states, counts and times; never an amount, a key, a password or an address.
+ACCEPT=''                                                 # only on the owner's word, after reading its STOP line: any of hatchet-address bridge-order boot-config, separated by spaces
+STOPS=''; stop() { echo "STOP ($1): $2"; case " $STOPS " in *" $1 "*) ;; *) STOPS="$STOPS $1";; esac; }
+risk() { case " $ACCEPT " in *" $1 "*) echo "ACCEPTED ($1): $2 (the owner accepted this for this restart)";; *) stop "$1" "$2";; esac; }
+note() { echo "NOTE: $1"; }
+en() { local e; e=$(systemctl is-enabled "$1" 2>/dev/null || true); printf '%s' "${e:-not installed}"; }
+ac() { local a; a=$(systemctl is-active "$1" 2>/dev/null || true); printf '%s' "${a:-unread}"; }
+same() { if [ -z "$1" ] || [ -z "$2" ]; then echo unread; elif [ "$1" = "$2" ]; then echo SAME; else echo DIFFERENT; fi; }
+# Minutes until a timer next fires: systemd's own date, else the list-timers line; off when the timer does not run, none when unread.
+nextin() { local n s=''; [ "$(systemctl is-active "$1" 2>/dev/null || true)" = active ] || { echo off; return 0; }
+  n=$(systemctl show -p NextElapseUSecRealtime --value "$1" 2>/dev/null || true); case "$n" in ''|n/a) ;; *) s=$(date -d "$n" +%s 2>/dev/null || true);; esac
+  if [ -z "$s" ]; then n=$(systemctl list-timers --all "$1" --no-legend 2>/dev/null | awk 'NR == 1 && $1 != "-" && $1 != "n/a" { print $1, $2, $3, $4 }' || true); case "$n" in '') ;; *) s=$(date -d "$n" +%s 2>/dev/null || true);; esac; fi
+  if [ -n "$s" ]; then echo $(( (s - $(date +%s)) / 60 )); else echo none; fi; }
+# A gate's own start checks (the ExecStartPre lines of its installed unit), run now under the unit's own address filter in a throwaway unit. Sets GCN (how many) and GCBAD (how many did not end "ok"). Prints each check's status, refusal code and how many addresses or models are outside its list, never an address.
+gcheck() { local U=$1 AL AF XL1 OUT RC R1 PY; local -a PA
+  GCN=0; GCBAD=0
+  AL=$(systemctl show -p IPAddressAllow --value "$U" 2>/dev/null || true); AF=$(systemctl show -p RestrictAddressFamilies --value "$U" 2>/dev/null || true)
+  PA=(--quiet --wait --pipe --collect -p IPAddressDeny=any -p "IPAddressAllow=$AL"); [ -z "$AF" ] || PA+=(-p "RestrictAddressFamilies=$AF")
+  while IFS= read -r XL1; do
+    [ -n "$XL1" ] || continue
+    GCN=$((GCN + 1)); RC=0
+    OUT=$(systemd-run "${PA[@]}" $XL1 < /dev/null 2>/dev/null | tail -n 1) || RC=$?
+    R1=$(jq -r '"\(.status) \(.error // "none"); outside the list: \(((.new // []) + (.outside // []) + (.missing // [])) | length)"' <<<"$OUT" 2>/dev/null || true)
+    PY=$(tr ' ' '\n' <<<"$XL1" | grep -m 1 '\.py$' | sed 's|.*/||' || true)
+    echo "  $U start check ${PY:-$GCN}: ${R1:-unread}; exit $RC"
+    case "$RC/${R1:-unread}" in '0/ok '*) ;; *) GCBAD=$((GCBAD + 1));; esac
+  done < <(systemctl show -p ExecStartPre --value "$U" 2>/dev/null | grep -o 'argv\[\]=[^;]*' | sed 's/^argv\[\]=//; s/[[:space:]]*$//' || true); }
+NOW=$(date +%s); BT=$(date -d "$(uptime -s)" +%s); HN=$(hostname)
+# 1. Ubuntu's flag, packages half done, what the daily upgrade and the shutdown would do, timers that could fire around the restart (DR2's and PRECHECK's lines; SB4's note on the daily upgrade).
+if [ -e /run/reboot-required ]; then
+  echo "Ubuntu's restart flag: set since $(date -u -r /run/reboot-required '+%Y-%m-%d %H:%M UTC')"
+  echo "packages that asked for the restart: $( { sort -u /run/reboot-required.pkgs 2>/dev/null || echo unread; } | tr '\n' ' ')"
+else stop no-flag "Ubuntu's flag /run/reboot-required is not there: no restart is owed now"; fi
+AR=$(apt-config shell AR Unattended-Upgrade::Automatic-Reboot 2>/dev/null || true); IOS=$(apt-config shell IOS Unattended-Upgrade::InstallOnShutdown 2>/dev/null || true)
+echo "the daily upgrade restarts the server by itself: ${AR:-not set} (not set, or AR='false': no); packages installed during a shutdown: ${IOS:-not set}"
+case "$IOS" in *true*) stop packages "unattended-upgrades installs packages during the shutdown (InstallOnShutdown): the shutdown could take long, and the boot could take a kernel never checked here";; esac
+UPM=$(nextin apt-daily-upgrade.timer); echo "the system's daily upgrade next runs in: $UPM minute(s) (off: not scheduled)"
+case "$UPM" in off) ;; none) note "when the system's daily upgrade next runs is unread: RESTART_GO refuses while it cannot read it";; *) [ "$UPM" -ge 90 ] || note "the system's daily upgrade runs within 90 minutes: RESTART_GO refuses within the hour before it";; esac
+echo "Bucharest time now: $(TZ=Europe/Bucharest date +%H:%M) (RESTART_GO refuses from 02:45 to 03:45, around the nightly dump)"
+for T in $(systemctl list-units --all --no-legend --plain --type=timer 'debateai-preview-runner-retire*' 2>/dev/null | awk '{ print $1 }' || true); do
+  TM2=$(nextin "$T"); echo "$T: $(ac "$T"); fires next in: $TM2 minute(s)"
+  case "$TM2" in off|none) ;; *) [ "$TM2" -ge 90 ] || stop timer "$T fires within 90 minutes: at the boot it could run before PostgreSQL is ready and email a failure; wait until it has fired, then RESTART_LOOK again";; esac
+done
+if pgrep -f '[/]usr/bin/unattended-upgrade' > /dev/null || pgrep -x dpkg > /dev/null || pgrep -x apt-get > /dev/null || pgrep -x apt > /dev/null; then stop packages "a package install runs now: wait until it has finished"; fi
+DA=$(dpkg --audit 2>&1 || true); [ -z "$DA" ] || stop packages "dpkg --audit names $(printf '%s\n' "$DA" | grep -c . || true) line(s) about packages not fully installed"
+# 2. The kernel the restart will boot, the way back to the one before, and who can sign in at the console.
+RK=$(uname -r); NK=$(ls -1 /boot/vmlinuz-* 2>/dev/null | sed 's|^/boot/vmlinuz-||' | sort -V | tail -n 1 || true)
+KC=0; for V in $(ls -1 /boot/vmlinuz-* 2>/dev/null | sed 's|^/boot/vmlinuz-||' || true); do if [ -s "/boot/initrd.img-$V" ] && [ -d "/lib/modules/$V" ]; then KC=$((KC + 1)); fi; done
+echo "kernel running: $RK; newest installed: ${NK:-none}; complete kernels (file, initrd and modules): $KC"
+if [ -z "$NK" ]; then stop kernel "no kernel file under /boot"
+else
+  [ -s "/boot/initrd.img-$NK" ] && [ -d "/lib/modules/$NK" ] || stop kernel "the newest kernel $NK has no initrd or no modules folder: its install is not finished"
+  if [ -f /boot/grub/grub.cfg ]; then GC=$(grep -cF "vmlinuz-$NK" /boot/grub/grub.cfg || true); echo "boot menu lines naming $NK: $GC"; [ "${GC:-0}" -ge 1 ] || stop kernel "the boot menu /boot/grub/grub.cfg does not name $NK"
+  else note "/boot/grub/grub.cfg is not there: how this server boots is to be read"; fi
+fi
+[ "$RK" != "$NK" ] || note "the newest kernel runs already: the restart is owed for the other packages above"
+[ "$KC" -ge 2 ] || note "only one complete kernel: the boot menu has no earlier kernel to fall back to"
+gv() { grep -hE "^$1=" /etc/default/grub /etc/default/grub.d/*.cfg 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d '"' || true; }
+GDF=$(gv GRUB_DEFAULT)
+echo "boot menu: GRUB_DEFAULT ${GDF:-not set}; saved entry $(grub-editenv list 2>/dev/null | sed -n 's/^saved_entry=//p' || true); GRUB_TIMEOUT_STYLE $(gv GRUB_TIMEOUT_STYLE); GRUB_TIMEOUT $(gv GRUB_TIMEOUT); GRUB_RECORDFAIL_TIMEOUT $(gv GRUB_RECORDFAIL_TIMEOUT)"
+case "${GDF:-0}" in 0) ;; saved) note "GRUB_DEFAULT=saved: the saved entry above is what boots";; *) note "GRUB_DEFAULT is not the first entry: read which kernel it boots";; esac
+PW=$(for U in root ubuntu; do printf '%s %s; ' "$U" "$(passwd -S "$U" 2>/dev/null | awk '{ print $2 }' || true)"; done)
+echo "console sign-in (status letters only; P: has a password, L: locked, NP: none): $PW"
+case "$PW" in *' P;'*) ;; *) note "no account here has a password: the hosting company's console would show a login prompt nobody can pass; rescue mode is the way in (the lifecycle guide's 'If it does not come back')";; esac
+# 3. Disks: room, nothing that asks for a passphrase at boot, /etc/fstab without errors.
+FREE=$(df --output=avail -BG / | tail -n 1 | tr -dc 0-9); echo "free on /: $FREE GB; free on /boot: $(df --output=avail -BM /boot | tail -n 1 | tr -dc 0-9) MB"
+[ "${FREE:-0}" -ge 5 ] || stop disk "less than 5 GB free on /"
+NC=$(lsblk -rno TYPE 2>/dev/null | grep -cx crypt || true); CT=$(grep -cvE '^[[:space:]]*(#|$)' /etc/crypttab 2>/dev/null || true)
+echo "the root file system: $(findmnt -no FSTYPE / || true); encrypted devices: $NC; /etc/crypttab lines: ${CT:-0}"
+[ "$NC" = 0 ] && [ "${CT:-0}" = 0 ] || stop passphrase "an encrypted disk: the boot may wait at the console for a passphrase"
+FV=$(findmnt --verify 2>&1 | tail -n 1 || true); echo "/etc/fstab, findmnt --verify: $FV"
+case "$FV" in Success*|'0 parse errors, 0 errors'*) ;; *) stop fstab "findmnt --verify finds an error in /etc/fstab: a mount that fails can hold the boot";; esac
+# 4. The release table (names.sh read it into ST), the maintenance check (MT1's read-only half), the old release's retirement receipt after a side-by-side upload (SB14), debates at work (DR2's guards), steps that run now.
+jq -r '.releases[] | "release \(.label) \(.state): units \(.units.api)/\(.units.ui)/\(.units.runner); open work \(.openWork); retire requested \(.retireRequested)"' <<<"$ST"
+[ "$(jq '.bad | length' <<<"$ST")" = 0 ] || stop release "release-check.mjs status has a bad list"
+MA=$(lc release-check.mjs maintenance 2>&1) || stop release "release-check.mjs maintenance refused (a release drains): $(printf '%s\n' "$MA" | tail -n 1 | cut -c1-200)"
+[ ! -e /etc/debateai-v3-preview/lifecycle/maintenance-pending ] || stop release "MT1's maintenance flag is there already: other maintenance is planned"
+if [ -e "$S/downtime-start-epoch" ]; then echo "the latest upload: the drained path (no retirement receipt)"
+elif [ -e "$S/retirement-receipt.json" ]; then echo "the latest upload: side by side; $OLABEL's retirement receipt: there"
+else stop receipt "the latest upload was side by side and $OLABEL has no retirement receipt yet: run SB14 first (its receipt reads $OLABEL's runner lines from the journal)"; fi
+WI=$(psqlq "SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')" || echo unread); WW=$(psqlq "SELECT count(*) FROM core.run_waiting_v" || echo unread)
+echo "debates queued or running: $WI; waiting in line: $WW"
+[ "$WI" = 0 ] && [ "$WW" = 0 ] || stop work "a debate is queued, running or waiting"
+[ -z "$(systemctl list-units 'ms-step-*' --no-legend --state=active,activating,deactivating)" ] || stop step "a detached step still runs: read its log first"
+for U in debateai-preview-team-unlock.service debateai-preview-backup.service; do case "$(ac "$U")" in active|activating|deactivating) stop step "$U runs now (the team unlock: finish the Team page change, or let its hour end; the backup: let it end)";; esac; done
+# 5. The four gates: state, window, calls in flight, when the window closes (never an amount); their own start checks run now; the server's name against each gate's GO (a gate runs only on its GO's target host: preview_budget_authority.py).
+echo "the server's name and /etc/hostname, which the boot sets: $(same "$HN" "$(sed -n 1p /etc/hostname 2>/dev/null | tr -d '[:space:]' || true)")"
+[ "$(same "$HN" "$(sed -n 1p /etc/hostname 2>/dev/null | tr -d '[:space:]' || true)")" = SAME ] || stop hostname "the server's name now is not the one in /etc/hostname: after the boot the gates would refuse to run under another name"
+for G in deepinfra:provider-budget:deepinfra-budget-v3 anthropic:anthropic-budget:anthropic-budget-v1 perplexity:perplexity-budget:perplexity-budget-v1 bedrock:bedrock-budget:bedrock-budget-v1; do
+  IFS=: read -r GN GU GK <<<"$G"
+  case "$GN" in deepinfra) GF=$GD; GP=$PD;; anthropic) GF=$GAN; GP=$PAN;; perplexity) GF=$GPX; GP=$PPX;; *) GF=$GBR; GP=$PBR;; esac
+  GJ=$(gs "$GF" "$GP" 2>/dev/null | jq -c '{state, reason, window_open, in_flight, open_until_utc}' 2>/dev/null || true); [ -n "$GJ" ] || GJ='{}'
+  GS=$(jq -r '.state // "unread"' <<<"$GJ"); GW=$(jq -r '.window_open | tostring' <<<"$GJ"); GI=$(jq -r '.in_flight | tostring' <<<"$GJ"); GO=$(jq -r '.open_until_utc // ""' <<<"$GJ"); GR=$(jq -r '.reason // "none"' <<<"$GJ")
+  SA=$(ac "debateai-preview-$GU"); if [ -S "/run/debateai-v3-preview/$GK.sock" ]; then SK=there; else SK=missing; fi
+  HL=unread; [ -z "$GO" ] || HL=$(( ( $(date -d "$GO" +%s 2>/dev/null || echo "$NOW") - NOW ) / 3600 ))
+  GOF=$(systemctl show -p ExecStart --value "debateai-preview-$GU" 2>/dev/null | grep -o -- '--go [^ ;]*' | head -n 1 | cut -d' ' -f2 || true)
+  GH=$(same "$HN" "$(jq -r '.target_host // empty' "$GOF" 2>/dev/null || true)")
+  echo "$GN gate: service $SA; socket $SK; state $GS; window open $GW; calls in flight $GI; window closes ${GO:-never} (in $HL hours); the server's name and its GO's target host: $GH"
+  [ "$GS" = active ] || stop gates "the $GN gate is $GS (reason $GR): its reason is read and it is re-opened only on the owner's yes, before any restart"
+  [ "$GW" = true ] || stop gates "the $GN gate's window is closed: its stop, then its activate (MAIN-SITE.md 6.5), on the owner's yes, before the restart (PWOFF1's gatesok needs all four open)"
+  [ "$GI" = 0 ] || stop work "the $GN gate has a call in flight"
+  case "$GN:$SA" in bedrock:active) ;; bedrock:*) note "the Amazon gate's service does not run now; RESTART_UP starts it when its start check passes";; *:active) ;; *) stop not-running "the $GN gate's service is $SA";; esac
+  case "$HL" in unread) ;; *) [ "$HL" -ge 48 ] || note "the $GN gate's window closes within two days: PWOFF1 and ASKS_OPEN need it open (its stop, then its activate, MAIN-SITE.md 6.5)";; esac
+  gcheck "debateai-preview-$GU"
+  if [ "$GN" = bedrock ]; then
+    [ "$GH" = SAME ] || note "the Amazon gate's GO names another host: it would not run (not needed before 'Switch it on')"
+    [ "$GCN" -ge 1 ] && [ "$GCBAD" = 0 ] || note "the Amazon gate's start check does not pass now: RESTART_UP will not start it; no ask calls it before 'Switch it on' (the release guide's 'After a reboot it is not running'; the Amazon gate guide's address check: fetch the ranges again, or ask)"
+  else
+    [ "$GH" = SAME ] || stop hostname "the $GN gate's GO names another host than this server: it would refuse to start after the boot"
+    [ "$GCN" -ge 1 ] && [ "$GCBAD" = 0 ] || stop gate-start "the $GN gate's start check does not pass now: the gate would not start again after the restart (its address list or model list needs a reviewed change first)"
+  fi
+done
+# 6. Every unit the site needs: running now, and in the boot's own dependency tree (what the boot starts by itself, drop-ins included).
+echo "default target: $(systemctl get-default 2>/dev/null || true)"
+BOOT=$(systemctl list-dependencies --all --plain --no-pager default.target 2>/dev/null | sed 's/^[^A-Za-z0-9]*//' | sort -u || true)
+TE=$(en debateai-preview.target); echo "the boot target: $TE, $(ac debateai-preview.target); its drop-ins: $(ls /etc/systemd/system/debateai-preview.target.d/ 2>/dev/null | tr '\n' ' ' || true)"
+[ "$TE" = enabled ] || stop boot-units "debateai-preview.target is not enabled: nothing of the site starts at boot"
+grep -qxF "Wants=debateai-preview-api@$LABEL.service debateai-preview-ui@$LABEL.service" /etc/systemd/system/debateai-preview.target.d/60-current-release.conf || stop boot-units "the boot target's 60-current-release.conf does not name $LABEL's pair"
+[ "$(systemctl show -p NeedDaemonReload --value debateai-preview.target 2>/dev/null || true)" != yes ] || stop reload "debateai-preview.target changed on disk since systemd last read it"
+# core: must run now and come back by itself; seen: the same, when it runs now; either: by itself only once its "Switch it on" drop-in is in the boot target, else RESTART_UP starts it; hand: RESTART_UP starts it.
+for KU in core:debateai-preview-postgresql.service core:debateai-preview-hatchet.service core:debateai-preview-hatchet-gateway.service seen:debateai-preview-capture.service core:debateai-preview-provider-budget.service core:debateai-preview-anthropic-budget.service either:debateai-preview-perplexity-budget.service hand:debateai-preview-bedrock-budget.service core:debateai-preview-turnstile.service core:debateai-preview-egress.service "core:$API.service" "core:$WEB.service" "hand:$RUN.service" core:debateai-preview-backup.timer core:debateai-preview-gate-halt-watch.timer core:debateai-preview-gate-addresses.timer core:debateai-preview-anthropic-halt-watch.timer core:debateai-preview-anthropic-addresses.timer either:debateai-preview-perplexity-halt-watch.timer either:debateai-preview-perplexity-addresses.timer hand:debateai-preview-bedrock-halt-watch.timer hand:debateai-preview-bedrock-addresses.timer core:caddy.service core:docker.service core:postfix.service core:systemd-resolved.service seen:debateai-notify-alarm.timer seen:debateai-geoip-refresh.timer; do
+  K=${KU%%:*}; U=${KU#*:}
+  LS=$(systemctl show -p LoadState --value "$U" 2>/dev/null || true)
+  if [ "$LS" != loaded ]; then if [ "$K" = seen ]; then echo "$U: not installed here"; else stop not-running "$U is not installed ($LS)"; fi; continue; fi
+  AS=$(ac "$U"); AB=no
+  if grep -qxF "$U" <<<"$BOOT"; then AB=yes; elif [ "$U" = docker.service ] && grep -qxF docker.socket <<<"$BOOT"; then AB='yes (through docker.socket)'; fi
+  echo "$U: $AS; $(en "$U"); started by the boot by itself: $AB"
+  [ "$(systemctl show -p NeedDaemonReload --value "$U" 2>/dev/null || true)" != yes ] || stop reload "$U changed on disk since systemd last read it: the boot would run the file as it is on disk"
+  # Caddy was found disabled once, started by hand at every earlier boot: its STOP line names the one command that puts it in the boot.
+  HINT=''; case "$U:$(en "$U")" in caddy.service:disabled) HINT=" (it is disabled: systemctl enable caddy.service, on the owner's yes, puts it in the boot and leaves Caddy running; then RESTART_LOOK again)";; esac
+  case "$K" in
+    core) [ "$AS" = active ] || stop not-running "$U is $AS now"; [ "$AB" != no ] || stop boot-units "$U runs now, but the boot would not start it$HINT";;
+    seen) if [ "$AS" = active ] && [ "$AB" = no ]; then stop boot-units "$U runs now, but the boot would not start it"; fi;;
+    either) [ "$AB" != no ] || note "$U is not in the boot (its Switch it on drop-in is not there): RESTART_UP starts it by hand when it ran before";;
+    hand) [ "$AB" = no ] || note "$U is started by the boot already";;
+  esac
+done
+EO=$(systemctl show -p After,Wants --value "$API.service" 2>/dev/null | tr ' ' '\n' | grep -c '^debateai-preview-egress\.service$' || true)
+echo "the API is ordered after the egress proxy: $([ "${EO:-0}" -ge 1 ] && echo yes || echo no) (H3's drop-in, which unit-templates.mjs copies into the template)"
+[ "${EO:-0}" -ge 1 ] || note "the API is not ordered after the egress proxy: with sandbox payments its start asks the proxy nothing (start-check-payments.mjs); before live payments this needs a look"
+# 7. ssh: in the boot; its unit files read; its settings accepted, unchanged since sshd started, and naming the ports ssh listens on now.
+SSB=no; SSHU=''
+for U in $(systemctl list-unit-files --no-legend 'ssh.*' 'sshd.*' 2>/dev/null | awk '{ print $1 }' || true); do
+  echo "$U: $(en "$U"), $(ac "$U"); changed on disk since systemd read it: $(systemctl show -p NeedDaemonReload --value "$U" 2>/dev/null || echo unread)"
+  if grep -qxF "$U" <<<"$BOOT"; then SSB=yes; fi
+  [ "$(systemctl show -p NeedDaemonReload --value "$U" 2>/dev/null || true)" != yes ] || stop ssh "$U changed on disk and systemd has not read it: the boot would run it untried"
+  case "$U" in ssh.service|sshd.service) [ -n "$SSHU" ] || SSHU=$U;; esac
+done
+[ "$SSB" = yes ] || stop ssh "no ssh unit is started by the boot"
+SD=$(command -v sshd || true); SPORTS=''
+if [ -z "$SD" ]; then stop ssh "sshd is not found"
+elif SO=$("$SD" -t 2>&1); then
+  echo "sshd's settings: accepted (sshd -t)"
+  SPORTS=$("$SD" -T 2>/dev/null | awk '$1 == "port" { print $2 } $1 == "listenaddress" { n = split($2, a, ":"); print a[n] }' | LC_ALL=C sort -u | tr '\n' ' ' || true)
+else stop ssh "sshd -t refuses its settings ($(printf '%s\n' "$SO" | head -n 1 | cut -c1-160)): ssh might not start after the restart"; fi
+LPORTS=$( { ss -ltnpH 2>/dev/null | awk '/"sshd/ { n = split($4, a, ":"); print a[n] }'; if [ "$(ac ssh.socket)" = active ]; then systemctl show -p Listen --value ssh.socket 2>/dev/null | awk '{ n = split($1, a, ":"); print a[n] }'; fi; } | LC_ALL=C sort -u | tr '\n' ' ' || true)
+echo "the ports sshd's settings name (sshd -T) and the ports ssh listens on now: $(same "$SPORTS" "$LPORTS")"
+[ "$(same "$SPORTS" "$LPORTS")" = SAME ] || stop ssh "the ports sshd's settings name are not the ones ssh listens on now, or are unread: the boot would apply settings that never ran"
+SST=$(systemctl show -p ExecMainStartTimestamp --value "${SSHU:-ssh.service}" 2>/dev/null || true)
+case "$SST" in
+  ''|n/a) note "ssh's service has no start time now (ssh started by its socket, on demand): its settings files are read at its next start";;
+  *) SSE=$(date -d "$SST" +%s 2>/dev/null || echo 0); SN=$(find /etc/ssh/sshd_config /etc/ssh/sshd_config.d -type f -newermt "@$SSE" 2>/dev/null | grep -c . || true)
+     echo "sshd's settings files changed after sshd last started: $SN"
+     [ "$SN" = 0 ] || stop ssh "an sshd settings file changed after sshd last started: the boot would apply it untried (a port, an address or AllowUsers could shut the operator out)";;
+esac
+# 8. The firewall, the network, mounts, the server's name and the boot menu as the boot loads them; cloud-init.
+LK=$(find /etc/netplan /etc/systemd/network /etc/network /etc/nftables.conf /etc/iptables /etc/fstab /etc/crypttab /etc/hostname /etc/cloud/cloud.cfg /etc/cloud/cloud.cfg.d /etc/default/grub /etc/default/grub.d -type f -newermt "@$BT" 2>/dev/null | LC_ALL=C sort | tr '\n' ' ' || true)
+NK2=$(find /etc/ufw /etc/default/ufw /etc/systemd/resolved.conf /etc/systemd/resolved.conf.d /etc/sysctl.conf /etc/sysctl.d /etc/modprobe.d -type f -newermt "@$BT" 2>/dev/null | LC_ALL=C sort | tr '\n' ' ' || true)
+echo "network, firewall, mount, name and boot menu files changed since the last boot: ${LK:-none}"
+[ -z "$LK" ] || risk boot-config "these files changed since the last boot and were never through one: $LK(read each; a network, firewall or mount change can shut ssh out)"
+[ -z "$NK2" ] || note "changed since the last boot (applied at once when made, as a rule): $NK2"
+if command -v ufw > /dev/null 2>&1; then
+  UE=$(sed -n 's/^ENABLED=//p' /etc/ufw/ufw.conf 2>/dev/null | tr -d '"' | head -n 1 || true); US=$(ufw status 2>/dev/null | sed -n 's/^Status: //p' | head -n 1 || true); UDP=$(sed -n 's/^DEFAULT_INPUT_POLICY=//p' /etc/default/ufw 2>/dev/null | tr -d '"' | head -n 1 || true)
+  echo "ufw: on at boot ${UE:-unread}; now ${US:-unread}; incoming at boot by default: ${UDP:-unread}"
+  case "${UE:-unread}/${US:-unread}" in
+    yes/active) if [ "$UDP" != ACCEPT ]; then UA=$(ufw show added 2>/dev/null | grep -E '^ufw (allow|limit)' || true); for P in $SPORTS; do if [ "$P" = 22 ]; then PRX='22(/tcp)?|ssh|OpenSSH'; else PRX="$P(/tcp)?"; fi; UR=$(grep -cE "(^|[ /])($PRX)( |$)" <<<"$UA" || true); echo "ufw rules loaded at boot that let ssh's port in: $UR"; [ "${UR:-0}" -ge 1 ] || stop firewall "ufw is on at boot and no rule it loads lets ssh's port in"; done; fi;;
+    no/inactive) ;;
+    *) stop firewall "ufw at boot (${UE:-unread}) differs from now (${US:-unread}), or is unread";;
+  esac
+else echo "ufw: not installed"; fi
+echo "firewall units: $(for U in $(systemctl list-unit-files --no-legend 'ufw*' 'nftables*' 'netfilter*' 'iptables*' 2>/dev/null | awk '{ print $1 }' || true); do printf '%s %s/%s; ' "$U" "$(en "$U")" "$(ac "$U")"; done)"
+for U in nftables.service netfilter-persistent.service; do [ "$(en "$U")" != enabled ] || [ "$(ac "$U")" = active ] || stop firewall "$U is enabled for the boot but is not active now: the boot would load a firewall that is not loaded now"; done
+if [ -e /etc/cloud/cloud.cfg ] && [ ! -e /etc/cloud/cloud-init.disabled ]; then
+  PH=$(grep -hE '^preserve_hostname:' /etc/cloud/cloud.cfg /etc/cloud/cloud.cfg.d/*.cfg 2>/dev/null | tail -n 1 | awk '{ print $2 }' || true)
+  CJ=/run/cloud-init/instance-data.json; MH=$(jq -r '.v1.local_hostname // empty' "$CJ" 2>/dev/null || true); II=$(jq -r '.v1.instance_id // empty' "$CJ" 2>/dev/null || true); IL=$(cat /var/lib/cloud/data/instance-id 2>/dev/null || true)
+  echo "cloud-init: $(en cloud-init.service); keeps a name a person set (preserve_hostname): ${PH:-not set}; its metadata name and the server's name: $(same "$MH" "$HN"); its instance id now and at the last boot: $(same "$II" "$IL")"
+  case "${PH:-false}" in true|True) ;; *) note "cloud-init manages the server's name at boot (preserve_hostname is not true); the gates depend on the name (the line above)";; esac
+  [ "$(same "$II" "$IL")" = SAME ] || note "cloud-init's instance id differs from the last boot's, or is unread: a new instance id makes cloud-init set the server up again (new ssh host keys, the name): ask"
+else echo "cloud-init: not installed, or switched off"; fi
+# 9. Files the boot would read that changed after their service last started (the names file's apinew rule, for every core unit): unit files, drop-ins, environment files, credentials; then PostgreSQL's own pending settings.
+fresh() { local FK=$1 FU=$2 FT FS FF FM; shift 2
+  [ "$(ac "$FU")" = active ] || return 0
+  FT=$(systemctl show -p ExecMainStartTimestamp --value "$FU" 2>/dev/null || true); case "$FT" in ''|n/a) FT=$(systemctl show -p ActiveEnterTimestamp --value "$FU" 2>/dev/null || true);; esac
+  case "$FT" in ''|n/a) note "$FU: its start time is unread"; return 0;; esac
+  FS=$(date -d "$FT" +%s 2>/dev/null || true); [ -n "$FS" ] || { note "$FU: its start time is unread"; return 0; }
+  for FF in $( { systemctl show -p FragmentPath --value "$FU"; systemctl show -p DropInPaths --value "$FU" | tr ' ' '\n'; systemctl show -p EnvironmentFiles --value "$FU" | awk '{ print $1 }'; systemctl show -p LoadCredential --value "$FU" | grep -o '/[^ ]*'; printf '%s\n' "$@"; } 2>/dev/null | grep '^/' | LC_ALL=C sort -u || true); do
+    [ -e "$FF" ] || continue
+    FM=$(stat -c %Y "$FF")
+    if [ "$FM" -gt "$FS" ]; then if [ "$FK" = stop ]; then stop changed-files "$FF changed after $FU last started: the boot would start it on a file that never ran (restart $FU now at a quiet time on the owner's yes, or put the file back)"; else note "$FF changed after $FU last started: its next start (the boot, or RESTART_UP) reads it as it is now"; fi
+    elif [ "$FM" = "$FS" ]; then note "$FF changed in the same second $FU started (the guides restart right after a move): read whether that start ran on it"; fi
+  done
+  for FF in $(systemctl show -p ExecStart --value "$FU" 2>/dev/null | grep -o 'path=[^ ;]*' | sed 's/^path=//' | LC_ALL=C sort -u || true); do
+    [ -e "$FF" ] || continue
+    [ "$(stat -L -c %Y "$FF")" -le "$FS" ] || note "the program $FF of $FU was replaced after $FU started (an update): the boot runs it first"
+  done; }
+for KU in "stop:caddy.service:$C /etc/debateai-v3-preview/public/caddy.env" "stop:$API.service:$A $MP" "stop:$WEB.service:$UF" stop:debateai-preview-postgresql.service: stop:debateai-preview-provider-budget.service: stop:debateai-preview-anthropic-budget.service: stop:debateai-preview-perplexity-budget.service: stop:debateai-preview-turnstile.service: stop:debateai-preview-hatchet.service: stop:debateai-preview-hatchet-gateway.service: "note:$RUN.service:$RF" note:debateai-preview-bedrock-budget.service: note:debateai-preview-egress.service: note:debateai-preview-capture.service: note:docker.service: note:postfix@-.service: note:systemd-resolved.service:; do
+  K=${KU%%:*}; R2=${KU#*:}; U=${R2%%:*}; FSL=${R2#*:}
+  fresh "$K" "$U" $FSL
+done
+echo "payments: the egress proxy's live drop-in $([ -e "$EDROP" ] && echo 'IS there' || echo 'is not there (sandbox)')"
+PP=$(psqlq "SELECT (SELECT count(*) FROM pg_settings WHERE pending_restart)||' '||(SELECT count(*) FROM pg_file_settings WHERE error IS NOT NULL)||' '||(SELECT count(*) FROM pg_hba_file_rules WHERE error IS NOT NULL)||' '||(SELECT count(*) FROM pg_ident_file_mappings WHERE error IS NOT NULL)" 2>/dev/null || echo 'unread unread unread unread')
+echo "PostgreSQL: settings waiting for a restart, settings file errors, pg_hba.conf errors, pg_ident.conf errors: $PP"
+[ "$PP" = '0 0 0 0' ] || stop database "a PostgreSQL setting waits for a restart, or one of its files has an error: the boot would apply it untried"
+# 10. Folders the boot makes again: /run/debateai-v3-preview (the gate v2 guide's tmpfiles line) and the database's socket folder with the mode and owner the boot gives it ("What the socket folder must allow", install step 7); the socket file against the database's own settings; the Turnstile relay's program (SB15's rule).
+TL=$(grep -h '^d /run/debateai-v3-preview ' /etc/tmpfiles.d/*.conf 2>/dev/null || true); echo "tmpfiles line for /run/debateai-v3-preview: ${TL:-none}"
+[ -n "$TL" ] || stop tmpfiles "no tmpfiles line makes /run/debateai-v3-preview again at boot: the gates could not start"
+oct() { local m=${1#[~:]}; m=${m#[~:]}; case "$m" in ''|-) m=0755;; esac; case "$m" in *[!0-7]*) echo bad;; *) printf '%o' "$((8#$m))";; esac; }
+PF=/run/debateai-v3-preview/postgresql; PNOW=$(stat -c '%a %U:%G' "$PF" 2>/dev/null || echo unread)
+PU=$(systemctl show -p User --value debateai-preview-postgresql 2>/dev/null || true); PU=${PU:-root}; PGR=$(systemctl show -p Group --value debateai-preview-postgresql 2>/dev/null || true); [ -n "$PGR" ] || PGR=$(id -gn "$PU" 2>/dev/null || echo "$PU")
+XL=$(systemctl show -p ExecStartPre --value debateai-preview-postgresql 2>/dev/null | grep -o 'argv\[\]=[^;]*' | sed 's/^argv\[\]=//; s/[[:space:]]*$//' | grep -F "$PF" | head -n 1 || true)
+PRD=$(systemctl show -p RuntimeDirectory --value debateai-preview-postgresql 2>/dev/null || true); case " $PRD " in *' debateai-v3-preview/postgresql '*) PRDY=yes;; *) PRDY=no;; esac
+PTL=$(grep -h "^[dD] $PF " /etc/tmpfiles.d/*.conf /run/tmpfiles.d/*.conf /usr/lib/tmpfiles.d/*.conf 2>/dev/null | head -n 1 || true)
+PRED=''; PSRC=nothing
+if [ -n "$XL" ]; then
+  PSRC='a start step (ExecStartPre)'
+  case "$XL" in *install\ *-d*) read -r XM XU XG <<<"$(awk '{ for (i = 1; i < NF; i++) { if ($i == "-o") o = $(i + 1); if ($i == "-g") g = $(i + 1); if ($i == "-m") m = $(i + 1) } } END { print (m == "" ? "-" : m), (o == "" ? "root" : o), (g == "" ? "root" : g) }' <<<"$XL")"; PRED="$(oct "$XM") $XU:$XG";; esac
+elif [ "$PRDY" = yes ]; then PSRC=RuntimeDirectory; PRED="$(oct "$(systemctl show -p RuntimeDirectoryMode --value debateai-preview-postgresql 2>/dev/null || true)") $PU:$PGR"
+elif [ -n "$PTL" ]; then PSRC='a tmpfiles line'; read -r _ _ TM TU TG _ <<<"$PTL"; [ "${TU:--}" != - ] || TU=root; [ "${TG:--}" != - ] || TG=root; PRED="$(oct "$TM") $TU:$TG"; fi
+echo "the database's socket folder now: $PNOW; what makes it at boot: $PSRC; the mode and owner it gives: ${PRED:-unread}"
+if [ -z "$PRED" ]; then stop socket-folder "what makes $PF at boot, and with which mode, could not be read: read systemctl cat debateai-preview-postgresql and the tmpfiles lines first"
+elif [ "$PRED" != "$PNOW" ]; then stop socket-folder "the boot would make $PF as $PRED; it is $PNOW now: the team unlock's login (REKEYCHECK, MAIN-SITE.md 5.7) may change; the folder is never changed by hand"; fi
+SPM=$(psqlq "SHOW unix_socket_permissions" 2>/dev/null || true); SPG=$(psqlq "SHOW unix_socket_group" 2>/dev/null || true)
+read -r SFM SFG <<<"$(stat -c '%a %G' "$PF/.s.PGSQL.5434" 2>/dev/null || echo 'unread unread')"
+echo "the socket file: mode $SFM, group $SFG; the database's settings: mode $(oct "${SPM:-x}"), group ${SPG:-its own}"
+[ "$SFM" = "$(oct "${SPM:-x}")" ] && { [ -z "$SPG" ] || [ "$SFG" = "$SPG" ]; } || stop socket-folder "the socket file's mode or group is not the one the database sets at its start: it was changed by hand, and the boot puts it back"
+TX=$(systemctl show -p ExecStart --value debateai-preview-turnstile 2>/dev/null | grep -o 'argv\[\]=[^;]*' | head -n 1 | sed 's/^argv\[\]=//' || true); TW=$(systemctl show -p WorkingDirectory --value debateai-preview-turnstile 2>/dev/null || true)
+for P in $TX ${TW#[-!]}; do case "$P" in /*) [ -e "$P" ] || stop turnstile "the Turnstile relay's $P is missing: it would not start again (the release guide's SB15 rule)";; esac; done
+echo "the Turnstile relay: $(relay) (expected PUBLIC_APP_URL=https://$HOST)"
+# 11. Hatchet and its gateway, as DR3 and DBBACK check them after a Hatchet restart, without the witness (the guides run it only while the gateway is stopped); whether Docker gives Hatchet the same address at boot; the database's listen addresses (counted, never printed) and its order after Docker.
+CID0=$(docker ps -q --no-trunc --filter label=com.docker.compose.project=debateai-v3-preview --filter label=com.docker.compose.service=hatchet-lite || true)
+IP0=$(docker inspect "$CID0" --format '{{(index .NetworkSettings.Networks "debateai-v3-preview-internal").IPAddress}}' 2>/dev/null || true)
+ALLOW=$(systemctl show -p IPAddressAllow --value debateai-preview-hatchet-gateway.service 2>/dev/null || true)
+if [ -n "$CID0" ] && [ -n "$IP0" ] && grep -qF -e " $IP0/32 " -e " $IP0 " <<<" $ALLOW "; then echo "Hatchet: container found; its address is in the gateway's allow list; the gateway: $(ac debateai-preview-hatchet-gateway)"; else stop hatchet "Hatchet's container or address is unread, or not in the gateway's allow list"; fi
+FX=$(docker inspect "$CID0" --format '{{with (index .NetworkSettings.Networks "debateai-v3-preview-internal").IPAMConfig}}{{.IPv4Address}}{{end}}' 2>/dev/null || true)
+NCN=$(docker network inspect debateai-v3-preview-internal --format '{{len .Containers}}' 2>/dev/null || echo unread)
+echo "Hatchet's restart rule: $(docker inspect "$CID0" --format '{{.HostConfig.RestartPolicy.Name}}' 2>/dev/null || echo unread); its address fixed in its settings: $([ -n "$FX" ] && echo yes || echo no); containers on its network: $NCN"
+[ -n "$FX" ] || risk hatchet-address "Hatchet's address is not fixed in its settings: Docker may give it another one at the boot; the gateway's allow list would then not name it, and no guide step repairs that (DR3 and DBBACK only refuse), so debates would stay stopped until a reviewed change"
+LA=$(psqlq "SHOW listen_addresses" || true); IFS=', ' read -r -a LAS <<<"$LA"; XA=0; XB=0
+for a in "${LAS[@]}"; do case "$a" in localhost|'*'|'') continue;; esac; IFN=$(ip -o addr show 2>/dev/null | awk -v a="$a" '{ split($4, p, "/"); if (p[1] == a) print $2 }' | head -n 1 || true); case "$IFN" in lo) ;; docker*|br-*) XA=$((XA + 1)); XB=$((XB + 1));; *) XA=$((XA + 1));; esac; done
+PGAD=$(systemctl show -p After --value debateai-preview-postgresql 2>/dev/null | tr ' ' '\n' | grep -cx 'docker.service' || true); NLB=$(sysctl -n net.ipv4.ip_nonlocal_bind 2>/dev/null || echo unread)
+echo "PostgreSQL: extra listen addresses $XA, of them on a Docker bridge $XB; ordered after Docker: $([ "${PGAD:-0}" -ge 1 ] && echo yes || echo no); binding an address not yet there allowed: $NLB; sockets listening on 5434 now: $(ss -ltnH 'sport = :5434' | grep -c . || true)"
+if [ "$XB" != 0 ] && [ "${PGAD:-0}" = 0 ] && [ "$NLB" != 1 ]; then risk bridge-order "PostgreSQL listens on a Docker bridge address and is not ordered after Docker: at the boot it may start before that bridge exists and listen without it; Hatchet would not reach the database, and no guide step repairs that, so debates would stay stopped until a reviewed change"; fi
+# 12. Backups: the nightly dump (this guide's backup.mjs) against the start of the latest upload (SB1's ledger-before), the newest PUBBACKUP (PUBCHECK's line, MAIN-SITE.md 5.9).
+BD=/var/backups/debateai-v3-preview; ND=$(ls -1t "$BD"/debateai-preview-*.dump 2>/dev/null | head -n 1 || true); UB=$(stat -c %Y "$S/ledger-before" 2>/dev/null || echo "$NOW")
+if [ -n "$ND" ]; then echo "newest nightly dump: ${ND##*/}, $(( ( NOW - $(stat -c %Y "$ND") ) / 3600 )) hours old"; [ "$(stat -c %Y "$ND")" -ge "$UB" ] || note "the newest nightly dump is from before the latest upload: RESTART_GO makes a fresh one first"; else note "no nightly dump in $BD: RESTART_GO makes one first"; fi
+NOK=$(journalctl -u debateai-preview-backup --since -2days -o cat --no-pager 2>/dev/null | grep -c PREVIEW_BACKUP_OK || true); NFL=$(journalctl -u debateai-preview-backup --since -2days -o cat --no-pager 2>/dev/null | grep -c PREVIEW_BACKUP_FAILED || true)
+echo "nightly backups in the last two days: ok $NOK, failed $NFL; the timer fires next in: $(nextin debateai-preview-backup.timer) minute(s)"
+[ "$NFL" = 0 ] || note "a dump failed in the last two days: RESTART_GO's fresh dump may fail too (journalctl -u debateai-preview-backup -o cat)"
+OB=$(cat "$BF" 2>/dev/null || true)
+if pubbackup "$OB"; then echo "the newest PUBBACKUP holds this corpus key and the key store: yes, $(( ( NOW - $(stat -c %Y "$OB/online.sha256") ) / 3600 )) hours old; publication keys made since: $(find "$PS" -type f -name publication-key.v1.json -newer "$OB/online.sha256" 2>/dev/null | grep -c . || true)"; else note "no PUBBACKUP holds this corpus key and the key store (PUBCHECK says the same)"; fi
+note "the dumps live on this server's own disk; only the hosting company's backup of the whole server covers a lost disk: the owner reads its date in the hosting company's control panel"
+# 13. For after the restart: what PWOFF1 reads (MAIN-SITE.md 8.2), read now; and mail. Never a stop.
+V=$(sed -n 's/^PREVIEW_ASKS_OPEN_TO=//p' "$A"); NB=$(sed -n 's/^PREVIEW_TEAM_USER_IDS_JSON=//p' "$A" | jq -r 'if type == "array" then length else empty end' 2>/dev/null || true)
+echo "asks open to: ${V:-closed}; the running API says so: $(said -xF "{\"event\":\"api.preview.asks_open\",\"to\":\"$V\"}" && echo yes || echo no); listed buyers in the API file: ${NB:-unread}, said by the API: $(said -xF "{\"event\":\"api.preview.listed_buyers\",\"count\":${NB:-0}}" && echo yes || echo no); mail mode: $(mailmode || true)"
+LT=$(psqlq "SELECT to_regclass('staff.preview_buyer_event') IS NOT NULL" 2>/dev/null || true); LN=''
+[ "$LT" != t ] || LN=$(psqlq "SELECT count(*) FROM (SELECT DISTINCT ON (user_id) kind FROM staff.preview_buyer_event ORDER BY user_id, revision DESC) l WHERE l.kind = 'ADDED'" 2>/dev/null || true)
+echo "accounts on the Team page's list of approved buyers: ${LN:-not read}"
+echo "the site password: /login answers $(curl -s -o /dev/null -m 15 -w '%{http_code}' "https://$HOST/login" || true); the NETOPIA review window: $(grep -qE 'review_locked|review_quiet|review window begin' "$C" && echo open || echo closed); the Owner's working staff keys: $(staffkey || echo unread); the running API started on its file as it is now: $(apinew && echo yes || echo no)"
+echo "mail: Postfix $(ac postfix.service); milters set: $(postconf -h smtpd_milters non_smtpd_milters 2>/dev/null | tr ', ' '\n\n' | grep -c . || true); mails waiting in its deferred queue: $(find /var/spool/postfix/deferred -type f 2>/dev/null | grep -c . || true)"
+# 14. The rest the restart touches.
+echo "up since: $(uptime -s); journal kept across restarts: $([ -d /var/log/journal ] && echo yes || echo no); boots in the journal: $(journalctl --list-boots --no-pager 2>/dev/null | grep -c . || true)"
+[ -z "$STOPS" ] || { echo "RESTART_LOOK_NOT_DONE: do not restart now:$STOPS (the STOP lines above; nothing changed)"; exit 1; }
+echo RESTART_LOOK_DONE
+exit 0
+```
+
+Expect about 110 lines, no `STOP (…)` line, then `RESTART_LOOK_DONE`. Keep the output: it is the "before" picture.
+Read the `NOTE:` lines too (below). Otherwise the last line is
+`RESTART_LOOK_NOT_DONE: do not restart now: <words> (the STOP lines above; nothing changed)`, and each word has its
+`STOP (<word>): …` line above.
+
+### Stop if
+
+**Not today (ask the owner; the restart waits for another day):**
+- `no-flag`: Ubuntu's flag is gone. The restart is no longer owed. (Did the server restart already?)
+- `kernel`: the newest kernel has no initrd, no modules folder, or is not in the boot menu. Its install did not
+  finish, and a restart could boot a broken kernel.
+- `packages` with `dpkg --audit names …`, or with `InstallOnShutdown`: packages are half installed, or the shutdown
+  itself would install packages. With `a package install runs now`: wait until it ends, then RESTART_LOOK again; that
+  one alone may still allow today.
+- `passphrase`, `fstab`, `disk`: an encrypted disk; an error in `/etc/fstab`; less than 5 GB free on `/`. Each can hold
+  the boot at the console.
+- `ssh`: no ssh unit is started by the boot; `sshd` is missing or `sshd -t` refuses its settings; an ssh unit file
+  changed and systemd has not read it; an sshd settings file changed after sshd last started; or the ports in sshd's
+  settings are not the ports ssh listens on now. Each could shut the operator out after the boot.
+- `firewall`: ufw is on at boot and no rule it loads lets ssh's port in; ufw at boot differs from now; or a firewall
+  unit the boot loads is not active now.
+- `hostname`: the server's name is not the one in `/etc/hostname`, or a gate's GO names another host. Each gate runs
+  only on its GO's target host, so after the boot it would not start.
+- `gate-start`: the DeepInfra, Anthropic or web search gate's own start check does not pass now. Each gate runs that
+  check at every start, so after the boot it would not start, and without the DeepInfra or Anthropic gate no debate
+  runs. The fix is a reviewed change of the gate's address list or model list, on the owner's yes. The hourly address
+  watchers do not show this: after their first email, a mismatch that stays is silent.
+- `release`: a release drains, the release table has a `bad` list, or MT1's flag exists already. Maintenance waits
+  until no release drains (the release guide's "Infrastructure maintenance").
+- `not-running`, `boot-units`, `reload`: a unit the site needs does not run now; or it runs but the boot would not start
+  it; or its file changed on disk and systemd never read it. A restart does not fix what is not understood. For Caddy
+  alone the `boot-units` line names the fix, when Caddy is disabled: `systemctl enable caddy.service`, on the owner's
+  yes. It changes nothing that runs (Caddy keeps running); then RESTART_LOOK again, which must show
+  `caddy.service: active; enabled; started by the boot by itself: yes`.
+- `changed-files`: a unit file, drop-in, environment file or credential of a core service changed after that service
+  last started (and likewise the API file, the mail plan, the Caddyfile and `caddy.env`). The boot would start it on a
+  file that never ran. Either restart that one service now, at a quiet time, through its guide's step and on the
+  owner's yes, or put the file back; then RESTART_LOOK again. A `NOTE` says when a file changed in the same second as
+  the start: the guides restart Caddy right after they move its file (PWOFF2, REVIEW_OPEN, HEALTH2), so read whether that start
+  ran on it.
+- `database`: a PostgreSQL setting waits for a restart, or one of its settings files has an error.
+- `tmpfiles`, `socket-folder`: nothing makes the gates' folder `/run/debateai-v3-preview` at boot; or the boot would
+  give the database's socket folder or socket file another mode or owner than now. The team unlock reaches the database
+  through that folder ("What the socket folder must allow", install step 7), and the folder is never changed by hand.
+  Read `systemctl cat debateai-preview-postgresql` and ask.
+- `turnstile`: the Turnstile relay's program or working folder is missing. It would not start again.
+- `hatchet`: Hatchet's container or address is unread, or not in the gateway's allow list. It is broken now; a
+  restart would not fix it.
+
+**Settle first, then RESTART_LOOK again (today is still possible):**
+- `work`: a debate is queued, running or waiting, or a gate has a call in flight. Wait for a quiet time.
+- `step`: a detached step, the team unlock or the nightly backup runs now. Let it end.
+- `gates`: a gate is not `active` (halted: its reason is read first, then its `activate`, on the owner's yes), or its
+  window is closed (its `stop`, then its `activate`, MAIN-SITE.md 6.5, on the owner's yes).
+- `timer`: a runner retire timer fires within 90 minutes. At the boot it could run before PostgreSQL is ready and
+  email a failure. Wait until it has fired.
+- `receipt`: the latest upload was side by side, and its old release has no retirement receipt yet. Run SB14 first: its
+  receipt reads the old runner's lines from the journal.
+
+**`NOTE` lines that matter:**
+- `AR='true'` on the daily upgrade's line: the server may restart by itself after a daily upgrade. Tell the owner. It
+  does not stop this restart.
+- `the system's daily upgrade runs within 90 minutes`, or a Bucharest time near 02:45 to 03:45: RESTART_GO refuses
+  within the hour before the daily upgrade and from 02:45 to 03:45 (the nightly dump's timer would fire during the
+  restart and run at the boot: `debateai-preview-backup.timer` has `Persistent=true`). Pick a time outside both.
+- `only one complete kernel`: the boot menu has no earlier kernel to fall back to.
+- `no account here has a password`: the console would show a login prompt nobody can pass; rescue mode is then the way
+  in ("If it does not come back").
+- `GRUB_TIMEOUT_STYLE hidden` or `GRUB_TIMEOUT 0` on the boot menu line: the menu is hidden ("If it does not come back"
+  says what that means at the console).
+- The Amazon gate's lines (`service does not run now`, `start check does not pass now`, `GO names another host`): it
+  is not needed before "Switch it on". RESTART_UP starts it only when its start check passes.
+- `the <gate> gate's window closes within two days`: settle it soon (MAIN-SITE.md 6.5).
+- `cloud-init manages the server's name at boot`, or `instance id differs`: read the cloud-init line with the owner. A
+  new instance id at the boot would give the server new ssh host keys, and ssh would then warn.
+- `the API is not ordered after the egress proxy`: harmless while payments are sandbox (the API's start asks the proxy
+  nothing then). It needs a look before live payments.
+- `the newest nightly dump is from before the latest upload`, or `a dump failed in the last two days`: RESTART_GO makes
+  a fresh dump first, and stops with nothing changed when that fails.
+- `no PUBBACKUP holds this corpus key and the key store`: PUBBACKUP (MAIN-SITE.md 5.9) before the restart is the
+  owner's choice.
+- `the program … was replaced after … started (an update)`: expected; that is why the server restarts.
+
+### The ACCEPT words
+
+Three risks only the owner can accept, each for one restart. With the word in `ACCEPT`, its line shows as
+`ACCEPTED (<word>): …` and does not stop RESTART_LOOK. What accepting means, if the risk bites:
+- `hatchet-address`: Hatchet's address is not fixed in its settings, so Docker may give it another one at the boot.
+  Hatchet's gateway lets in only the address its allow list names. If the address changes, the site itself comes back,
+  but Hatchet cannot reach the gateway: RESTART_UP keeps the runner stopped and ends `RESTART_UP_NOT_DONE` with
+  `BAD (hatchet)`. No guide step repairs that (DR3 and DBBACK only refuse), so debates stay stopped until a reviewed
+  change. With one container on its network, Docker usually gives the same address back; nothing here proves it.
+  RESTART_LOOK prints `containers on its network` for that reason.
+- `bridge-order`: PostgreSQL listens on a Docker bridge address and is not ordered after Docker, so at the boot it may
+  start before that bridge exists and listen without it. Hatchet would then not reach the database. As above: the site
+  comes back, debates stay stopped until a reviewed change.
+- `boot-config`: a network, firewall, mount, name, boot menu or cloud-init file changed since the last boot and was
+  never through one. Read each named file with the owner. When its change was applied and tried since (for example
+  `netplan apply`, or a mount done by hand that works), or it cannot touch the network, ssh or the disks, the owner may
+  accept it. A wrong network or firewall file can shut ssh out; the console is then the way in.
+
+### RESTART_GO (detached)
+
+Only after `RESTART_LOOK_DONE`, REKEYCHECK's two lines, and the owner's yes. Hours may pass while waiting for the yes,
+so it first runs again RESTART_LOOK's checks that can change by the hour: the time windows, a retire timer, the daily
+upgrade's setting for the shutdown, the newest kernel (an upgrade may have installed another one), `dpkg --audit`, the
+free space, the gates' start checks, the server's name against each gate's GO, and PostgreSQL's pending settings. If
+one fails, nothing changed and the site is up. Then it makes the fresh dump with this guide's own backup line
+(`systemctl start debateai-preview-backup`, then `PREVIEW_BACKUP_OK` in its journal); the dump keeps the 7 newest
+copies, as every night. Only then does the site go down.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# RESTART_GO: the owed restart (detached run only). Guards first, with RESTART_LOOK's checks that can change by the hour run again: if one fails, nothing changed and the site is up. Then a fresh database dump (the lifecycle guide's own backup line), a root-only record of the state before, the website and the API stopped (no new debate can start), the runner stopped once nothing is queued or running (DR2's order), MT1's maintenance flag, and a clean systemctl reboot 30 seconds later, so this step ends and its log is complete first.
+MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending
+TS=$(date -u +%Y%m%dT%H%M%SZ); RD=$M/restart/$TS
+SELF=$(sed -n 's|^0::.*/\(ms-step-[0-9]*\.service\)$|\1|p' "/proc/$$/cgroup" 2>/dev/null || true)
+nogo() { echo "RESTART_GO_NOT_DONE: $1 (nothing changed; the site is up)"; exit 1; }
+gline() { local G F P; for G in deepinfra anthropic perplexity bedrock; do case "$G" in deepinfra) F=$GD; P=$PD;; anthropic) F=$GAN; P=$PAN;; perplexity) F=$GPX; P=$PPX;; *) F=$GBR; P=$PBR;; esac; printf '%s %s\n' "$G" "$(gs "$F" "$P" 2>/dev/null | jq -r '"\(.state) \(.window_open) \(.in_flight)"' 2>/dev/null || echo 'unread unread unread')"; done; }
+# Minutes until a timer next fires (as in RESTART_LOOK): off when the timer does not run, none when unread.
+nextin() { local n s=''; [ "$(systemctl is-active "$1" 2>/dev/null || true)" = active ] || { echo off; return 0; }
+  n=$(systemctl show -p NextElapseUSecRealtime --value "$1" 2>/dev/null || true); case "$n" in ''|n/a) ;; *) s=$(date -d "$n" +%s 2>/dev/null || true);; esac
+  if [ -z "$s" ]; then n=$(systemctl list-timers --all "$1" --no-legend 2>/dev/null | awk 'NR == 1 && $1 != "-" && $1 != "n/a" { print $1, $2, $3, $4 }' || true); case "$n" in '') ;; *) s=$(date -d "$n" +%s 2>/dev/null || true);; esac; fi
+  if [ -n "$s" ]; then echo $(( (s - $(date +%s)) / 60 )); else echo none; fi; }
+# A gate's own start checks, as in RESTART_LOOK: sets GCN and GCBAD; prints status, refusal code and counts only.
+gcheck() { local U=$1 AL AF XL1 OUT RC R1 PY; local -a PA
+  GCN=0; GCBAD=0
+  AL=$(systemctl show -p IPAddressAllow --value "$U" 2>/dev/null || true); AF=$(systemctl show -p RestrictAddressFamilies --value "$U" 2>/dev/null || true)
+  PA=(--quiet --wait --pipe --collect -p IPAddressDeny=any -p "IPAddressAllow=$AL"); [ -z "$AF" ] || PA+=(-p "RestrictAddressFamilies=$AF")
+  while IFS= read -r XL1; do
+    [ -n "$XL1" ] || continue
+    GCN=$((GCN + 1)); RC=0
+    OUT=$(systemd-run "${PA[@]}" $XL1 < /dev/null 2>/dev/null | tail -n 1) || RC=$?
+    R1=$(jq -r '"\(.status) \(.error // "none"); outside the list: \(((.new // []) + (.outside // []) + (.missing // [])) | length)"' <<<"$OUT" 2>/dev/null || true)
+    PY=$(tr ' ' '\n' <<<"$XL1" | grep -m 1 '\.py$' | sed 's|.*/||' || true)
+    echo "  $U start check ${PY:-$GCN}: ${R1:-unread}; exit $RC"
+    case "$RC/${R1:-unread}" in '0/ok '*) ;; *) GCBAD=$((GCBAD + 1));; esac
+  done < <(systemctl show -p ExecStartPre --value "$U" 2>/dev/null | grep -o 'argv\[\]=[^;]*' | sed 's/^argv\[\]=//; s/[[:space:]]*$//' || true); }
+# 1. Guards.
+[ -n "$SELF" ] || nogo "this step runs only as a detached run (MAIN-SITE.md, 'How to run a server step', the detached run, steps 1 to 3): an ssh window that drops would leave the site down halfway"
+[ ! -e "$RD" ] || nogo "$RD exists: run it again a second later"
+[ -e /run/reboot-required ] || nogo "Ubuntu's restart flag is not there: ask"
+[ "$(systemctl is-active restart-go-reboot.timer || true)" != active ] || nogo "a restart is scheduled already (restart-go-reboot.timer)"
+OTHER=$(systemctl list-units 'ms-step-*' --no-legend --plain --state=active,activating,deactivating 2>/dev/null | awk '{ print $1 }' | grep -vxF "$SELF" || true)
+[ -z "$OTHER" ] || nogo "another detached step still runs: read its log first"
+! pgrep -f '[/]usr/bin/unattended-upgrade' > /dev/null && ! pgrep -x dpkg > /dev/null && ! pgrep -x apt-get > /dev/null && ! pgrep -x apt > /dev/null || nogo "a package install runs now: wait until it has finished, then RESTART_GO again"
+for U in debateai-preview-team-unlock.service debateai-preview-backup.service; do case "$(systemctl is-active "$U" || true)" in active|activating|deactivating) nogo "$U runs now: let it end first";; esac; done
+[ ! -e "$MF" ] || nogo "MT1's maintenance flag is there already: ask"
+MA=$(lc release-check.mjs maintenance 2>&1) || { echo "$MA" | cut -c1-300; nogo "a release is draining: restart once it has retired"; }
+[ "$(psqlq "SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')" || echo unread)" = 0 ] || nogo "a debate is queued or running: pick a quieter time"
+[ "$(psqlq "SELECT count(*) FROM core.run_waiting_v" || echo unread)" = 0 ] || nogo "a debate is waiting in line: pick a quieter time"
+gatesok || nogo "a spending gate is not active with its window open: RESTART_LOOK says which"
+[ "$(gline | awk '$4 != "0"' | grep -c . || true)" = 0 ] || nogo "a gate has a call in flight: pick a quieter time"
+for U in "$API" "$WEB" caddy debateai-preview-postgresql debateai-preview-hatchet debateai-preview-hatchet-gateway debateai-preview-provider-budget debateai-preview-anthropic-budget; do [ "$(systemctl is-active "$U" || true)" = active ] || nogo "$U does not run now: RESTART_LOOK first"; done
+# The time: not around the nightly dump (its timer would run at the boot), not within the hour before the daily upgrade (it too would run at the boot), no retire timer due (RESTART_LOOK section 1).
+BH=$((10#$(TZ=Europe/Bucharest date +%H%M))); [ "$BH" -lt 245 ] || [ "$BH" -gt 345 ] || nogo "it is between 02:45 and 03:45 Bucharest time: the nightly dump's timer would fire during the restart and run at the boot (debateai-preview-backup.timer has Persistent=true); wait until 03:45"
+UPM=$(nextin apt-daily-upgrade.timer); case "$UPM" in off) ;; none) nogo "when the system's daily upgrade next runs is unread: read systemctl list-timers apt-daily-upgrade.timer, then ask";; *) [ "$UPM" -ge 60 ] || nogo "the system's daily upgrade runs within the hour ($UPM minutes): wait until it has run and ended, then RESTART_LOOK again";; esac
+for T in $(systemctl list-units --all --no-legend --plain --type=timer 'debateai-preview-runner-retire*' 2>/dev/null | awk '{ print $1 }' || true); do TM2=$(nextin "$T"); case "$TM2" in off|none) ;; *) [ "$TM2" -ge 60 ] || nogo "$T fires within the hour: wait until it has fired";; esac; done
+case "$(apt-config shell IOS Unattended-Upgrade::InstallOnShutdown 2>/dev/null || true)" in *true*) nogo "unattended-upgrades installs packages during the shutdown (InstallOnShutdown): ask";; esac
+# The kernel the boot will take (an upgrade may have run since RESTART_LOOK), packages half done, room.
+NK=$(ls -1 /boot/vmlinuz-* 2>/dev/null | sed 's|^/boot/vmlinuz-||' | sort -V | tail -n 1 || true)
+[ -n "$NK" ] && [ -s "/boot/initrd.img-$NK" ] && [ -d "/lib/modules/$NK" ] || nogo "the newest kernel ${NK:-none} has no initrd or no modules folder: RESTART_LOOK"
+if [ -f /boot/grub/grub.cfg ]; then GC=$(grep -cF "vmlinuz-$NK" /boot/grub/grub.cfg || true); [ "${GC:-0}" -ge 1 ] || nogo "the boot menu does not name the newest kernel $NK: RESTART_LOOK"; fi
+[ -z "$(dpkg --audit 2>&1 || true)" ] || nogo "dpkg --audit names packages not fully installed: RESTART_LOOK"
+[ "$(df --output=avail -BG / | tail -n 1 | tr -dc 0-9)" -ge 5 ] || nogo "less than 5 GB free on /"
+# The gates' own start checks again, and the server's name against each gate's GO (RESTART_LOOK section 5); PostgreSQL's pending settings (section 9).
+HN=$(hostname)
+for G in provider-budget anthropic-budget perplexity-budget bedrock-budget; do
+  U=debateai-preview-$G; gcheck "$U"
+  GOF=$(systemctl show -p ExecStart --value "$U" 2>/dev/null | grep -o -- '--go [^ ;]*' | head -n 1 | cut -d' ' -f2 || true); TH=$(jq -r '.target_host // empty' "$GOF" 2>/dev/null || true)
+  if [ "$G" = bedrock-budget ]; then
+    [ "$GCN" -ge 1 ] && [ "$GCBAD" = 0 ] || echo "the Amazon gate's start check does not pass now: RESTART_UP will not start it (no ask calls it before 'Switch it on')"
+  else
+    [ "$GCN" -ge 1 ] && [ "$GCBAD" = 0 ] || nogo "the $G gate's start check does not pass now: it would not start again after the boot (RESTART_LOOK, STOP gate-start)"
+    [ -n "$TH" ] && [ "$TH" = "$HN" ] || nogo "the server's name is not the $G gate's target host: it would not run after the boot (RESTART_LOOK, STOP hostname)"
+  fi
+done
+[ "$(psqlq "SELECT (SELECT count(*) FROM pg_settings WHERE pending_restart) + (SELECT count(*) FROM pg_file_settings WHERE error IS NOT NULL) + (SELECT count(*) FROM pg_hba_file_rules WHERE error IS NOT NULL) + (SELECT count(*) FROM pg_ident_file_mappings WHERE error IS NOT NULL)" || echo unread)" = 0 ] || nogo "a PostgreSQL setting waits for a restart, or one of its files has an error: RESTART_LOOK"
+# 2. A fresh dump of the database while the site is up (the lifecycle guide's backup test line). It lands on this server's own disk.
+T1=$(date +%s); sleep 1
+systemctl start debateai-preview-backup.service || nogo "the fresh dump failed (journalctl -u debateai-preview-backup -n 20 -o cat): ask"
+BO=$(journalctl -u debateai-preview-backup --since "@$T1" -o cat --no-pager | grep '"event":"PREVIEW_BACKUP_OK"' | tail -n 1 || true)
+[ -n "$BO" ] || nogo "the fresh dump did not log PREVIEW_BACKUP_OK: ask"
+echo "a fresh dump before the restart: $(jq -r '.file // "unread"' <<<"$BO" 2>/dev/null || echo unread)"
+# 3. The record of the state before (root-only; counts, states, names and hashes; Hatchet's address only in its own file, never printed).
+umask 077
+install -d -o root -g root -m 0700 "$M/restart"; install -d -o root -g root -m 0700 "$RD"
+uname -r > "$RD/kernel-before"; printf '%s\n' "$NK" > "$RD/kernel-newest"; cat /proc/sys/kernel/random/boot_id > "$RD/boot-id-before"; printf '%s\n' "$HN" > "$RD/hostname"
+CID0=$(docker ps -q --no-trunc --filter label=com.docker.compose.project=debateai-v3-preview --filter label=com.docker.compose.service=hatchet-lite || true)
+IP0=$(docker inspect "$CID0" --format '{{(index .NetworkSettings.Networks "debateai-v3-preview-internal").IPAddress}}' 2>/dev/null || true)
+[ -n "$CID0" ] && [ -n "$IP0" ] || { echo "RESTART_GO_NOT_DONE: the Hatchet container or its address is unread (nothing stopped; the record $RD stays): ask"; exit 1; }
+printf '%s\n%s\n' "$CID0" "$IP0" > "$RD/hatchet"
+{ ss -ltnH 'sport = :5434' | grep -c . || true; } > "$RD/pg-listen"
+stat -c '%a %U:%G' /run/debateai-v3-preview/postgresql > "$RD/pg-socket-mode" && stat -c '%a %U:%G' /run/debateai-v3-preview/postgresql/.s.PGSQL.5434 > "$RD/pg-socket-file" && psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration" > "$RD/ledger" || { echo "RESTART_GO_NOT_DONE: the database's socket or ledger is unread (nothing stopped; the record $RD stays): ask"; exit 1; }
+LT=$(psqlq "SELECT to_regclass('staff.preview_buyer_event') IS NOT NULL" 2>/dev/null || true); LN=none
+[ "$LT" != t ] || LN=$(psqlq "SELECT count(*) FROM (SELECT DISTINCT ON (user_id) kind FROM staff.preview_buyer_event ORDER BY user_id, revision DESC) l WHERE l.kind = 'ADDED'")
+printf '%s\n' "$LN" > "$RD/buyers"
+{ sed -n 's/^PREVIEW_TEAM_USER_IDS_JSON=//p' "$A" | jq -r 'length' 2>/dev/null || echo unread; } > "$RD/team-line"
+sed -n 's/^PREVIEW_ASKS_OPEN_TO=//p' "$A" > "$RD/asks"
+{ mailmode || true; } > "$RD/mail-mode"
+{ postconf -h relayhost smtpd_milters non_smtpd_milters 2>/dev/null || echo unread; } | sha256sum | cut -c1-64 > "$RD/mail-conf"
+{ find /var/spool/postfix/deferred -type f 2>/dev/null | grep -c . || true; } > "$RD/mail-deferred"
+{ curl -s -o /dev/null -m 15 -w '%{http_code}' "https://$HOST/login" || true; } > "$RD/login-code"
+if grep -qE 'review_locked|review_quiet|review window begin' "$C"; then echo open; else echo closed; fi > "$RD/review-window"
+{ systemctl list-units --type=service,timer,socket,target --state=active --no-legend --plain 'debateai-*' 'caddy*' 'docker*' 'containerd*' 'postfix*' 'opendkim*' 'opendmarc*' 'ssh*' 'systemd-resolved*' | awk '{ print $1 }' | grep -vE '^debateai-preview-(alert|notice)@|^debateai-preview-team-unlock\.|^debateai-preview-backup\.service$|-(halt-watch|addresses)\.service$|^debateai-preview-runner-retire|^debateai-geoip-refresh\.service$|^debateai-notify-alarm\.service$|^sshd?@' | LC_ALL=C sort -u || true; } > "$RD/units-active"
+gline | awk '{ print $1, $2, $3 }' > "$RD/gates"
+printf '%s\n' "$RD" > "$M/restart/last"
+echo "the record before the restart: $RD ($(grep -c . "$RD/units-active" || true) units running; Team page's list of approved buyers $(cat "$RD/buyers"); team line $(cat "$RD/team-line"))"
+# 4. The website and the API, then the runner once nothing is queued or running (DR2's order).
+date -u +%s > "$RD/stop-epoch"; echo "DOWNTIME START $(date -u)"
+systemctl stop "$WEB" "$API" || { echo "RESTART_GO_NOT_DONE: the stop of the website and the API failed: RESTART_BACK, then ask"; exit 1; }
+for U in "$WEB" "$API"; do case "$(systemctl is-active "$U" || true)" in inactive|failed) ;; *) echo "RESTART_GO_NOT_DONE: $U still runs: RESTART_BACK, then ask"; exit 1;; esac; done
+if [ "$(psqlq "SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')" || echo unread)" != 0 ] || [ "$(psqlq "SELECT count(*) FROM core.run_waiting_v" || echo unread)" != 0 ]; then
+  echo "a debate was admitted during the stop: the runner keeps running; the API and the website start again (apistart, then webup)"
+  if apistart && webup; then echo "RESTART_GO_NOT_DONE: a debate was admitted during the stop; the site is up again and no restart is scheduled: pick a quieter time"; else echo "RESTART_GO_NOT_DONE: a debate was admitted during the stop, and the API or the website did not start again (above): the site is DOWN: RESTART_BACK now, then ask"; fi
+  exit 1
+fi
+systemctl stop "$RUN" || { echo "RESTART_GO_NOT_DONE: the stop of the runner failed (the site is DOWN): RESTART_BACK, then ask"; exit 1; }
+case "$(systemctl is-active "$RUN" || true)" in inactive|failed) ;; *) echo "RESTART_GO_NOT_DONE: the runner still runs (the site is DOWN): RESTART_BACK, then ask"; exit 1;; esac
+# 5. The gates: nothing in flight, all four active with their window open (a cut call would halt a gate at its next start).
+for i in $(seq 1 30); do [ "$(gline | awk '$4 != "0"' | grep -c . || true)" = 0 ] && break; sleep 2; done
+gline | awk '{ print $1 " gate: state " $2 "; window open " $3 "; calls in flight " $4 }'
+[ "$(gline | awk '$2 != "active" || $3 != "true" || $4 != "0"' | grep -c . || true)" = 0 ] || { echo "RESTART_GO_NOT_DONE: a gate is not active with its window open, or still has a call in flight; the website, API and runner are stopped (the site is DOWN; no restart is scheduled): ask now; RESTART_BACK brings the site back"; exit 1; }
+# 6. MT1's flag: no switch or rollback starts until RESTART_UP (or MT2) moves it into S.
+install -o root -g root -m 0600 /dev/null "$MF"
+echo "MAINTENANCE_PENDING since $(date -u)"
+# 7. Last checks, then the reboot, 30 seconds from now.
+[ -e /run/reboot-required ] && [ -e "$MF" ] && [ "$(cat "$M/restart/last")" = "$RD" ] && [ "$(psqlq "SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')" || echo unread)" = 0 ] || { echo "RESTART_GO_NOT_DONE: a last check failed (the site is DOWN; no restart is scheduled): RESTART_BACK, then ask"; exit 1; }
+SC=$(command -v systemctl)
+systemd-run --quiet --unit=restart-go-reboot --on-active=30 --timer-property=AccuracySec=1s "$SC" reboot || { echo "RESTART_GO_NOT_DONE: the restart could not be scheduled (the site is DOWN): RESTART_BACK, then ask"; exit 1; }
+[ "$(systemctl is-active restart-go-reboot.timer || true)" = active ] || { echo "RESTART_GO_NOT_DONE: the restart timer does not run (the site is DOWN): RESTART_BACK, then ask"; exit 1; }
+echo "the restart starts at about $(date -u -d '+30 seconds' '+%H:%M:%S UTC'); until then, systemctl stop restart-go-reboot.timer calls it off (then RESTART_BACK); once systemctl list-jobs shows reboot.target, it can no longer be called off"
+echo RESTART_GO_DONE
+exit 0
+```
+
+Expect the four gates' start-check lines, `a fresh dump before the restart: …`, the record line,
+`DOWNTIME START …`, four gate lines, `MAINTENANCE_PENDING since …`, the restart's time, then `RESTART_GO_DONE`. The
+ssh window drops about 30 seconds later. Until then, `systemctl stop restart-go-reboot.timer` calls the restart off
+(then RESTART_BACK); once `systemctl list-jobs` shows `reboot.target`, it can no longer be called off.
+
+`RESTART_GO_NOT_DONE: … (nothing changed; the site is up)` is a guard: settle what it names, then RESTART_LOOK again.
+Every other `RESTART_GO_NOT_DONE` line says whether the site is down. When it is (`the site is DOWN`) and no restart is
+scheduled, run RESTART_BACK.
+
+### RESTART_BACK (detached; only when RESTART_GO stopped with the site down)
+
+It works only in the same boot, and refuses after a restart (then RESTART_UP) and once the shutdown has begun.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# RESTART_BACK: only when RESTART_GO stopped with the site down and no restart scheduled, in the same boot. The API, then the website (apistart, then webup: MAIN-SITE.md 3.0), then the runner when the DeepInfra and Anthropic gates run with all four windows open (SB14B's lines; the web search gate too when the runner's file names its socket), then MT1's flag moved into S (MT2's line). Nothing else changes.
+MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending
+RD=$(cat "$M/restart/last" 2>/dev/null || true)
+[ -n "$RD" ] && [ -s "$RD/boot-id-before" ] || { echo "RESTART_BACK_NOT_DONE: RESTART_GO's record is missing, so RESTART_GO stopped nothing: ask"; exit 1; }
+[ "$(cat /proc/sys/kernel/random/boot_id)" = "$(cat "$RD/boot-id-before")" ] || { echo "RESTART_BACK_NOT_DONE: the server restarted since RESTART_GO: run RESTART_UP instead"; exit 1; }
+[ "$(systemctl is-active restart-go-reboot.timer || true)" != active ] || { echo "RESTART_BACK_NOT_DONE: the restart is still scheduled: systemctl stop restart-go-reboot.timer first, or let it happen (then RESTART_UP)"; exit 1; }
+[ "$(systemctl list-jobs --no-legend 2>/dev/null | grep -c 'reboot\.target' || true)" = 0 ] || { echo "RESTART_BACK_NOT_DONE: the shutdown has begun (reboot.target is queued) and cannot be called off: wait, then RESTART_UP"; exit 1; }
+if [ "$(systemctl is-active "$API" || true)" != active ]; then apistart || { echo "RESTART_BACK_NOT_DONE: the API did not start (above; MAIN-SITE.md's stage table, part 2): the site is DOWN: ask now"; exit 1; }; fi
+if [ "$(systemctl is-active "$WEB" || true)" != active ]; then webup || { echo "RESTART_BACK_NOT_DONE: the website did not start (above): the site is DOWN: ask now"; exit 1; }; fi
+EK='000 none'; for i in $(seq 1 30); do EK=$(edgekey); [ "$EK" = "200 $KEY" ] && break; sleep 2; done
+[ "$EK" = "200 $KEY" ] || { echo "RESTART_BACK_NOT_DONE: the edge does not answer from $KEY ($EK): ask now"; exit 1; }
+PXN=$(sed -n 's/^PREVIEW_PROVIDER_TEST_CONFIG_JSON=//p' "$RF" | jq -r 'if .perplexity_budget_socket then "named" else "not named" end' 2>/dev/null || true); PXN=${PXN:-unread}
+GNA=0; for U in provider-budget anthropic-budget; do [ "$(systemctl is-active "debateai-preview-$U" || true)" = active ] || GNA=$((GNA + 1)); done
+[ "$PXN" = 'not named' ] || [ "$(systemctl is-active debateai-preview-perplexity-budget || true)" = active ] || GNA=$((GNA + 1))
+if gatesok && [ "$GNA" = 0 ]; then
+  case "$(systemctl is-active "$RUN" || true)" in
+    inactive|failed)
+      T0=$(date +%s); systemctl start "$RUN" || echo "systemctl start $RUN returned non-zero"
+      for i in $(seq 1 80); do [ "$(journalctl -u "$RUN" --since "@$T0" -o cat --no-pager | grep -cE 'PREVIEW_RUNNER_(STARTED|STARTUP_REFUSED|STOPPED_ON_FAILURE|RETIRED)|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; sleep 3; done
+      BADL=$(journalctl -u "$RUN" --since "@$T0" -o cat --no-pager | grep -E 'UNAUTHENTICATED|STARTUP_REFUSED|PRESTART_REFUSED|STOPPED_ON_FAILURE' || true)
+      # The runner's refusal lines are printed cut short, with any IPv4 address in them blanked: a step prints no address.
+      [ -z "$BADL" ] || { echo "$BADL" | cut -c1-300 | sed -E 's/[0-9]{1,3}([.][0-9]{1,3}){3}/<address>/g'; echo "RESTART_BACK_NOT_DONE: the site is up, but the runner refused to start (above): ask"; exit 1; }
+      GU2=$(journalctl -u "$RUN" --since "@$T0" -o cat --no-pager | grep -o 'GATE_CAPACITY_UNREAD","gate":"[a-z]*"' | sed 's/.*"gate":"//; s/"$//' | LC_ALL=C sort -u | tr '\n' ' ' || true)
+      echo "gates the runner could not read at its start: ${GU2:-none} (the Amazon gate's line is expected while its service does not run: restart the runner later, the Amazon gate guide's 'Switch it on', step 4)"
+      [ -z "$(printf '%s\n' $GU2 | grep -vx bedrock || true)" ] || { echo "RESTART_BACK_NOT_DONE: the site is up, but the runner could not read a gate it needs (above): ask"; exit 1; };;
+    *) echo "$RUN is already running";;
+  esac
+else echo "RESTART_BACK_NOT_DONE: the site is up, but a gate the runner needs does not run, or a window is closed, so the runner is not started: ask"; exit 1; fi
+if [ -e "$MF" ]; then mv "$MF" "$S/maintenance-pending.done-$(date -u +%Y%m%dT%H%M%SZ)"; echo "the maintenance flag moved into $S"; fi
+echo "the site is up on $KEY; the runner: $(systemctl is-active "$RUN" || true); the restart is still owed"
+echo RESTART_BACK_DONE
+exit 0
+```
+
+Expect the API's and the website's start lines (only for what was stopped), the runner's line, `the site is up on
+<KEY>; …; the restart is still owed`, then `RESTART_BACK_DONE`. The restart is then still owed: RESTART_LOOK again on
+another day. On `RESTART_BACK_NOT_DONE`, ask at once when its line says `the site is DOWN`.
+
+### RESTART_UP (detached, once ssh answers)
+
+When ssh answers again (usually 1 to 3 minutes after the drop): `sudo -i`, then RESTART_UP as a detached run. It may
+take up to about 20 minutes: it waits for PostgreSQL, the gates' start checks, the API, the website and the runner. If
+ssh warns that the server's host key changed, do not accept the new key: that is a server set up again (a new
+cloud-init instance) or another server. The owner looks at the console.
+
+What it starts by hand, in this order, and only on these conditions:
+
+| What | When | How |
+|---|---|---|
+| Hatchet's gateway | the boot did not start it, the Hatchet container and its address are the ones before the restart, the address is in the gateway's allow list, and the gateway witness says `PASS` (DBBACK's order) | `systemctl start debateai-preview-hatchet-gateway.service` |
+| A gate that ran before, and the Amazon gate | the boot did not start it (`inactive`, `Result=success`, `NRestarts=0`) and its own start check passes now; then up to 30 s for its socket | `systemctl start debateai-preview-<gate>` |
+| A gate watcher or the backup timer that ran before | the boot did not start it | `systemctl start <that timer>` |
+| The API and the website, once more | the API gave up at the boot on `POSTGRES_NOT_READY` alone | `apistart`, then `webup` |
+| The current release's runner, last and once | the database, Hatchet, the DeepInfra and Anthropic gates (and the web search gate when the runner's file names its socket: each one running, `active`, its window open, as SB14B needs), the API and the website are right | `systemctl start debateai-preview-runner@<label>`, with SB14B's wait and journal lines |
+| MT1's flag moved into `$S` | a run with no `BAD` line | MT2's line |
+
+**`BAD` and `ASK`.** A `BAD (…)` line means the restart is not proven yet; it holds the maintenance flag. An `ASK (…)`
+line is the owner's decision and does not hold the flag: the kernel the boot took, Ubuntu's flag set again, alert
+emails since the boot (the state now is what counts), refusals at the boot other than `POSTGRES_NOT_READY` before the
+start that runs now, the Amazon gate, more mail waiting than before.
+
+**Running it again.** It is meant to be run again after a `BAD` line is settled. A second run starts only gates and
+watchers that ran before and are still `inactive` with `Result=success` and `NRestarts=0` (a gate only when its start
+check passes); the API once more only on the same `POSTGRES_NOT_READY` rule; the gateway only after the same checks.
+It does not start the runner again when an earlier run started it and it has stopped since: that needs
+`RUNNER_AGAIN='yes'` at the top, on the owner's word.
+
+```sh
+set -euo pipefail
+# RESTART_UP: after the restart (detached run, once ssh answers). PostgreSQL first, because the names file reads the release table from the database, with DR3's wait line. Then the boot's facts, Hatchet as DBBACK checks it, the gates (the Amazon gate, and any gate or watcher that ran before and that the boot did not start, started by hand once its start check passes), the API and the website (started again once when the boot's tries gave up on POSTGRES_NOT_READY alone), the runner by hand, and the proofs against RESTART_GO's record. BAD lines hold the maintenance flag; ASK lines are the owner's decisions and do not.
+RUNNER_AGAIN=''                                           # leave empty; 'yes' only on the owner's word, when this step started the runner before and it has stopped since
+KNOWN_FAILED=''                                           # on a later run only: failed units outside the site that the owner has read and accepts, names separated by spaces
+SOCK=/run/debateai-v3-preview/postgresql
+for i in $(seq 1 90); do /usr/lib/postgresql/18/bin/pg_isready -q -h "$SOCK" -p 5434 && break; sleep 2; done
+/usr/lib/postgresql/18/bin/pg_isready -q -h "$SOCK" -p 5434 || { echo "RESTART_UP_NOT_DONE: PostgreSQL is not ready (debateai-preview-postgresql: $(systemctl is-active debateai-preview-postgresql || true)): ask"; exit 1; }
+. /root/preview-archive/main-site/names.sh
+MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending
+RD=$(cat "$M/restart/last" 2>/dev/null || true)
+[ -n "$RD" ] && [ -s "$RD/boot-id-before" ] || { echo "RESTART_UP_NOT_DONE: RESTART_GO's record is missing: ask"; exit 1; }
+[ "$(cat /proc/sys/kernel/random/boot_id)" != "$(cat "$RD/boot-id-before")" ] || { echo "RESTART_UP_NOT_DONE: the server has not restarted since RESTART_GO (the same boot): read RESTART_GO's log; ask"; exit 1; }
+umask 077; date +%s >> "$RD/up-runs"; echo "RESTART_UP, run $(grep -c . "$RD/up-runs" || true) since the restart"
+BAD=''; bad() { echo "BAD ($1): $2"; case " $BAD " in *" $1 "*) ;; *) BAD="$BAD $1";; esac; }
+ASK=''; ask() { echo "ASK ($1): $2"; case " $ASK " in *" $1 "*) ;; *) ASK="$ASK $1";; esac; }
+NORUN=''; norun() { case " $NORUN " in *" $1 "*) ;; *) NORUN="$NORUN $1";; esac; }
+gcheck() { local U=$1 AL AF XL1 OUT RC R1 PY; local -a PA
+  GCN=0; GCBAD=0
+  AL=$(systemctl show -p IPAddressAllow --value "$U" 2>/dev/null || true); AF=$(systemctl show -p RestrictAddressFamilies --value "$U" 2>/dev/null || true)
+  PA=(--quiet --wait --pipe --collect -p IPAddressDeny=any -p "IPAddressAllow=$AL"); [ -z "$AF" ] || PA+=(-p "RestrictAddressFamilies=$AF")
+  while IFS= read -r XL1; do
+    [ -n "$XL1" ] || continue
+    GCN=$((GCN + 1)); RC=0
+    OUT=$(systemd-run "${PA[@]}" $XL1 < /dev/null 2>/dev/null | tail -n 1) || RC=$?
+    R1=$(jq -r '"\(.status) \(.error // "none"); outside the list: \(((.new // []) + (.outside // []) + (.missing // [])) | length)"' <<<"$OUT" 2>/dev/null || true)
+    PY=$(tr ' ' '\n' <<<"$XL1" | grep -m 1 '\.py$' | sed 's|.*/||' || true)
+    echo "  $U start check ${PY:-$GCN}: ${R1:-unread}; exit $RC"
+    case "$RC/${R1:-unread}" in '0/ok '*) ;; *) GCBAD=$((GCBAD + 1));; esac
+  done < <(systemctl show -p ExecStartPre --value "$U" 2>/dev/null | grep -o 'argv\[\]=[^;]*' | sed 's/^argv\[\]=//; s/[[:space:]]*$//' || true); }
+# 1. The boot: the kernel, Ubuntu's flag, an upgrade that caught up, the server's name.
+echo "up since $(uptime -s); kernel $(uname -r) (before: $(cat "$RD/kernel-before"); newest installed then: $(cat "$RD/kernel-newest")); the site stopped at $(date -u -d "@$(cat "$RD/stop-epoch")" '+%H:%M:%S UTC')"
+[ "$(uname -r)" = "$(cat "$RD/kernel-newest")" ] || ask kernel "the server does not run the newest kernel: the restart did not take it; the site can go on; whether to restart again later is the owner's"
+[ ! -e /run/reboot-required ] || ask flag "Ubuntu's restart flag is set (again): packages $( { sort -u /run/reboot-required.pkgs 2>/dev/null || echo unread; } | tr '\n' ' ')"
+if pgrep -f '[/]usr/bin/unattended-upgrade' > /dev/null || pgrep -x dpkg > /dev/null; then bad packages "a package upgrade runs since the boot (the daily upgrade caught up): let it end, then RESTART_UP again"; NORUN="$NORUN packages"; fi
+if [ "$(hostname)" = "$(cat "$RD/hostname")" ]; then echo "the server's name: SAME as before"; else bad hostname "the server's name changed at the boot (DIFFERENT): the gates refuse to run under another name (their GO's target host)"; NORUN="$NORUN hostname"; fi
+# 2. PostgreSQL: the same ledger (nothing migrated), the socket folder and file, the listening sockets, no setting left waiting.
+echo "PostgreSQL: $(systemctl is-active debateai-preview-postgresql || true), restarts since the boot $(systemctl show -p NRestarts --value debateai-preview-postgresql)"
+[ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration" || echo unread)" = "$(cat "$RD/ledger")" ] || bad database "the migration ledger is not the one before the restart"
+PM=$(stat -c '%a %U:%G' "$SOCK" 2>/dev/null || echo unread); PSF=$(stat -c '%a %U:%G' "$SOCK/.s.PGSQL.5434" 2>/dev/null || echo unread)
+echo "socket folder: $PM (before: $(cat "$RD/pg-socket-mode")); socket file: $PSF (before: $(cat "$RD/pg-socket-file"))"
+[ "$PM" = "$(cat "$RD/pg-socket-mode")" ] && [ "$PSF" = "$(cat "$RD/pg-socket-file")" ] || bad database "the socket folder's or file's mode or owner changed: the team unlock may fail (REKEYCHECK, MAIN-SITE.md 5.7); never fix it by hand (the lifecycle guide's 'What the socket folder must allow')"
+PL=$(ss -ltnH 'sport = :5434' | grep -c . || true); echo "sockets listening on 5434: $PL (before: $(cat "$RD/pg-listen"))"
+[ "$PL" = "$(cat "$RD/pg-listen")" ] || { bad database "PostgreSQL listens on a different number of addresses than before (one on a Docker bridge?)"; NORUN="$NORUN database"; }
+[ "$(psqlq "SELECT count(*) FROM pg_settings WHERE pending_restart" || echo unread)" = 0 ] || bad database "a PostgreSQL setting still waits for a restart"
+# 3. Hatchet as DBBACK checks it: the same container and address as before, the address in the gateway's allow list; the witness only before starting a gateway that does not run (the guides run it only then); the gateway.
+CID0=$(sed -n 1p "$RD/hatchet"); IP0=$(sed -n 2p "$RD/hatchet"); HOK=yes
+CID=''; for i in $(seq 1 30); do CID=$(docker ps -q --no-trunc --filter label=com.docker.compose.project=debateai-v3-preview --filter label=com.docker.compose.service=hatchet-lite || true); [ -n "$CID" ] && break; sleep 2; done
+IP=$(docker inspect "$CID" --format '{{(index .NetworkSettings.Networks "debateai-v3-preview-internal").IPAddress}}' 2>/dev/null || true)
+ALLOW=$(systemctl show -p IPAddressAllow --value debateai-preview-hatchet-gateway.service)
+[ "$(systemctl is-active debateai-preview-hatchet || true)" = active ] || { HOK=no; bad hatchet "debateai-preview-hatchet is $(systemctl is-active debateai-preview-hatchet || true)"; }
+[ -n "$CID" ] && [ "$CID" = "$CID0" ] || { HOK=no; bad hatchet "the Hatchet container is not the one before the restart, or does not run"; }
+[ -n "$IP" ] && [ "$IP" = "$IP0" ] && grep -qF -e " $IP/32 " -e " $IP " <<<" $ALLOW " || { HOK=no; bad hatchet "Hatchet's address changed, or is not in the gateway's allow list: no guide step repairs this; ask"; }
+if [ "$HOK" = yes ] && [ "$(systemctl is-active debateai-preview-hatchet-gateway || true)" != active ]; then
+  W=''; WX=0; W=$(/usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin /usr/local/bin/node /opt/debateai-v3-preview/operator/gateway/gateway-route-witness.mjs check 2>&1) || WX=$?
+  if [ "$WX" = 0 ] && grep -q PASS <<<"$W"; then echo "the gateway witness: PASS"; systemctl start debateai-preview-hatchet-gateway.service || bad hatchet "the gateway did not start"; else HOK=no; bad hatchet "the gateway witness did not say PASS (its output stays unprinted: it may name an address): the gateway is NOT started"; fi
+fi
+[ "$(systemctl is-active debateai-preview-hatchet-gateway || true)" = active ] || { HOK=no; bad hatchet "the gateway does not run"; }
+echo "Hatchet: $([ "$HOK" = yes ] && echo 'the same container and address as before, in the gateway allow list; gateway running' || echo 'NOT as before (the BAD lines above)')"
+[ "$HOK" = yes ] || NORUN="$NORUN hatchet"
+# 4. The gates. First the boot's own starts finish their checks (each retries every 30 s, at most 4 tries); then the hand starts, each only after its own start check passes now (no failed start, no alert email); then the watchers that ran before. The Amazon gate is not needed for debates before "Switch it on" (the release guide's "After a reboot it is not running"): without it the runner starts all the same and is restarted later (the Amazon gate guide's "Switch it on", step 4).
+for i in $(seq 1 60); do NACT=0; for U in provider-budget anthropic-budget perplexity-budget bedrock-budget; do case "$(systemctl is-active "debateai-preview-$U" || true)" in activating|deactivating|reloading) NACT=$((NACT + 1));; esac; done; [ "$NACT" = 0 ] && break; sleep 3; done
+PXN=$(sed -n 's/^PREVIEW_PROVIDER_TEST_CONFIG_JSON=//p' "$RF" | jq -r 'if .perplexity_budget_socket then "named" else "not named" end' 2>/dev/null || true); PXN=${PXN:-unread}
+echo "the runner's file names the web search gate's socket: $PXN"
+for G in provider-budget:deepinfra-budget-v3 anthropic-budget:anthropic-budget-v1 perplexity-budget:perplexity-budget-v1 bedrock-budget:bedrock-budget-v1; do
+  U=debateai-preview-${G%%:*}; SK=/run/debateai-v3-preview/${G#*:}.sock
+  P=$(systemctl show -p ActiveState -p Result -p NRestarts "$U"); GA=$(sed -n 's/^ActiveState=//p' <<<"$P"); GRS=$(sed -n 's/^Result=//p' <<<"$P"); GNR=$(sed -n 's/^NRestarts=//p' <<<"$P")
+  WASON=no; if grep -qxF "$U.service" "$RD/units-active"; then WASON=yes; fi
+  if [ "$GA" = inactive ] && [ "$GRS" = success ] && [ "$GNR" = 0 ] && { [ "$WASON" = yes ] || [ "$U" = debateai-preview-bedrock-budget ]; }; then
+    gcheck "$U"
+    if [ "$GCN" -ge 1 ] && [ "$GCBAD" = 0 ]; then
+      echo "$U: not started by the boot; its start check passes now; starting it by hand"
+      systemctl start "$U" || echo "systemctl start $U returned non-zero"
+      for i in $(seq 1 30); do [ -S "$SK" ] && break; sleep 1; done
+    else echo "$U: not started by the boot, and its start check does not pass now (above): not started"; fi
+  elif [ "$GA" != active ]; then echo "$U: $GA (Result=$GRS, NRestarts=$GNR): not started by hand: read its journal (journalctl -u $U -n 20 -o cat)"; fi
+done
+for T in $(grep -E '^debateai-preview-[a-z-]+\.timer$' "$RD/units-active" || true); do
+  [ "$(systemctl is-active "$T" || true)" != active ] || continue
+  echo "$T: ran before the restart, not started by the boot; starting it by hand"; systemctl start "$T" || echo "systemctl start $T returned non-zero"
+done
+for G in deepinfra:provider-budget:deepinfra-budget-v3 anthropic:anthropic-budget:anthropic-budget-v1 perplexity:perplexity-budget:perplexity-budget-v1 bedrock:bedrock-budget:bedrock-budget-v1; do
+  IFS=: read -r GN GU GK <<<"$G"
+  case "$GN" in deepinfra) GF=$GD; GP=$PD;; anthropic) GF=$GAN; GP=$PAN;; perplexity) GF=$GPX; GP=$PPX;; *) GF=$GBR; GP=$PBR;; esac
+  SA=$(systemctl is-active "debateai-preview-$GU" || true); if [ -S "/run/debateai-v3-preview/$GK.sock" ]; then SKS=there; else SKS=missing; fi
+  GJ=$(gs "$GF" "$GP" 2>/dev/null | jq -r '"\(.state) \(.window_open) \(.in_flight) \(.reason // "none")"' 2>/dev/null || true); [ -n "$GJ" ] || GJ='unread unread unread unread'
+  read -r GS GW GI GR <<<"$GJ"
+  echo "$GN gate: service $SA; socket $SKS; state $GS; window open $GW; calls in flight $GI"
+  # A gate the runner needs that is halted, or whose window is closed, holds the runner as SB14B does: the DeepInfra and Anthropic gates always, the web search gate when the runner's file names its socket. The Amazon gate does not hold it (above).
+  if [ "$GS" != active ] || [ "$GW" != true ]; then
+    bad gates "the $GN gate is $GS with its window open $GW (reason $GR): its reason is read first; it is re-opened only on the owner's yes (PWOFF1's gatesok needs all four)"
+    case "$GN" in deepinfra|anthropic) norun gates;; perplexity) [ "$PXN" = 'not named' ] || norun gates;; esac
+  fi
+  if [ "$SA" != active ] || [ "$SKS" != there ]; then
+    case "$GN" in
+      bedrock) ask amazon-gate "the Amazon gate's service does not run: no ask calls it before 'Switch it on' (the release guide's 'After a reboot it is not running'); start it by hand later, once its start check passes, then restart the runner when no debate runs (the Amazon gate guide's 'Switch it on', step 4)";;
+      perplexity) bad gates "the web search gate's service does not run"; [ "$PXN" = 'not named' ] || norun gates;;
+      *) bad gates "the $GN gate's service does not run"; norun gates;;
+    esac
+  fi
+done
+gatesok || bad gates "gatesok (PWOFF1's check) says no"
+# 5. The API and the website, judged by the start that runs now; the boot's earlier tries printed as information (POSTGRES_NOT_READY alone is the boot's expected wait: the lifecycle guide's "Boot sequence"). PWOFF1's lines, the edge.
+for i in $(seq 1 120); do AS=$(systemctl is-active "$API" || true); [ "$AS" = failed ] && break; [ "$AS" = active ] && [ "$(inv "$API" | grep -c '^PREVIEW_API_STARTED ' || true)" -gt 0 ] && break; sleep 3; done
+RR=$(journalctl -b -u "$API" -u "$WEB" -o cat --no-pager | grep -E 'PREVIEW_LIFECYCLE_PRESTART_REFUSED|PREVIEW_API_STARTUP_REFUSED|PREVIEW_UI_STARTUP_REFUSED|api\.boot\.failed' || true)
+NRR=$(printf '%s\n' "$RR" | grep -c . || true); NRX=$(printf '%s\n' "$RR" | grep . | grep -vc POSTGRES_NOT_READY || true)
+echo "refusal lines of the API and the website since the boot: $NRR, other than POSTGRES_NOT_READY: $NRX ($(printf '%s\n' "$RR" | grep -oE '"(reason|code)":"[A-Za-z0-9_:.-]*"' | sed 's/^"[a-z]*":"//; s/"$//' | LC_ALL=C sort | uniq -c | awk '{ printf "%s x%s; ", $2, $1 }' || true))"
+if [ "$(systemctl is-active "$API" || true)" = failed ] && [ "$NRR" -ge 1 ] && [ "$NRX" = 0 ]; then
+  echo "the API gave up before PostgreSQL was ready (POSTGRES_NOT_READY only): starting it once more (apistart, then webup; MAIN-SITE.md 3.0)"
+  if apistart; then webup || echo "webup did not end well (above)"; else echo "apistart did not end well (above)"; fi
+fi
+[ "$NRX" = 0 ] || ask refusals "the API or the website refused at the boot for a reason other than POSTGRES_NOT_READY (codes above), before the start that runs now: read them (MAIN-SITE.md's stage table, part 2)"
+if [ "$(systemctl is-active "$API" || true)" = active ] && [ "$(inv "$API" | grep '^PREVIEW_API_STARTED ' | grep -c "\"releaseKey\":\"$KEY\"" || true)" -ge 1 ]; then echo "API: started on $KEY at $(systemctl show -p ActiveEnterTimestamp --value "$API"); restarts since the boot $(systemctl show -p NRestarts --value "$API")"; else bad api "the API does not run on $KEY ($(systemctl is-active "$API" || true))"; NORUN="$NORUN api"; fi
+RC=000; for i in $(seq 1 60); do RZ=$(readyz "$UIP"); RC=${RZ##*$'\n'}; [ "$RC" = 200 ] && break; [ "$(systemctl is-active "$WEB" || true)" = failed ] && break; sleep 3; done
+echo "website: $(systemctl is-active "$WEB" || true); its /readyz: $RC"
+[ "$RC" = 200 ] || { bad website "the website is not ready"; NORUN="$NORUN website"; }
+EK='000 none'; for i in $(seq 1 30); do EK=$(edgekey); [ "$EK" = "200 $KEY" ] && break; sleep 2; done
+echo "the edge answers: $EK (expected 200 $KEY)"
+[ "$EK" = "200 $KEY" ] || bad edge "the edge does not answer from $KEY"
+V=$(sed -n 's/^PREVIEW_ASKS_OPEN_TO=//p' "$A"); NB=$(sed -n 's/^PREVIEW_TEAM_USER_IDS_JSON=//p' "$A" | jq -r 'if type == "array" then length else empty end' 2>/dev/null || true)
+[ "$V" = "$(cat "$RD/asks")" ] || bad pwoff "the API file's asks line is not the one before the restart"
+if [ -n "$V" ]; then said -xF "{\"event\":\"api.preview.asks_open\",\"to\":\"$V\"}" || bad pwoff "the running API does not say asks open to $V"; fi
+if [ "$V" = everyone-with-listed-buyers ]; then [ -n "$NB" ] && said -xF "{\"event\":\"api.preview.listed_buyers\",\"count\":$NB}" || bad pwoff "the running API does not say the $NB listed buyers the API file holds"; fi
+MMD=$(mailmode || true); echo "asks open to: ${V:-closed}; listed buyers in the API file: ${NB:-none}; mail mode: ${MMD:-unread} (before: $(cat "$RD/mail-mode"))"
+[ "$MMD" = "$(cat "$RD/mail-mode")" ] || bad pwoff "the running API's mail mode is not the one before the restart"
+apinew || bad pwoff "the running API did not start on its file as it is now"
+# 6. The runner, by hand, last (SB14B's lines; DR6's start check; AFTERDR6's reading): only when everything it needs is right, and once. A runner this step started that has stopped since is not started again without the owner's word (its unit: each start is a person's decision).
+RCHK=no
+if [ -n "$NORUN" ]; then bad runner "not started: it waits for:$NORUN (the BAD lines above come first)"
+else
+  RSA0=$(systemctl is-active "$RUN" || true)
+  case "$RSA0" in
+    inactive|failed)
+      if [ -e "$RD/runner-started" ] && [ "$RUNNER_AGAIN" != yes ]; then bad runner "this step started the runner at $(cat "$RD/runner-started"), and it is $RSA0 now: read its journal and ask; it starts again only with RUNNER_AGAIN='yes' at the top, on the owner's word"
+      else
+        T0=$(date +%s); date -u '+%Y-%m-%d %H:%M:%S UTC' > "$RD/runner-started"; RCHK=yes
+        systemctl start "$RUN" || echo "systemctl start $RUN returned non-zero"
+        for i in $(seq 1 80); do [ "$(journalctl -u "$RUN" --since "@$T0" -o cat --no-pager | grep -cE 'PREVIEW_RUNNER_(STARTED|STARTUP_REFUSED|STOPPED_ON_FAILURE|RETIRED)|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; sleep 3; done
+      fi;;
+    *) echo "$RUN is already running"; RCHK=yes;;
+  esac
+fi
+if [ "$RCHK" = yes ]; then
+  RJ=$(journalctl -u "$RUN" _SYSTEMD_INVOCATION_ID="$(systemctl show -p InvocationID --value "$RUN")" -o cat --no-pager || true)
+  GU2=$(grep -o 'GATE_CAPACITY_UNREAD","gate":"[a-z]*"' <<<"$RJ" | sed 's/.*"gate":"//; s/"$//' | LC_ALL=C sort -u | tr '\n' ' ' || true)
+  echo "gates the runner could not read at its start: ${GU2:-none}"
+  for g in $GU2; do case "$g" in bedrock) ask runner-amazon "the runner started without the Amazon gate: restart it once that gate runs, when no debate runs, on the owner's yes (the Amazon gate guide's 'Switch it on', step 4)";; *) bad runner "the runner could not read the $g gate at its start";; esac; done
+  BADL=$(grep -E 'UNAUTHENTICATED|STARTUP_REFUSED|PRESTART_REFUSED|STOPPED_ON_FAILURE|RUNNER_PREVIEW_OUTSIDER_CLAIM_LIVE|_MISMATCH|_UNSEALED|ENGINE_REQUIRES|ENGINE_[A-Z_]*REFUSED|REGISTER_[A-Z_]*REFUSED' <<<"$RJ" || true)
+  # The runner's refusal lines are printed cut short, with any IPv4 address in them blanked: a step prints no address.
+  [ -z "$BADL" ] || { echo "$BADL" | cut -c1-300 | sed -E 's/[0-9]{1,3}([.][0-9]{1,3}){3}/<address>/g'; bad runner "the runner's journal holds a refusal (above)"; }
+  RSA=$(systemctl is-active "$RUN" || true); RN=$(systemctl show -p NRestarts --value "$RUN")
+  NS=$(grep '^PREVIEW_RUNNER_STARTED ' <<<"$RJ" | grep -c "\"releaseKey\":\"$KEY\"" || true)
+  echo "runner: $RSA, restarts $RN; start lines naming $KEY: $NS; debates it sent on at its start: $(grep -o '"startupDispatched":[0-9]*' <<<"$RJ" | tail -n 1 | cut -d: -f2 || true)"
+  [ "$RSA" = active ] && [ "$RN" = 0 ] && [ "$NS" -ge 1 ] || bad runner "the runner does not run on $KEY"
+fi
+# 7. The release table (lc release-check.mjs status, as SB14 and MT2 read it).
+SX=0; ST2=$(lc release-check.mjs status 2>&1) || SX=$?
+jq -r '.releases[] | "release \(.label) \(.state): units \(.units.api)/\(.units.ui)/\(.units.runner); open work \(.openWork)"' <<<"$ST2" 2>/dev/null || printf '%s\n' "$ST2" | cut -c1-300
+[ "$SX" = 0 ] && [ "$(jq '.bad | length' <<<"$ST2" 2>/dev/null || echo unread)" = 0 ] || bad release "release-check.mjs status refused, or has a bad list"
+[ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | "\(.state) \(.units.api) \(.units.ui) \(.units.runner)"' <<<"$ST2" 2>/dev/null || true)" = 'CURRENT active active active' ] || bad release "$LABEL is not CURRENT with its API, website and runner active"
+[ "$(jq '[.releases[] | select(.state == "STAGED" or .state == "DRAINING")] | length' <<<"$ST2" 2>/dev/null || echo unread)" = 0 ] || bad release "a release is staged or draining"
+grep -qxF "Wants=debateai-preview-api@$LABEL.service debateai-preview-ui@$LABEL.service" /etc/systemd/system/debateai-preview.target.d/60-current-release.conf || bad release "the boot target does not name $LABEL's pair (AFTERDR6's line)"
+# 8. Every unit that ran before runs again (the Amazon gate's own units: an ASK); no failed unit; alert emails since the boot (information: the state now is what counts); the restore fence did not fire (AFTERDR6's line).
+NOWU=$(systemctl list-units --type=service,timer,socket,target --state=active --no-legend --plain 'debateai-*' 'caddy*' 'docker*' 'containerd*' 'postfix*' 'opendkim*' 'opendmarc*' 'ssh*' 'systemd-resolved*' | awk '{ print $1 }' | LC_ALL=C sort -u || true)
+MISS=$(LC_ALL=C comm -23 "$RD/units-active" <(printf '%s\n' "$NOWU") || true)
+MISSA=$(printf '%s\n' "$MISS" | grep '^debateai-preview-bedrock-' || true); MISSO=$(printf '%s\n' "$MISS" | grep . | grep -v '^debateai-preview-bedrock-' || true)
+[ -z "$MISSO" ] || { echo "ran before the restart, does not run now: $(printf '%s\n' "$MISSO" | tr '\n' ' ')"; bad units "a unit that ran before the restart does not run now (above)"; }
+[ -z "$MISSA" ] || ask amazon-gate "the Amazon gate's units that ran before do not run now: $(printf '%s\n' "$MISSA" | tr '\n' ' ')"
+FL=$(systemctl list-units --failed --no-legend --plain | awk '{ print $1 }' | grep -vxF -e none $(for U in $KNOWN_FAILED; do printf ' -e %s' "$U"; done) || true)
+FLA=$(printf '%s\n' "$FL" | grep '^debateai-preview-bedrock-' || true); FLO=$(printf '%s\n' "$FL" | grep . | grep -v '^debateai-preview-bedrock-' || true)
+[ -z "$FLO" ] || { echo "failed units: $(printf '%s\n' "$FLO" | tr '\n' ' ')"; bad units "a unit is failed (above): read it; a failed unit outside the site that the owner accepts goes into KNOWN_FAILED"; }
+[ -z "$FLA" ] || ask amazon-gate "the Amazon gate's units failed: $(printf '%s\n' "$FLA" | tr '\n' ' ')"
+AU2=$(journalctl -b -o cat --no-pager -u 'debateai-preview-alert@*' | grep -o '"event":"PREVIEW_LIFECYCLE_ALERT_SENT","unit":"[^"]*"' | sed 's/.*"unit":"//; s/"$//' | LC_ALL=C sort -u | tr '\n' ' ' || true)
+echo "alert emails to the owner since the boot, for: ${AU2:-none}"
+[ -z "$AU2" ] || ask alerts "alert emails went out since the boot (for the units above): the state above is what counts now; the owner reads them"
+NRV=$(journalctl -b -u "$API" -o cat --no-pager | grep -c '"event":"api.restore_fence","outcome":"RESTORE_REVOKED"' || true); echo "restore fence since the boot: RESTORE_REVOKED $NRV"
+[ "$NRV" = 0 ] || bad fence "the restore fence revoked the sessions and holds the public library: the release guide's H11 step 4; ask"
+# 9. The site password, the review window, the Turnstile relay, the Team page's list and the team line, mail, as before.
+LC=$(curl -s -o /dev/null -m 15 -w '%{http_code}' "https://$HOST/login" || true); echo "https://$HOST/login answers $LC (before: $(cat "$RD/login-code"))"
+[ "$LC" = "$(cat "$RD/login-code")" ] || bad caddy "the Log in page does not answer as before the restart"
+if grep -qE 'review_locked|review_quiet|review window begin' "$C"; then RW=open; else RW=closed; fi; echo "the NETOPIA review window: $RW (before: $(cat "$RD/review-window"))"
+[ "$RW" = "$(cat "$RD/review-window")" ] || bad caddy "the review window is not as before"
+[ "$(relay)" = "PUBLIC_APP_URL=https://$HOST" ] || bad turnstile "the Turnstile relay does not answer as $HOST"
+LT=$(psqlq "SELECT to_regclass('staff.preview_buyer_event') IS NOT NULL" 2>/dev/null || true); LN=none
+[ "$LT" != t ] || LN=$(psqlq "SELECT count(*) FROM (SELECT DISTINCT ON (user_id) kind FROM staff.preview_buyer_event ORDER BY user_id, revision DESC) l WHERE l.kind = 'ADDED'" || echo unread)
+TLN=$(sed -n 's/^PREVIEW_TEAM_USER_IDS_JSON=//p' "$A" | jq -r 'length' 2>/dev/null || echo unread)
+echo "the Team page's list of approved buyers: $LN accounts (before: $(cat "$RD/buyers")); the team line: $TLN (before: $(cat "$RD/team-line"))"
+[ "$LN" = "$(cat "$RD/buyers")" ] && [ "$TLN" = "$(cat "$RD/team-line")" ] || bad buyers "the number of approved buyers or the team line is not the one before the restart"
+MC=$( { postconf -h relayhost smtpd_milters non_smtpd_milters 2>/dev/null || echo unread; } | sha256sum | cut -c1-64); MQ=$(find /var/spool/postfix/deferred -type f 2>/dev/null | grep -c . || true)
+echo "mail: Postfix's relay and milter settings $([ "$MC" = "$(cat "$RD/mail-conf")" ] && echo SAME || echo DIFFERENT) as before; mails waiting in the deferred queue: $MQ (before: $(cat "$RD/mail-deferred"))"
+[ "$MC" = "$(cat "$RD/mail-conf")" ] || bad mail "Postfix's relay or milter settings are not the ones before the restart"
+[ "$MQ" -le "$(cat "$RD/mail-deferred")" ] || ask mail "more mail waits in Postfix's queue than before: MAILTEST (MAIN-SITE.md 1.4)"
+# 10. The end. BAD lines hold the maintenance flag; MT2's move only when there is none.
+echo "ASK lines (the owner's decisions; they do not hold the maintenance flag):${ASK:- none}"
+[ -z "$BAD" ] || { echo "RESTART_UP_NOT_DONE:$BAD (the BAD lines above; the maintenance flag stays until a run ends DONE, or until MT2 on the owner's yes): ask"; exit 1; }
+if [ -e "$MF" ]; then mv "$MF" "$S/maintenance-pending.done-$(date -u +%Y%m%dT%H%M%SZ)"; echo "MT2: the maintenance flag moved into $S"; else echo "the maintenance flag was moved already"; fi
+echo RESTART_UP_DONE
+exit 0
+```
+
+Expect `up since …` on the newest kernel; `the server's name: SAME as before`; PostgreSQL `active`, the socket folder,
+socket file and listening sockets as before; `the gateway witness: PASS` when the boot did not start the gateway;
+`Hatchet: the same container and address as before, in the gateway allow list; gateway running`; a line for each gate
+the boot did not start and this step started; four gate lines `service active; socket there; state active; window open
+true; calls in flight 0`; refusal lines with at most a few `POSTGRES_NOT_READY`; `API: started on <KEY> …`;
+`website: active; its /readyz: 200`; `the edge answers: 200 <KEY>`; `gates the runner could not read at its start:
+none`; the runner `active, restarts 0`; the release lines, the current one `CURRENT: units active/active/active`;
+`alert emails … none`; `RESTORE_REVOKED 0`; the Log in page, the review window, the buyer counts and the mail settings
+as before; `ASK lines …: none`; `MT2: the maintenance flag moved …`; then `RESTART_UP_DONE`.
+
+**On `RESTART_UP_NOT_DONE`**, the site is up unless a `BAD` line says the API or the website is not. Ask before anything
+else. Cases with a known next step:
+- `BAD (packages)`: the daily upgrade caught up at the boot. Let it end, then RESTART_UP again.
+- `RUNNER_PREVIEW_OUTSIDER_CLAIM_LIVE` among the runner's lines: a debate's claim is still live. Wait a few minutes,
+  then, on the owner's word, RESTART_UP again with `RUNNER_AGAIN='yes'` (MAIN-SITE.md part 10).
+- `BAD (units)` naming only a failed unit outside the site that the owner reads and accepts: put its name in
+  `KNOWN_FAILED` at the top and run RESTART_UP again.
+- A `BAD` line that will not clear (for example `BAD (hatchet)` after Hatchet's address changed): the site is up and
+  debates are stopped. The maintenance flag stays and blocks every switch and rollback. When the owner decides the
+  restart itself is over, MT2 moves the flag, on the owner's yes. The cause waits for a reviewed repair.
+- The last line is `NAMES_NOT_DONE: …` instead of a `RESTART_UP_…` line: the names file could not read the release
+  table, and RESTART_UP did nothing else. Read the line above it; ask.
+
+### If it does not come back
+
+What the operator tells the owner, in order:
+1. **The ssh window drops about 30 seconds after `RESTART_GO_DONE`.** That is expected. Wait 2 minutes, then try ssh
+   once a minute.
+2. **If ssh still answers after 2 minutes and `uptime -s` shows the old time**, the restart has not happened yet.
+   `systemctl list-jobs` shows what the shutdown waits for. If it shows `reboot.target`, the shutdown has begun and
+   cannot be called off: wait. RESTART_BACK applies only when RESTART_GO ended `RESTART_GO_NOT_DONE`, or when the
+   timer was stopped before it fired.
+3. **At 5 minutes with no ssh**, look from the Mac whether the site answers at all:
+   `curl -s -o /dev/null -m 15 -w '%{http_code}\n' https://dezbatere.ro/login`, with the name the site answers as:
+   the main name, dezbatere.ro, or `https://v3-preview.dezbatere.ro/login` while the site still answers only as the
+   test name. Any code but `000` (`401` while the site password is on, `200` once it is off) means the server and Caddy
+   are up and only ssh is missing; `000` means the server is not up yet. Tell the owner which.
+4. **At 10 minutes with no ssh**, tell the owner the time of `RESTART_GO_DONE`, and keep trying. The operator's ssh
+   access has its own end time; past it, only the owner can reach the server.
+5. **At 15 minutes**, the owner opens this server in the hosting company's control panel, reads the state the panel
+   shows for it, and opens its console there. The owner describes the screen in words (never a password or a code in
+   a chat):
+   - "A stop job is running for … (x / y)": the shutdown waits for a service to stop. Wait until its counter ends.
+     Never reset the server from the panel while it counts. A gate may take up to 1,300 seconds to stop when a call
+     was in flight (its unit's `TimeoutStopSec`; RESTART_GO checked that none was). A reset from the panel is the
+     owner's last resort, only after the counter has run out.
+   - a login prompt: the server runs, but the network or ssh did not come up. Whether any account can sign in there is
+     RESTART_LOOK's `console sign-in` line (`P` means it has a password). If none can, rescue mode is the way in.
+   - "emergency mode", or a request for the root password for maintenance: a mount failed.
+   - a passphrase prompt: an encrypted disk.
+   - Ubuntu's boot menu, or "Kernel panic": the new kernel. In the boot menu, "Advanced options for Ubuntu" lists the
+     earlier kernel, for one boot. When RESTART_LOOK's boot menu line says the menu is hidden (`GRUB_TIMEOUT_STYLE
+     hidden`, or `GRUB_TIMEOUT 0`), holding Shift or pressing Esc during the boot may show it; whether the console
+     passes those keys is not known.
+   - nothing at all: the server may not run. Starting or restarting it from the panel is the owner's choice.
+6. **When the console gives no way in: rescue mode, and repair first.** The panel's rescue mode starts the server from
+   a rescue system; the hosting company sends its access to the owner, and it stays out of any chat. From there the
+   server's disk and the failed boot's journal (when the journal is kept) can be read. Repairing the boot loses nothing: for a kernel problem,
+   mount the disk, `chroot` into it, and set the earlier kernel for one boot (`grub-reboot`); for a mount or network
+   problem, put back the file the boot stopped on. Then restart from the panel, back to the disk. The owner decides
+   each step.
+7. **The last way back: the hosting company's automated backup of the whole server.** It is the owner's decision
+   alone. It brings the whole disk back to that point, and everything since is lost: debates, sign-ups, the Team
+   page's changes, an upload made since; the four spending gates' ledgers (after such a restore a gate no longer knows
+   the calls already paid since that point, so on that day it could let spending go past its daily limit); publication
+   keys made since, and the record of mail sent since. After such a restore the boot starts the API, the website and
+   the gates by itself: until the first commands below run, the restored sessions work and the public pages answer
+   (through the review window too, when it was open at that point). The owner hears this before the restart, not
+   after. So the first commands, as root, before anything else:
+   `systemctl stop 'debateai-preview-ui@*' 'debateai-preview-api@*' 'debateai-preview-runner@*'`, then each gate's
+   `stop` (MAIN-SITE.md 6.5 (a)), so the gates stay halted. Then the block of "Restore a nightly dump" (below: the
+   restored sessions revoked, the fence marked; a whole-disk restore brings the fence's file back with the database,
+   so the fence does not see it by itself). The gates stay stopped until the owner has compared each provider's own
+   record of that day with the gate's; then their `activate` (MAIN-SITE.md 6.5). Then ask before anything else.
+
+### What the first restart taught
+
+The first restart with these steps ran clean: RESTART_LOOK stopped first on four things, which were settled or
+accepted; RESTART_GO, the boot and RESTART_UP then ended `_DONE`. Four findings are now in the steps and in "Boot
+sequence" above:
+1. **Caddy was disabled.** It was not in the boot's dependency tree: at every earlier boot it had been started by hand.
+   It is enabled now (`systemctl enable caddy.service`). Caddy must be enabled; RESTART_LOOK stops (`boot-units`) when
+   it is not, and its line names that one command.
+2. **Docker does not give Hatchet a fixed address**, and the gateway's allow list names the address. It stayed the
+   same that time. RESTART_LOOK reports it as a risk the owner accepts (`hatchet-address`), and RESTART_UP checks the
+   same container and address as before.
+3. **A cloud-init file had changed and never been through a boot** (`/etc/cloud/cloud.cfg.d/90_dpkg.cfg`). The owner
+   read it and accepted it (`boot-config`).
+4. **After the boot, Hatchet's gateway did not run**, although it is in the boot's tree. RESTART_UP ran the gateway
+   witness, which said `PASS`, and started the gateway by hand. The runner never starts at boot: RESTART_UP starts it
+   by hand, once, last.
 
 ## Files
 
@@ -804,7 +1790,8 @@ inert without the drop-ins.
    (`journalctl -u 'debateai-preview-alert@*' --since -5min` shows no new run).
 2. **Crash, UI.** Same with `debateai-preview-ui`; the site answers again on 127.0.0.1:3100.
 3. **Reboot.** After `reboot`, every unit in the target is `active`; every public page returns 200
-   through Caddy with the preview credentials and 401 without them.
+   through Caddy with the preview credentials and 401 without them. On the live server, never a bare `reboot`:
+   "Restarting the server" (above) is the way.
 4. **Tamper.** Copy one small file of the API release that is listed in its source manifest to
    `/root/preview-archive/`, change one byte of the original, then
    `systemctl restart debateai-preview-api`. Expect `PREVIEW_LIFECYCLE_PRESTART_REFUSED` with
@@ -889,7 +1876,8 @@ pnpm exec vitest run tests/unit/preview-lifecycle-common.test.ts tests/unit/prev
   tests/unit/preview-lifecycle-release-check.test.ts tests/unit/preview-lifecycle-release-retire.test.ts \
   tests/unit/preview-lifecycle-release-env.test.ts tests/unit/preview-lifecycle-release-archive.test.ts \
   tests/unit/preview-lifecycle-unit-templates.test.ts tests/unit/preview-lifecycle-migration-steps.test.ts \
-  tests/unit/preview-release-caddy-slots.test.ts tests/unit/preview-release-guide.test.ts
+  tests/unit/preview-release-caddy-slots.test.ts tests/unit/preview-release-guide.test.ts \
+  tests/unit/preview-lifecycle-restart.test.ts
 ```
 
 They use throwaway folders owned by the test user instead of root, synthetic plans and fake

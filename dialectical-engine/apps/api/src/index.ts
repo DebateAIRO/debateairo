@@ -2126,7 +2126,7 @@ export interface ApiOptions {
   /** Decision 13: digs and reports on a public debate, by anyone with credit (./public-tree.ts); absent: only the first snapshot is readable. */
   readonly publicTree?: PublicTreeOptions;
   readonly publicFlags?: PublicFlagPorts;
-  /** Upvotes on public debates (0193): the vote store, on the request pool under the caller's session. Absent: the two writes answer 404 and the own-votes read answers an empty list. */
+  /** Upvotes on public debates (0194): the vote store, on the request pool under the caller's session. Absent: the two writes answer 404 and the own-votes read answers an empty list. */
   readonly publicVotes?: PublicVotePorts;
   /** 0157 (D1): the signed-in person's own statements of reasons, their facts opened under each debate's key. */
   readonly moderationStatements?: ModerationStatementPorts;
@@ -4309,7 +4309,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const state = await pressPublicFlag({ ownerRef, publicationRef: publicationRef.data, flagId: randomUUID(), where: body.data.where, claim: body.data.claim }, options.publicFlags);
     return reply.send(PublicFlagAnswerSchema.parse({ state }));
   });
-  // Upvotes on public debates (0193): one vote per account per debate; a repeat PUT changes nothing and DELETE takes it back. Every absence is the one 404,
+  // Upvotes on public debates (0194): one vote per account per debate; a repeat PUT changes nothing and DELETE takes it back. Every absence is the one 404,
   // only the count leaves the server, and the account is the session's, never the request's. The three share the publicVotes budget, charged before the id is looked at.
   api.put<{ Params: { id: string } }>("/v1/public/debates/:id/vote", credentialRoutePolicy("PUT /v1/public/debates/{id}/vote"), async (request, reply) => {
     const ownerRef = request.authenticatedSession?.ownerRef;

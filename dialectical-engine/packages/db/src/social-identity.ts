@@ -91,7 +91,9 @@ export class PostgresSocialIdentityRepository {
     async claim(input: Pick<SocialFlowSeed, 'stateHash' | 'cookieHash' | 'bindingHash' | 'provider' | 'configuration'>): Promise<SocialFlowClaim | null> { return (await this.pool.query('SELECT identity.claim_social_flow($1) value', [input])).rows[0].value; }
     // K09/NV-42: admitted by SOCIAL_CALLBACK and run after a verified provider exchange, so it may use the login reserve.
     // NV-13: the v2 callback answers a link to a pending_verification account like no link (0178).
-    async callback(input: Readonly<Record<string, unknown>>, source: AuthSourceContext): Promise<SocialCallbackResult> { return this.tx.audited(source, async (c, audit) => (await c.query('SELECT identity.finish_social_callback_v2($1,$2) value', [input, audit])).rows[0].value, 'login'); }
+    // 0193: v3 is 0178's v2 with one more arm. A sign-in through Google for an address Google itself answers for, that an
+    // active account with a second step signs in with, makes that account's Google link and goes on as a linked sign-in.
+    async callback(input: Readonly<Record<string, unknown>>, source: AuthSourceContext): Promise<SocialCallbackResult> { return this.tx.audited(source, async (c, audit) => (await c.query('SELECT identity.finish_social_callback_v3($1,$2) value', [input, audit])).rows[0].value, 'login'); }
     async loginStatus(input: Readonly<{ challengeHash:string; browserHash:string; bindingHash:string; admittedProviders:readonly string[] }>): Promise<{expiresAt:string;availableMethods:readonly ('passkey'|'totp'|'recovery_code')[]}|null> {
         return (await this.pool.query('SELECT identity.read_social_login_status($1) value',[input])).rows[0].value;
     }

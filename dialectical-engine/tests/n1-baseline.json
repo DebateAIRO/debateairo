@@ -1,7 +1,7 @@
 {
   "schema": "debateai-n1-baseline-v1",
-  "commit": "84891f69ce725a0b66c28eb3600d6a290514cf35",
-  "reason": "84891f69c-r33-v1",
+  "commit": "27b6a42ac68c1829e9a5274f2a9274f08f0876ca",
+  "reason": "27b6a42ac-r34-v1",
   "suites": [
     "tests/integration/b3-holds-waiting-line.test.ts",
     "tests/integration/b7b-waiting-line.test.ts",
@@ -26,7 +26,7 @@
     },
     {
       "name": "tests/integration/identity-database.test.ts > S2 identity schema on real PostgreSQL > creates the exact identity table inventory with the required contact, audit, and erasure column types",
-      "reason": "pins the exact list of identity tables its own migration chain creates; a database migrated ahead holds the tables later expand steps add (0193, the public debate upvotes: 1), which the released code never reads"
+      "reason": "pins the exact list of identity tables its own migration chain creates; a database migrated ahead holds the tables later expand steps add (0194, the public debate upvotes: 1), which the released code never reads"
     }
   ],
   "knownRed": []

@@ -180,7 +180,7 @@ describe("the questions not started yet in account.json", () => {
 });
 
 describe("the worker reads 0162's reader", () => {
-  it("as one more function in its role witness (the twenty-fifth, after 0157's moderation reader; twenty-six since 0193), and beside the snapshot in readRaw", async () => {
+  it("as one more function in its role witness (the twenty-fifth, after 0157's moderation reader; twenty-six since 0194), and beside the snapshot in readRaw", async () => {
     const seen: unknown[][] = [];
     const principal = (name: string, workerCount: number) => ({ principal: name, authorization_member: name === "request",
       worker_member: name === "worker", request_count: name === "request" ? 4 : 0, worker_count: workerCount, privileged: false });

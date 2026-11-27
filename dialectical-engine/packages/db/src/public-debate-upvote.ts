@@ -3,14 +3,14 @@ import type { Pool } from "pg";
 export type PublicDebateUpvoteCast = Readonly<{ outcome: "CAST" | "ALREADY" | "NOT_PUBLIC" | "ACCOUNT_INVALID"; upvotes: number | null }>;
 export type PublicDebateUpvoteWithdrawn = Readonly<{ outcome: "WITHDRAWN" | "NONE"; upvotes: number | null }>;
 
-/** The account's refusal of a cast: 0193's own (the account is not active), or the voter's key gone while the vote was written (23503). */
+/** The account's refusal of a cast: 0194's own (the account is not active), or the voter's key gone while the vote was written (23503). */
 function accountInvalid(error: unknown): boolean {
   const record = error as Readonly<{ code?: unknown; message?: unknown }> | null;
   return record !== null && typeof record === "object" && (record.message === "PUBLIC_DEBATE_UPVOTE_ACCOUNT_INVALID" || record.code === "23503");
 }
 
 /**
- * Upvotes on public debates (migration 0193), through its definers only. It runs on the API's request pool under the caller's session, where
+ * Upvotes on public debates (migration 0194), through its definers only. It runs on the API's request pool under the caller's session, where
  * the database asks whose connection it is; never inside a cross-account frame, where that question is answered yes for every owner.
  */
 export class PostgresPublicDebateUpvoteRepository {
@@ -42,7 +42,7 @@ export class PostgresPublicDebateUpvoteRepository {
 }
 
 /**
- * 0193's sweep of the votes of debates gone for good (identity.delete_gone_public_debate_upvotes). It is the cross-account marker's alone, so it
+ * 0194's sweep of the votes of debates gone for good (identity.delete_gone_public_debate_upvotes). It is the cross-account marker's alone, so it
  * is called outside any request, where the API's pool reaches its system login; inside a request the request login is refused. A count only:
  * no ref and no owner reaches this class.
  */

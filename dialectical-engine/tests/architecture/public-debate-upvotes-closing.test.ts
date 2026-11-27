@@ -1,7 +1,7 @@
 // tests/architecture/public-debate-upvotes-closing.test.ts
 // Upvotes on public debates (design §6): the two closed lists the slice registers last. The shipped-file manifest names each new
 // shipped source file, and the pull-request integration list runs each of the slice's database suites once, under a comment naming
-// step 0193. Neither the known-red list nor the host-sensitive list gains an entry of this slice.
+// step 0194. Neither the known-red list nor the host-sensitive list gains an entry of this slice.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -10,7 +10,7 @@ const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8")
 
 /** The database suites this slice adds. Each runs on every pull request. */
 const SUITES = [
-  "tests/integration/public-debate-upvotes-0193.test.ts",
+  "tests/integration/public-debate-upvotes-0194.test.ts",
   "tests/integration/public-debate-upvotes-repository.test.ts",
   "tests/integration/public-vote-flow.test.ts"
 ] as const;
@@ -20,17 +20,17 @@ const SHIPPED = [
   "apps/api/src/public-vote.ts",
   "apps/ui/components/LibraryVote.tsx",
   "apps/ui/lib/upvoteWords.ts",
-  "packages/db/src/migration-forward0193.ts",
+  "packages/db/src/migration-forward0194.ts",
   "packages/db/src/public-debate-upvote.ts"
 ] as const;
 
 describe("public debate upvotes: the closing registrations", () => {
-  it("runs each of the slice's database suites on every pull request, once, under a comment naming step 0193", () => {
+  it("runs each of the slice's database suites on every pull request, once, under a comment naming step 0194", () => {
     const lines = read("tests/ci-integration-auth.txt").split("\n");
     for (const suite of SUITES) {
       expect(existsSync(new URL(suite, ROOT)), suite).toBe(true);
       expect(lines.filter((line) => line === suite), suite).toEqual([suite]);
-      expect(lines[lines.indexOf(suite) - 1], suite).toMatch(/^# [^\n]*\(0193\): [^\n]+\.$/u);
+      expect(lines[lines.indexOf(suite) - 1], suite).toMatch(/^# [^\n]*\(0194\): [^\n]+\.$/u);
     }
   });
 

@@ -1,5 +1,5 @@
-// tests/integration/public-debate-upvotes-0193.test.ts
-// Migration 0193 on real PostgreSQL: a signed-in account upvotes a debate that is public now, once, and may take the vote back; each
+// tests/integration/public-debate-upvotes-0194.test.ts
+// Migration 0194 on real PostgreSQL: a signed-in account upvotes a debate that is public now, once, and may take the vote back; each
 // public debate shows how many accounts upvoted it and never who. Every vote is cast on the API's request login inside the voter's own
 // request, as the vote routes run it; the count is read and the sweep is run on the API's system login, the export on the export
 // worker's. Debates, holds and exports are fixture rows written by the superuser as the product writes them. Data is made up.
@@ -164,7 +164,7 @@ afterAll(async () => {
   await database?.stop();
 });
 
-describe("0193: upvotes on public debates, on the real logins", () => {
+describe("0194: upvotes on public debates, on the real logins", () => {
   it("one vote per account per debate: CAST with the fresh count, ALREADY the second time, a person may upvote their own debate, and taking a vote back deletes the row", async () => {
     const { ref } = await debate(ana);
     expect(await cast(request, ben.token, ben.ownerRef, ref)).toEqual({ outcome: "CAST", upvotes: 1 });

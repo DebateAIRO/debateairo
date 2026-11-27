@@ -165,7 +165,7 @@ describe("0152: a reporter's own reports in their export, and what the AI checks
     ]);
     expect(read("packages/db/src/data-export.ts")).toContain(`"${EXPORT_READER}"`);
     // V4 start step, Task 39e: 0162's export reader is the twenty-fifth worker function (after 0157's moderation reader).
-    // Public debate upvotes: 0193's export reader is the twenty-sixth.
+    // Public debate upvotes: 0194's export reader is the twenty-sixth.
     expect(read("packages/db/src/data-export.ts")).toContain("worker.worker_count !== 26");
   });
 

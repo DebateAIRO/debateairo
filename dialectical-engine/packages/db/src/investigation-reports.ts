@@ -13,7 +13,7 @@ export * from "./preview-buyers.js";
 // 0188: the Owner's permit for a locked-out account.
 export * from "./recovery-permits.js";
 export * from "./path-suggestions.js";
-// 0193: upvotes on public debates.
+// 0194: upvotes on public debates.
 export * from "./public-debate-upvote.js";
 import type { InvestigationRead } from "./investigations.js";
 import type { PieceSettingsVersion, WebSealed } from "./web-evidence.js";
