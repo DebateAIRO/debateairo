@@ -38,10 +38,11 @@ function failureKey(failure: unknown): string {
 const rowName = (ref: string) => `preview-buyer-${ref}`;
 
 /**
- * Who may buy while the whole site is open with test payments: the Owner's list (migration 0186), beside the team. The
- * server is the only judge of who the Owner is: any failed read renders nothing at all, so everyone else sees no hint that
- * this panel exists. An addition shows the account's shortened address before the key is touched, so the Owner sees whom
- * it names; the full address is typed here and never shown back.
+ * Who may buy while the whole site is open with buying kept to listed accounts: the Owner's list (migration 0186), beside
+ * the team. The server is the only judge of who the Owner is: any failed read renders nothing at all, so everyone else
+ * sees no hint that this panel exists. An addition shows the account's shortened address before the key is touched, so
+ * the Owner sees whom it names; the full address is typed here and never shown back. The title, the hint and the
+ * confirmation say whether the list buys with test payments or with real money, as the server's answer names them.
  */
 export function PreviewBuyersPanel({ client, catalog = staffEnglish, locale = "en" }: { client?: PreviewBuyersClient; catalog?: MessageCatalog; locale?: LocaleCode }) {
   const api = useMemo(() => client ?? createPreviewBuyersClient(), [client]);
@@ -181,16 +182,18 @@ export function PreviewBuyersPanel({ client, catalog = staffEnglish, locale = "e
   }
 
   const shown = (masked: string | null) => masked ?? t(catalog, `${K}.unreadable`);
+  /** With real payments the box says real money, and its confirmation carries no test-plan rule. */
+  const real = page.environment === "live";
   const pendingLine = (change: Pending) => change.kind === "add"
-    ? t(catalog, `${K}.confirmAdd`, { address: change.masked })
+    ? t(catalog, real ? `${K}.confirmAddReal` : `${K}.confirmAdd`, { address: change.masked })
     : t(catalog, `${K}.confirmRemove`, { address: shown(change.buyer.masked_address) });
   const locked = busy || pending !== null;
   const count = page.team_count + page.buyers.length;
 
   return <div className="setInner staffAccess teamLimitPanel" data-preview-buyers-panel aria-busy={busy}>
     <section className="setCard" aria-labelledby="preview-buyers-title">
-      <h2 className="staffSectionTitle" id="preview-buyers-title">{t(catalog, `${K}.title`)}</h2>
-      <p className="setCardHint">{t(catalog, `${K}.hint`)}</p>
+      <h2 className="staffSectionTitle" id="preview-buyers-title">{t(catalog, real ? `${K}.titleReal` : `${K}.title`)}</h2>
+      <p className="setCardHint">{t(catalog, real ? `${K}.hintReal` : `${K}.hint`)}</p>
       {page.applies ? null : <p className="setCardHint" data-preview-buyers-not-now>{t(catalog, `${K}.notNow`)}</p>}
       {/* While the list counts for nothing its accounts cannot buy through it, so the line only counts who is on it. */}
       {page.applies ? <p data-preview-buyers-count>{t(catalog, `${K}.count`, { count: String(count), cap: String(page.cap) })}</p>

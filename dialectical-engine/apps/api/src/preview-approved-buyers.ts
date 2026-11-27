@@ -17,9 +17,9 @@ const LISTED_TIMEOUT_MS = 3_000;
 /**
  * Who may start a purchase on the preview. The team line first, by previewBuyerAdmits, unchanged: a team member or, where
  * anyone may buy, any signed-in account, never reads the database. Where previewBuyerNeedsApproval says the Owner's list
- * counts (everyone-with-listed-buyers on the sandbox, an account not on the team line), the list decides: listed ADMIT,
- * not listed REFUSE. A list that cannot be read (no port, a throw, an answer that is not a plain yes or no, or no answer
- * in time) is UNAVAILABLE, so the purchase is refused and nothing is charged.
+ * counts (everyone-with-listed-buyers, with test payments or real ones, an account not on the team line), the list
+ * decides: listed ADMIT, not listed REFUSE. A list that cannot be read (no port, a throw, an answer that is not a plain
+ * yes or no, or no answer in time) is UNAVAILABLE, so the purchase is refused and nothing is charged.
  */
 export async function previewBuyerVerdict(input: Readonly<{
   config: PreviewProviderTestConfig | undefined;

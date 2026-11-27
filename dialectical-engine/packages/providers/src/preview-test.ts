@@ -223,9 +223,9 @@ export function previewTeamAdmits(
  * Who may start debates on the preview when the team rule is lifted, read from PREVIEW_ASKS_OPEN_TO. Absent: the team
  * rule as above. "everyone": any signed-in account. "everyone-with-test-payments": the same, while payments are the
  * sandbox's; the two names keep the boot line truthful about which payment system strangers meet.
- * "everyone-with-listed-buyers": any signed-in account may ask too, while payments are the sandbox's, and the team line
- * stays in the file with one meaning only: the accounts that may buy (previewBuyerAdmits). Each name is accepted only
- * exactly.
+ * "everyone-with-listed-buyers": any signed-in account may ask too, on either payment system, and the team line stays in
+ * the file with one meaning only: the accounts that may buy, beside those the Owner approves (previewBuyerAdmits,
+ * previewBuyerNeedsApproval). Each name is accepted only exactly.
  */
 export const PREVIEW_ASKS_OPEN_TO_VALUES = Object.freeze(["everyone", "everyone-with-test-payments", "everyone-with-listed-buyers"] as const);
 export type PreviewAsksOpenTo = typeof PREVIEW_ASKS_OPEN_TO_VALUES[number];
@@ -268,10 +268,11 @@ export function previewAskAdmits(
  * whole order page). Off the preview there is no rule. On it, any signed-in account may buy in exactly two states: real
  * payments with asks open to "everyone" (anyone may ask, so anyone may pay), and the friends' test behind the site
  * password, "everyone-with-test-payments" on NETOPIA's sandbox. Everywhere else only an account on the team line may buy:
- * with real payments and the team rule, an account that may not ask would pay and then be refused every question; on the
- * sandbox, the provider's public test card buys a plan's real AI allowance, so opening or closing asks never opens
- * buying to strangers. A pairing the API's boot refuses (a value on the other payment system) answers the team line too.
- * A session without a user id is refused on the preview either way.
+ * with real payments and the team rule, an account that may not ask would pay and then be refused every question; under
+ * "everyone-with-listed-buyers", on either payment system, buying is kept to the team and the accounts the Owner approves
+ * (previewBuyerNeedsApproval); on the sandbox, the provider's public test card buys a plan's real AI allowance, so opening
+ * or closing asks never opens buying to strangers. A pairing the API's boot refuses (a value on the other payment system)
+ * answers the team line too. A session without a user id is refused on the preview either way.
  */
 export function previewBuyerAdmits(
   config: PreviewProviderTestConfig | undefined, teamUserIds: readonly string[] | undefined,
@@ -283,16 +284,17 @@ export function previewBuyerAdmits(
 }
 /**
  * Whether the buyer rule above refused an account that the Owner's list of approved buyers (migration 0186,
- * staff.preview_buyer_listed) may still admit: only on the preview, only with the sandbox's payments and asks open to
- * everyone with buying kept to listed accounts ("everyone-with-listed-buyers"), only for a signed-in account, and only
- * when the team line did not admit it. Everywhere else the list counts for nothing and is never read: with real payments,
- * with asks closed (the team rule), in the friends' test (anyone may buy there) and off the preview. Pure, like the rule.
+ * staff.preview_buyer_listed) may still admit: only on the preview, only with asks open to everyone with buying kept to
+ * listed accounts ("everyone-with-listed-buyers"), with the sandbox's payments or real ones, only for a signed-in
+ * account, and only when the team line did not admit it. Everywhere else the list counts for nothing and is never read:
+ * with asks closed (the team rule), under "everyone" with real payments and in the friends' test (anyone may buy in
+ * both), and off the preview. Pure, like the rule.
  */
 export function previewBuyerNeedsApproval(
   config: PreviewProviderTestConfig | undefined, teamUserIds: readonly string[] | undefined,
   asksOpenTo: PreviewAsksOpenTo | undefined, livePayments: boolean, userId: string | undefined
 ): boolean {
-  return config !== undefined && !livePayments && asksOpenTo === "everyone-with-listed-buyers" && userId !== undefined
+  return config !== undefined && asksOpenTo === "everyone-with-listed-buyers" && userId !== undefined
     && !previewBuyerAdmits(config, teamUserIds, asksOpenTo, livePayments, userId);
 }
 /**

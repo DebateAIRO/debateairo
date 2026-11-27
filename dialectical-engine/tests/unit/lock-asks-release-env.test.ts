@@ -101,6 +101,16 @@ describe("same: PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers", () => {
       .toEqual(["SAME_PREVIEW_TEAM_USER_IDS_JSON"]);
   });
 
+  it("with real payments in both API files (MAIN-SITE.md 8.1b): OK, as on the sandbox; the payment system is compared on its own", () => {
+    const LIVE: Env = { NETOPIA_API_BASE_URL: "https://secure.netopia-payments.com/api", PREVIEW_LIVE_PAYMENTS: "real-money" };
+    expect(bad(sameChecks([release("t", "A", NEW_KEY, { both: LISTED, api: LIVE })]))).toEqual([]);
+    expect(bad(sameChecks([release("old-v1", "A", OLD_KEY, { both: LISTED, api: LIVE }), release("new-v1", "B", NEW_KEY, { both: LISTED, api: LIVE })]))).toEqual([]);
+    // One release on the sandbox and one live: only the payment system's own check names it.
+    const SANDBOX: Env = { NETOPIA_API_BASE_URL: "https://secure.sandbox.netopia-payments.com" };
+    expect(bad(sameChecks([release("old-v1", "A", OLD_KEY, { both: LISTED, api: SANDBOX }), release("new-v1", "B", NEW_KEY, { both: LISTED, api: LIVE })])))
+      .toEqual(["SAME_API_PAYMENT_SYSTEM"]);
+  });
+
   it("beside a release under another value: BAD SAME_PREVIEW_ASKS_OPEN_TO", () => {
     expect(bad(sameChecks([release("old-v1", "A", OLD_KEY, { both: LISTED }), release("new-v1", "B", NEW_KEY)])))
       .toEqual(["SAME_PREVIEW_ASKS_OPEN_TO"]);

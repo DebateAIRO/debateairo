@@ -8,9 +8,10 @@ export type PreviewBuyersClient = ReturnType<typeof createPreviewBuyersClient>;
 export type PreviewBuyer = contract.PreviewBuyersPage["buyers"][number];
 
 /**
- * The Owner's list of accounts that may buy while payments are in test mode (the Team page). The typed address goes only
- * in request bodies: the look-up that answers its shortened form before any key is touched, the key ceremony's intent and
- * the addition itself. It never goes into a URL or browser storage, and proof handles stay in the ceremony that made them.
+ * The Owner's list of accounts that may buy while the whole site is open with buying kept to listed accounts, with test
+ * payments or real ones (the Team page). The typed address goes only in request bodies: the look-up that answers its
+ * shortened form before any key is touched, the key ceremony's intent and the addition itself. It never goes into a URL
+ * or browser storage, and proof handles stay in the ceremony that made them.
  */
 export function createPreviewBuyersClient({ fetchImplementation = fetch, apiBase = API_BASE, browser = createStaffWebAuthnBrowser() }: {
   fetchImplementation?: typeof fetch;

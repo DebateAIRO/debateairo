@@ -247,13 +247,15 @@ export const PreviewBuyerAddRequestSchema = z.object({ ...PreviewBuyerAddShape, 
 export const PreviewBuyerRemoveRequestSchema = z.object({ expected_revision: RevisionSchema, operation_id: z.uuid(), proof_handle: OpaqueHandleSchema }).strict();
 export const PreviewBuyerRefParamsSchema = z.object({ ref: z.uuid() }).strict();
 /**
- * 0186: the Owner's list. `applies`: this API runs the site open to everyone with buying kept to listed accounts on the
- * test payments, so the list counts now. `team_count` and `cap`: the team line's accounts and the most that may buy at
- * once, the team included. Each row: the ref of its latest addition, the shortened address (null when it cannot be read
- * now) and since when. The full address and the account id never leave the server.
+ * 0186: the Owner's list. `applies`: this API runs the site open to everyone with buying kept to listed accounts, so the
+ * list counts now. `environment`: the payment system a listed account buys with, NETOPIA's sandbox (test payments) or
+ * live (real money), the same value the billing answers carry. `team_count` and `cap`: the team line's accounts and the
+ * most that may buy at once, the team included. Each row: the ref of its latest addition, the shortened address (null
+ * when it cannot be read now) and since when. The full address and the account id never leave the server.
  */
 export const PreviewBuyersPageSchema = z.object({
-    applies: z.boolean(), team_count: z.number().int().min(0).max(1000), cap: z.number().int().positive().max(1000), revision: RevisionSchema,
+    applies: z.boolean(), environment: z.enum(["sandbox", "live"]),
+    team_count: z.number().int().min(0).max(1000), cap: z.number().int().positive().max(1000), revision: RevisionSchema,
     buyers: z.array(z.object({ ref: z.uuid(), masked_address: PreviewBuyerMaskedAddressSchema.nullable(), since: z.iso.datetime({ offset: true }) }).strict()).max(1000)
 }).strict();
 export type PreviewBuyersPage = z.infer<typeof PreviewBuyersPageSchema>;

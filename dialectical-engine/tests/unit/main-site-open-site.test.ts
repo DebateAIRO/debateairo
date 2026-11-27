@@ -1,12 +1,14 @@
 // Part 6b of the owner's runbook (deploy/preview-auth-dev/v1/MAIN-SITE.md): the whole site open before real payments,
 // with PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers, where anyone signed in may ask and only the accounts on the team
-// line may buy. The steps live only in the runbook, so they run here in bash against throwaway env files, with the
-// server's commands stood in for: ASKS_OPEN takes the third value and keeps the team line, behind the site password, on
-// the sandbox and the main name only, and checks the API's count line; ASKS_CLOSE and MAIL_CLOSE need the site password
-// on whatever the payments; BUYERS writes one list into both files alike, never prints or keeps the address, reads the
-// list's cap from the release's code, and puts both files back on any refusal; OPENCHECK reads the open site, the day's
-// mail and the plans of accounts not on the list; PWOFF1 accepts 6b's pairing beside part 8's; CLOSED flags the third
-// value. The files the steps write are then read by the release check's own SAME checks and the shared parser.
+// line may buy; and 8.1b, the same value with real payments. The steps live only in the runbook, so they run here in bash
+// against throwaway env files, with the server's commands stood in for: ASKS_OPEN takes the third value and keeps the
+// team line, behind the site password, on the main name only, on the sandbox or with real payments, and checks the
+// API's count line; ASKS_CLOSE and MAIL_CLOSE need the site password on whatever the payments; BUYERS writes one list
+// into both files alike, never prints or keeps the address, reads the list's cap from the release's code, and puts both
+// files back on any refusal; OPENCHECK reads the payments, the open site, the day's mail and the plans of accounts not
+// on the list, of the payment system the API file names; PWOFF1 accepts 6b's and 8.1b's pairings beside 8.1's; CLOSED
+// flags the third value. The files the steps write are then read by the release check's own SAME checks and the shared
+// parser.
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -63,8 +65,9 @@ const LIVE = ['NETOPIA_API_BASE_URL=https://secure.netopia-payments.com/api', 'P
 const ROBOTS = 'x-robots-tag: noindex, nofollow';
 const SENTENCE = 'Buying a plan is open only to invited accounts for now. You can keep using the Free plan.';
 
+/** `live`: NETOPIA's live address and the live payments line; `noPayments`: no NETOPIA line at all; `apiExtra`: more lines in the API file. */
 type Files = Readonly<{ team?: readonly string[] | null; runnerTeam?: readonly string[] | null; value?: string | undefined; runnerValue?: string;
-  host?: string; live?: boolean; staff?: boolean }>;
+  host?: string; live?: boolean; noPayments?: boolean; apiExtra?: readonly string[]; staff?: boolean }>;
 const line = (team: readonly string[]) => `PREVIEW_TEAM_USER_IDS_JSON=${JSON.stringify(team)}`;
 function envFiles(files: Files): Readonly<{ api: string; runner: string; ui: string }> {
   const team = files.team === undefined ? [OWNER, PARTNER] : files.team;
@@ -73,7 +76,7 @@ function envFiles(files: Files): Readonly<{ api: string; runner: string; ui: str
   const common = ['NODE_ENV=production', 'DEBATEAI_DEPLOYMENT_MODE=hosted', `PREVIEW_PROVIDER_TEST_CONFIG_JSON=${CONFIG}`,
     'HATCHET_WORKFLOW_NAME=debateai-preview-run', 'REGISTER_VERSION=18', `RELEASE_KEY=${KEY}`];
   const worker = `debateai-preview-runner-${KEY}`;
-  const api = [`PUBLIC_APP_URL=https://${host}`, ...common, 'API_PORT=3101', ...(files.live ? LIVE : [SANDBOX]),
+  const api = [`PUBLIC_APP_URL=https://${host}`, ...common, 'API_PORT=3101', ...(files.noPayments ? [] : files.live ? LIVE : [SANDBOX]), ...(files.apiExtra ?? []),
     ...(files.staff ? ['STAFF_ACCESS_POLICY_VERSION=2'] : []), ...(team === null ? [] : [line(team)]),
     ...(files.value ? [`PREVIEW_ASKS_OPEN_TO=${files.value}`] : []), ''];
   const runnerValue = files.runnerValue ?? files.value;
@@ -98,7 +101,7 @@ const STUBS = [
   'gatesok() { [ ! -e "$D/gates-closed" ]; }', 'gates() { echo "the gates (stand-in)"; }',
   `lc() { printf '%s\\n' "$*" >> "$D/lc-calls"; if [ -e "$D/same-bad" ]; then echo 'BAD SAME_API_RUNNER_PREVIEW_TEAM_USER_IDS_JSON:cur'; return 1; fi; echo 'OK (stand-in)'; }`,
   'apiup() { local v n; : > "$D/journal"; echo start >> "$D/starts"',
-  '  if [ -e "$D/api-refuses" ]; then echo "PREVIEW_API_STARTUP_REFUSED PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX"; return 1; fi',
+  '  if [ -e "$D/api-refuses" ]; then echo "PREVIEW_API_STARTUP_REFUSED PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_BILLING_OFF"; return 1; fi',
   `  v=$(sed -n 's/^PREVIEW_ASKS_OPEN_TO=//p' "$A"); [ -z "$v" ] || printf '{"event":"api.preview.asks_open","to":"%s"}\\n' "$v" >> "$D/journal"`,
   `  if [ "$v" = ${VALUE} ] && [ ! -e "$D/no-count-line" ]; then n=$(sed -n 's/^PREVIEW_TEAM_USER_IDS_JSON=//p' "$A" | jq length); printf '{"event":"api.preview.listed_buyers","count":%s}\\n' "$n" >> "$D/journal"; fi`,
   '  echo "PREVIEW_API_STARTED {}" >> "$D/journal"; }',
@@ -237,10 +240,37 @@ describe('ASKS_OPEN with the third value (6b)', () => {
     expect(checked(w)).toEqual({ bad: [], asks: VALUE, team: [OWNER, PARTNER] });
   }));
 
-  it('refuses, with nothing changed, on live payments, on the test name, with the password off, or with two different team lines', () => {
+  it('with real payments (8.1b) it opens the same way: the team line kept as the list, the value added, the count line checked', () => withWorld({ live: true }, w => {
+    const before = w.api();
+    const result = run('ASKS_OPEN', w, V6B);
+    expect(result.lines).toContain('payments: live');
+    expect(result.lines.slice(-3)).toEqual(['listed buyers: 2 (the team line)',
+      'the Team page\'s list of approved buyers: empty; from now on you allow buyers there (6b.3)', 'ASKS_OPEN_DONE']);
+    expect(w.api()).toBe(`${before}PREVIEW_ASKS_OPEN_TO=${VALUE}\n`);
+    expect(w.runner()).toContain(`\n${line([OWNER, PARTNER])}\n`);
+    expect(checked(w)).toEqual({ bad: [], asks: VALUE, team: [OWNER, PARTNER] });
+  }));
+
+  it('with real payments it still refuses the friends\' value, and an earlier opening\'s accounts still on the Team page\'s list', () => {
+    withWorld({ live: true }, w => {
+      const api = w.api();
+      expect(run('ASKS_OPEN', w).last).toBe('ASKS_OPEN_NOT_DONE: everyone-with-test-payments does not go with payments live (part 10: PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING, ..._BILLING_OFF, ..._TEST_PAYMENTS_NOT_SANDBOX, ..._LISTED_BUYERS_BILLING_OFF)');
+      expect(w.api()).toBe(api);
+    });
+    withWorld({ live: true, answers: { approved: '1\n' } }, w => {
+      const api = w.api();
+      expect(run('ASKS_OPEN', w, V6B).last).toBe('ASKS_OPEN_NOT_DONE: 1 account(s) allowed on the Team page in an earlier opening are still on its list; nothing changed: remove them on the Team page (the box of who may buy; removing works while the team tools are locked), then ASKS_OPEN again');
+      expect(w.api()).toBe(api);
+      expect(existsSync(join(w.dir, 'starts'))).toBe(false);
+    });
+  });
+
+  it('refuses, with nothing changed, with billing off, on the test name, on the sandbox with a live payments line, with the password off, or with two different team lines', () => {
     const cases: ReadonlyArray<readonly [Setup, string]> = [
-      [{ live: true }, `ASKS_OPEN_NOT_DONE: ${VALUE} does not go with payments live (part 10: PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING, ..._BILLING_OFF, ..._TEST_PAYMENTS_NOT_SANDBOX, ..._LISTED_BUYERS_NOT_SANDBOX)`],
-      [{ host: 'v3-preview.dezbatere.ro' }, `ASKS_OPEN_NOT_DONE: ${VALUE} opens only on dezbatere.ro with no live payments line (the API answers as v3-preview.dezbatere.ro; nothing changed): part 5 first`],
+      [{ noPayments: true }, `ASKS_OPEN_NOT_DONE: ${VALUE} does not go with payments none (part 10: PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING, ..._BILLING_OFF, ..._TEST_PAYMENTS_NOT_SANDBOX, ..._LISTED_BUYERS_BILLING_OFF)`],
+      [{ host: 'v3-preview.dezbatere.ro' }, `ASKS_OPEN_NOT_DONE: ${VALUE} opens only on dezbatere.ro, and on the sandbox only with no live payments line (the API answers as v3-preview.dezbatere.ro; nothing changed): part 5 first`],
+      [{ host: 'v3-preview.dezbatere.ro', live: true }, `ASKS_OPEN_NOT_DONE: ${VALUE} opens only on dezbatere.ro, and on the sandbox only with no live payments line (the API answers as v3-preview.dezbatere.ro; nothing changed): part 5 first`],
+      [{ apiExtra: ['PREVIEW_LIVE_PAYMENTS=real-money'] }, `ASKS_OPEN_NOT_DONE: ${VALUE} opens only on dezbatere.ro, and on the sandbox only with no live payments line (the API answers as dezbatere.ro; nothing changed): part 5 first`],
       [{ answers: { login: '200' } }, `ASKS_OPEN_NOT_DONE: the site password is off; ${VALUE} is set only behind it: PWON first`],
       [{ runnerTeam: [OWNER] }, 'ASKS_OPEN_NOT_DONE: the API and runner files do not hold the same one team line; nothing changed: ask'],
       [{ flags: ['gates-closed'] }, 'ASKS_OPEN_NOT_DONE: a spending gate is not active with its window open (above)']
@@ -268,7 +298,7 @@ describe('ASKS_OPEN with the third value (6b)', () => {
   it('refuses, with nothing changed, while an account allowed on the Team page in an earlier opening is still on its list, or when that list does not read', () => {
     const DOES_NOT_READ = 'ASKS_OPEN_NOT_DONE: the Team page\'s list of approved buyers does not read (the database did not answer); nothing changed: ask';
     const cases: ReadonlyArray<readonly [Setup, string]> = [
-      [{ answers: { approved: '2\n' } }, 'ASKS_OPEN_NOT_DONE: 2 account(s) allowed on the Team page in an earlier opening are still on its list; nothing changed: remove them on the Team page (Who may buy while payments are in test mode; removing works while the team tools are locked), then ASKS_OPEN again'],
+      [{ answers: { approved: '2\n' } }, 'ASKS_OPEN_NOT_DONE: 2 account(s) allowed on the Team page in an earlier opening are still on its list; nothing changed: remove them on the Team page (the box of who may buy; removing works while the team tools are locked), then ASKS_OPEN again'],
       [{ answers: { approved: '' } }, DOES_NOT_READ],
       [{ answers: { 'buyer-table': '' } }, DOES_NOT_READ]
     ];
@@ -402,6 +432,26 @@ describe('BUYERS', () => {
       expect(result.lines.slice(-3)).toEqual(['listed buyers now: 0', 'this account holds no open sandbox plan and no unfinished payment page', 'BUYERS_DONE']);
       expect(w.api()).toContain('\nPREVIEW_TEAM_USER_IDS_JSON=[]\n');
       expect(checked(w)).toEqual({ bad: [], asks: VALUE, team: [] });
+      expect(w.file('queries')).toContain("payment_environment') = 'sandbox'");
+    });
+  });
+
+  it('with real payments (8.1b), says whether the removed account still holds a live plan, which renews until its holder cancels it', () => {
+    withWorld(open([OWNER, FRIEND], { live: true, answers: { held: '1\n' } }), w => {
+      const result = run('BUYERS', w, REMOVE);
+      expect(result.lines.slice(-3)).toEqual(['listed buyers now: 1',
+        'LOOK: this account still holds an open live plan or an unfinished payment page; a live plan renews each month on its saved card until its holder cancels it',
+        'BUYERS_DONE']);
+      const asked = w.file('queries');
+      expect(asked).toContain("payment_environment') = 'live'");
+      expect(asked).toContain("g.payment_environment = 'live'");
+      expect(asked).not.toContain("'sandbox'");
+    });
+    withWorld(open([OWNER, FRIEND], { live: true }), w => {
+      expect(run('BUYERS', w, REMOVE).lines.slice(-2)).toEqual(['this account holds no open live plan and no unfinished payment page', 'BUYERS_DONE']);
+    });
+    withWorld(open([OWNER, FRIEND], { live: true, answers: { held: '' } }), w => {
+      expect(run('BUYERS', w, REMOVE).lines.slice(-2)).toEqual(['LOOK: whether this account still holds a live plan did not read: ask', 'BUYERS_DONE']);
     });
   });
 
@@ -459,7 +509,7 @@ describe('OPENCHECK', () => {
   /** Opened with the team; then BUYERS added the friend, then took the partner off. */
   const OPEN: Setup = { value: VALUE, team: [OWNER, FRIEND], opened: [OWNER, PARTNER], kept: [[OWNER, PARTNER], [OWNER, PARTNER, FRIEND]] };
   const OK_LINES = [
-    'listed buyers in the files: 2', 'the four spending gates: active, with their window open',
+    'payments: sandbox', 'listed buyers in the files: 2', 'the four spending gates: active, with their window open',
     'mail on 2026-11-23 (UTC): 120 handed to the mail program, 6% of daily_limit; sign-up mail stopped: no; all mail stopped: no',
     'mail on 2026-11-24 (UTC): 8 handed to the mail program, 0% of daily_limit; sign-up mail stopped: no; all mail stopped: no',
     'accounts on the Team page\'s list: 0; accounts that may buy, the team line included: 2',
@@ -481,6 +531,38 @@ describe('OPENCHECK', () => {
     expect(queries.filter(query => query.includes(ever) && query.includes('g.created_at >= to_timestamp(1795939200)'))).toHaveLength(1);
     expect(queries.find(query => query.includes('outbound_mail_daily_count'))).toContain("r.register_version = 18 AND r.row_key = 'outboundMailPolicy'");
   }));
+
+  it('with real payments (8.1b) passes the same way, and asks the database about live plans and payments only', () => withWorld({ ...OPEN, live: true, answers: { login: '200' } }, w => {
+    const result = run('OPENCHECK', w);
+    expect(result.lines).toEqual(OK_LINES.map(entry => entry === 'payments: sandbox' ? 'payments: live'
+      : entry.replace('open sandbox plans', 'open live plans')));
+    const queries = w.file('queries').split('\n').filter(query => query.includes('billing.'));
+    expect(queries).toHaveLength(5);
+    for (const query of queries) {
+      expect(query).toMatch(/payment_environment(?:'\))? = 'live'/u);
+      expect(query).not.toContain("'sandbox'");
+    }
+  }));
+
+  it('with real payments, says what a live plan does instead of the 14 days to withdraw it', () => {
+    withWorld({ ...OPEN, live: true, answers: { login: '200', approved: '2\n', 'may-buy': '4\n', 'listed-plans': '2 9\n' } }, w => {
+      const result = run('OPENCHECK', w);
+      expect(result.lines).toContain('open live plans of accounts on the Team page\'s list: 2 (each renews every month on its saved card until its holder cancels it)');
+      expect(result.out).not.toContain('within 14 days');
+      expect(result.last).toBe('OPENCHECK_DONE');
+    });
+    withWorld({ ...OPEN, live: true, answers: { login: '200', plans: '1\n' } }, w => {
+      const result = run('OPENCHECK', w);
+      expect(result.lines).toContain('accounts not on the list now: open live plans 1, unfinished payment pages 0');
+      expect(result.lines).toContain('LOOK: plans or payment pages of accounts not on the list (from before the opening, of accounts you took off it, or of accounts suspended while on it): each goes on until it is withdrawn or cancelled; a live plan renews each month on its saved card until its holder cancels it');
+      expect(result.last).toBe('OPENCHECK_DONE');
+    });
+    withWorld({ ...OPEN, live: true, answers: { login: '200', since: '1\n' } }, w => {
+      const result = run('OPENCHECK', w);
+      expect(result.lines).toContain('CHECK_FAILED: an account that was never on the list started a checkout or an upgrade since the opening: the buyer rule did not hold: PWON now (6.5 (b)), then ask');
+      expect(result.last).toMatch(/^OPENCHECK_NOT_DONE: /u);
+    });
+  });
 
   it('fails when a never-listed account started a checkout since the opening, and only looks at older plans', () => {
     withWorld({ ...OPEN, answers: { login: '200', since: '1\n' } }, w => {
@@ -507,7 +589,8 @@ describe('OPENCHECK', () => {
         'CHECK_FAILED: the running API does not say the 2 listed buyers the files hold (restarted since the last change of the list?)'],
       [{ ...OPEN, answers: { login: '200' }, flags: ['gates-closed'] }, 'CHECK_FAILED: a spending gate is not active with its window open (GATES, 6.2, shows which)'],
       [{ ...OPEN, answers: { login: '200' }, openedAt: null }, 'CHECK_FAILED: the opening\'s time or the kept copies of the list do not read (ASKS_OPEN of this guide writes them): ask'],
-      [{ ...OPEN, live: true, answers: { login: '200' } }, 'CHECK_FAILED: payments are not NETOPIA\'s sandbox']
+      [{ ...OPEN, apiExtra: ['PREVIEW_LIVE_PAYMENTS=real-money'], answers: { login: '200' } }, 'CHECK_FAILED: payments are neither NETOPIA\'s sandbox nor real payments with the live payments line'],
+      [{ ...OPEN, noPayments: true, answers: { login: '200' } }, 'CHECK_FAILED: payments are neither NETOPIA\'s sandbox nor real payments with the live payments line']
     ];
     for (const [setup, failed] of cases) withWorld(setup, w => {
       const result = run('OPENCHECK', w);
@@ -608,7 +691,7 @@ describe('OPENCHECK', () => {
   });
 });
 
-describe('PWOFF1 accepts 6b\'s pairing beside part 8\'s', () => {
+describe('PWOFF1 accepts 6b\'s and 8.1b\'s pairings beside 8.1\'s', () => {
   const CADDY = ['dezbatere.ro {', '    route {', '        respond @wrongOrigin "ORIGIN_REFUSED" 403', '        basic_auth {',
     '            {$PREVIEW_BASIC_AUTH_USER} {$PREVIEW_BASIC_AUTH_HASH}', '        }', '        reverse_proxy 127.0.0.1:3100', '    }', '}', ''].join('\n');
   const MAIL = JSON.stringify({ schema: 'preview-auth-dev-mail-v2', recipients: 'open', publicAppUrl: 'https://dezbatere.ro' });
@@ -621,19 +704,24 @@ describe('PWOFF1 accepts 6b\'s pairing beside part 8\'s', () => {
     return { last: result.last, copied: existsSync(join(w.dir, 'm/password/Caddyfile.before-open')) };
   });
 
-  it('takes everyone-with-listed-buyers on the sandbox, and everyone with real payments, as before', () => {
+  it('takes everyone-with-listed-buyers on the sandbox and with real payments, and everyone with real payments, as before', () => {
     expect(pwoff1({ value: VALUE })).toEqual({ last: 'PWOFF1_DONE', copied: true });
+    expect(pwoff1({ value: VALUE, live: true })).toEqual({ last: 'PWOFF1_DONE', copied: true });
     expect(pwoff1({ value: 'everyone', team: null, live: true })).toEqual({ last: 'PWOFF1_DONE', copied: true });
   });
 
   it('refuses, before any copy, every other pairing and a 6b state the API or the gates do not confirm', () => {
     const cases: ReadonlyArray<readonly [Setup, string]> = [
-      [{ value: VALUE, live: true }, 'PWOFF1_NOT_DONE: with everyone-with-listed-buyers the API file must name NETOPIA\'s sandbox'],
+      [{ value: VALUE, noPayments: true }, 'PWOFF1_NOT_DONE: with everyone-with-listed-buyers the API file must name NETOPIA\'s sandbox (6b), or real payments (8.1b, part 7 first)'],
+      [{ value: VALUE, apiExtra: ['PREVIEW_LIVE_PAYMENTS=real-money'] }, 'PWOFF1_NOT_DONE: with everyone-with-listed-buyers on NETOPIA\'s sandbox the API file must have no live payments line'],
       [{ value: VALUE, journal: [JSON.stringify({ event: 'api.preview.listed_buyers', count: 5 })] }, 'PWOFF1_NOT_DONE: the running API does not say the number of listed buyers the API file holds: ask'],
+      [{ value: VALUE, live: true, journal: [JSON.stringify({ event: 'api.preview.listed_buyers', count: 5 })] }, 'PWOFF1_NOT_DONE: the running API does not say the number of listed buyers the API file holds: ask'],
       [{ value: VALUE, flags: ['gates-closed'] }, 'PWOFF1_NOT_DONE: a spending gate is not active with its window open (GATES, 6.2)'],
+      [{ value: VALUE, live: true, flags: ['gates-closed'] }, 'PWOFF1_NOT_DONE: a spending gate is not active with its window open (GATES, 6.2)'],
       [{ value: VALUE, runnerValue: 'everyone' }, 'PWOFF1_NOT_DONE: asks are not open with one same value in both files (8.1 or 6b first)'],
       [{ value: 'everyone', team: null }, 'PWOFF1_NOT_DONE: the API file names NETOPIA\'s sandbox'],
-      [{ value: 'everyone-with-test-payments', team: null }, 'PWOFF1_NOT_DONE: asks are open to everyone-with-test-payments: the password comes off only with everyone (8.1, real payments) or everyone-with-listed-buyers (6b, NETOPIA\'s sandbox)'],
+      [{ value: 'everyone-with-test-payments', team: null }, 'PWOFF1_NOT_DONE: asks are open to everyone-with-test-payments: the password comes off only with everyone (8.1, real payments) or everyone-with-listed-buyers (6b on NETOPIA\'s sandbox, 8.1b with real payments)'],
+      [{ value: 'everyone-with-test-payments', team: null, live: true }, 'PWOFF1_NOT_DONE: asks are open to everyone-with-test-payments: the password comes off only with everyone (8.1, real payments) or everyone-with-listed-buyers (6b on NETOPIA\'s sandbox, 8.1b with real payments)'],
       [{}, 'PWOFF1_NOT_DONE: asks are not open with one same value in both files (8.1 or 6b first)'],
       [{ value: VALUE, answers: { login: '200' } }, 'PWOFF1_NOT_DONE: the site does not ask for the password now: look']
     ];
@@ -683,11 +771,31 @@ describe('the words of 6b', () => {
     const named = (read('deploy/preview-auth-dev/v1/startup-refusals.mjs').match(/\/\^PREVIEW_[^\n]*\$\//u) ?? [''])[0];
     const pattern = new RegExp(named.slice(1, -1), 'u');
     for (const [code, file] of [['PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_WITHOUT_TEAM', 'packages/providers/src/preview-test.ts'],
-      ['PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX', 'apps/api/src/preview-asks-open.ts']] as const) {
+      ['PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_BILLING_OFF', 'apps/api/src/preview-asks-open.ts']] as const) {
       expect(part10).toContain(`| \`${code}\` |`);
       expect(read(file)).toContain(`"${code}"`);
       expect(pattern.test(code), code).toBe(true);
     }
+    // The old name is no row of its own any more, and the code no longer gives it: only an older release prints it.
+    expect(part10).not.toContain('| `PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX` |');
+    expect(read('apps/api/src/preview-asks-open.ts')).not.toContain('LISTED_BUYERS_NOT_SANDBOX');
+  });
+
+  it('opens 8.1b with real payments after part 7, keeps the switch with asks closed, and says the Team page box stays', () => {
+    expect(runbook.split('\n')).toContain('### 8.1b Or: the whole site open with real payments, buying only for the accounts you approve');
+    expect(runbook).toContain('| 8 | opening to everyone: asks (buying for anyone signed in, 8.1; or only for the accounts you approve, 8.1b), then the password off');
+    expect(flat).not.toContain('With real payments the box is no longer shown');
+    expect(flat).toContain('a later opening with `everyone-with-listed-buyers` (8.1b included) refuses while any account is left on it (6.1): every account that may buy with real money is one you approve afresh');
+    // The switch and the way back still need asks closed and the password on.
+    for (const step of ['PAY_SWITCH', 'PAY_BACK']) {
+      const text = script(step);
+      expect(text, step).toContain("! grep -q '^PREVIEW_ASKS_OPEN_TO=' \"$A\" \"$RF\" || ");
+      expect(text, step).toContain("[ \"$(curl -s -o /dev/null -w '%{http_code}' \"https://$HOST/login\")\" = 401 ] || ");
+    }
+    // 6b.6 still closes the sandbox opening before part 7.
+    const before7 = runbook.slice(runbook.indexOf('### 6b.6 Before part 7'), runbook.indexOf('## 7. Real payments'));
+    expect(before7).toContain('1. PWON (8.4).');
+    expect(before7).toContain('2. ASKS_CLOSE (6.3).');
   });
 
   it('quotes the sentence a person not on the list sees exactly as the website writes it', () => {
@@ -713,6 +821,7 @@ describe('the words of 6b', () => {
     const staff = JSON.parse(read('apps/ui/messages/en/staff.json')) as Record<string, string>;
     const said = (key: string) => staff[`staff.previewBuyers.${key}`]!;
     expect(flat).toContain(`**${said('title')}**`);
+    expect(flat).toContain(`**${said('titleReal')}**`);
     for (const key of ['address', 'add', 'remove', 'confirm', 'cancel']) expect(flat, key).toContain(`**${said(key)}**`);
     for (const key of ['added', 'removed', 'unknown', 'onTeam', 'already', 'stale', 'nothingChanged']) expect(flat, key).toContain(`"${said(key)}"`);
     // The rare refusal when the team tools lock while a change is saved: its first sentence, as the box prints it.
@@ -724,6 +833,10 @@ describe('the words of 6b', () => {
     expect(add).not.toMatch(/needs them unlocked/);
     const confirm = said('confirmAdd').replace('{address}', maskedAddress('stefan.nour@example.com')!);
     expect(flat).toContain(`"${confirm}"`);
+    const confirmReal = said('confirmAddReal').replace('{address}', maskedAddress('stefan.nour@example.com')!);
+    expect(flat).toContain(`"${confirmReal}"`);
+    // The box's sentence when nothing may be added, as the guide quotes it.
+    expect(flat).toContain(`"${said('notOpen').split('. ')[0]}. …"`);
     expect(flat).toContain('stefan.nour@example.com reads `ste•••n.n•••our@example.com`');
     expect(maskedAddress('stefan.nour@example.com')).toBe('ste•••n.n•••our@example.com');
     // A very short name never shows whole: the guide says what the API prints for one of two characters and of four.

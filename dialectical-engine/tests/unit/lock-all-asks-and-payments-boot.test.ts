@@ -2,8 +2,8 @@
 // rule (stage preview-live-payments) and then the asks rule (stage preview-asks-open), each over the payment system its
 // own way: the first reads the billing connectors or the provider-only ones, the second the billing connectors only.
 // Together they must mean: asks open to everyone only with billing on, NETOPIA's live system and the owner's switch;
-// asks open with test payments, or with listed buyers, only with billing on and NETOPIA's sandbox, and never with the
-// switch.
+// asks open with test payments only with billing on and NETOPIA's sandbox, and never with the switch; asks open with
+// listed buyers with billing on, on NETOPIA's sandbox without the switch or on its live system with it.
 import { describe, expect, it } from "vitest";
 import { assertPreviewLivePayments } from "../../apps/api/src/billing/stage-clock.js";
 import { assertPreviewAsksOpenBoot } from "../../apps/api/src/preview-asks-open.js";
@@ -41,8 +41,10 @@ describe("the asks and live payments boot rules together, on the hosted preview"
     const verdict = boot(billing, asksOpen, flag);
     if (asksOpen === "everyone") {
       expect(verdict === null).toBe(billing === "billing on, live" && flag === "real-money");
-    } else if (asksOpen === "everyone-with-test-payments" || asksOpen === "everyone-with-listed-buyers") {
+    } else if (asksOpen === "everyone-with-test-payments") {
       expect(verdict === null).toBe(billing === "billing on, sandbox" && flag === null);
+    } else if (asksOpen === "everyone-with-listed-buyers") {
+      expect(verdict === null).toBe((billing === "billing on, sandbox" && flag === null) || (billing === "billing on, live" && flag === "real-money"));
     } else {
       // The team rule: only the payments rule can refuse, exactly as without the asks lock.
       expect(verdict === null).toBe(
@@ -61,11 +63,18 @@ describe("the asks and live payments boot rules together, on the hosted preview"
     expect(boot("provider-only, live", "everyone", "real-money")).toBe("PREVIEW_LIVE_PAYMENTS_BILLING_OFF");
   });
 
-  it("names the refusal the listed buyers' value meets away from the sandbox", () => {
+  it("starts the listed buyers' value on the sandbox and with real payments, and names the refusal it meets with billing off", () => {
     expect(boot("billing on, sandbox", "everyone-with-listed-buyers", null)).toBeNull();
-    expect(boot("billing on, live", "everyone-with-listed-buyers", "real-money")).toBe("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX");
-    expect(boot("billing off", "everyone-with-listed-buyers", null)).toBe("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX");
-    expect(boot("provider-only, sandbox", "everyone-with-listed-buyers", null)).toBe("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX");
+    expect(boot("billing on, live", "everyone-with-listed-buyers", "real-money")).toBeNull();
+    expect(boot("billing off", "everyone-with-listed-buyers", null)).toBe("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_BILLING_OFF");
+    expect(boot("provider-only, sandbox", "everyone-with-listed-buyers", null)).toBe("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_BILLING_OFF");
+    expect(boot("provider-only, live", "everyone-with-listed-buyers", "real-money")).toBe("PREVIEW_LIVE_PAYMENTS_BILLING_OFF");
+    // NETOPIA's live system without the owner's switch, or the switch beside the sandbox: the payments rule refuses first.
+    expect(boot("billing on, live", "everyone-with-listed-buyers", null)).toBe("PREVIEW_LIVE_PAYMENTS_UNSET");
     expect(boot("billing on, sandbox", "everyone-with-listed-buyers", "real-money")).toBe("PREVIEW_LIVE_PAYMENTS_MISMATCH");
+  });
+
+  it("still refuses the friends' value with real payments", () => {
+    expect(boot("billing on, live", "everyone-with-test-payments", "real-money")).toBe("PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX");
   });
 });

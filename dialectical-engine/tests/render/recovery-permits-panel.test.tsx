@@ -129,7 +129,7 @@ describe("who sees the box", () => {
   it("is mounted on the team page, right after the buyers box", async () => {
     vi.stubGlobal("fetch", (async (input: RequestInfo | URL) => String(input).endsWith("/v1/admin/recovery-permits")
       ? Response.json(basePage) : String(input).endsWith("/v1/admin/preview-buyers")
-        ? Response.json({ applies: true, team_count: 1, cap: 20, revision: 1, buyers: [] }) : Response.json({ error: "UNAUTHORIZED" }, { status: 401 })) as typeof fetch);
+        ? Response.json({ applies: true, environment: "sandbox", team_count: 1, cap: 20, revision: 1, buyers: [] }) : Response.json({ error: "UNAUTHORIZED" }, { status: 401 })) as typeof fetch);
     const { default: TeamPage } = await import("../../apps/ui/app/admin/team/page.js");
     const page = await TeamPage();
     await act(async () => root.render(page));

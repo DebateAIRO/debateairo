@@ -139,7 +139,7 @@ describe("the team allowance panel: Cancel goes back to where the person asked f
 });
 
 const BUYER = "66666666-6666-4666-8666-666666666666";
-const buyersPage = { applies: true, team_count: 2, cap: 20, revision: 3, buyers: [{ ref: BUYER, masked_address: "a•••@example.com", since: "2031-03-01T00:00:00.000Z" }] };
+const buyersPage = { applies: true, environment: "sandbox", team_count: 2, cap: 20, revision: 3, buyers: [{ ref: BUYER, masked_address: "a•••@example.com", since: "2031-03-01T00:00:00.000Z" }] };
 const buyersClient = () => ({ read: vi.fn(async () => buyersPage), find: vi.fn(async () => ({ masked_address: "ste•••n.n•••our@example.com" })),
   add: vi.fn(async () => undefined), remove: vi.fn(async () => undefined), cancel: vi.fn() });
 
