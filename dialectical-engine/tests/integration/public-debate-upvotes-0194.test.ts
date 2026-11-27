@@ -334,14 +334,16 @@ describe("0194: upvotes on public debates, on the real logins", () => {
     for (const pool of [bare("DATABASE_URL"), system, bare("ERASURE_DATABASE_URL")]) await expect(exported(pool, exportId, lease)).rejects.toMatchObject({ code: "42501" });
   });
 
-  it("the sweep deletes the votes of a debate that is gone for good, a bounded number a call, and leaves a held or a public debate's alone", async () => {
+  it("the sweep deletes the votes of a debate that is gone for good, also one held and then made private, a bounded number a call, and leaves a held or a public debate's alone", async () => {
     while (await sweep(system, 100) > 0) { /* what the cases above left behind */ }
     // live and held: ana and ben upvote each; then staff hold `held`. ended: ana, ben and cal upvote; then it is made private.
     // moved: ana upvotes; then it is made private and published again under a new link, which cal upvotes.
+    // heldEnded: ben upvotes; then staff hold it, and then it is made private (design section 5: held and then made private is swept).
     const live = await debate(ana);
     const held = await debate(ana);
     const ended = await debate(ana);
     const moved = await debate(ana);
+    const heldEnded = await debate(ana);
     for (const voter of [ana, ben]) {
       await cast(request, voter.token, voter.ownerRef, live.ref);
       await cast(request, voter.token, voter.ownerRef, held.ref);
@@ -353,22 +355,28 @@ describe("0194: upvotes on public debates, on the real logins", () => {
     await unpublish(moved.runId, moved.ref);
     const next = await publish(moved.runId);
     await cast(request, cal.token, cal.ownerRef, next);
+    await cast(request, ben.token, ben.ownerRef, heldEnded.ref);
+    await hold(heldEnded.ref);
+    await unpublish(heldEnded.runId, heldEnded.ref);
+    const gone = async (): Promise<number> => (await votersOf(ended.ref)).length + (await votersOf(moved.ref)).length + (await votersOf(heldEnded.ref)).length;
     await expect(inAccountRequest(ana.token, () => sweep(request, 1))).rejects.toMatchObject(denied("delete_gone_public_debate_upvotes"));
     await expect(sweep(bare("DATABASE_URL"), 1)).rejects.toMatchObject(denied("delete_gone_public_debate_upvotes"));
-    expect((await votersOf(ended.ref)).length + (await votersOf(moved.ref)).length).toBe(4);
+    // The batch is bounded to 1..1000: a limit outside it is refused and deletes nothing.
+    for (const limit of [0, -1, 1001]) await expect(sweep(system, limit), String(limit)).rejects.toMatchObject(INVALID);
+    expect(await gone()).toBe(5);
     expect(await sweep(system, 1)).toBe(1);
-    expect((await votersOf(ended.ref)).length + (await votersOf(moved.ref)).length).toBe(3);
+    expect(await gone()).toBe(4);
     // A vote another transaction holds is skipped, not waited for: the API runs a second sweep after this one on the same trigger (T16).
     const holder = await database.pool.connect();
     try {
       await holder.query("BEGIN");
       await holder.query("SELECT 1 FROM identity.public_debate_upvote WHERE publication_ref=$1 LIMIT 1 FOR UPDATE", [ended.ref]);
-      expect(await sweep(system, 100)).toBe(2);
+      expect(await sweep(system, 100)).toBe(3);
       await holder.query("COMMIT");
     } finally { await holder.query("ROLLBACK").catch(() => undefined); holder.release(); }
     expect(await sweep(system, 100)).toBe(1);
-    expect(await sweep(system, 100)).toBe(0);
-    expect([await votersOf(ended.ref), await votersOf(moved.ref)]).toEqual([[], []]);
+    expect(await sweep(system, 1000)).toBe(0);
+    expect([await votersOf(ended.ref), await votersOf(moved.ref), await votersOf(heldEnded.ref)]).toEqual([[], [], []]);
     expect(await votersOf(live.ref)).toEqual([ana.ownerRef, ben.ownerRef].sort());
     expect(await votersOf(held.ref)).toEqual([ana.ownerRef, ben.ownerRef].sort());
     expect(await votersOf(next)).toEqual([cal.ownerRef]);
