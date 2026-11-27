@@ -1,7 +1,7 @@
 # Upvotes on public debates — design
 
 Date: 26 November 2026 · Branch: `feat/2026-11-26-public-debate-upvotes` (from `dev` at `c946564be`)
-Status: **draft for the owner's approval.** The owner's four decisions of 26 November are recorded in section 9.
+Status: **approved by the owner on 26 November 2026**; the owner's four decisions are recorded in section 9.
 
 ## 1. What it is and why
 
@@ -110,7 +110,12 @@ Approved by the owner as a light-mode mockup on 26 November 2026.
   **0194**, previous `0193_google_return_connects_account.sql`. If another step lands on `dev` first, this one is
   renumbered and its manifest redone.
 - Two releases run side by side during an upload. The step is **expand** (additive only) and the new list field
-  is **optional**, so an older page reads a newer API and a newer page reads an older API.
+  is **optional**, so a newer page reads an older API (the row shows no box). An older page does not read a newer
+  API: the list's schema is strict, so a build from before this feature refuses a row that carries `vote_count`
+  and shows its "published debates are temporarily unavailable" line. That cannot happen in an upload, because
+  each slot runs its own API and website as a pair and traffic moves from one pair to the other
+  (`deploy/vps/README.md`: a release's `ui.env` names its own slot's API in `DIALECTICAL_API_BASE`, and the
+  upload's step 11 starts the two together).
 - No login holds any right on a person-linked identity table. All access is through `SECURITY DEFINER`
   functions with `search_path = pg_catalog`; a function handed an owner first asks
   `identity.request_owner_matches`.

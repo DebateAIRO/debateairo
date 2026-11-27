@@ -42,7 +42,7 @@ Five conditions no test covered before review. Each now has a test in its owning
 2. **A session that ended on the server (T11, Step 2; code in Step 8).** The press is sent once, answers 401, state and count go back, and the one line is the sign-in link, not "Try again"; a second press sends nothing. Test: same file, "a session that ended on the server: …".
 3. **A withdrawal answered 404 (T11, Step 2; code in Step 8).** The debate left the list while the page was open; the server deleted the row and answered 404. The box ends not upvoted and the next press asks to vote. Test: same file, "a withdrawal answered 404 …". The server side is T08, case 4.
 4. **The website's own client against the real routes (T07, Step 2, case 12; code in Step 11).** `refs=a%2Cb` in one member, `PUT` with a JSON `{}` body, `DELETE` with no body and no content type, through the real handlers; a debate that is not public surfaces as `NOT_FOUND` with `serverCode` `DEBATE_NOT_FOUND`. Test: `tests/unit/public-vote-routes.test.ts`.
-5. **A real vote row in the export (T06, Step 4; code in Steps 7 and 8).** The vote table, 0193's reader on the worker's login, `readRaw`, `collectSnapshot`, `account.json`: one entry per vote of that account, exactly `{ debate_reference, upvoted_at }` in UTC, nothing of another account. Test: `tests/integration/data-export-e2e.test.ts`, case `E16` (the file goes from 15 to 16 cases; T15 Step 12 runs it again).
+5. **A real vote row in the export (T06, Step 4; code in Steps 7 and 8).** The vote table, 0194's reader on the worker's login, `readRaw`, `collectSnapshot`, `account.json`: one entry per vote of that account, exactly `{ debate_reference, upvoted_at }` in UTC, nothing of another account. Test: `tests/integration/data-export-e2e.test.ts`, case `E16` (the file goes from 15 to 16 cases; T15 Step 12 runs it again).
 
 ## Interfaces
 
@@ -61,7 +61,7 @@ Five conditions no test covered before review. Each now has a test in its owning
 
 **Step files:** `migrations/0194_public_debate_upvotes.sql`; manifest `migrations/lineage/public-debate-upvotes-forward0194.json` (version `public-debate-upvotes-forward0194-v1`, six keys, `amendsPostconditionsOf: []`); loader `loadForward0194` in `packages/db/src/migration-forward0194.ts` (refusal prefix `MIGRATION_FORWARD0194_`), last in `STEPS`; step refusals `PUBLIC_DEBATE_UPVOTES_OWNER_UNABLE` and `PUBLIC_DEBATE_UPVOTES_CONTRACT`.
 
-**Database pins (T02):** four `privilegeDisclosures` entries with source `migrations/0193_public_debate_upvotes.sql`, in this order: `debateai_billing_runtime` (cast, withdraw, read_own), `debateai_rls_all_accounts` (counts), `debateai_data_export_worker` (export reader), `debateai_rls_all_accounts` (sweep); `ASKS_CONNECTION` gains the three billing-role signatures; the identity inventory gains `"public_debate_upvote"`; `tests/n1-baseline.json` `setAside` gains the released inventory test.
+**Database pins (T02):** four `privilegeDisclosures` entries with source `migrations/0194_public_debate_upvotes.sql`, in this order: `debateai_billing_runtime` (cast, withdraw, read_own), `debateai_rls_all_accounts` (counts), `debateai_data_export_worker` (export reader), `debateai_rls_all_accounts` (sweep); `ASKS_CONNECTION` gains the three billing-role signatures; the identity inventory gains `"public_debate_upvote"`; `tests/n1-baseline.json` `setAside` gains the released inventory test.
 
 **Repositories** (`packages/db/src/public-debate-upvote.ts`, exported by `export * from "./public-debate-upvote.js";` in `packages/db/src/investigation-reports.ts`; never `packages/db/src/index.ts`, which is byte-pinned):
 
@@ -144,8 +144,8 @@ DOM: `div.libVoteRow > [ button.libVote[type=button][data-library-vote][aria-pre
 
 | id | Title | Depends on | File under `2026-11-26-public-debate-upvotes/` | May run alongside |
 |---|---|---|---|---|
-| T01 | Database step 0193 (the vote table, six functions, the step's files) | none (T00, `dev` with 0192, is this tree) | `T01-database-step-0193.md` | T03, T04, T09, T10 |
-| T02 | Database pins and behaviour test for step 0193 | T01 | `T02-database-pins-and-behaviour.md` | T03, T04, T05, T06, T09, T10 |
+| T01 | Database step 0194, built as 0193 (the vote table, six functions, the step's files) | none (T00, `dev` with 0192, is this tree) | `T01-database-step-0193.md` | T03, T04, T09, T10 |
+| T02 | Database pins and behaviour test for step 0194, built as 0193 | T01 | `T02-database-pins-and-behaviour.md` | T03, T04, T05, T06, T09, T10 |
 | T03 | Contract shapes and client methods | none | `T03-contract-and-client.md` | T01, T04, T09, T10 |
 | T04 | The `publicVotes` admission budget | none | `T04-vote-rate-limit.md` | T01, T03, T09, T10 |
 | T05 | Db repository and the count in `listPublicRefs` | T01 | `T05-db-repository-and-list-count.md` | T02, T06 |
@@ -209,7 +209,7 @@ T17 and T15 hold the full text of every command. This is the recipe and what thi
 | 8 | The unit gate (CI job `verify-tests`): the two commands of T15 Step 10 (`pnpm run test:ci-gate` with `CI_TEST_FILES_SIDE_BY_SIDE=1`, its log in `${TMPDIR:-/tmp}/upvotes-unit-gate.log`, then the filter for names outside the three Node-pin files). About 7 minutes | `exit=1`, `CI_KNOWN_RED_GATE new=30 known=3 stale=0`; every NEW name is in the three Node-pin files (the second command prints `foreign=1` and nothing before it). From 2 December 2026 (UTC) expect `new=31`: one dated red in `dependency-floors.test.ts`, not this slice's |
 | 9 | The integration gate (CI job `auth-integration`): the command of T15 Step 11 (`pnpm run test:ci-integration` with `CI_TEST_FILES_SIDE_BY_SIDE=1`, its log in `${TMPDIR:-/tmp}/upvotes-integration-gate.log`). Up to 30 minutes | `exit=0`, `CI_GATE_SCOPE files=87 tests=<n>`, `CI_KNOWN_RED_GATE new=0 known=0 stale=0`. No baseline of this gate was taken on this machine unless the orchestrator took one first; T15 Step 11 says how to judge anything else |
 | 10 | The five database suites no CI job runs (T15 Step 12): `s8-publication-database`, `rls-readers`, `migration-per-step`, `data-export-database`, `data-export-e2e` | each `Test Files  1 passed (1)`; `data-export-e2e` shows 16 tests |
-| 11 | What the slice must not have touched (T15 Step 13) | only `-- migrations` and the three paths `migrations/0193_public_debate_upvotes.sql`, `migrations/lineage/README.md`, `migrations/lineage/public-debate-upvotes-forward0193.json` |
+| 11 | What the slice must not have touched (T15 Step 13) | only `-- migrations` and the three paths `migrations/0194_public_debate_upvotes.sql`, `migrations/lineage/README.md`, `migrations/lineage/public-debate-upvotes-forward0194.json` (T15 Step 13's own block still prints the 0193 names it was written with) |
 | 12 | `<prefix> sh -c 'node tools/limits-check.mjs --base "$(git merge-base HEAD origin/dev)"; echo "exit=$?"'` | `LIMITS_CHECK_NO_LIST: …`, `LIMITS_CHECK_OK <n> added line(s) read.`, `exit=0` (the shape half only; the list is a CI secret) |
 | 13 | `<prefix> git status --short` | nothing, or only the `??` lines of the plan and the design under `docs/superpowers/` |
 
@@ -217,9 +217,9 @@ The new and moved test files, each green when run alone with `<prefix> pnpm exec
 
 | File | Task | Expected |
 |---|---|---|
-| `tests/architecture/public-debate-upvotes-0193-contract.test.ts` | T01 | `Tests  11 passed (11)` |
-| `tests/architecture/migration-forward-chain.test.ts` | T01 | `Tests  69 passed (69)` |
-| `tests/integration/public-debate-upvotes-0193.test.ts` | T02 | `Tests  12 passed (12)` |
+| `tests/architecture/public-debate-upvotes-0194-contract.test.ts` | T01, T18 | `Tests  11 passed (11)` |
+| `tests/architecture/migration-forward-chain.test.ts` | T01, T18 | `Tests  70 passed (70)` (69 before dev's 0193 came in) |
+| `tests/integration/public-debate-upvotes-0194.test.ts` | T02, T18 | `Tests  12 passed (12)` |
 | `tests/architecture/p3-production-database-principals.test.ts` | T02 | `Tests  28 passed (28)` |
 | `tests/unit/public-votes-contract.test.ts` | T03 | `Tests  8 passed (8)` |
 | `tests/unit/public-vote-budget.test.ts` | T04 | `Tests  7 passed (7)` |
