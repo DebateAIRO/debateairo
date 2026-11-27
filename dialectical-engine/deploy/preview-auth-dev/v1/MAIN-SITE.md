@@ -4898,12 +4898,12 @@ out with SIGNUPS.
 (d) **Asks back to the team only:** ASKS_CLOSE (6.3). It runs only with the password on, so when the site is open
 PWON (b) comes first.
 
-(e) **One account may buy no more** (only while 6b or 8.1b is open): **Remove** on its row of the Team page's list (6b.3) and
-your key. Nothing restarts, and it works while the team tools are locked. For an account BUYERS put on the team line,
-or on a release before the Team page's list, BUYERS (6b.3b) with `W=remove`. Either way it stops that account's new
-checkouts and upgrades; a plan it holds goes on until it is withdrawn or cancelled (3.3). To stop all buying by anyone
-outside the team at once, use PWON (b): then only the team, who know the site password, can reach the site (a payment
-page opened earlier can still be paid for up to a day).
+(e) **One account may buy no more** (only while 6b or 8.1b is open): **Remove** on its row of the Team page's list
+(6b.3) and your key. Nothing restarts, and it works while the team tools are locked. For an account BUYERS put on the
+team line, or on a release before the Team page's list, BUYERS (6b.3b) with `W=remove`. Either way it stops that
+account's new checkouts and upgrades; a plan it holds goes on until it is withdrawn or cancelled (3.3). To stop all
+buying by anyone outside the team at once, use PWON (b): then only the team, who know the site password, can reach the
+site (a payment page opened earlier can still be paid for up to a day).
 
 (a), (b) and (b2) work at any time, even during an upload, and so does **Remove** on the Team page. (c), (d) and
 BUYERS do not: wait until the upload is over. Their names file stops them only once the new release is staged, not
@@ -4949,8 +4949,9 @@ OPENCHECK (6b.4) checks every morning that it held.
   box "Who may buy while payments are in test mode" on the Team page (https://dezbatere.ro/admin/team; with real
   payments its title is "Who may buy plans with real money"). Only you, the Owner, see it and change it, each change
   with your security key; nothing restarts, and the API reads it at the moment someone presses the pay button (6b.3).
-  It counts only while 6b (or 8.1b) is open; it starts empty at each opening (ASKS_OPEN refuses otherwise, 6.1). An account on it buys only while it is active: a suspended account cannot buy,
-  stays in the box with **Remove**, and can buy again if it becomes active again, unless you remove it.
+  It counts only while 6b (or 8.1b) is open; it starts empty at each opening (ASKS_OPEN refuses otherwise, 6.1). An
+  account on it buys only while it is active: a suspended account cannot buy, stays in the box with **Remove**, and can
+  buy again if it becomes active again, unless you remove it.
 
 The list holds at most `PREVIEW_TEAM_MAX_MEMBERS` accounts, the team included, its two parts together: that is the
 cap's name in the code (`packages/providers/src/preview-test.ts`). The Team page refuses an account past it, and BUYERS
@@ -5212,16 +5213,17 @@ on NETOPIA's sandbox, "Who may buy plans with real money" with real payments.
 3. In the browser where your staff key works on dezbatere.ro, open https://dezbatere.ro/admin/team (type the
    address), and verify your key as usual (**Verify security key for team access**).
 4. In the box **Who may buy while payments are in test mode** (with real payments, 8.1b: **Who may buy plans with real
-   money**), type the person's address in **The account's email address** and press **Allow to buy**. The address goes to the server only inside the request; it is never stored
-   in the list, never shown back in full, and never written in a log.
+   money**), type the person's address in **The account's email address** and press **Allow to buy**. The address goes
+   to the server only inside the request; it is never stored in the list, never shown back in full, and never written in
+   a log.
 5. The box asks, for example: "Allow ste•••n.n•••our@example.com to buy test plans? Each test plan it buys must be
    withdrawn or cancelled within 14 days, before real payments." With real payments (8.1b) it asks instead: "Allow
    ste•••n.n•••our@example.com to buy plans with real money? A plan it buys renews each month on its card until it is
-   cancelled." The shortened address keeps the start, the middle
-   and the end of the part before the @, and the domain whole, so you can tell whose account it is
-   (stefan.nour@example.com reads `ste•••n.n•••our@example.com`). It never shows that part whole: a name of one or two
-   characters before the @ shows only the dots (`•••@example.com`), and one of three or four only its first character.
-   If it is not the person you mean, press **Cancel**. Otherwise press **Confirm** and touch your key.
+   cancelled." The shortened address keeps the start, the middle and the end of the part before the @, and the domain
+   whole, so you can tell whose account it is (stefan.nour@example.com reads `ste•••n.n•••our@example.com`). It never
+   shows that part whole: a name of one or two characters before the @ shows only the dots (`•••@example.com`), and one
+   of three or four only its first character. If it is not the person you mean, press **Cancel**. Otherwise press
+   **Confirm** and touch your key.
 6. Expect "Done: this account can buy now.", and a new row: the shortened address and "allowed on <date>". The line
    above the rows counts the accounts that can buy, the team included. If the team tools were unlocked, the security
    alert arrives at your alert address within a minute or two; if they were locked, none comes.
@@ -5341,11 +5343,11 @@ whether that account still holds an open plan (a sandbox plan in 6b, a live plan
 page.
 
 **Taking an account off the list** stops its new checkouts and upgrades only. A plan it holds keeps renewing on its
-saved test card, and its holder can still change that card, until the plan is withdrawn or cancelled: run
-WITHDRAWOTHER (3.3) within 14 days of its purchase, after you tell them, or ask them to cancel it in Settings or on
-`/cancel`. With real payments (8.1b) its plan renews each month on the card it was paid with, until its holder cancels
-it in Settings or on `/cancel`. A NETOPIA page it opened while it was listed can still be paid for up to a day. Taking
-everyone off leaves the list empty (`[]`): nobody may buy. To stop all buying by anyone outside the team at once, PWON is faster (6b.5); a
+saved test card, and its holder can still change that card, until the plan is withdrawn or cancelled: run WITHDRAWOTHER
+(3.3) within 14 days of its purchase, after you tell them, or ask them to cancel it in Settings or on `/cancel`. With
+real payments (8.1b) its plan renews each month on the card it was paid with, until its holder cancels it in Settings or
+on `/cancel`. A NETOPIA page it opened while it was listed can still be paid for up to a day. Taking everyone off leaves
+the list empty (`[]`): nobody may buy. To stop all buying by anyone outside the team at once, PWON is faster (6b.5); a
 payment page opened earlier can still be paid for up to a day.
 
 **If it stops:**
@@ -5461,9 +5463,9 @@ exit 0
 
 Expect, in order: `payments: sandbox` (6b) or `payments: live` (8.1b), `listed buyers in the files: <how many>` (the
 team line), the gates' line, two mail lines (yesterday and today, UTC), on a database that holds the Team page's list
-its three lines (how many accounts are on it and how many may buy with the team line; its changes since the opening;
-the open plans of its accounts), the two lines about accounts not on the list, then `OPENCHECK_DONE`. It changes nothing, and it prints no address, no id and no
-amount of money: the mail lines are counts and a share of the limit.
+its three lines (how many accounts are on it and how many may buy with the team line; its changes since the opening; the
+open plans of its accounts), the two lines about accounts not on the list, then `OPENCHECK_DONE`. It changes nothing,
+and it prints no address, no id and no amount of money: the mail lines are counts and a share of the limit.
 
 **What its counts mean.**
 - `open sandbox plans` and `unfinished payment pages` of accounts not on the list now: a plan or a page from before
@@ -6332,12 +6334,12 @@ below holds, since the password was off with real payments on. After step 2, rem
 page's list (ASKS_CLOSE prints how many).
 
 **If the password was ever off with real payments on (part 8: 8.1 or 8.1b), stop and ask before step 1.** Someone
-outside the team may then hold a paid plan. A paid plan renews every month on its saved card until its owner cancels it, and
-both ways to cancel (Settings, and the `/cancel` link in the plan's mails) are behind the site password. Once the
-password is back, such a plan does not end until its owner cancels it on `/cancel`, and only the NETOPIA review
-window (5.8, REVIEW_OPEN) can let them reach that page again. Until then PAY_BACK never passes, and that person is
-still charged every month while they cannot open the rest of the site. Never end their plan yourself. PWON as a
-brake (6.5 (b)) still works at any time.
+outside the team may then hold a paid plan. A paid plan renews every month on its saved card until its owner cancels it,
+and both ways to cancel (Settings, and the `/cancel` link in the plan's mails) are behind the site password. Once the
+password is back, such a plan does not end until its owner cancels it on `/cancel`, and only the NETOPIA review window
+(5.8, REVIEW_OPEN) can let them reach that page again. Until then PAY_BACK never passes, and that person is still
+charged every month while they cannot open the rest of the site. Never end their plan yourself. PWON as a brake (6.5
+(b)) still works at any time.
 
 1. **The site password back:** PWON (8.4). It also closes the NETOPIA review window (5.8) if it is open.
 2. **Asks back to the team:** ASKS_CLOSE (6.3).
