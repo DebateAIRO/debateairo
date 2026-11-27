@@ -24,6 +24,10 @@ import { importHistoricalRegisterFixture, registerFixtureRow } from "../support/
  * list at any moment of the two minutes before the charge. A charge of an account erased since is counted on its own.
  * OPENCHECK also counts the open sandbox plans of the accounts on the Team page's list and how many days ago the oldest
  * was bought, a reminder that each is withdrawn within 14 days of its purchase.
+ *
+ * OPENCHECK and BUYERS read the plans and payments of the payment system the API file names (PE: sandbox, or live with
+ * real payments, MAIN-SITE.md 8.1b). A second stack runs with real payments: its live purchases count under PE=live and
+ * never under PE=sandbox, and the sandbox stack's purchases never under PE=live.
  */
 const RUNBOOK = readFileSync(resolve(import.meta.dirname, "../../deploy/preview-auth-dev/v1/MAIN-SITE.md"), "utf8");
 const PREVIEW = parsePreviewProviderTestConfig(JSON.stringify({
@@ -84,23 +88,24 @@ beforeAll(async () => {
 afterAll(async () => { await stack?.stop(); });
 
 /** One count query of the runbook, as psql -XAt prints its single value. */
-const single = async (query: string) => {
-  const result = await stack.database.pool.query(query);
+const singleOn = async (on: BillingStack, query: string) => {
+  const result = await on.database.pool.query(query);
   expect(result.rows).toHaveLength(1);
   return String(Object.values(result.rows[0] as Record<string, unknown>)[0]);
 };
+const single = (query: string) => singleOn(stack, query);
 
 /**
  * OPENCHECK's four counts for a team line now and every team line since the opening, on a database that holds the Team
  * page's list (LT=t, as OPENCHECK reads it): the plans and payment pages of accounts not on the list now, the starts since
  * the opening by accounts never on it, and the starts of accounts erased since.
  */
-async function openCounts(now: readonly string[], ever: readonly string[]) {
+async function openCounts(now: readonly string[], ever: readonly string[], on: BillingStack = stack, PE: "sandbox" | "live" = "sandbox", at: number = openedAt) {
   const lines = [lineOf(opencheck, "notlisted() {"), lineOf(opencheck, "notapproved() {"), lineOf(opencheck, "notapprovedthen() {"),
     lineOf(opencheck, "PLANS=$(psqlq"), lineOf(opencheck, "PAGES=$(psqlq"), lineOf(opencheck, "SINCE=$(psqlq"), lineOf(opencheck, "GONE=$(psqlq")];
-  const queries = asked(lines, { J: JSON.stringify(now), EVER: JSON.stringify([...ever].sort()), AT: String(openedAt), LT: "t" });
+  const queries = asked(lines, { J: JSON.stringify(now), EVER: JSON.stringify([...ever].sort()), AT: String(at), LT: "t", PE });
   expect(queries).toHaveLength(4);
-  const [plans, pages, since, gone] = await Promise.all(queries.map(single));
+  const [plans, pages, since, gone] = await Promise.all(queries.map((query) => singleOn(on, query)));
   return { plans, pages, since, gone };
 }
 
@@ -206,7 +211,7 @@ describe("the Team page's list in OPENCHECK, ASKS_OPEN, ASKS_CLOSE and CLOSED on
   it("OPENCHECK's reminder counts the open sandbox plans of the accounts on the list now and how many days ago the oldest was bought", async () => {
     const owner = previewBuyerOwner(stack.database.pool);
     const reminder = async () => {
-      const queries = asked([lineOf(opencheck, 'LISTED="SELECT'), lineOf(opencheck, "LP=$(psqlq")], {});
+      const queries = asked([lineOf(opencheck, 'LISTED="SELECT'), lineOf(opencheck, "LP=''; [ -z \"$PE\" ] || LP=$(psqlq")], { PE: "sandbox" });
       expect(queries).toHaveLength(1);
       return single(queries[0]!);
     };
@@ -255,13 +260,71 @@ describe("BUYERS's reads on real PostgreSQL", () => {
 
   it("says whether a removed account still holds a sandbox plan or an unfinished payment page", async () => {
     const held = async (person: BillingPerson) => {
-      const queries = asked([lineOf(buyers, "H=$(psqlq")], { OR: person.ownerRef });
+      const queries = asked([lineOf(buyers, "H=$(psqlq")], { OR: person.ownerRef, PE: "sandbox" });
       expect(queries).toHaveLength(1);
       return Number(await single(queries[0]!));
     };
     expect(await held(removedSubscriber)).toBeGreaterThan(0);
     expect(await held(listedBuyer)).toBeGreaterThan(0);
     expect(await held(nobody)).toBe(0);
+  });
+});
+
+describe("with real payments (MAIN-SITE.md 8.1b): OPENCHECK and BUYERS read live plans and payments", () => {
+  let live: BillingStack;
+  const liveTeam: string[] = [];
+  let teamBuyer: BillingPerson;
+  let approvedBuyer: BillingPerson;
+  let slipped: BillingPerson;
+  let liveOpenedAt: number;
+  beforeAll(async () => {
+    live = await startBillingStack({ paymentEnvironment: "live", preview: { config: PREVIEW, teamUserIds: liveTeam, asksOpenTo: "everyone-with-listed-buyers", approvedBuyers: true } });
+    liveOpenedAt = Math.floor(Date.now() / 1000) - 5;
+    teamBuyer = await live.signUp("live.team@example.test", "DE");
+    approvedBuyer = await live.signUp("live.approved@example.test", "DE");
+    slipped = await live.signUp("live.slipped@example.test", "DE");
+    liveTeam.push(teamBuyer.userId);
+    // The team account buys and pays; the account the Owner approves buys and pays; a third account's checkout gets past
+    // the rule (put on the team line for this one request, as a failure of the rule would) and stays unfinished.
+    await live.subscribe(teamBuyer, "PLUS", "DE");
+    await previewBuyerOwner(live.database.pool).change("PREVIEW_BUYER_ADD", approvedBuyer.userId);
+    await live.subscribe(approvedBuyer, "PLUS", "DE");
+    liveTeam.push(slipped.userId);
+    try {
+      const quote = await live.quote(slipped, "PLUS");
+      const checkout = await live.checkout(slipped, String(quote.body.quote_ref));
+      expect([checkout.status, checkout.body.environment]).toEqual([200, "live"]);
+    } finally { liveTeam.splice(liveTeam.indexOf(slipped.userId), 1); }
+  }, 600_000);
+  afterAll(async () => { await live?.stop(); });
+
+  it("counts the start that got past the rule under PE=live, and nothing of the live stack under PE=sandbox", async () => {
+    expect(await openCounts([teamBuyer.userId], [teamBuyer.userId], live, "live", liveOpenedAt)).toEqual({ plans: "0", pages: "1", since: "1", gone: "0" });
+    expect(await openCounts([teamBuyer.userId], [teamBuyer.userId], live, "sandbox", liveOpenedAt)).toEqual({ plans: "0", pages: "0", since: "0", gone: "0" });
+    // An empty team line: the team account's live plan and the unfinished page are outside the list, and so are their
+    // starts; the approved account, still on the Team page's list, is not.
+    expect(await openCounts([], [], live, "live", liveOpenedAt)).toEqual({ plans: "1", pages: "1", since: "2", gone: "0" });
+  });
+
+  it("the sandbox stack's purchases never count under PE=live", async () => {
+    expect(await openCounts([], [], stack, "live")).toEqual({ plans: "0", pages: "0", since: "0", gone: "0" });
+  });
+
+  it("counts the live plans of the accounts on the Team page's list", async () => {
+    const queries = asked([lineOf(opencheck, 'LISTED="SELECT'), lineOf(opencheck, "LP=''; [ -z \"$PE\" ] || LP=$(psqlq")], { PE: "live" });
+    expect(queries).toHaveLength(1);
+    expect((await singleOn(live, queries[0]!)).split(" ")[0]).toBe("1");
+  });
+
+  it("BUYERS says whether a removed account still holds a live plan or an unfinished payment page", async () => {
+    const held = async (person: BillingPerson, PE: "sandbox" | "live") => {
+      const queries = asked([lineOf(buyers, "H=$(psqlq")], { OR: person.ownerRef, PE });
+      expect(queries).toHaveLength(1);
+      return Number(await singleOn(live, queries[0]!));
+    };
+    expect(await held(approvedBuyer, "live")).toBeGreaterThan(0);
+    expect(await held(slipped, "live")).toBeGreaterThan(0);
+    expect(await held(approvedBuyer, "sandbox")).toBe(0);
   });
 });
 

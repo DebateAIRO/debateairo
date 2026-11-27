@@ -53,10 +53,11 @@ setting stops that service, and the journal names the setting with a short code.
   `secret="…"`, 1.1). Despite that word, it is not a secret.
 - *A Next.js page request* is the website's own background request when it moves to another page (Next.js is the
   website's framework).
-- *A listed account* (6b) is an account that may buy test plans while asks are open with `everyone-with-listed-buyers`:
-  an account on the team line (`PREVIEW_TEAM_USER_IDS_JSON`), or, on a release that carries it, an account you allowed
-  on the Team page. *The list* is the team line together with *the Team page's list*, the box "Who may buy while
-  payments are in test mode" on the Team page, which you change with your security key and no restart (6b.3). The
+- *A listed account* (6b, 8.1b) is an account that may buy while asks are open with `everyone-with-listed-buyers` (test
+  plans in 6b, plans with real money in 8.1b): an account on the team line (`PREVIEW_TEAM_USER_IDS_JSON`), or, on a
+  release that carries it, an account you allowed on the Team page. *The list* is the team line together with *the Team
+  page's list*, the box "Who may buy while payments are in test mode" on the Team page (with real payments: "Who may buy
+  plans with real money"), which you change with your security key and no restart (6b.3). The
   Team page's list comes with the release that carries the database step 0186; before that release, the list is the
   team line alone, changed with BUYERS (6b.3b).
 
@@ -138,7 +139,7 @@ if the server shows something else.
 | 6 | friends' test with test payments (it may run while NETOPIA reviews) | password on | ASKS_CLOSE |
 | 6b | the whole site open while payments are NETOPIA's sandbox: anyone may sign up and ask on the Free plan, only the accounts you list may buy test plans (after part 5 and 5.7, on a release that carries it; before you enrol the point of sale, 5.8b step 3) | open | PWON, then ASKS_CLOSE |
 | 7 | real payments (only after NETOPIA's approval and the signed contract; 6b closed first; if anyone outside the team had the site password, a new one first) | password on | PAY_BACK |
-| 8 | opening to everyone: asks, then the password off (only once your staff key works on dezbatere.ro, 5.7) | open | PWON, ASKS_CLOSE |
+| 8 | opening to everyone: asks (buying for anyone signed in, 8.1; or only for the accounts you approve, 8.1b), then the password off (only once your staff key works on dezbatere.ro, 5.7) | open | PWON, ASKS_CLOSE |
 | 9 | closing everything again | closed | – |
 | 10 | every named refusal code | – | – |
 
@@ -187,7 +188,8 @@ then PAY0 (7.1) until it prints all zeros, then a new site password (PWNEW, 7.0)
 site answering as dezbatere.ro, your staff key working there (5.7) and mail open (4.3), ASKS_OPEN with
 `V=everyone-with-listed-buyers` behind the password, then PWOFF1, the hand edit and PWOFF2 (part 8's steps). Strangers
 sign up and use the Free plan; only the accounts on the list may buy test plans; nobody needs the site password. Then
-you enrol the point of sale (5.8b). Before part 7 it closes again (6b.6). Part 6b says all of it.
+you enrol the point of sale (5.8b). Before part 7 it closes again (6b.6). Part 6b says all of it. After part 7 the
+same value can open the site again with real payments, buying only for the accounts you approve (8.1b).
 
 **If NETOPIA approves before you have had a friends' test,** part 7 comes first. Skip 7.0 only if nobody outside the
 team has had the site password. If NETOPIA's tester had it (5.8b), run PWNEW (7.0) first. Friends can then come in
@@ -205,10 +207,11 @@ go on a second time, that friends' test closes and the site password changes (7.
   (`PREVIEW_MAIL_LEGACY_NEEDS_PREVIEW_ORIGIN`). Part 4 comes first.
 - **The name before real payments.** NETOPIA's return and notice addresses are made from the name the API answers as,
   at the moment of each payment. Take real payments only on the name they will stay on.
-- **The friends' test and 6b close before real payments.** The API refuses `everyone-with-test-payments` and
-  `everyone-with-listed-buyers` with live payments (`PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX`,
-  `PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX`). The friends knew the site password (and NETOPIA's tester may
-  have, 5.8b), so it changes before real payments (PWNEW, 7.0). 6b gives the password to nobody.
+- **The friends' test and 6b close before real payments.** PAY_SWITCH runs only with asks closed and the site password
+  on, and the API refuses `everyone-with-test-payments` with live payments
+  (`PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX`). After the switch, 6b's value may open the site again with real
+  payments (8.1b), as a new opening: the Team page's list starts empty. The friends knew the site password (and
+  NETOPIA's tester may have, 5.8b), so it changes before real payments (PWNEW, 7.0). 6b gives the password to nobody.
 - **`everyone` needs real payments.** The API refuses `everyone` while billing runs on NETOPIA's sandbox
   (`PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING`): anyone could pay with the public test card and get real AI credit. With
   billing off it is refused too (`PREVIEW_ASKS_OPEN_TO_BILLING_OFF`): without plans, an account's only limit is its
@@ -216,10 +219,10 @@ go on a second time, that friends' test closes and the site password changes (7.
 - **Who may buy.** Only an account on the team line may start a purchase (a checkout or a plan upgrade), with two
   exceptions: under `everyone` with real payments anyone signed in may buy, and under `everyone-with-test-payments`
   (the friends' test, behind the site password) anyone signed in may buy a test plan. Under
-  `everyone-with-listed-buyers` (6b) anyone signed in may ask, and the team line, with the Team page's list on a
-  release that carries it, is the list of who may buy. Anyone else is refused at the last button
-  (`PREVIEW_TEAM_ONLY`); nothing is charged or written. The Team page's list counts only then: with asks closed, in
-  the friends' test and with real payments the API never reads it. The order page and its price
+  `everyone-with-listed-buyers` (6b on the sandbox, 8.1b with real payments) anyone signed in may ask, and the team
+  line, with the Team page's list on a release that carries it, is the list of who may buy. Anyone else is refused at
+  the last button (`PREVIEW_TEAM_ONLY`); nothing is charged or written. The Team page's list counts only then: with asks
+  closed, in the friends' test and under `everyone` the API never reads it. The order page and its price
   stay open to every signed-in account. A release older than the one that carries 6b checks buying only while payments
   are real: on the sandbox it lets any signed-in account buy.
 - **Asks and mail close only behind the password.** ASKS_CLOSE and MAIL_CLOSE refuse whenever the Log in page does not
@@ -244,7 +247,9 @@ go on a second time, that friends' test closes and the site password changes (7.
   (`PREVIEW_ASKS_OPEN_TO_INVALID`), and an older API lets any signed-in account buy on the sandbox. So 6b opens only
   once the upload that brought it is over and you would no longer go back to the release before it; while 6b is
   open, a later upload keeps the same value and the same list in both releases (5.6). Before you go back to a release
-  older than the one that carries 6b: PWON, then ASKS_CLOSE.
+  older than the one that carries 6b: PWON, then ASKS_CLOSE. 8.1b (6b's value with real payments) needs a later
+  release still: an older API refuses that pairing at start (`PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX`), and
+  ASKS_OPEN then puts both files back by itself.
 - **NETOPIA's logo comes only with an upload.** Its line (`NETOPIA_LOGO_ID`) goes into the new release's own website
   file in the release guide's SB5d, right after DR1; no step of this document adds it, and it never goes into an
   older release's file. It changes nothing in Caddy, so it does not depend on the site password or the name.
@@ -4611,7 +4616,7 @@ publishing is on (5.9), and that nobody can take it down by hand for now.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # ASKS_OPEN: every signed-in account may start debates (V below). The runner's file says the same; only the API restarts.
-V=everyone-with-test-payments                             # part 6 (friends' test); part 6b: V=everyone-with-listed-buyers; part 8: V=everyone
+V=everyone-with-test-payments                             # part 6 (friends' test); 6b and 8.1b: V=everyone-with-listed-buyers; 8.1: V=everyone
 declare -F upfail >/dev/null || { echo "ASKS_OPEN_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then ASKS_OPEN"; exit 1; }
 case "$V" in everyone|everyone-with-test-payments|everyone-with-listed-buyers) ;; *) echo "ASKS_OPEN_NOT_DONE: V is not one of the three values"; exit 1;; esac
 ! grep -q '^PREVIEW_ASKS_OPEN_TO=' "$A" "$RF" || { echo "ASKS_OPEN_NOT_DONE: already open: ASKS_CLOSE first"; exit 1; }
@@ -4625,15 +4630,15 @@ NB=''; LT=''; if [ "$V" = everyone-with-listed-buyers ]; then
   LT=$(psqlq "SELECT to_regclass('staff.preview_buyer_event') IS NOT NULL" || true); LN=0
   case "$LT" in t) LN=$(psqlq "SELECT count(*) FROM (SELECT DISTINCT ON (user_id) kind FROM staff.preview_buyer_event ORDER BY user_id, revision DESC) l WHERE l.kind = 'ADDED'" || true);; f) ;; *) LN='';; esac
   printf '%s\n' "$LN" | grep -qxE '[0-9]+' || { echo "ASKS_OPEN_NOT_DONE: the Team page's list of approved buyers does not read (the database did not answer); nothing changed: ask"; exit 1; }
-  [ "$LN" = 0 ] || { echo "ASKS_OPEN_NOT_DONE: $LN account(s) allowed on the Team page in an earlier opening are still on its list; nothing changed: remove them on the Team page (Who may buy while payments are in test mode; removing works while the team tools are locked), then ASKS_OPEN again"; exit 1; }
+  [ "$LN" = 0 ] || { echo "ASKS_OPEN_NOT_DONE: $LN account(s) allowed on the Team page in an earlier opening are still on its list; nothing changed: remove them on the Team page (the box of who may buy; removing works while the team tools are locked), then ASKS_OPEN again"; exit 1; }
 fi
 for F in "$A" "$RF"; do [ -z "$(tail -c1 "$F")" ] || { echo "ASKS_OPEN_NOT_DONE: $F does not end in a newline"; exit 1; }; done
 gatesok || { gates; echo "ASKS_OPEN_NOT_DONE: a spending gate is not active with its window open (above)"; exit 1; }
 [ "$(inv "$API" | grep -c '"event":"api.release.no_site_cap"' || true)" = 0 ] || { echo "ASKS_OPEN_NOT_DONE: the running API has no ask room (it would refuse PREVIEW_ASKS_OPEN_TO_WITHOUT_ROOM)"; exit 1; }
 PAY=none; if grep -qxE 'NETOPIA_API_BASE_URL=https://secure(-sandbox|\.sandbox)\.netopia-payments\.com' "$A"; then PAY=sandbox; elif grep -qx 'NETOPIA_API_BASE_URL=https://secure.netopia-payments.com/api' "$A"; then PAY=live; fi
 echo "payments: $PAY"
-case "$V/$PAY" in everyone-with-test-payments/sandbox|everyone-with-listed-buyers/sandbox|everyone/live) ;; *) echo "ASKS_OPEN_NOT_DONE: $V does not go with payments $PAY (part 10: PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING, ..._BILLING_OFF, ..._TEST_PAYMENTS_NOT_SANDBOX, ..._LISTED_BUYERS_NOT_SANDBOX)"; exit 1;; esac
-[ "$V" != everyone-with-listed-buyers ] || { [ "$HOST" = dezbatere.ro ] && [ "$(grep -c '^PREVIEW_LIVE_PAYMENTS=' "$A" || true)" = 0 ]; } || { echo "ASKS_OPEN_NOT_DONE: everyone-with-listed-buyers opens only on dezbatere.ro with no live payments line (the API answers as $HOST; nothing changed): part 5 first"; exit 1; }
+case "$V/$PAY" in everyone-with-test-payments/sandbox|everyone-with-listed-buyers/sandbox|everyone-with-listed-buyers/live|everyone/live) ;; *) echo "ASKS_OPEN_NOT_DONE: $V does not go with payments $PAY (part 10: PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING, ..._BILLING_OFF, ..._TEST_PAYMENTS_NOT_SANDBOX, ..._LISTED_BUYERS_BILLING_OFF)"; exit 1;; esac
+[ "$V" != everyone-with-listed-buyers ] || { [ "$HOST" = dezbatere.ro ] && { [ "$PAY" = live ] || [ "$(grep -c '^PREVIEW_LIVE_PAYMENTS=' "$A" || true)" = 0 ]; }; } || { echo "ASKS_OPEN_NOT_DONE: everyone-with-listed-buyers opens only on dezbatere.ro, and on the sandbox only with no live payments line (the API answers as $HOST; nothing changed): part 5 first"; exit 1; }
 [ "$V" = everyone ] || [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || { echo "ASKS_OPEN_NOT_DONE: the site password is off; $V is set only behind it: PWON first"; exit 1; }
 AS=$M/asks/open-$(date -u +%Y%m%dT%H%M%SZ); install -d -o root -g root -m 0700 "$AS"
 for F in "$A" "$RF"; do cp -p "$F" "$AS/$(basename "$F").before-open"; done
@@ -4654,25 +4659,27 @@ exit 0
 ```
 
 Expect `payments: sandbox`, the SAME list, the API's lines with `{"event":"api.preview.asks_open","to":"everyone-with-test-payments"}`,
-then `ASKS_OPEN_DONE`. With `V=everyone-with-listed-buyers` (6b) expect `payments: sandbox`, the SAME list, the
-API's lines with `{"event":"api.preview.asks_open","to":"everyone-with-listed-buyers"}`, then `listed buyers: <how
-many>` (the API's own line is `{"event":"api.preview.listed_buyers","count":<how many>}`; it counts the team line
-only), on a release that carries the Team page's list `the Team page's list of approved buyers: empty; …`, then
-`ASKS_OPEN_DONE`.
+then `ASKS_OPEN_DONE`. With `V=everyone-with-listed-buyers` expect `payments: sandbox` (6b) or `payments: live`
+(8.1b), the SAME list, the API's lines with `{"event":"api.preview.asks_open","to":"everyone-with-listed-buyers"}`,
+then `listed buyers: <how many>` (the API's own line is `{"event":"api.preview.listed_buyers","count":<how many>}`;
+it counts the team line only), on a release that carries the Team page's list `the Team page's list of approved
+buyers: empty; …`, then `ASKS_OPEN_DONE`.
 
-**With `V=everyone-with-listed-buyers` (6b).** The team line stays in both files: from now on it is the list of
+**With `V=everyone-with-listed-buyers` (6b, 8.1b).** The team line stays in both files: from now on it is the list of
 buyers, and at first it holds the team. The runner checks the line's form at its start but never uses it to decide
-whose debates run. The step refuses, with nothing changed, unless payments are NETOPIA's sandbox, the API answers as
-dezbatere.ro, and the Log in page still asks for the site password: 6b sets the value behind the password, and only
-PWOFF1 and PWOFF2 take the password off afterwards. `same` does not look at the payment system: a value on another
-payment system is refused by the API's start (`PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX`), and the step then
-puts both files back.
+whose debates run. The step refuses, with nothing changed, unless payments are NETOPIA's sandbox (6b) or real
+payments (8.1b), the API answers as dezbatere.ro, and the Log in page still asks for the site password: the value is
+set behind the password, and only PWOFF1 and PWOFF2 take the password off afterwards. `same` does not look at the
+payment system: with billing off the API's start refuses the value (`PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_BILLING_OFF`),
+and so does an API older than the one that lets it run with real payments, when payments are real
+(`PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX`); the step then puts both files back.
 
 On a database that holds the Team page's list of approved buyers (6b.3), the step also refuses, with nothing changed,
 while any account is still on that list: `ASKS_OPEN_NOT_DONE: <how many> account(s) allowed on the Team page in an
 earlier opening are still on its list …`. The list counts for nothing while asks are closed, but from this opening on
 it would count again, and those accounts could buy with no new approval and no new alert. So every opening starts from
-the team, as before. Open the Team page, press **Remove** on each row and touch your key: removing works while the team
+the team, as before, with real payments too: every account that buys with real money in 8.1b is one you approved for
+that opening. Open the Team page, press **Remove** on each row and touch your key: removing works while the team
 tools are locked, so no UNLOCK is needed. Then run ASKS_OPEN again. On a release without the Team page's list (after a
 way back), there is no box to remove them with: ask.
 
@@ -4758,10 +4765,11 @@ start, their queued work; and every checkout or plan upgrade by an account not o
 while payments are real, and, with the release that carries 6b, on NETOPIA's sandbox too. After 6b, the accounts you
 listed with BUYERS are on the team line no more: the line kept before the opening comes back, so none of them
 becomes an account that may ask. The accounts you allowed on the Team page were never on the team line: their
-approvals stop counting at this restart, because the API reads that list only while 6b is open, and they stay on the
-list, with their dates, until you remove them there. ASKS_CLOSE prints how many are left; the next ASKS_OPEN with
-`everyone-with-listed-buyers` refuses until none is (6.1). A plan any of them bought goes on until it is withdrawn or
-cancelled (3.3).
+approvals stop counting at this restart, because the API reads that list only while asks are open with
+`everyone-with-listed-buyers` (6b, 8.1b), and they stay on the list, with their dates, until you remove them there.
+ASKS_CLOSE prints how many are left; the next ASKS_OPEN with `everyone-with-listed-buyers` refuses until none is
+(6.1). A plan any of them bought goes on until it is withdrawn or cancelled (3.3); a plan bought with real money renews
+every month until its holder cancels it.
 
 ASKS_CLOSE runs only with the site password on (PWON first), whatever the payments: with the site open, closing asks
 alone would leave the people who signed up (paying customers among them, while payments are real) on an open site
@@ -4890,7 +4898,7 @@ out with SIGNUPS.
 (d) **Asks back to the team only:** ASKS_CLOSE (6.3). It runs only with the password on, so when the site is open
 PWON (b) comes first.
 
-(e) **One account may buy no more** (only while 6b is open): **Remove** on its row of the Team page's list (6b.3) and
+(e) **One account may buy no more** (only while 6b or 8.1b is open): **Remove** on its row of the Team page's list (6b.3) and
 your key. Nothing restarts, and it works while the team tools are locked. For an account BUYERS put on the team line,
 or on a release before the Team page's list, BUYERS (6b.3b) with `W=remove`. Either way it stops that account's new
 checkouts and upgrades; a plan it holds goes on until it is withdrawn or cancelled (3.3). To stop all buying by anyone
@@ -4912,7 +4920,8 @@ NETOPIA's sandbox, and lets only the accounts on the team line (`PREVIEW_TEAM_US
 that carries it, the accounts you allow on the Team page. With it, and only with it, the site password comes off on
 dezbatere.ro before real payments: strangers sign up and use the Free plan, and only the accounts you list can buy test
 plans. Nobody needs the site password, friends and NETOPIA's tester included. Part 6's friends' test and 6b never run
-together.
+together. After part 7 the same value opens the site with real payments (8.1b): the Team page's list (6b.3), BUYERS
+(6b.3b) and OPENCHECK (6b.4) serve it too.
 
 **What each visitor can do while 6b is open.**
 - **Someone with no account** reads every page, with no password box anywhere, and can sign up: the bot check, the
@@ -4937,10 +4946,10 @@ OPENCHECK (6b.4) checks every morning that it held.
   to decide whose debates run). At the opening it holds the team, and it stays the team: ASKS_CLOSE puts back the team
   line kept before the opening, so no account you listed only to buy becomes an account that may ask.
 - The Team page's list, in the database, on a release that carries it (the release with the database step 0186): the
-  box "Who may buy while payments are in test mode" on the Team page (https://dezbatere.ro/admin/team). Only you, the
-  Owner, see it and change it, each change with your security key; nothing restarts, and the API reads it at the
-  moment someone presses the pay button (6b.3). It counts only while 6b is open; it starts empty at each opening
-  (ASKS_OPEN refuses otherwise, 6.1). An account on it buys only while it is active: a suspended account cannot buy,
+  box "Who may buy while payments are in test mode" on the Team page (https://dezbatere.ro/admin/team; with real
+  payments its title is "Who may buy plans with real money"). Only you, the Owner, see it and change it, each change
+  with your security key; nothing restarts, and the API reads it at the moment someone presses the pay button (6b.3).
+  It counts only while 6b (or 8.1b) is open; it starts empty at each opening (ASKS_OPEN refuses otherwise, 6.1). An account on it buys only while it is active: a suspended account cannot buy,
   stays in the box with **Remove**, and can buy again if it becomes active again, unless you remove it.
 
 The list holds at most `PREVIEW_TEAM_MAX_MEMBERS` accounts, the team included, its two parts together: that is the
@@ -5191,8 +5200,9 @@ copy of the Caddyfile put back by hand: ask before anything else (HEALTH1 and HE
 ### 6b.3 Add or remove a buyer on the Team page
 
 On a release that carries the Team page's list (6b, "Before the release that carries the Team page's list"), while 6b
-is open. Nothing restarts, and nobody else sees the box: the Team page shows it to the Owner alone, and only while
-payments are NETOPIA's sandbox.
+or 8.1b is open. Nothing restarts, and nobody else sees the box: the Team page shows it to the Owner alone, and only
+while billing is on. Its title says which payments the list buys with: "Who may buy while payments are in test mode"
+on NETOPIA's sandbox, "Who may buy plans with real money" with real payments.
 
 **To allow an account to buy:**
 1. The account has signed up already (the person did it; you cannot do it for them).
@@ -5201,11 +5211,13 @@ payments are NETOPIA's sandbox.
    locked, it sends no alert, but is recorded like every change. No UNLOCK is needed for this box.
 3. In the browser where your staff key works on dezbatere.ro, open https://dezbatere.ro/admin/team (type the
    address), and verify your key as usual (**Verify security key for team access**).
-4. In the box **Who may buy while payments are in test mode**, type the person's address in **The account's email
-   address** and press **Allow to buy**. The address goes to the server only inside the request; it is never stored
+4. In the box **Who may buy while payments are in test mode** (with real payments, 8.1b: **Who may buy plans with real
+   money**), type the person's address in **The account's email address** and press **Allow to buy**. The address goes to the server only inside the request; it is never stored
    in the list, never shown back in full, and never written in a log.
 5. The box asks, for example: "Allow ste•••n.n•••our@example.com to buy test plans? Each test plan it buys must be
-   withdrawn or cancelled within 14 days, before real payments." The shortened address keeps the start, the middle
+   withdrawn or cancelled within 14 days, before real payments." With real payments (8.1b) it asks instead: "Allow
+   ste•••n.n•••our@example.com to buy plans with real money? A plan it buys renews each month on its card until it is
+   cancelled." The shortened address keeps the start, the middle
    and the end of the part before the @, and the domain whole, so you can tell whose account it is
    (stefan.nour@example.com reads `ste•••n.n•••our@example.com`). It never shows that part whole: a name of one or two
    characters before the @ shows only the dots (`•••@example.com`), and one of three or four only its first character.
@@ -5216,7 +5228,8 @@ payments are NETOPIA's sandbox.
 7. If you unlocked the team tools for something else, lock them again when you are done:
    `systemctl stop debateai-preview-team-unlock` (they lock by themselves after one hour anyway).
 
-The person is not told: no mail goes to them. Tell them yourself, with the rules of 6b.1 (decision 5).
+The person is not told: no mail goes to them. Tell them yourself, with the rules of 6b.1 (decision 5), or, with real
+payments, what 8.1b says a plan bought there does.
 
 **To stop an account from buying:** press **Remove** on its row, then **Confirm**, and touch your key. As for an
 addition, the team tools may be locked (no UNLOCK): a removal made while they are locked sends no alert, but is
@@ -5238,9 +5251,9 @@ the list" below says.
 - "The team tools are locked, so nothing was added. …": the release running is older than the one that lets an
   addition go on with the key alone; there an addition still needs the team tools unlocked. UNLOCK (5.7, step 3), then
   again.
-- "Adding works only while the whole site is open with test payments. …": 6b is not open (or it closed): the box
-  then says that the list counts for nothing right now, counts only the accounts on it ("Accounts on this list: …"),
-  and offers only **Remove**.
+- "Adding works only while the whole site is open with buying kept to invited accounts. …": neither 6b nor 8.1b is
+  open (or it closed): the box then says that the list counts for nothing right now, counts only the accounts on it
+  ("Accounts on this list: …"), and offers only **Remove**.
 - "Nothing changed.": the key's prompt was closed or timed out; press the button again.
 - "This did not go through. …": read the box again; if it says it twice, ask.
 
@@ -5307,11 +5320,15 @@ if [ "$R" != 0 ]; then WHY=$(upfail "$R" 'the new list'); back; { apistart && we
 said -xF "{\"event\":\"api.preview.listed_buyers\",\"count\":$NB}" || { echo "BUYERS_NOT_DONE: the API does not say the $NB listed buyers the files hold: ask"; exit 1; }
 echo "listed buyers now: $NB"
 if [ "$W" = remove ]; then
-  H=$(psqlq "SELECT (SELECT count(*) FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' WHERE s.owner_ref = '$OR' AND jsonb_extract_path_text(c.data, 'payment_environment') = 'sandbox' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED')) + (SELECT count(*) FROM billing.charge g WHERE g.owner_ref = '$OR' AND g.payment_environment = 'sandbox' AND g.kind IN ('INITIAL', 'UPGRADE') AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = g.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) AND NOT EXISTS (SELECT 1 FROM billing.subscription_latest_v e WHERE e.subscription_id = g.subscription_id AND e.kind IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED')))" || echo unknown)
-  case "$H" in
-    0) echo "this account holds no open sandbox plan and no unfinished payment page";;
-    ''|*[!0-9]*) echo "LOOK: whether this account still holds a sandbox plan did not read: run SANDBOXLIST (3.3)";;
-    *) echo "LOOK: this account still holds an open sandbox plan or an unfinished payment page; it goes on until it is withdrawn (WITHDRAWOTHER, 3.3, within 14 days of its purchase, after you tell them) or they cancel it";;
+  # The plans of the payment system the API file names: the sandbox's (6b), or real payments' (8.1b).
+  PE=sandbox; ! grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || PE=live
+  H=$(psqlq "SELECT (SELECT count(*) FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' WHERE s.owner_ref = '$OR' AND jsonb_extract_path_text(c.data, 'payment_environment') = '$PE' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED')) + (SELECT count(*) FROM billing.charge g WHERE g.owner_ref = '$OR' AND g.payment_environment = '$PE' AND g.kind IN ('INITIAL', 'UPGRADE') AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = g.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) AND NOT EXISTS (SELECT 1 FROM billing.subscription_latest_v e WHERE e.subscription_id = g.subscription_id AND e.kind IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED')))" || echo unknown)
+  case "$PE/$H" in
+    */0) echo "this account holds no open $PE plan and no unfinished payment page";;
+    sandbox/|sandbox/*[!0-9]*) echo "LOOK: whether this account still holds a sandbox plan did not read: run SANDBOXLIST (3.3)";;
+    live/|live/*[!0-9]*) echo "LOOK: whether this account still holds a live plan did not read: ask";;
+    sandbox/*) echo "LOOK: this account still holds an open sandbox plan or an unfinished payment page; it goes on until it is withdrawn (WITHDRAWOTHER, 3.3, within 14 days of its purchase, after you tell them) or they cancel it";;
+    *) echo "LOOK: this account still holds an open live plan or an unfinished payment page; a live plan renews each month on its saved card until its holder cancels it";;
   esac
 fi
 unset OR TU
@@ -5320,13 +5337,15 @@ exit 0
 ```
 
 Expect `listed buyers now: <how many>`, then `BUYERS_DONE`; when you removed an account, one more line before it says
-whether that account still holds an open sandbox plan or an unfinished payment page.
+whether that account still holds an open plan (a sandbox plan in 6b, a live plan in 8.1b) or an unfinished payment
+page.
 
 **Taking an account off the list** stops its new checkouts and upgrades only. A plan it holds keeps renewing on its
 saved test card, and its holder can still change that card, until the plan is withdrawn or cancelled: run
 WITHDRAWOTHER (3.3) within 14 days of its purchase, after you tell them, or ask them to cancel it in Settings or on
-`/cancel`. A NETOPIA page it opened while it was listed can still be paid for up to a day. Taking everyone off leaves
-the list empty (`[]`): nobody may buy. To stop all buying by anyone outside the team at once, PWON is faster (6b.5); a
+`/cancel`. With real payments (8.1b) its plan renews each month on the card it was paid with, until its holder cancels
+it in Settings or on `/cancel`. A NETOPIA page it opened while it was listed can still be paid for up to a day. Taking
+everyone off leaves the list empty (`[]`): nobody may buy. To stop all buying by anyone outside the team at once, PWON is faster (6b.5); a
 payment page opened earlier can still be paid for up to a day.
 
 **If it stops:**
@@ -5339,13 +5358,14 @@ payment page opened earlier can still be paid for up to a day.
 
 ### 6b.4 The morning check (OPENCHECK)
 
-OPENCHECK only reads. Run it every morning while 6b is open, after a later upload (once the first line of names.sh
-names it), and whenever something looks wrong.
+OPENCHECK only reads. Run it every morning while 6b or 8.1b is open, after a later upload (once the first line of
+names.sh names it), and whenever something looks wrong. It reads the plans and payments of the payment system the API
+file names: NETOPIA's sandbox (6b), or real payments (8.1b).
 
 ```sh
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
-# OPENCHECK: the morning check while 6b is open (read-only). The value and the team line in both files and in the running API's lines; the open site's answers; the gates; the day's mail against its limit; the Team page's list; the plans and payment pages of accounts not on the list. It prints counts and yes or no, never an address, an id or an amount of money.
+# OPENCHECK: the morning check while 6b or 8.1b is open (read-only). The value and the team line in both files and in the running API's lines; the payments; the open site's answers; the gates; the day's mail against its limit; the Team page's list; the plans and payment pages of accounts not on the list. It prints counts and yes or no, never an address, an id or an amount of money.
 BAD=''; bad() { echo "CHECK_FAILED: $1"; BAD=yes; }
 code() { curl -s -o /dev/null -m 15 -w '%{http_code}' "$@" || true; }
 ID='"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"'; LIST="\[($ID(,$ID)*)?\]"
@@ -5353,7 +5373,12 @@ ID='"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"'; LIST="\[($I
 [ "$HOST" = dezbatere.ro ] || bad "the API answers as $HOST, not dezbatere.ro"
 [ "$(grep -cx 'PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers' "$A" || true)" = 1 ] && [ "$(grep -cx 'PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers' "$RF" || true)" = 1 ] || bad "the two files do not both hold everyone-with-listed-buyers"
 said -xF '{"event":"api.preview.asks_open","to":"everyone-with-listed-buyers"}' || bad "the running API does not say asks open to everyone-with-listed-buyers"
-grep -qxE 'NETOPIA_API_BASE_URL=https://secure(-sandbox|\.sandbox)\.netopia-payments\.com' "$A" && [ "$(grep -c '^PREVIEW_LIVE_PAYMENTS=' "$A" || true)" = 0 ] || bad "payments are not NETOPIA's sandbox"
+# The payments: NETOPIA's sandbox with no live payments line (6b), or its live address with the line (8.1b). The plans and payments below are that system's.
+PE=''
+if grep -qxE 'NETOPIA_API_BASE_URL=https://secure(-sandbox|\.sandbox)\.netopia-payments\.com' "$A" && [ "$(grep -c '^PREVIEW_LIVE_PAYMENTS=' "$A" || true)" = 0 ]; then PE=sandbox
+elif grep -qx 'NETOPIA_API_BASE_URL=https://secure.netopia-payments.com/api' "$A" && grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A"; then PE=live
+else bad "payments are neither NETOPIA's sandbox nor real payments with the live payments line"; fi
+[ -z "$PE" ] || echo "payments: $PE"
 J=$(sed -n 's/^PREVIEW_TEAM_USER_IDS_JSON=//p' "$A" | jq -c . 2>/dev/null || true)
 if [ "$(grep -c '^PREVIEW_TEAM_USER_IDS_JSON=' "$A" || true)" = 1 ] && [ "$(grep '^PREVIEW_TEAM_USER_IDS_JSON=' "$A")" = "$(grep '^PREVIEW_TEAM_USER_IDS_JSON=' "$RF" || true)" ] && printf '%s\n' "$J" | grep -qxE "$LIST"; then
   NB=$(jq length <<<"$J"); echo "listed buyers in the files: $NB"
@@ -5382,7 +5407,7 @@ if [ -s "$M/asks/names.sh" ]; then . "$M/asks/names.sh"; AT=${ASKS_AT:-}; fi
 if [ -n "$J" ] && printf '%s\n' "$AT" | grep -qxE '[0-9]+'; then
   EVER=$( { for F in "$ASKS_ARCHIVE/api-$ASKS_LABEL.env.before-open" "$ASKS_ARCHIVE"/buyers-*/api-*.env.before "$A"; do [ ! -e "$F" ] || sed -n 's/^PREVIEW_TEAM_USER_IDS_JSON=//p' "$F"; done; } | jq -cs 'add | unique' 2>/dev/null || true)
 fi
-# The Team page's list (6b.3), on a database that holds it: how many accounts are on it; with the team line, how many may buy, against the cap read from this release's code, never printed; its changes since the opening; the open sandbox plans of its accounts and how many days ago the oldest was bought, a reminder of the 14 days to withdraw each, never a failure. On a release that carries the list: whether the API's login may read it, and whether the API could not read it at a pay button since its start.
+# The Team page's list (6b.3), on a database that holds it: how many accounts are on it; with the team line, how many may buy, against the cap read from this release's code, never printed; its changes since the opening; the open plans of its accounts and how many days ago the oldest was bought, on the sandbox a reminder of the 14 days to withdraw each, never a failure. On a release that carries the list: whether the API's login may read it, and whether the API could not read it at a pay button since its start.
 LT=$(psqlq "SELECT to_regclass('staff.preview_buyer_event') IS NOT NULL" || true)
 TP=no; [ ! -f "$CAPI/dialectical-engine/apps/api/src/staff/preview-buyers.ts" ] || TP=yes
 LISTED="SELECT l.user_id FROM (SELECT DISTINCT ON (user_id) user_id, kind FROM staff.preview_buyer_event ORDER BY user_id, revision DESC) l WHERE l.kind = 'ADDED'"
@@ -5394,9 +5419,10 @@ if [ "$LT" = t ] && [ -n "$J" ] && [ -n "$EVER" ]; then
   if printf '%s\n' "$LN" | grep -qxE '[0-9]+' && printf '%s\n' "$MB" | grep -qxE '[0-9]+' && printf '%s\n' "$CH" | grep -qxE '[0-9]+ [0-9]+' && [ -n "$CAP" ]; then
     echo "accounts on the Team page's list: $LN; accounts that may buy, the team line included: $MB"
     echo "changes on the Team page's list since the opening: ${CH% *} added, ${CH#* } removed"
-    LP=$(psqlq "SELECT count(*) || ' ' || coalesce(max(floor(extract(epoch FROM now() - coalesce(a.bought, c.at)) / 86400))::bigint, 0) FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' LEFT JOIN LATERAL (SELECT min(b.at) AS bought FROM billing.subscription_event b WHERE b.subscription_id = s.subscription_id AND b.kind = 'ACTIVATED') a ON true WHERE jsonb_extract_path_text(c.data, 'payment_environment') = 'sandbox' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED', 'CREATED') AND EXISTS (SELECT 1 FROM identity.\"user\" u WHERE u.owner_ref = s.owner_ref AND u.user_id IN ($LISTED))" || true)
-    if ! printf '%s\n' "$LP" | grep -qxE '[0-9]+ [0-9]+'; then echo "open sandbox plans of accounts on the Team page's list: did not read (SANDBOXLIST, 3.3, lists every open sandbox plan)"
-    elif [ "${LP% *}" = 0 ]; then echo "open sandbox plans of accounts on the Team page's list: 0"
+    LP=''; [ -z "$PE" ] || LP=$(psqlq "SELECT count(*) || ' ' || coalesce(max(floor(extract(epoch FROM now() - coalesce(a.bought, c.at)) / 86400))::bigint, 0) FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' LEFT JOIN LATERAL (SELECT min(b.at) AS bought FROM billing.subscription_event b WHERE b.subscription_id = s.subscription_id AND b.kind = 'ACTIVATED') a ON true WHERE jsonb_extract_path_text(c.data, 'payment_environment') = '$PE' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED', 'CREATED') AND EXISTS (SELECT 1 FROM identity.\"user\" u WHERE u.owner_ref = s.owner_ref AND u.user_id IN ($LISTED))" || true)
+    if ! printf '%s\n' "$LP" | grep -qxE '[0-9]+ [0-9]+'; then echo "open ${PE:-sandbox or live} plans of accounts on the Team page's list: did not read$([ "$PE" != sandbox ] || echo ' (SANDBOXLIST, 3.3, lists every open sandbox plan)')"
+    elif [ "${LP% *}" = 0 ]; then echo "open $PE plans of accounts on the Team page's list: 0"
+    elif [ "$PE" = live ]; then echo "open live plans of accounts on the Team page's list: ${LP% *} (each renews every month on its saved card until its holder cancels it)"
     else echo "open sandbox plans of accounts on the Team page's list: ${LP% *}; the oldest was bought ${LP#* } day(s) ago (withdraw each within 14 days of its purchase, or its holder cancels it: 6b.1, 3.3)"; fi
     [ "$MB" -le "$CAP" ] || bad "more accounts may buy than PREVIEW_TEAM_MAX_MEMBERS allows: remove some on the Team page, then ask"
     if [ "$TP" = yes ]; then
@@ -5407,24 +5433,24 @@ if [ "$LT" = t ] && [ -n "$J" ] && [ -n "$EVER" ]; then
   else bad "the Team page's list does not read (the database did not answer, or the cap does not read from this release's code)"; fi
 elif [ "$LT" = f ]; then [ "$TP" = no ] || bad "this release carries the Team page's list, but the database does not hold it: ask"
 elif [ "$LT" != t ]; then bad "whether the database holds the Team page's list does not read (the database did not answer)"; fi
-# Plans and payment pages of accounts not on the list now (not on the team line, and not on the Team page's list or suspended while on it: such an account cannot buy). A plan: a sandbox plan whose latest event is not ENDED, WITHDRAWN, ERASURE_STOPPED or CREATED (a cancelled plan still in its month counts). A payment page: a sandbox checkout or upgrade (a charge of kind INITIAL or UPGRADE) with neither a SUCCEEDED nor a FAILED event, on a plan that has not ended.
+# Plans and payment pages of accounts not on the list now (not on the team line, and not on the Team page's list or suspended while on it: such an account cannot buy), of the payment system above. A plan: one whose latest event is not ENDED, WITHDRAWN, ERASURE_STOPPED or CREATED (a cancelled plan still in its month counts). A payment page: a checkout or upgrade (a charge of kind INITIAL or UPGRADE) with neither a SUCCEEDED nor a FAILED event, on a plan that has not ended.
 # Since the opening: checkouts and upgrades started at or after ASKS_OPEN by accounts on no team line since then and not on the Team page's list at any moment of the two minutes before the charge (the pay button's check comes a moment before the charge is written, and a removal may fall between). A refused checkout or upgrade writes no row, so this count must be 0. A charge of an account erased since has no account left to look up: those are counted on their own.
 notlisted() { printf "NOT EXISTS (SELECT 1 FROM identity.\"user\" u WHERE u.owner_ref = %s.owner_ref AND u.user_id::text IN (SELECT jsonb_array_elements_text('%s'::jsonb)))" "$1" "$2"; }
 notapproved() { if [ "$LT" = t ]; then printf "NOT EXISTS (SELECT 1 FROM identity.\"user\" u WHERE u.owner_ref = %s.owner_ref AND staff.preview_buyer_listed(u.user_id))" "$1"; else printf 'true'; fi; }
 notapprovedthen() { if [ "$LT" = t ]; then printf "NOT EXISTS (SELECT 1 FROM identity.\"user\" u JOIN staff.preview_buyer_event e ON e.user_id = u.user_id WHERE u.owner_ref = %s.owner_ref AND e.kind = 'ADDED' AND e.recorded_at <= %s.created_at AND NOT EXISTS (SELECT 1 FROM staff.preview_buyer_event n WHERE n.user_id = e.user_id AND n.revision > e.revision AND n.recorded_at < %s.created_at - interval '2 minutes'))" "$1" "$1" "$1"; else printf 'true'; fi; }
-if [ -z "$J" ]; then :
+if [ -z "$J" ] || [ -z "$PE" ]; then :
 elif printf '%s\n' "$EVER" | grep -qxE "$LIST"; then
-  PLANS=$(psqlq "SELECT count(*) FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' WHERE jsonb_extract_path_text(c.data, 'payment_environment') = 'sandbox' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED', 'CREATED') AND $(notlisted s "$J") AND $(notapproved s)" || true)
-  PAGES=$(psqlq "SELECT count(*) FROM billing.charge g WHERE g.payment_environment = 'sandbox' AND g.kind IN ('INITIAL', 'UPGRADE') AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = g.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) AND NOT EXISTS (SELECT 1 FROM billing.subscription_latest_v e WHERE e.subscription_id = g.subscription_id AND e.kind IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED')) AND $(notlisted g "$J") AND $(notapproved g)" || true)
-  SINCE=$(psqlq "SELECT count(*) FROM billing.charge g WHERE g.payment_environment = 'sandbox' AND g.kind IN ('INITIAL', 'UPGRADE') AND g.created_at >= to_timestamp($AT) AND EXISTS (SELECT 1 FROM identity.\"user\" x WHERE x.owner_ref = g.owner_ref) AND $(notlisted g "$EVER") AND $(notapprovedthen g)" || true)
-  GONE=$(psqlq "SELECT count(*) FROM billing.charge g WHERE g.payment_environment = 'sandbox' AND g.kind IN ('INITIAL', 'UPGRADE') AND g.created_at >= to_timestamp($AT) AND NOT EXISTS (SELECT 1 FROM identity.\"user\" x WHERE x.owner_ref = g.owner_ref)" || true)
+  PLANS=$(psqlq "SELECT count(*) FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' WHERE jsonb_extract_path_text(c.data, 'payment_environment') = '$PE' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED', 'CREATED') AND $(notlisted s "$J") AND $(notapproved s)" || true)
+  PAGES=$(psqlq "SELECT count(*) FROM billing.charge g WHERE g.payment_environment = '$PE' AND g.kind IN ('INITIAL', 'UPGRADE') AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = g.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) AND NOT EXISTS (SELECT 1 FROM billing.subscription_latest_v e WHERE e.subscription_id = g.subscription_id AND e.kind IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED')) AND $(notlisted g "$J") AND $(notapproved g)" || true)
+  SINCE=$(psqlq "SELECT count(*) FROM billing.charge g WHERE g.payment_environment = '$PE' AND g.kind IN ('INITIAL', 'UPGRADE') AND g.created_at >= to_timestamp($AT) AND EXISTS (SELECT 1 FROM identity.\"user\" x WHERE x.owner_ref = g.owner_ref) AND $(notlisted g "$EVER") AND $(notapprovedthen g)" || true)
+  GONE=$(psqlq "SELECT count(*) FROM billing.charge g WHERE g.payment_environment = '$PE' AND g.kind IN ('INITIAL', 'UPGRADE') AND g.created_at >= to_timestamp($AT) AND NOT EXISTS (SELECT 1 FROM identity.\"user\" x WHERE x.owner_ref = g.owner_ref)" || true)
   NUM=yes; for CNT in "$PLANS" "$PAGES" "$SINCE" "$GONE"; do printf '%s\n' "$CNT" | grep -qxE '[0-9]+' || NUM=no; done
   if [ "$NUM" = no ]; then bad "the plans of accounts not on the list do not read (the database did not answer)"
   else
-    echo "accounts not on the list now: open sandbox plans $PLANS, unfinished payment pages $PAGES"
+    echo "accounts not on the list now: open $PE plans $PLANS, unfinished payment pages $PAGES"
     echo "checkouts and upgrades started since the opening by accounts never on the list: $SINCE"
     [ "$SINCE" = 0 ] || bad "an account that was never on the list started a checkout or an upgrade since the opening: the buyer rule did not hold: PWON now (6.5 (b)), then ask"
-    [ "$PLANS/$PAGES" = 0/0 ] || echo "LOOK: plans or payment pages of accounts not on the list (from before the opening, of accounts you took off it, or of accounts suspended while on it): each goes on until it is withdrawn or cancelled; settle them as 3.3 says"
+    [ "$PLANS/$PAGES" = 0/0 ] || echo "LOOK: plans or payment pages of accounts not on the list (from before the opening, of accounts you took off it, or of accounts suspended while on it): each goes on until it is withdrawn or cancelled; $([ "$PE" = live ] && echo 'a live plan renews each month on its saved card until its holder cancels it' || echo 'settle them as 3.3 says')"
     [ "$GONE" = 0 ] || echo "LOOK: $GONE checkout(s) or upgrade(s) since the opening by accounts erased since: whether they were on the list no longer reads; if you know of no such erasure, ask"
   fi
 else bad "the opening's time or the kept copies of the list do not read (ASKS_OPEN of this guide writes them): ask"; fi
@@ -5433,10 +5459,10 @@ echo OPENCHECK_DONE
 exit 0
 ```
 
-Expect, in order: `listed buyers in the files: <how many>` (the team line), the gates' line, two mail lines (yesterday
-and today, UTC), on a database that holds the Team page's list its three lines (how many accounts are on it and how
-many may buy with the team line; its changes since the opening; the open sandbox plans of its accounts), the two lines
-about accounts not on the list, then `OPENCHECK_DONE`. It changes nothing, and it prints no address, no id and no
+Expect, in order: `payments: sandbox` (6b) or `payments: live` (8.1b), `listed buyers in the files: <how many>` (the
+team line), the gates' line, two mail lines (yesterday and today, UTC), on a database that holds the Team page's list
+its three lines (how many accounts are on it and how many may buy with the team line; its changes since the opening;
+the open plans of its accounts), the two lines about accounts not on the list, then `OPENCHECK_DONE`. It changes nothing, and it prints no address, no id and no
 amount of money: the mail lines are counts and a share of the limit.
 
 **What its counts mean.**
@@ -5445,6 +5471,9 @@ amount of money: the mail lines are counts and a share of the limit.
   Team page's list that is suspended (it cannot buy while suspended). Each goes on until
   it is withdrawn or cancelled, and each blocks real payments: settle them as 3.3 says (WITHDRAWOTHER within 14 days
   of the purchase, after you tell them, or the holder cancels). A non-zero count is a `LOOK:` line, not a failure.
+  With real payments (8.1b) the line says `open live plans`: a live plan of an account you took off the list renews
+  each month on its saved card until its holder cancels it; it was paid for, and it keeps PAY_BACK (7.11) closed until
+  it is over.
 - `checkouts and upgrades started since the opening by accounts never on the list` must be 0: a checkout or an upgrade
   the API refuses writes no row. Not 0 means the buyer rule did not hold: PWON now (6.5 (b)), then ask. Do not
   withdraw anything before you ask. This count leaves out every account that was on the team line at any time since
@@ -5460,7 +5489,9 @@ amount of money: the mail lines are counts and a share of the limit.
   never a failure. Withdraw each such plan with WITHDRAWOTHER (3.3, after you tell them) within 14 days of its
   purchase, or its holder cancels it (6b.1, decision 5); after 14 days only its holder can cancel it. A plan counts
   from its purchase, whatever the account's state; `did not read` means the database did not answer this one question:
-  SANDBOXLIST (3.3) lists every open sandbox plan.
+  SANDBOXLIST (3.3) lists every open sandbox plan. With real payments (8.1b) the line is `open live plans of accounts
+  on the Team page's list`, a count only: those plans were bought with real money, and each renews every month until
+  its holder cancels it; they are not withdrawn as 6b's test plans are.
 - `CHECK_FAILED: the API's login may not read the Team page's list …`: every account allowed there is refused at the
   pay button (503), and nothing is charged: the rule still holds, so no PWON is needed; ask.
 - `LOOK: since its start the API could not read the Team page's list …`: those purchases were refused with nothing
@@ -5507,20 +5538,23 @@ The brakes are those of 6.5, fastest first:
 
 ### 6b.6 Before part 7
 
-PAY_SWITCH refuses while any asks value is set and while the site password is off, and the live start refuses
-`everyone-with-listed-buyers` (`PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX`). So, in this order:
+PAY_SWITCH refuses while any asks value is set and while the site password is off. So 6b closes before the switch,
+in this order:
 1. PWON (8.4). From then on the people who signed up cannot reach the site until part 8 opens it again: not to sign
    in, and not to reach Settings (their data export or deletion), except by writing to the company's address. Tell
    them what you decided before you opened (6b.1): this document has no step that writes to them.
 2. ASKS_CLOSE (6.3). Their waiting debates are recorded failed. It prints how many accounts are still on the Team
-   page's list: remove each there now (**Remove**, your key; no UNLOCK needed). With real payments the box is no
-   longer shown, and a later 6b opening refuses while any account is left on it (6.1).
+   page's list: remove each there now (**Remove**, your key; no UNLOCK needed). The box stays on the Team page with
+   real payments too (its title then says real money), and a later opening with `everyone-with-listed-buyers` (8.1b
+   included) refuses while any account is left on it (6.1): every account that may buy with real money is one you
+   approve afresh.
 3. Every sandbox plan the listed accounts bought, NETOPIA's tester's included, is withdrawn with WITHDRAWOTHER within
    14 days of its purchase (tell them first) or cancelled by its holder. After 14 days only the holder can cancel, and
    the live start waits until they do. Then PAY0 (7.1) until it prints all zeros.
 4. PWNEW (7.0) only if someone outside the team ever had the site password (a friends' test of part 6, or NETOPIA's
    tester given it as 5.8b step 2 describes for the review window). 6b itself gives it to nobody.
-5. Part 7 as written; later part 8, with `everyone`.
+5. Part 7 as written; later part 8: asks open to everyone with `everyone` (8.1), or the whole site open again with
+   real payments and buying only for the accounts you approve (8.1b).
 
 From the opening on, people outside the team have accounts on this server. A later change of the Terms or of the
 Privacy Policy reaches them: ask before an upload that changes either.
@@ -5532,9 +5566,9 @@ Privacy Policy reaches them: ask before an upload that changes either.
 **Before you start:**
 - NETOPIA approved and the contract is signed (1.1, 5.8b), and the SmartBill proof passed (1.2).
 - The main name is open (part 5), and the billing check passes on it.
-- Asks are closed (ASKS_CLOSE). The live start refuses `everyone-with-test-payments` and
-  `everyone-with-listed-buyers`. After the switch you open asks with `everyone` (part 8), never with the friends'
-  value or 6b's.
+- Asks are closed (ASKS_CLOSE): PAY_SWITCH runs only with asks closed, and the live start refuses
+  `everyone-with-test-payments`. After the switch you open asks with `everyone` (8.1), or with
+  `everyone-with-listed-buyers` to keep buying to the accounts you approve (8.1b), never with the friends' value.
 - If 6b was open: it is closed as 6b.6 says (PWON, ASKS_CLOSE, every plan the listed accounts bought withdrawn or
   cancelled, PAY0 printing all zeros). The site password is on again, and the people who signed up wait for part 8.
 - If a friends' test ran (part 6), or NETOPIA's tester had the site password (5.8b): every plan they bought is closed
@@ -5769,7 +5803,7 @@ set -euo pipefail
 declare -F upfail >/dev/null || { echo "PAY_SWITCH_NOT_DONE: the names file is from an earlier version of this guide (no upfail); nothing changed: run LOCKS0 (3.0) again, then PAY_SWITCH"; exit 1; }
 QL=$(grep -oE '^QUADERNO_API_BASE_URL=https://[a-z0-9-]+' "$M/pay/live.lines" | cut -d/ -f3 || true)
 [ "$HOST" = dezbatere.ro ] || { echo "PAY_SWITCH_NOT_DONE: the API answers as $HOST: open the main name first (part 5)"; exit 1; }
-! grep -q '^PREVIEW_ASKS_OPEN_TO=' "$A" "$RF" || { echo "PAY_SWITCH_NOT_DONE: asks are open: ASKS_CLOSE first (the live start refuses everyone-with-test-payments and everyone-with-listed-buyers)"; exit 1; }
+! grep -q '^PREVIEW_ASKS_OPEN_TO=' "$A" "$RF" || { echo "PAY_SWITCH_NOT_DONE: asks are open: ASKS_CLOSE first (the switch runs with asks closed; the live start refuses everyone-with-test-payments)"; exit 1; }
 [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || { echo "PAY_SWITCH_NOT_DONE: the site password is off"; exit 1; }
 [ "$(modecheck "$QL")" = 'egress: live' ] || { echo "PAY_SWITCH_NOT_DONE: the egress proxy is not live for $QL (PAY_EGRESS first)"; exit 1; }
 cmp -s "$M/pay/sandbox.lines" <(grep -E "$KEYS" "$A") || { echo "PAY_SWITCH_NOT_DONE: the API file's payment lines changed since PAY_LINES: ask"; exit 1; }
@@ -6035,16 +6069,86 @@ decided your numbers and gate pots (1.7, 6.4); you have decided whether to open 
 it, as in 6b's decision 7; and you have read the
 warning in bold at the start of part 9: once strangers can buy, closing everything again needs help.
 
-**6b uses 8.2 to 8.4 too.** PWOFF1 accepts two pairings: part 8's (`everyone` in both files and in the running API's
-line, real payments) and 6b's (`everyone-with-listed-buyers` in both files and in the running API's line, the listed
-count the API printed equal to the list in the file, NETOPIA's sandbox with no `PREVIEW_LIVE_PAYMENTS` line, the four
-spending gates active). Every other guard is the same for both: dezbatere.ro, the staff screens and the Owner's
-working staff key there, mail open, the Log in page asking for the password, the review window closed, and no earlier
-copies. The hand edit, PWOFF2 and PWON are the same for both.
+**6b and 8.1b use 8.2 to 8.4 too.** PWOFF1 accepts three pairings: 8.1's (`everyone` in both files and in the
+running API's line, real payments), 6b's (`everyone-with-listed-buyers` in both files and in the running API's line,
+the listed count the API printed equal to the list in the file, NETOPIA's sandbox with no `PREVIEW_LIVE_PAYMENTS`
+line, the four spending gates active) and 8.1b's (the same as 6b's, with real payments: NETOPIA's live address and the
+line `PREVIEW_LIVE_PAYMENTS=real-money`). Every other guard is the same for all three: dezbatere.ro, the staff screens
+and the Owner's working staff key there, mail open, the Log in page asking for the password, the review window
+closed, and no earlier copies. The hand edit, PWOFF2 and PWON are the same for all three.
 
 ### 8.1 Asks open to everyone
 
-Run ASKS_OPEN (6.1) with the line `V=everyone`. It refuses unless payments are live. Then test it as in 6.2.
+Run ASKS_OPEN (6.1) with the line `V=everyone`. It refuses unless payments are live. Then test it as in 6.2. Anyone
+signed in may then buy a plan. To keep buying to the accounts you approve, use 8.1b instead.
+
+### 8.1b Or: the whole site open with real payments, buying only for the accounts you approve
+
+`PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers` with real payments: anyone may sign up and use the Free plan, and
+only the team and the accounts you approve on the Team page may buy, with real money. It is 6b's value after part 7,
+and it uses 6b's tools: the Team page's list (6b.3), BUYERS for `W=remove` (6b.3b) and OPENCHECK (6b.4). Buying for
+anyone signed in stays with `everyone` (8.1). It needs a release that lets 6b's value run with real payments: an older
+API refuses the pairing at start (`PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX`), and ASKS_OPEN then puts both
+files back by itself.
+
+**Before you open:**
+- Part 7 up to 7.8: PAY_PROVE (7.7) passed, and your first real payment (7.8) went through with its M1 and M2. Its
+  invoice (7.9) and its refund (7.10) may follow while the site is open.
+- Everything under part 8's "Before you start" above.
+- The four spending gates are active with their window open (GATES, 6.2), and AICHECK (6b.1) ends with
+  `AICHECK_DONE`, or you decided to open without it (6b.1, decision 1).
+- Asks are closed, as part 7 leaves them, and the Team page's list is empty: ASKS_OPEN refuses while any account is on
+  it (6.1), so every account that may buy with real money is one you approve for this opening.
+- You have decided whom you approve, and you will tell each of them what a plan bought here is (below).
+
+**The steps, in order.** Each API restart shows an error page for a minute or more: pick quiet minutes.
+1. ASKS_OPEN (6.1) with the line `V=everyone-with-listed-buyers`, while the site password is still on. Expect
+   `payments: live`, the API's line `{"event":"api.preview.asks_open","to":"everyone-with-listed-buyers"}`,
+   `listed buyers: <how many> (the team line)`, the line that the Team page's list is empty, then `ASKS_OPEN_DONE`.
+2. On the Team page, in the box **Who may buy plans with real money**, allow each account you approve (6b.3, your
+   security key; nothing restarts). The box asks, for example: "Allow ste•••n.n•••our@example.com to buy plans with
+   real money? A plan it buys renews each month on its card until it is cancelled."
+3. A test behind the password, with the password typed: an account that is not on the list asks a short question
+   (the debate starts); it opens a plan from `/pricing` (the whole order page shows, with its price and no test-mode
+   note), and at **Abonați-vă și plătiți** (Subscribe and pay) the sentence shows. Never press that button as an
+   account on the list in a test: it places a real order.
+4. PWOFF1 (8.2), the hand edit of 8.2, then PWOFF2 (8.3).
+5. By hand, in a private window that never had the site password, as 6b.2 step 7 says.
+6. OPENCHECK (6b.4). Expect `payments: live` among its lines, then `OPENCHECK_DONE`.
+
+Every morning while it is open: OPENCHECK, the four spending gates (6.2), AICHECK (6b.1), the Public tab and the report
+mails, as in 6b.2.
+
+**What an account that is not on the list sees.** What 6b.1 says for an account that is not listed, without the
+test-mode note: it asks on the Free plan, sees the prices and the whole order page, and at the last button (or the
+upgrade's pay button in Settings) it is refused with the sentence "Buying a plan is open only to invited accounts for
+now. You can keep using the Free plan." (403 `PREVIEW_TEAM_ONLY`). Nothing is charged or written, and no NETOPIA page
+opens.
+
+**What a plan an approved account buys does.** It is a real purchase, with M1, M2 and its invoice (7.9). From then on
+it renews every month on the card it was paid with, until its holder cancels it in Settings or on `/cancel`. Its
+holder may withdraw it within the days the Terms allow (Settings, **Withdraw**); its refund then goes as 7.10 says.
+Taking the account off the list does not end its plan: it stops only that account's new checkouts and upgrades.
+
+**To stop new sales.**
+- One account: **Remove** on its row of the Team page's list (6b.3), with your key, at any time, even with the team
+  tools locked. A plan it holds goes on until its holder cancels it.
+- Everyone outside the team at once: PWON (8.4). Then only the team, who know the site password, can reach the site;
+  a payment page opened earlier can still be paid for up to a day. While the password is on, the people who hold a
+  plan cannot reach Settings or `/cancel` either: read part 9's warning in bold.
+
+**Uploads while it is open:** 5.6's rules for 6b hold (the value and the team line are copied; additions on the Team
+page wait from SB3 until the upload is over), and so do 7.12's (the site password on from DR2 until SB13b on the
+drained path).
+
+**The way back.**
+1. PWON (8.4), then ASKS_CLOSE (6.3): asks and buying are the team's again. ASKS_CLOSE prints how many accounts are
+   left on the Team page's list: remove each there (the next opening refuses otherwise, 6.1).
+2. Back to the sandbox, if you want it: PAY_BACK (7.11), with its own preconditions. Every live plan must be over,
+   and the plans of people outside the team end only when their holders cancel them: read part 9's warning in bold,
+   and ask, before you start.
+3. Before you go back to a release older than the one that lets 6b's value run with real payments: PWON, then
+   ASKS_CLOSE, first (an older API refuses the pairing at start).
 
 ### 8.2 Take the site password off: the guards and the copy
 
@@ -6054,7 +6158,7 @@ set -euo pipefail
 # PWOFF1: the guards, then two copies of the live Caddyfile, one to edit. Nothing live changes.
 # The robots header the Caddyfile may send already (the same lines in REVIEW_OPEN, REVIEW_MACTEST, PWOFF1 and PWOFF2). It prints none; group, when the one robots line is exactly X-Robots-Tag "noindex, nofollow" in a plain header group after the password, inside the dezbatere.ro block (a server's own file can have it from when the server was set up); or other, for any other robots line, which every step refuses.
 robots() { awk '{ t = $0; sub(/^[ \t]+/, "", t) } $0 == "dezbatere.ro {" { s = 1 } s && $0 == "}" { s = 0 } s && t ~ /^basic_auth([ \t]|$)/ { a = 1 } s && g && t == "}" { g = 0 } tolower(t) ~ /x-robots-tag/ { n++; if (s && a && g && t == "X-Robots-Tag \"noindex, nofollow\"") k++ } s && a && t == "header {" { g = 1 } END { print (n == 0 ? "none" : (n == 1 && k == 1 ? "group" : "other")) }' "$1"; }
-# Two pairings are accepted: everyone with real payments (part 8), or everyone-with-listed-buyers on NETOPIA's sandbox (6b).
+# Three pairings are accepted: everyone with real payments (8.1), everyone-with-listed-buyers on NETOPIA's sandbox (6b), or everyone-with-listed-buyers with real payments (8.1b).
 V=$(sed -n 's/^PREVIEW_ASKS_OPEN_TO=//p' "$A")
 [ "$(grep -c '^PREVIEW_ASKS_OPEN_TO=' "$A" || true)" = 1 ] && [ "$(grep -c '^PREVIEW_ASKS_OPEN_TO=' "$RF" || true)" = 1 ] && [ -n "$V" ] && grep -qxF "PREVIEW_ASKS_OPEN_TO=$V" "$RF" || { echo "PWOFF1_NOT_DONE: asks are not open with one same value in both files (8.1 or 6b first)"; exit 1; }
 said -xF "{\"event\":\"api.preview.asks_open\",\"to\":\"$V\"}" || { echo "PWOFF1_NOT_DONE: the running API does not say asks open to $V"; exit 1; }
@@ -6063,12 +6167,15 @@ case "$V" in
     ! grep -qxE 'NETOPIA_API_BASE_URL=https://secure(-sandbox|\.sandbox)\.netopia-payments\.com' "$A" || { echo "PWOFF1_NOT_DONE: the API file names NETOPIA's sandbox"; exit 1; }
     grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || { echo "PWOFF1_NOT_DONE: payments are not live (part 7 first)"; exit 1; };;
   everyone-with-listed-buyers)
-    grep -qxE 'NETOPIA_API_BASE_URL=https://secure(-sandbox|\.sandbox)\.netopia-payments\.com' "$A" || { echo "PWOFF1_NOT_DONE: with everyone-with-listed-buyers the API file must name NETOPIA's sandbox"; exit 1; }
-    [ "$(grep -c '^PREVIEW_LIVE_PAYMENTS=' "$A" || true)" = 0 ] || { echo "PWOFF1_NOT_DONE: with everyone-with-listed-buyers the API file must have no live payments line"; exit 1; }
+    if grep -qxE 'NETOPIA_API_BASE_URL=https://secure(-sandbox|\.sandbox)\.netopia-payments\.com' "$A"; then
+      [ "$(grep -c '^PREVIEW_LIVE_PAYMENTS=' "$A" || true)" = 0 ] || { echo "PWOFF1_NOT_DONE: with everyone-with-listed-buyers on NETOPIA's sandbox the API file must have no live payments line"; exit 1; }
+    else
+      grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || { echo "PWOFF1_NOT_DONE: with everyone-with-listed-buyers the API file must name NETOPIA's sandbox (6b), or real payments (8.1b, part 7 first)"; exit 1; }
+    fi
     NB=$(sed -n 's/^PREVIEW_TEAM_USER_IDS_JSON=//p' "$A" | jq -r 'if type == "array" then length else empty end' 2>/dev/null || true)
     [ -n "$NB" ] && said -xF "{\"event\":\"api.preview.listed_buyers\",\"count\":$NB}" || { echo "PWOFF1_NOT_DONE: the running API does not say the number of listed buyers the API file holds: ask"; exit 1; }
     gatesok || { echo "PWOFF1_NOT_DONE: a spending gate is not active with its window open (GATES, 6.2)"; exit 1; };;
-  *) echo "PWOFF1_NOT_DONE: asks are open to $V: the password comes off only with everyone (8.1, real payments) or everyone-with-listed-buyers (6b, NETOPIA's sandbox)"; exit 1;;
+  *) echo "PWOFF1_NOT_DONE: asks are open to $V: the password comes off only with everyone (8.1, real payments) or everyone-with-listed-buyers (6b on NETOPIA's sandbox, 8.1b with real payments)"; exit 1;;
 esac
 [ "$HOST" = dezbatere.ro ] || { echo "PWOFF1_NOT_DONE: the API answers as $HOST: the password comes off only on the main name (part 5)"; exit 1; }
 grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { echo "PWOFF1_NOT_DONE: the staff screens are off: STAFFMAIN and the rest of 5.7 first"; exit 1; }
@@ -6199,8 +6306,9 @@ If the NETOPIA review window (5.8) is open, PWON closes it first, with the same 
 - The brakes are those of 6.5, with PWON as brake (b).
 - `everyone-with-test-payments` never runs without the password. Put the password back before anyone writes that
   value again.
-- With 6b open (`everyone-with-listed-buyers`, NETOPIA's sandbox), only the listed accounts may buy, and OPENCHECK
-  (6b.4) runs every morning. ASKS_CLOSE and MAIL_CLOSE need PWON first, as with real payments.
+- With 6b or 8.1b open (`everyone-with-listed-buyers`, on NETOPIA's sandbox or with real payments), only the listed
+  accounts may buy, and OPENCHECK (6b.4) runs every morning. ASKS_CLOSE and MAIL_CLOSE need PWON first, whatever the
+  payments.
 - Nothing becomes publicly listed by search engines while the robots header is sent (the line PWOFF2 checked).
 
 ---
@@ -6219,8 +6327,12 @@ ever real. The people who signed up keep their accounts, but cannot reach the si
 **Publishing (5.9) is not one of these steps.** Closing everything leaves it as it is, behind the site password again;
 PUBOFF (5.9b) is its own step, and what it can and cannot undo is said there.
 
-**If the password was ever off with real payments on (part 8), stop and ask before step 1.** Someone outside the
-team may then hold a paid plan. A paid plan renews every month on its saved card until its owner cancels it, and
+**If 8.1b was open** (the site open with real payments, buying only for the accounts you approved): the warning
+below holds, since the password was off with real payments on. After step 2, remove the accounts left on the Team
+page's list (ASKS_CLOSE prints how many).
+
+**If the password was ever off with real payments on (part 8: 8.1 or 8.1b), stop and ask before step 1.** Someone
+outside the team may then hold a paid plan. A paid plan renews every month on its saved card until its owner cancels it, and
 both ways to cancel (Settings, and the `/cancel` link in the plan's mails) are behind the site password. Once the
 password is back, such a plan does not end until its owner cancels it on `/cancel`, and only the NETOPIA review
 window (5.8, REVIEW_OPEN) can let them reach that page again. Until then PAY_BACK never passes, and that person is
@@ -6304,8 +6416,8 @@ that service.
 | `PREVIEW_ASKS_OPEN_TO_WITHOUT_ROOM` | API start, stage `preview-asks-open` | the ask room (the site's daily ceiling and per-person holds) is not built | ASKS_CLOSE; ask |
 | `PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING` | API start, stage `preview-asks-open` | `everyone` while billing runs on NETOPIA's sandbox | ASKS_CLOSE; open with `everyone` only after part 7 |
 | `PREVIEW_ASKS_OPEN_TO_BILLING_OFF` | API start, stage `preview-asks-open` | `everyone` while the site version's billing is off (the provider-only mode included) | ASKS_CLOSE; asks stay closed until an upload turns billing on (then part 7) |
-| `PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX` | API start, stage `preview-asks-open` | `everyone-with-test-payments` with live payments, or billing off | ASKS_CLOSE. With live payments, open with `everyone`. With billing off, asks stay closed (only an upload turns billing on) |
-| `PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX` | API start, stage `preview-asks-open` | `everyone-with-listed-buyers` while payments are not NETOPIA's sandbox: real payments (with the payments line), billing off, or the provider-only mode. NETOPIA's live address without the payments line stops earlier, with `PREVIEW_LIVE_PAYMENTS_UNSET`. SAME does not look at payments, so only the start refuses it | ASKS_OPEN puts both files back by itself. 6b runs only on the sandbox: with real payments, ASKS_CLOSE (after PWON when the site is open), then open with `everyone` (part 8) |
+| `PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX` | API start, stage `preview-asks-open` | `everyone-with-test-payments` with live payments, or billing off | ASKS_CLOSE. With live payments, open with `everyone` (8.1) or `everyone-with-listed-buyers` (8.1b). With billing off, asks stay closed (only an upload turns billing on) |
+| `PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_BILLING_OFF` | API start, stage `preview-asks-open` | `everyone-with-listed-buyers` while the site version's billing is off (the provider-only mode included): no account has a plan of its own, so a few accounts could use up the site's day. SAME does not look at payments, so only the start refuses it. A release older than the one that lets the value run with real payments names this refusal `PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX`, and gives it with real payments too | ASKS_OPEN puts both files back by itself. With billing off, asks stay closed with this value (only an upload turns billing on). On an older release with real payments: ASKS_CLOSE (after PWON when the site is open), then open with `everyone` (8.1), or upload a release that carries 8.1b |
 | `PREVIEW_MAIL_PLAN_UNREADABLE` | launcher, API | `mail-plan.json` is missing, not root's 0644 file with one link, empty or over 4 KiB, not strict JSON, or its folder is wrong | put the last good plan back (MAIL_CLOSE, or 1.5) |
 | `PREVIEW_MAIL_PLAN_SCHEMA` | launcher, API | another schema; a key missing or extra; a value of the wrong type; v2 without `recipients`; allow-list without `recipientPolicy` | as above |
 | `PREVIEW_MAIL_MODE_UNKNOWN` | launcher, API | `recipients` is not exactly `allow-list` or `open` | as above |
@@ -6357,8 +6469,8 @@ that service.
 | `BAD SAME_API_RUNNER_PREVIEW_TEAM_USER_IDS_JSON:<label>` | SAME | the API and runner files hold different team lines (under 6b: different lists of buyers) | ASKS_OPEN, ASKS_CLOSE and BUYERS put both files back by themselves; otherwise ask |
 | `BAD SAME_PREVIEW_TEAM_USER_IDS_JSON` | SAME, two releases | two releases hold different team lines (under 6b: the list changed during an upload) | ask before any switch |
 | `BAD SAME_API_PAYMENT_SYSTEM` | SAME, two releases | two API files name different payment systems | ask before any switch |
-| `PREVIEW_TEAM_ONLY` (HTTP 403 from `/api/v1/billing/checkout` or `/api/v1/billing/subscription/upgrade`; the order page and the Settings upgrade show "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.") | per request, the API | an account the buyer rule does not admit tried to buy or upgrade a plan: with asks closed, an account not on the team (on NETOPIA's sandbox too, with the release that carries 6b); under `everyone-with-listed-buyers` (6b), an account not on the list. Nothing was charged or written, and no NETOPIA page opened | expected; pay with a team account; under 6b, allow the account on the Team page if it may buy (6b.3; BUYERS on a release before the Team page's list); with real payments, open asks (part 8) |
-| `PREVIEW_BUYERS_UNAVAILABLE` (HTTP 503 from the same two addresses; the page shows "Something went wrong. Please try again."; the API's journal holds `{"event":"api.preview.buyer_check_unavailable"}`) | per request, the API | under `everyone-with-listed-buyers` on the sandbox, an account not on the team line tried to buy, and the API could not read the Team page's list within 3 seconds (the database did not answer, or the API's login may not read it). It refuses rather than guess: nothing was charged or written, and no NETOPIA page opened; the team line still buys | OPENCHECK (6b.4) counts it; if it comes back, ask |
+| `PREVIEW_TEAM_ONLY` (HTTP 403 from `/api/v1/billing/checkout` or `/api/v1/billing/subscription/upgrade`; the order page and the Settings upgrade show "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.") | per request, the API | an account the buyer rule does not admit tried to buy or upgrade a plan: with asks closed, an account not on the team (on NETOPIA's sandbox too, with the release that carries 6b); under `everyone-with-listed-buyers` (6b, 8.1b), an account not on the list. Nothing was charged or written, and no NETOPIA page opened | expected; pay with a team account; under 6b or 8.1b, allow the account on the Team page if it may buy (6b.3; BUYERS on a release before the Team page's list); with real payments and asks closed, open asks (part 8) |
+| `PREVIEW_BUYERS_UNAVAILABLE` (HTTP 503 from the same two addresses; the page shows "Something went wrong. Please try again."; the API's journal holds `{"event":"api.preview.buyer_check_unavailable"}`) | per request, the API | under `everyone-with-listed-buyers` (6b, 8.1b), an account not on the team line tried to buy, and the API could not read the Team page's list within 3 seconds (the database did not answer, or the API's login may not read it). It refuses rather than guess: nothing was charged or written, and no NETOPIA page opened; the team line still buys | OPENCHECK (6b.4) counts it; if it comes back, ask |
 | `PREVIEW_MAIL_REFUSED` (and the API's `AUTH_MAIL_DELIVERY_FAILED … code=SENDMAIL_EXIT_1`) | per mail, the mail program | one mail was refused by the plan's rules (in allow-list mode: an address not on the list); with a correct plan, on every mail: the mail program ran out of time before it handed the mail on | expected in allow-list mode for other addresses; otherwise ask before MAIL_CLOSE (4.2) |
 | `AUTH_MAIL_DELIVERY_FAILED … code=SENDMAIL_TIMEOUT` | per mail, the API | the mail program took more than 5 seconds and was stopped (MAILTIME, 1.8, timed its load) | ask before MAIL_CLOSE (4.2) |
 | a plain `401` with no password box (only while the NETOPIA review window, 5.8, is open) | per request, Caddy | a stranger's background request for a closed address: a Next.js page request, the account check (`/api/v1/session`), the help check (`/api/v1/geo/availability`) or the browser's own icon request (`/favicon.ico`, `/apple-touch-icon.png`); the page shows Log in and no Help, and no password box opens | expected; if a password box opens by itself over a public page, REVIEW_CLOSE, then ask |

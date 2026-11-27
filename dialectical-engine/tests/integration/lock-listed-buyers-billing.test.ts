@@ -4,16 +4,17 @@ import { startBillingStack, type BillingPerson, type BillingStack, type HttpAnsw
 import { previewBuyerOwner } from "../support/previewBuyerOwner.js";
 
 /**
- * The preview's buyer rule on NETOPIA's sandbox, on the fake stack (the real billing routes, runtime and jobs over
- * embedded Postgres and the NETOPIA protocol fake), with the API's options as main.ts hands them: the preview
- * configuration, the team line, and with a value of PREVIEW_ASKS_OPEN_TO the open flag and the value. Under
+ * The preview's buyer rule on NETOPIA's sandbox and with real payments, on the fake stack (the real billing routes,
+ * runtime and jobs over embedded Postgres and the NETOPIA protocol fake), with the API's options as main.ts hands them:
+ * the preview configuration, the team line, and with a value of PREVIEW_ASKS_OPEN_TO the open flag and the value. Under
  * everyone-with-listed-buyers any signed-in account may ask, and under the team rule only the team; under both, only an
  * account on the team line may start a purchase. An account not on it gets every price as before, and is refused 403
  * PREVIEW_TEAM_ONLY at the checkout and at the upgrade with nothing written: no charge, no payment page, no subscription
  * event, no job and no NETOPIA request. A listed account buys and upgrades as before.
  *
- * The Owner's list of approved buyers (0186) is handed as main.ts hands it. Under everyone-with-listed-buyers an account
- * the Owner approved through the list's door buys like a team account, and is refused again once removed; under the team
+ * The Owner's list of approved buyers (0186) is handed as main.ts hands it. Under everyone-with-listed-buyers, on either
+ * payment system, an account the Owner approved through the list's door buys like a team account, and is refused again
+ * once removed; under the team
  * rule the list counts for nothing. A list that cannot be read refuses an account not on the team line 503
  * PREVIEW_BUYERS_UNAVAILABLE with nothing written, and is never read for a team account.
  *
@@ -33,12 +34,13 @@ const refusedAsBuyer = (answer: HttpAnswer) =>
 const refusedUnreadable = (answer: HttpAnswer) =>
   expect({ status: answer.status, error: answer.body.error }).toEqual({ status: 503, error: "PREVIEW_BUYERS_UNAVAILABLE" });
 
-const MODES: ReadonlyArray<readonly [string, PreviewAsksOpenTo | undefined]> = [
-  ["everyone-with-listed-buyers", "everyone-with-listed-buyers"],
-  ["the team rule (no value)", undefined]
+const MODES: ReadonlyArray<readonly [string, PreviewAsksOpenTo | undefined, "sandbox" | "live"]> = [
+  ["everyone-with-listed-buyers on the sandbox", "everyone-with-listed-buyers", "sandbox"],
+  ["the team rule (no value) on the sandbox", undefined, "sandbox"],
+  ["everyone-with-listed-buyers with real payments", "everyone-with-listed-buyers", "live"]
 ];
 
-describe.each(MODES)("%s on the sandbox: only the team line may buy", (_name, asksOpenTo) => {
+describe.each(MODES)("%s: only the team line, and the accounts the Owner approves where the list counts, may buy", (_name, asksOpenTo, payments) => {
   /** The team line as the API read it at start; filled once the people below exist. */
   const team: string[] = [];
   let stack: BillingStack;
@@ -67,7 +69,7 @@ describe.each(MODES)("%s on the sandbox: only the team line may buy", (_name, as
   const upgradeBody = (quoteRef: string) => ({ plan_id: "PRO", quote_ref: quoteRef, locale: "en", renewal_terms: stack.consents("en").renewal_terms });
 
   beforeAll(async () => {
-    stack = await startBillingStack({ preview: { config: PREVIEW, teamUserIds: team, approvedBuyers: true, ...(asksOpenTo === undefined ? {} : { asksOpenTo }) } });
+    stack = await startBillingStack({ paymentEnvironment: payments, preview: { config: PREVIEW, teamUserIds: team, approvedBuyers: true, ...(asksOpenTo === undefined ? {} : { asksOpenTo }) } });
     owner = previewBuyerOwner(stack.database.pool);
     listedBuyer = await stack.signUp("listed.buyer@example.test", "DE");
     stranger = await stack.signUp("not.listed@example.test", "DE");
@@ -95,13 +97,13 @@ describe.each(MODES)("%s on the sandbox: only the team line may buy", (_name, as
     expect(withoutQuotes(priced)).toEqual(withoutQuotes(before));
   });
 
-  it("a listed account's checkout opens NETOPIA's sandbox page and writes its charge", async () => {
+  it("a listed account's checkout opens NETOPIA's page and writes its charge", async () => {
     const quote = await stack.quote(listedBuyer, "PLUS");
     expect(quote.status).toBe(200);
     const before = await counts();
     const checkout = await stack.checkout(listedBuyer, String(quote.body.quote_ref));
     expect(checkout.status).toBe(200);
-    expect(checkout.body.environment).toBe("sandbox");
+    expect(checkout.body.environment).toBe(payments);
     expect(String(checkout.body.redirect_url).startsWith(`${stack.netopia.baseUrl}/ui/card?p=`)).toBe(true);
     const after = await counts();
     expect(after.charges).toBe(before.charges + 1);
@@ -123,7 +125,7 @@ describe.each(MODES)("%s on the sandbox: only the team line may buy", (_name, as
     expect(await stack.entitlementPlan(removedSubscriber.ownerRef)).toBe("PLUS");
   });
 
-  it("a listed plan holder's upgrade opens NETOPIA's sandbox page and writes its charge", async () => {
+  it("a listed plan holder's upgrade opens NETOPIA's page and writes its charge", async () => {
     const quote = await stack.post(listedSubscriber, "/v1/billing/subscription/upgrade-quote", { plan_id: "PRO" });
     expect(quote.status).toBe(200);
     const before = await counts();
@@ -142,7 +144,7 @@ describe.each(MODES)("%s on the sandbox: only the team line may buy", (_name, as
     const checkout = await stack.checkout(approved, String(quote.body.quote_ref));
     if (listCounts) {
       expect(checkout.status).toBe(200);
-      expect(checkout.body.environment).toBe("sandbox");
+      expect(checkout.body.environment).toBe(payments);
       expect(String(checkout.body.redirect_url).startsWith(`${stack.netopia.baseUrl}/ui/card?p=`)).toBe(true);
       expect((await counts()).charges).toBe(before.charges + 1);
     } else {

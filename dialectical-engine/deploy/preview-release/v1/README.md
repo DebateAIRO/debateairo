@@ -5328,7 +5328,8 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 After SB8 the online backup is a last resort only (spec §11): going back is the switch the other way, never a restore.
 
 **While MAIN-SITE.md's 6b is open** (`PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers` in the API and runner files:
-the site open before real payments, and only the accounts on the team line may buy). SB5's `derive` copies the value
+the site open before real payments, and only the accounts on the team line may buy; the same holds for its 8.1b, the
+same value with real payments). SB5's `derive` copies the value
 and the team line, which is then the list of buyers, into the new release's files byte for byte, and its SAME checks
 hold both releases to the same value (`SAME_PREVIEW_ASKS_OPEN_TO`) and the same list (`SAME_PREVIEW_TEAM_USER_IDS_JSON`).
 Never change the list (MAIN-SITE.md's BUYERS) from SB3 to the end of the upload. The value can be set only when every
@@ -7333,9 +7334,10 @@ payment, NETOPIA notice, invoice and credit note written since then, while the c
 stay issued. If LIVEAFTER does not end with `LIVEAFTER_DONE`, never run rbD-B: fix forward, and ask.
 
 **While MAIN-SITE.md's 6b is open** (`PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers`: the site open before real
-payments, buying only for the accounts on the team line), DR1's `derive` copies the value and the team line into the
-new release's files, and its SAME checks hold both releases to the same value and the same list; never change the list
-(MAIN-SITE.md's BUYERS, and additions on its Team page's list) from SB3 on. Run MAIN-SITE.md's PWON before DR2: the
+payments, buying only for the accounts on the team line; or its 8.1b, the same value with real payments), DR1's
+`derive` copies the value and the team line into the new release's files, and its SAME checks hold both releases to
+the same value and the same list; never change the list (MAIN-SITE.md's BUYERS, and additions on its Team page's
+list) from SB3 on. Run MAIN-SITE.md's PWON before DR2: the
 site is down from DR2 to DR6 anyway, and rbD-B would lose everything strangers write after DR3. rbD-B to a release
 older than the one that brought 6b needs MAIN-SITE.md's ASKS_CLOSE first (an older API refuses the value, and lets any
 signed-in account buy on NETOPIA's sandbox). After SB13b, edit the first line of MAIN-SITE.md's names file, run its

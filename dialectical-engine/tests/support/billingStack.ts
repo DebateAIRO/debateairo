@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { pathToFileURL } from "node:url";
 import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
-import { BillingPersonAllowanceSource, foldSubscription } from "@debateai/billing-core";
+import { BillingPersonAllowanceSource, foldSubscription, type CardPayments } from "@debateai/billing-core";
 import { PostgresModelSpendStore, costEnvelopeDay } from "@debateai/budget";
 import {
   createEmailBlindIndex,
@@ -279,7 +279,12 @@ export type BillingStackPreview = Readonly<{
   config: PreviewProviderTestConfig; teamUserIds: readonly string[]; asksOpenTo?: PreviewAsksOpenTo; approvedBuyers?: true;
 }>;
 
-export async function startBillingStack(options: Readonly<{ preview?: BillingStackPreview }> = {}): Promise<BillingStack> {
+/**
+ * `paymentEnvironment`: the payment system the stack's billing names, as main.ts's connectors carry it; NETOPIA's sandbox
+ * by default. Every row the stack writes carries it, and the NETOPIA fake answers either way.
+ */
+export async function startBillingStack(options: Readonly<{ preview?: BillingStackPreview; paymentEnvironment?: "sandbox" | "live" }> = {}): Promise<BillingStack> {
+  const paymentEnvironment = options.paymentEnvironment ?? "sandbox";
   // The test file that starts the stack: its API pools come from apiTestPools under that file's name (the master-key
   // list is checked against it). Read before the first wait.
   const testFile = currentTestFile();
@@ -302,9 +307,16 @@ export async function startBillingStack(options: Readonly<{ preview?: BillingSta
   let advancedMs = 0;
   const now = (): Date => new Date(Date.now() + advancedMs);
   const netopia = await startFakeNetopia({ now });
-  const payments = createNetopiaPayments(
+  const fakeClient = createNetopiaPayments(
     { baseUrl: netopia.baseUrl, apiKey: netopia.apiKey, posSignature: netopia.posSignature }, { now }
   );
+  // The client names its environment from its address, and the fake's loopback address reads as the sandbox: with real
+  // payments the same client's calls answer as NETOPIA's live system, as the live connector would.
+  const payments: CardPayments = paymentEnvironment === "sandbox" ? fakeClient : Object.freeze({
+    provider: fakeClient.provider, environment: paymentEnvironment,
+    startHostedPayment: fakeClient.startHostedPayment.bind(fakeClient), chargeSavedCard: fakeClient.chargeSavedCard.bind(fakeClient),
+    status: fakeClient.status.bind(fakeClient), ...(fakeClient.refund === undefined ? {} : { refund: fakeClient.refund.bind(fakeClient) })
+  });
   const acceptances = new AcceptanceRepository(database.pool);
   // The runtime holds this one object; each of its fields reads the policy in force (`useCountryPolicy`).
   let policyInForce: CountryPolicy = testCountryPolicy;
@@ -394,7 +406,7 @@ export async function startBillingStack(options: Readonly<{ preview?: BillingSta
   const connectors: BillingConnectors = Object.freeze({
     payments,
     noticeTrust: Object.freeze({ posSignature: netopia.posSignature, keys: loadTrustedKeys(netopia.trustedKeysPem) }),
-    paymentEnvironment: "sandbox",
+    paymentEnvironment,
     tax,
     invoiceRo: invoices,
     recordsKey,
@@ -470,7 +482,7 @@ export async function startBillingStack(options: Readonly<{ preview?: BillingSta
   const ownerDesk = new RefundDesk({
     repository: billingRepository, jobs: ownerJobQueries,
     policy: testBillingPolicy, audit: () => undefined, clock: now,
-    netopia: { payments: { status: notHere }, paymentEnvironment: "sandbox", jobs: ownerJobQueries }
+    netopia: { payments: { status: notHere }, paymentEnvironment, jobs: ownerJobQueries }
   });
 
   // NETOPIA posts its message to PUBLIC_APP_URL/api/v1/billing/netopia/notify, which the stack never serves: the fake
