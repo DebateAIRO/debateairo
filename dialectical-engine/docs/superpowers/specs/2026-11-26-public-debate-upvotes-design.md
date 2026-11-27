@@ -156,7 +156,7 @@ Functions (all `SECURITY DEFINER`, `search_path = pg_catalog`):
 
 A sixth function deletes the upvotes of debates that are gone for good (section 5). It takes no owner, is
 granted to the system login's marker only (`debateai_rls_all_accounts`), deletes in bounded batches, never
-touches a debate under a staff hold, and returns how many rows it removed. Its exact name and signature are
+touches a debate that is only held (one held and then made private is swept, section 5), and returns how many rows it removed. Its exact name and signature are
 fixed in the plan.
 
 Cast refuses an account that is not active. The two writers return the fresh count themselves, because the
