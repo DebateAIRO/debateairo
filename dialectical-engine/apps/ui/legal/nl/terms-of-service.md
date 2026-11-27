@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: SERVICEVOORWAARDEN · v1.2 · VAN KRACHT OP 27 NOVEMBER 2026
+eyebrow: SERVICEVOORWAARDEN · v1.2 · VAN KRACHT OP 28 NOVEMBER 2026
 title: Waarmee u instemt
 lede: De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.
 endMarker: EINDE VAN DE VOORWAARDEN · v1.2
@@ -21,7 +21,7 @@ jumps:
 18 TOEPASSELIJK RECHT
 -->
 
-**Version 1.2 · Effective 27 november 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
+**Version 1.2 · Effective 28 november 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
 **In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Op het gratis abonnement worden uw debatten openbaar wanneer ze zijn afgerond, na een AI-controle; op een betaald abonnement zijn ze privé, tenzij u ze publiceert. Eenmaal openbaar kan iedereen een debat lezen, en het blijft openbaar. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders, voornamelijk DeepInfra, in de Verenigde Staten. De voorwaarden van DeepInfra, Anthropic en Amazon staan hen niet toe daarop modellen te trainen. De aanbieder van de zoekfunctie op het web ontvangt alleen de korte zoektermen die de modellen opstellen (hoofdstuk 8). Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 

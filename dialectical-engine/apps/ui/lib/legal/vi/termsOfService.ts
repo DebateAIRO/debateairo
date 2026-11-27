@@ -381,8 +381,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "1.2",
-  sha256: "33465fc35402f6d9372e2a2c494bf8008d247c631a8197757b68ab0f606de874",
-  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v1.2 · CÓ HIỆU LỰC 27 THÁNG 11 NĂM 2026",
+  sha256: "f5b06a19cfcd466a46e97ea48ed30ec924e358a9180623197a9513f417ad4afb",
+  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v1.2 · CÓ HIỆU LỰC 28 THÁNG 11 NĂM 2026",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",
   endMarker: "HẾT ĐIỀU KHOẢN · v1.2",
