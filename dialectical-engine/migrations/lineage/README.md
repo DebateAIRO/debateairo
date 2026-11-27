@@ -1371,7 +1371,8 @@ The seventy-sixth chain step, after the reader of the release switches (0185). W
 payments in test mode and buying kept to listed accounts (`PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers` on NETOPIA's
 sandbox), only an account on the team line in the server files could start a purchase, and changing that line restarted
 the site. This step lets the Owner approve more buyers on the Team page, with no restart. The team line keeps its one
-meaning; the list counts only under that value with the sandbox's payments, and with real payments the API never reads it.
+meaning; the list counts only under that value. A later release lets that value run with real payments too, and the list
+then counts there as well (`MAIN-SITE.md` 8.1b); the step itself is unchanged.
 
 - `staff.preview_buyer_event`: one append-only row per change (`ADDED` or `REMOVED`), with the account, the Owner's staff
   record, the operation, the digest of its request, whether an alert went with it, and the list's revision (one counter
