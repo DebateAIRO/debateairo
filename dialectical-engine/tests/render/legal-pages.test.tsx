@@ -355,7 +355,8 @@ describe("the terms versions page lists only versions that exist", () => {
   const minor = (version: string): number => Number(version.split(".")[1]);
 
   // Version 1.0 is the first published text: the pre-launch drafts were never offered to the public and are not kept.
-  // Version 1.1 replaced it, so the page lists 1.1, in force, and 1.0, linked to its archived text.
+  // Version 1.1 replaced it, and version 1.2 replaced 1.1, so the page lists 1.2, in force, and 1.1 and 1.0, each
+  // linked to its archived text.
   it("names the current version, linked to its text, and the version it replaced, linked to its archived text", () => {
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
@@ -363,13 +364,16 @@ describe("the terms versions page lists only versions that exist", () => {
     expect(rows).toHaveLength(TERMS_VERSIONS.length);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
     expect(rows[0]?.querySelector(".legalVersionTag")?.textContent).toBe(legalEnglish["legal.versions.current"]);
-    expect(TERMS_VERSIONS.map(({ version }) => version)).toEqual(["1.1", "1.0"]);
-    const older = rows[1]?.querySelector("a")?.getAttribute("href") ?? "";
-    expect(rows[1]?.querySelector(".legalVersionTag")).toBeNull();
-    expect(rows[1]?.textContent).toContain(legalEnglish["legal.archive.meta"]);
-    const archived = archivedLegalText("TERMS", older.replace("/terms/versions/", ""), "en");
-    expect(archived?.version, older).toBe("1.0");
-    expect(archived?.text).toMatch(/^\*\*Version 1\.0 · Effective /mu);
+    expect(TERMS_VERSIONS.map(({ version }) => version)).toEqual(["1.2", "1.1", "1.0"]);
+    // Each earlier version's row links to its archived English text.
+    for (const [index, version] of [[1, "1.1"], [2, "1.0"]] as const) {
+      const older = rows[index]?.querySelector("a")?.getAttribute("href") ?? "";
+      expect(rows[index]?.querySelector(".legalVersionTag")).toBeNull();
+      expect(rows[index]?.textContent).toContain(legalEnglish["legal.archive.meta"]);
+      const archived = archivedLegalText("TERMS", older.replace("/terms/versions/", ""), "en");
+      expect(archived?.version, older).toBe(version);
+      expect(archived?.text).toMatch(new RegExp(`^\\*\\*Version ${version.replace(".", "\\.")} · Effective `, "mu"));
+    }
     expect(view.querySelector(".legalVersionsNone")).toBeNull();
   });
 

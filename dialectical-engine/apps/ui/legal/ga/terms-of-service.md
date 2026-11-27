@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v1.1 · I bhFEIDHM 24 SAMHAIN 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v1.2 · I bhFEIDHM 27 SAMHAIN 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v1.1
+endMarker: DEIREADH NA dTÉARMAÍ · v1.2
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 1.1 · Effective 24 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 1.2 · Effective 27 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Ar an bplean saor in aisce, bíonn do dhíospóireachtaí poiblí nuair a bhíonn siad críochnaithe, tar éis seiceála IS; ar phlean íoctha bíonn siad príobháideach mura bhfoilsíonn tú iad. Nuair a bhíonn díospóireacht phoiblí, is féidir le duine ar bith í a léamh, agus fanann sí poiblí. Seoltar téacs a chuireann tú isteach chuig na soláthraithe IS atá liostaithe inár gClár Soláthraithe, DeepInfra den chuid is mó, sna Stáit Aontaithe. Ní cheadaíonn téarmaí DeepInfra, Anthropic agus Amazon dóibh samhlacha a oiliúint air. Ní fhaigheann an soláthraí cuardaigh gréasáin ach na frásaí gearra cuardaigh a scríobhann na samhlacha (rannán 8). Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -164,6 +164,8 @@ Bíonn díospóireachtaí ar phlean íoctha **príobháideach mar réamhshocrú*
 
 **Tuarascálacha ó dhuine ar bith.** Is féidir le duine ar bith a bhfuil creidmheas aige tuarascáil a scríobh ar dhíospóireacht phoiblí fad nach gcuirtear aon ní eile léi, lena chuóta féin. Tá an tuarascáil poiblí. Níl ainm cleite an scríobhaí ach tagairt: scríobhann na IS an tuarascáil ón méid a thaispeánann an leathanach, agus ní ráiteas ón scríobhaí í. Fanann tuarascálacha roimhe seo inléite.
 
+**Vótaí.** Nuair atá tú sínithe isteach, is féidir leat vótáil ar dhíospóireacht ar liosta na ndíospóireachtaí poiblí, do cheann féin san áireamh, chun a thaispeáint do léitheoirí eile gur fiú í a léamh, dar leat. Tá vóta amháin ag gach cuntas do gach díospóireacht, agus tarraingíonn brú eile ar an gcnaipe do vóta siar fad atá an díospóireacht ar an liosta. Taispeánann an liosta cé mhéad vóta atá ag gach díospóireacht agus ní thaispeánann sé riamh cé a thug iad. Scriostar do vótaí nuair a thagann dúnadh do chuntais i bhfeidhm (rannán 6), agus scriostar vótaí díospóireachta nuair a bhíonn a leathanach poiblí imithe go buan (an Beartas Príobháideachais, rannán 7). Ná húsáid níos mó ná cuntas amháin, ná aon mhodh uathoibrithe, chun líon a athrú: ceadaíonn rannán 6 cuntas amháin duit, agus ní cheadaíonn rannán 7 rochtain uathoibrithe.
+
 **Tar éis don údar imeacht.** Fanann díospóireacht phoiblí ar oscailt do rannchuidiúcháin tar éis don chéad údar a chuntas a scriosadh. Oibríonn rannchuidiúcháin nua ón gcóip phoiblí. Níl úinéir ar bith ar an leathanach: tógann roinnt daoine agus na IS díospóireacht phoiblí. Coinníonn gach duine cibé cearta atá aige ina chuid focal féin agus tugann sé an ceadúnas thíos. Ní éiríonn aon duine ina chomhúinéir ar an díospóireacht. Ní féidir le duine ar bith, an chéad údar san áireamh, rannchuidiú duine eile a chur á bhaint ná cosc a chur ar dhaoine eile cur leis, ach amháin tríd an mbealach tuairiscithe i rannán 10.
 
 **Is féidir linn ábhar foilsithe a bhaint anuas i gcónaí.** Féadfaimid díospóireacht fhoilsithe a bhaint nó rochtain uirthi a shrianadh nuair a éilíonn an dlí é, nuair a ordaíonn cúirt nó údarás inniúil é, nó nuair a sháraíonn sí na Téarmaí seo nó nuair atá sí neamhdhleathach. Ní chuireann aon ní sa rannán seo cosc orainn gníomhú de bhun fógra bailí faoi rannán 10, agus ní gealltanas é aon ní ann go bhfanfaidh díospóireacht fhoilsithe ar fáil.
@@ -253,7 +255,7 @@ Insímid duit roimh ré, ar mheán marthanach, cad atá ag athrú agus cathain. 
 
 **Ar na Téarmaí seo.** Féadfaimid na Téarmaí seo a athrú ar na cineálacha céanna cúiseanna. I gcás athruithe nach laghdaíonn do chearta, foilsímid an leagan nua le hachoimre ar an méid a d'athraigh agus seolaimid ríomhphost chugat **30 lá ar a laghad** sula dtagann sé i bhfeidhm; má leanann tú ort ag úsáid Dialectical Engine tar éis an dáta sin, ciallaíonn sé go nglacann tú leis, agus féadfaidh tú do chuntas a dhúnadh roimhe sin. I gcás athruithe a laghdaíonn do chearta — lena n-áirítear méaduithe praghais ar phlean atá ann cheana, teorainneacha níos ísle, gnéithe a baineadh, úsáidí nua as d'ábhar, nó athruithe ar dhliteanas, ar an dlí rialaithe nó ar réiteach díospóidí — iarraimid ort glacadh go sainráite leis an leagan nua ag do chéad síniú isteach eile, agus ní bhíonn feidhm ag an athrú ach feasta. Ní dhéanaimid athrú aisghníomhach riamh, agus ní úsáidimid an rannán seo riamh chun croílár an mhéid ar íoc tú as a athrú i lár téarma gan bealach amach a thairiscint duit. Fanann leaganacha roimhe seo ar fáil ag dezbatere.ro/terms/versions.
 
-Tháinig leagan 1.1 in ionad leagan 1.0: deir rannán 8 anois go n-oibríonn DeepInfra ar a fhreastalaithe féin gach samhail a thugtar do dhíospóireacht tríd, agus athraíodh an achoimre dá réir.
+Tháinig leagan 1.2 in ionad leagan 1.1: deir rannán 9 anois cad is vóta ar dhíospóireacht phoiblí ann, go bhfuil vóta amháin ag gach cuntas do gach díospóireacht agus gur féidir é a tharraingt siar, go dtaispeánann an liosta cé mhéad vóta atá ag díospóireacht agus nach dtaispeánann sé riamh cé a thug iad, agus nach ceadmhach líon a athrú le níos mó ná cuntas amháin ná trí mhodh uathoibrithe. Tháinig leagan 1.1 in ionad leagan 1.0: deir rannán 8 anois go n-oibríonn DeepInfra ar a fhreastalaithe féin gach samhail a thugtar do dhíospóireacht tríd, agus athraíodh an achoimre dá réir.
 
 ## 15. Dliteanas
 

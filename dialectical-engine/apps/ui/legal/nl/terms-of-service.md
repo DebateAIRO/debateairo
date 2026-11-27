@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: SERVICEVOORWAARDEN · v1.1 · VAN KRACHT OP 24 NOVEMBER 2026
+eyebrow: SERVICEVOORWAARDEN · v1.2 · VAN KRACHT OP 27 NOVEMBER 2026
 title: Waarmee u instemt
 lede: De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.
-endMarker: EINDE VAN DE VOORWAARDEN · v1.1
+endMarker: EINDE VAN DE VOORWAARDEN · v1.2
 bodyLabel: Tekst van de Servicevoorwaarden
 annexTitle: Bijlage A — Regionale voorwaarden
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TOEPASSELIJK RECHT
 -->
 
-**Version 1.1 · Effective 24 november 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
+**Version 1.2 · Effective 27 november 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
 **In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Op het gratis abonnement worden uw debatten openbaar wanneer ze zijn afgerond, na een AI-controle; op een betaald abonnement zijn ze privé, tenzij u ze publiceert. Eenmaal openbaar kan iedereen een debat lezen, en het blijft openbaar. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders, voornamelijk DeepInfra, in de Verenigde Staten. De voorwaarden van DeepInfra, Anthropic en Amazon staan hen niet toe daarop modellen te trainen. De aanbieder van de zoekfunctie op het web ontvangt alleen de korte zoektermen die de modellen opstellen (hoofdstuk 8). Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 
@@ -164,6 +164,8 @@ Debatten op een betaald abonnement zijn **standaard privé**: niets wat u daar m
 
 **Rapporten van iedereen.** Iedereen met tegoed kan een rapport over een openbaar debat schrijven zolang er niets meer aan wordt toegevoegd, met het eigen quotum. Het rapport is openbaar. Het pseudoniem van de schrijver is alleen een verwijzing: een rapport wordt door de AI’s geschreven op basis van wat de pagina toont, en het is niet de verklaring van de schrijver. Eerdere rapporten blijven leesbaar.
 
+**Stemmen.** Wanneer u bent aangemeld, kunt u op een debat op de lijst van openbare debatten stemmen, ook op uw eigen debat, om andere lezers te laten zien dat u het de moeite van het lezen waard vond. Elk account heeft één stem per debat, en opnieuw op de knop drukken trekt uw stem in zolang het debat op de lijst staat. De lijst toont hoeveel stemmen elk debat heeft en nooit wie ze heeft gegeven. Uw stemmen worden verwijderd wanneer de sluiting van uw account ingaat (hoofdstuk 6), en de stemmen van een debat worden verwijderd wanneer de openbare pagina ervan definitief verdwenen is (Privacybeleid, hoofdstuk 7). Gebruik niet meer dan één account, en geen geautomatiseerde middelen, om een aantal te veranderen: hoofdstuk 6 staat u één account toe, en hoofdstuk 7 staat geen geautomatiseerde toegang toe.
+
 **Nadat de auteur is vertrokken.** Een openbaar debat blijft open voor bijdragen nadat de eerste auteur zijn account heeft gewist. Nieuwe bijdragen werken vanuit de openbare kopie. Niemand is eigenaar van de pagina: een openbaar debat wordt opgebouwd door meerdere mensen en door de AI’s. Ieder behoudt de rechten die hij of zij eventueel heeft op de eigen woorden en verleent de onderstaande licentie. Niemand wordt mede-eigenaar van het debat. Niemand, ook de eerste auteur niet, kan de bijdrage van een ander laten verwijderen of anderen beletten iets aan het debat toe te voegen, behalve via de meldingsprocedure van hoofdstuk 10.
 
 **Wij kunnen gepubliceerde inhoud altijd verwijderen.** Wij kunnen een gepubliceerd debat verwijderen of de toegang daartoe beperken wanneer de wet dit vereist, wanneer een rechter of bevoegde autoriteit dit gelast, of wanneer het deze Voorwaarden schendt of illegaal is. Niets in dit hoofdstuk belet ons te handelen naar aanleiding van een geldige melding krachtens hoofdstuk 10 en niets daarin is een belofte dat een gepubliceerd debat beschikbaar zal blijven.
@@ -253,7 +255,7 @@ Wij vertellen u vooraf, op een duurzame gegevensdrager, wat er verandert en wann
 
 **In deze Voorwaarden.** Wij kunnen deze Voorwaarden om dezelfde soorten redenen wijzigen. Voor wijzigingen die uw rechten niet verminderen, publiceren wij de nieuwe versie met een samenvatting van wat is gewijzigd en sturen wij u ten minste **30 dagen** vóór de ingangsdatum een e-mail; als u Dialectical Engine na die datum blijft gebruiken, betekent dit dat u de wijziging aanvaardt, en u kunt uw account voordien sluiten. Voor wijzigingen die uw rechten verminderen — waaronder prijsverhogingen voor een bestaand abonnement, lagere limieten, verwijderde functies, nieuw gebruik van uw inhoud of wijzigingen in aansprakelijkheid, toepasselijk recht of geschillenbeslechting — vragen wij u bij uw volgende aanmelding uitdrukkelijk de nieuwe versie te aanvaarden en geldt de wijziging uitsluitend voor de toekomst. Wij maken een wijziging nooit met terugwerkende kracht en gebruiken dit hoofdstuk nooit om de kern van hetgeen waarvoor u hebt betaald tijdens de looptijd te wijzigen zonder u een uitweg te bieden. Eerdere versies blijven beschikbaar op dezbatere.ro/terms/versions.
 
-Versie 1.1 verving versie 1.0: hoofdstuk 8 zegt nu dat DeepInfra elk model dat via DeepInfra aan een debat wordt geleverd op zijn eigen servers laat draaien, en de samenvatting is daarop aangepast.
+Versie 1.2 verving versie 1.1: hoofdstuk 9 zegt nu wat een stem op een openbaar debat is, dat elk account er één per debat heeft en die kan intrekken, dat de lijst toont hoeveel stemmen een debat heeft en nooit wie ze heeft gegeven, en dat een aantal niet met meer dan één account of met geautomatiseerde middelen mag worden veranderd. Versie 1.1 verving versie 1.0: hoofdstuk 8 zegt nu dat DeepInfra elk model dat via DeepInfra aan een debat wordt geleverd op zijn eigen servers laat draaien, en de samenvatting is daarop aangepast.
 
 ## 15. Aansprakelijkheid
 

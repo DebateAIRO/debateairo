@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v1.1 · ĮSIGALIOJA 2026 M. LAPKRIČIO 24 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v1.2 · ĮSIGALIOJA 2026 M. LAPKRIČIO 27 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v1.1
+endMarker: SĄLYGŲ PABAIGA · v1.2
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 1.1 · Effective 2026 m. lapkričio 24 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 1.2 · Effective 2026 m. lapkričio 27 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Nemokamame plane jūsų debatai tampa vieši, kai jie baigiami, po DI patikros; mokamame plane jie yra privatūs, nebent juos paskelbiate. Viešus tapusius debatus gali skaityti bet kas, ir jie lieka vieši. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams, daugiausia DeepInfra, Jungtinėse Amerikos Valstijose. DeepInfra, Anthropic ir Amazon sąlygos neleidžia jiems pagal jį mokyti modelių. Interneto paieškos paslaugų teikėjas gauna tik trumpas paieškos frazes, kurias parašo modeliai (8 skyrius). Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -164,6 +164,8 @@ Mokamame plane debatai yra **privatūs pagal numatytuosius nustatymus**: niekas,
 
 **Ataskaitos, kurias parašo bet kas.** Kiekvienas, turintis kredito, gali parašyti viešo debato ataskaitą, kol prie jo dar nieko nepridedama, naudodamas savo kvotą. Ataskaita yra vieša. Rašytojo slapyvardis yra tik nuoroda: ataskaitą DI parašo pagal tai, ką rodo puslapis, ir ji nėra rašytojo pareiškimas. Ankstesnės ataskaitos lieka skaitomos.
 
+**Balsai.** Prisijungę galite balsuoti už debatą viešų debatų sąraše, taip pat ir už savo, kad parodytumėte kitiems skaitytojams, jog jis jums atrodė vertas skaityti. Kiekviena paskyra turi po vieną balsą kiekvienam debatui, o dar kartą paspaudus mygtuką jūsų balsas atšaukiamas, kol debatas yra sąraše. Sąraše rodoma, kiek balsų turi kiekvienas debatas, ir niekada – kas juos atidavė. Jūsų balsai ištrinami, kai įsigalioja jūsų paskyros uždarymas (6 skyrius), o debato balsai ištrinami, kai jo viešas puslapis išnyksta visam laikui (Privatumo politika, 7 skyrius). Nenaudokite daugiau nei vienos paskyros ar jokių automatizuotų priemonių balsų skaičiui pakeisti: 6 skyrius jums leidžia turėti vieną paskyrą, o 7 skyrius neleidžia automatizuotos prieigos.
+
 **Pasitraukus autoriui.** Viešas debatas lieka atviras indėliams po to, kai jo pirmasis autorius ištrynė savo paskyrą. Nauji indėliai veikia pagal viešą kopiją. Puslapis niekam nepriklauso: viešą debatą kuria keli žmonės ir DI. Kiekvienas išsaugo tas teises, kurias turi į savo žodžius, ir suteikia toliau nurodytą licenciją. Niekas netampa debato bendrasavininku. Niekas, įskaitant pirmąjį autorių, negali pasiekti, kad būtų pašalintas kito asmens indėlis, ar sutrukdyti kitiems papildyti debatą, išskyrus per 10 skyriuje nurodytą pranešimų teikimo tvarką.
 
 **Paskelbtą turinį visada galime pašalinti.** Galime pašalinti paskelbtus debatus arba apriboti prieigą prie jų, kai to reikalauja teisės aktai, kai taip nurodo teismas ar kompetentinga institucija arba kai jie pažeidžia šias Sąlygas ar yra neteisėti. Jokia šio skyriaus nuostata netrukdo mums imtis veiksmų gavus pagrįstą pranešimą pagal 10 skyrių ir nežada, kad paskelbti debatai liks prieinami.
@@ -253,7 +255,7 @@ Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitima
 
 **Šių Sąlygų pakeitimai.** Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš **30 dienų** iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions.
 
-1.1 versija pakeitė 1.0 versiją: 8 skyriuje dabar nurodyta, kad DeepInfra savo serveriuose paleidžia kiekvieną modelį, kurį debatai gauna per ją, o santrauka atitinkamai pakeista.
+1.2 versija pakeitė 1.1 versiją: 9 skyriuje dabar nurodyta, kas yra balsas už viešą debatą, kad kiekviena paskyra turi po vieną balsą kiekvienam debatui ir gali jį atšaukti, kad sąraše rodoma, kiek balsų turi debatas, ir niekada – kas juos atidavė, ir kad balsų skaičiaus negalima keisti naudojant daugiau nei vieną paskyrą ar automatizuotas priemones. 1.1 versija pakeitė 1.0 versiją: 8 skyriuje dabar nurodyta, kad DeepInfra savo serveriuose paleidžia kiekvieną modelį, kurį debatai gauna per ją, o santrauka atitinkamai pakeista.
 
 ## 15. Atsakomybė
 

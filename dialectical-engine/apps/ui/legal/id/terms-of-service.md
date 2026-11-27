@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v1.1 · BERLAKU 24 NOVEMBER 2026
+eyebrow: KETENTUAN LAYANAN · v1.2 · BERLAKU 27 NOVEMBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v1.1
+endMarker: AKHIR KETENTUAN · v1.2
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 1.1 · Effective 24 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 1.2 · Effective 27 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Di paket Gratis, debat Anda menjadi publik setelah selesai, setelah pemeriksaan AI; di paket berbayar, debat bersifat privat kecuali Anda memublikasikannya. Setelah publik, siapa pun dapat membaca debat itu, dan debat itu tetap publik. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, terutama DeepInfra, di Amerika Serikat. Ketentuan DeepInfra, Anthropic, dan Amazon tidak mengizinkan mereka melatih model dengan teks itu. Penyedia pencarian web hanya menerima frasa pencarian singkat yang ditulis model (bagian 8). Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -164,6 +164,8 @@ Di paket berbayar, debat bersifat **privat secara bawaan**. Tidak ada hal yang A
 
 **Laporan dari siapa pun.** Siapa pun yang memiliki kredit dapat menulis laporan tentang debat publik selama tidak ada lagi yang sedang ditambahkan ke dalamnya, menggunakan kuota miliknya sendiri. Laporan itu bersifat publik. Nama samaran penulis hanyalah referensi: laporan ditulis oleh AI dari apa yang ditampilkan halaman, dan bukan pernyataan penulisnya. Laporan sebelumnya tetap dapat dibaca.
 
+**Suara.** Saat Anda masuk, Anda dapat memberi suara pada debat di daftar debat publik, termasuk debat Anda sendiri, untuk menunjukkan kepada pembaca lain bahwa menurut Anda debat itu layak dibaca. Setiap akun memiliki satu suara untuk setiap debat, dan menekan tombol lagi menarik kembali suara Anda selama debat itu ada di daftar. Daftar menampilkan berapa banyak suara yang dimiliki setiap debat dan tidak pernah menampilkan siapa yang memberikannya. Suara Anda dihapus saat penutupan akun Anda berlaku (bagian 6), dan suara sebuah debat dihapus saat halaman publiknya telah hilang untuk selamanya (Kebijakan Privasi, bagian 7). Jangan gunakan lebih dari satu akun, atau sarana otomatis apa pun, untuk mengubah jumlah suara: bagian 6 mengizinkan Anda satu akun, dan bagian 7 tidak mengizinkan akses otomatis.
+
 **Setelah penulis pergi.** Debat publik tetap terbuka untuk kontribusi setelah penulis pertamanya menghapus akunnya. Kontribusi baru bekerja dari salinan publik. Tidak ada yang memiliki halaman tersebut: debat publik dibangun oleh beberapa orang dan oleh AI. Setiap orang tetap memegang hak apa pun yang mereka miliki atas kata-kata mereka sendiri dan memberikan lisensi di bawah ini. Tidak ada yang menjadi pemilik bersama debat tersebut. Tidak seorang pun, termasuk penulis pertama, dapat membuat kontribusi orang lain dihapus atau menghentikan orang lain menambahkan ke dalamnya, kecuali melalui jalur pelaporan pada bagian 10.
 
 **Kami selalu dapat menurunkan konten yang dipublikasikan.** Kami dapat menghapus atau membatasi akses ke debat yang dipublikasikan jika diwajibkan hukum, diperintahkan oleh pengadilan atau otoritas berwenang, atau jika debat tersebut melanggar Ketentuan ini atau melanggar hukum. Tidak ada hal dalam bagian ini yang menghalangi kami bertindak berdasarkan pemberitahuan yang sah menurut bagian 10, dan tidak ada hal di dalamnya yang menjanjikan bahwa debat yang dipublikasikan akan tetap tersedia.
@@ -253,7 +255,7 @@ Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang
 
 **Pada Ketentuan ini.** Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya **30 hari** sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions.
 
-Versi 1.1 menggantikan versi 1.0: bagian 8 kini menyatakan bahwa DeepInfra menjalankan di servernya sendiri setiap model yang dipakai suatu debat melalui DeepInfra, dan ringkasan diubah agar sesuai.
+Versi 1.2 menggantikan versi 1.1: bagian 9 kini menyatakan apa itu suara pada debat publik, bahwa setiap akun memiliki satu suara untuk setiap debat dan dapat menariknya kembali, bahwa daftar menampilkan berapa banyak suara yang dimiliki sebuah debat dan tidak pernah menampilkan siapa yang memberikannya, dan bahwa jumlah suara tidak boleh diubah dengan lebih dari satu akun atau dengan sarana otomatis. Versi 1.1 menggantikan versi 1.0: bagian 8 kini menyatakan bahwa DeepInfra menjalankan di servernya sendiri setiap model yang dipakai suatu debat melalui DeepInfra, dan ringkasan diubah agar sesuai.
 
 ## 15. Tanggung jawab
 

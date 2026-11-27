@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v1.1 · EFFETTIVI 24 TA’ NOVEMBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v1.2 · EFFETTIVI 27 TA’ NOVEMBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v1.1
+endMarker: TMIEM IT-TERMINI · v1.2
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 1.1 · Effective 24 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 1.2 · Effective 27 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Fuq il-pjan B’xejn, id-dibattiti tiegħek huma pubbliċi meta jintemmu, wara verifika bl-IA; fuq pjan bi ħlas, huma privati sakemm ma tippubblikahomx. Ladarba jkunu pubbliċi, kulħadd jista’ jaqra dibattitu, u jibqa’ pubbliku. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, prinċipalment lil DeepInfra, fl-Istati Uniti. It-termini ta’ DeepInfra, Anthropic u Amazon ma jippermettulhomx iħarrġu mudelli fuqu. Il-fornitur tat-tfittxija fuq il-web jirċievi biss il-frażijiet qosra ta’ tfittxija li jiktbu l-mudelli (taqsima 8). Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -164,6 +164,8 @@ Id-dibattiti fuq pjan bi ħlas huma **privati b’mod awtomatiku**: xejn minn da
 
 **Rapporti minn kulħadd.** Kull min għandu kreditu jista’ jikteb rapport dwar dibattitu pubbliku waqt li ma jkun għadu qed jiżdied xejn miegħu, bl-użu tal-kwota tiegħu stess. Ir-rapport huwa pubbliku. Il-psewdonimu tal-kittieb huwa referenza biss: rapport jinkiteb mis-sistemi tal-IA minn dak li l-paġna turi, u mhuwiex dikjarazzjoni tal-kittieb. Ir-rapporti preċedenti jibqgħu jinqraw.
 
+**Voti.** Meta tkun dħalt fil-kont tiegħek, tista’ tivvota għal dibattitu fil-lista tad-dibattiti pubbliċi, inkluż wieħed tiegħek, biex turi lil qarrejja oħra li sibtu jistħoqqlu jinqara. Kull kont għandu vot wieħed għal kull dibattitu, u meta tagħfas il-buttuna mill-ġdid tirtira l-vot tiegħek sakemm id-dibattitu jkun fil-lista. Il-lista turi kemm-il vot għandu kull dibattitu u qatt ma turi min tahom. Il-voti tiegħek jitħassru meta l-għeluq tal-kont tiegħek jidħol fis-seħħ (taqsima 6), u l-voti ta’ dibattitu jitħassru meta l-paġna pubblika tiegħu tkun marret għal kollox (Politika dwar il-Privatezza, taqsima 7). Tużax aktar minn kont wieħed, jew xi mezz awtomatizzat, biex tibdel għadd: it-taqsima 6 tippermettilek kont wieħed, u t-taqsima 7 ma tippermettix aċċess awtomatizzat.
+
 **Wara li l-awtur jitlaq.** Dibattitu pubbliku jibqa’ miftuħ għall-kontribuzzjonijiet wara li l-ewwel awtur tiegħu jkun ħassar il-kont tiegħu. Kontribuzzjonijiet ġodda jaħdmu mill-kopja pubblika. Ħadd ma huwa s-sid tal-paġna: dibattitu pubbliku jinbena minn diversi persuni u mis-sistemi tal-IA. Kull persuna żżomm kwalunkwe dritt li għandha fi kliemha stess u tagħti l-liċenzja ta’ hawn taħt. Ħadd ma jsir koproprjetarju tad-dibattitu. Ħadd, inkluż l-ewwel awtur, ma jista’ jġiegħel li titneħħa l-kontribuzzjoni ta’ persuna oħra jew iwaqqaf lil oħrajn milli jżidu magħha, ħlief permezz tal-proċedura ta’ rapportar fit-taqsima 10.
 
 **Dejjem nistgħu nneħħu kontenut ippubblikat.** Nistgħu nneħħu jew nirrestrinġu l-aċċess għal dibattitu ppubblikat fejn titlob dan il-liġi, fejn tordna dan qorti jew awtorità kompetenti, jew fejn jikser dawn it-Termini jew ikun illegali. Xejn f’din it-taqsima ma jwaqqafna milli naġixxu fuq avviż validu skont it-taqsima 10, u xejn fiha mhu wegħda li dibattitu ppubblikat se jibqa’ disponibbli.
@@ -253,7 +255,7 @@ Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidl
 
 **F’dawn it-Termini.** Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas **30 jum** qabel ma tidħol fis-seħħ; jekk tkompli tuża Dialectical Engine wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions.
 
-Il-verżjoni 1.1 issostitwiet il-verżjoni 1.0: it-taqsima 8 issa tgħid li DeepInfra jħaddem fuq is-servers tiegħu stess kull mudell li jingħata lil dibattitu permezz tiegħu, u s-sommarju ġie mibdul biex jaqbel magħha.
+Il-verżjoni 1.2 issostitwiet il-verżjoni 1.1: it-taqsima 9 issa tgħid x’inhu vot fuq dibattitu pubbliku, li kull kont għandu wieħed għal kull dibattitu u jista’ jirtirah, li l-lista turi kemm-il vot għandu dibattitu u qatt ma turi min tahom, u li għadd ma għandux jinbidel b’aktar minn kont wieħed jew b’mezzi awtomatizzati. Il-verżjoni 1.1 issostitwiet il-verżjoni 1.0: it-taqsima 8 issa tgħid li DeepInfra jħaddem fuq is-servers tiegħu stess kull mudell li jingħata lil dibattitu permezz tiegħu, u s-sommarju ġie mibdul biex jaqbel magħha.
 
 ## 15. Responsabbiltà
 

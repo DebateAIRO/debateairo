@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v1.1 · HATÁLYOS 2026. NOVEMBER 24.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v1.2 · HATÁLYOS 2026. NOVEMBER 27.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v1.1
+endMarker: A FELTÉTELEK VÉGE · v1.2
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 1.1 · Effective 2026. november 24. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 1.2 · Effective 2026. november 27. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Az ingyenes csomagon az Ön vitái befejezésük után, MI-ellenőrzést követően nyilvánosak; fizetős csomagon privátak, amíg közzé nem teszi őket. Nyilvánossá válva bárki elolvashatja a vitát, és az nyilvános marad. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, főként az Egyesült Államokban működő DeepInfra szolgáltatónak. A DeepInfra, az Anthropic és az Amazon feltételei nem engedik meg nekik, hogy modelleket tanítsanak be rajta. A webes keresési szolgáltató csak a modellek által megfogalmazott rövid keresőkifejezéseket kapja meg (8. szakasz). Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -164,6 +164,8 @@ Fizetős csomagon a viták **alapértelmezés szerint privátak**: az Ön ott l�
 
 **Jelentések, amelyeket bárki írhat.** Bárki, akinek kreditje van, jelentést írhat egy nyilvános vitáról olyankor, amikor éppen semmi sincs folyamatban, ami kiegészítené, saját keretét használva. A jelentés nyilvános. Az író álneve csupán hivatkozás: a jelentést az MI-rendszerek készítik az oldal tartalma alapján, és nem az író nyilatkozata. A korábbi jelentések olvashatók maradnak.
 
+**Szavazatok.** Bejelentkezve szavazhat egy vitára a nyilvános viták listáján, a sajátjára is, hogy megmutassa a többi olvasónak, hogy érdemesnek találta elolvasni. Minden fióknak vitánként egy szavazata van, és a gomb ismételt megnyomása visszavonja az Ön szavazatát, amíg a vita szerepel a listán. A lista azt mutatja, hogy az egyes viták hány szavazatot kaptak, azt pedig soha, hogy ki adta őket. Szavazatait töröljük, amikor fiókja megszüntetése hatályba lép (6. szakasz), egy vita szavazatait pedig akkor töröljük, amikor a nyilvános oldala végleg megszűnt (Adatvédelmi szabályzat, 7. szakasz). Ne használjon egynél több fiókot vagy bármilyen automatizált eszközt egy szavazatszám megváltoztatására: a 6. szakasz egy fiókot enged Önnek, a 7. szakasz pedig nem engedi az automatizált hozzáférést.
+
 **A szerző távozása után.** Egy nyilvános vita a közreműködések számára nyitva marad, miután első szerzője törölte fiókját. Az új közreműködések a nyilvános példányra épülnek. Az oldal senkinek sem a tulajdona: egy nyilvános vitát több személy és az MI-rendszerek építenek. Mindenki megtartja azokat a jogokat, amelyekkel saját szavai tekintetében rendelkezik, és megadja az alábbi engedélyt. Senki sem válik a vita társtulajdonosává. Senki — az első szerzőt is beleértve — nem érheti el, hogy más személy közreműködését eltávolítsák, és nem akadályozhatja meg, hogy mások kiegészítsék a vitát, kivéve a 10. szakasz szerinti bejelentési úton.
 
 **A közzétett tartalmat mindig eltávolíthatjuk.** Eltávolíthatunk egy közzétett vitát, vagy korlátozhatjuk az ahhoz való hozzáférést, ha ezt jogszabály írja elő, bíróság vagy illetékes hatóság rendeli el, illetve ha a vita sérti e Feltételeket vagy jogellenes. E szakasz egyetlen rendelkezése sem akadályozza, hogy a 10. szakasz szerinti érvényes értesítés alapján intézkedjünk, és nem ígéri, hogy egy közzétett vita elérhető marad.
@@ -253,7 +255,7 @@ Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha
 
 **E Feltételek módosítása.** E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább **30 nappal** a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a Dialectical Engine szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions.
 
-Az 1.1-es változat az 1.0-s változatot váltotta fel: a 8. szakasz most kimondja, hogy a DeepInfra minden olyan modellt, amelyet rajta keresztül kap meg egy vita, saját szerverein futtat, és ennek megfelelően módosult az összefoglaló.
+Az 1.2-es változat az 1.1-es változatot váltotta fel: a 9. szakasz most kimondja, mi a szavazat egy nyilvános vitára, hogy minden fióknak vitánként egy szavazata van, amelyet visszavonhat, hogy a lista azt mutatja, hány szavazatot kapott egy vita, azt pedig soha, hogy ki adta őket, továbbá hogy egy szavazatszámot nem szabad egynél több fiókkal vagy automatizált eszközökkel megváltoztatni. Az 1.1-es változat az 1.0-s változatot váltotta fel: a 8. szakasz most kimondja, hogy a DeepInfra minden olyan modellt, amelyet rajta keresztül kap meg egy vita, saját szerverein futtat, és ennek megfelelően módosult az összefoglaló.
 
 ## 15. Felelősség
 

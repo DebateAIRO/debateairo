@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v1.1 · GÜLTIG AB 24. NOVEMBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v1.2 · GÜLTIG AB 27. NOVEMBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v1.1
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v1.2
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 1.1 · Effective 24. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 1.2 · Effective 27. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Im kostenlosen Tarif sind Ihre Debatten nach Abschluss öffentlich, nach einer KI-Prüfung; im kostenpflichtigen Tarif sind sie privat, sofern Sie sie nicht veröffentlichen. Sobald eine Debatte öffentlich ist, kann jede Person sie lesen, und sie bleibt öffentlich. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis der KI-Anbieter aufgeführten KI-Anbieter gesendet, hauptsächlich an DeepInfra in den Vereinigten Staaten. Die Bedingungen von DeepInfra, Anthropic und Amazon erlauben es ihnen nicht, damit Modelle zu trainieren. Der Anbieter der Websuche erhält nur die kurzen Suchbegriffe, die die Modelle formulieren (Abschnitt 8). Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -164,6 +164,8 @@ Im kostenpflichtigen Tarif sind Debatten **standardmäßig privat**: Nichts, was
 
 **Berichte von allen.** Wer Guthaben hat, kann einen Bericht über eine öffentliche Debatte schreiben, während ihr gerade nichts mehr hinzugefügt wird, und zwar mit dem eigenen Kontingent. Der Bericht ist öffentlich. Das Pseudonym des Verfassers ist nur ein Verweis: Ein Bericht wird von den KI-Systemen aus dem geschrieben, was die Seite zeigt, und ist keine Erklärung des Verfassers. Frühere Berichte bleiben lesbar.
 
+**Stimmen.** Wenn Sie angemeldet sind, können Sie für eine Debatte auf der Liste der öffentlichen Debatten abstimmen, auch für Ihre eigene, um anderen Lesern zu zeigen, dass Sie sie lesenswert fanden. Jedes Konto hat eine Stimme für jede Debatte, und ein erneuter Druck auf die Schaltfläche nimmt Ihre Stimme zurück, solange die Debatte auf der Liste steht. Die Liste zeigt, wie viele Stimmen jede Debatte hat, und nie, wer sie abgegeben hat. Ihre Stimmen werden gelöscht, wenn die Schließung Ihres Kontos wirksam wird (Abschnitt 6), und die Stimmen einer Debatte werden gelöscht, wenn ihre öffentliche Seite endgültig verschwunden ist (Datenschutzerklärung, Abschnitt 7). Verwenden Sie nicht mehr als ein Konto und keine automatisierten Mittel, um eine Stimmenzahl zu verändern: Abschnitt 6 erlaubt Ihnen ein Konto, und Abschnitt 7 erlaubt keinen automatisierten Zugriff.
+
 **Nach dem Ausscheiden des Verfassers.** Eine öffentliche Debatte bleibt für Beiträge offen, nachdem ihr erster Verfasser sein Konto gelöscht hat. Neue Beiträge arbeiten mit der öffentlichen Kopie. Niemandem gehört die Seite: Eine öffentliche Debatte wird von mehreren Personen und von den KI-Systemen aufgebaut. Jede Person behält die Rechte, die sie gegebenenfalls an ihren eigenen Worten hat, und räumt die nachstehende Lizenz ein. Niemand wird Miteigentümer der Debatte. Niemand, auch nicht der erste Verfasser, kann den Beitrag einer anderen Person entfernen lassen oder andere daran hindern, der Debatte etwas hinzuzufügen, außer über den Meldeweg nach Abschnitt 10.
 
 **Wir können veröffentlichte Inhalte jederzeit entfernen.** Wir können eine veröffentlichte Debatte entfernen oder den Zugriff darauf beschränken, wenn das Gesetz dies verlangt, ein Gericht oder eine zuständige Behörde dies anordnet oder die Debatte gegen diese Nutzungsbedingungen verstößt oder rechtswidrig ist. Nichts in diesem Abschnitt hindert uns daran, aufgrund eines wirksamen Hinweises nach Abschnitt 10 tätig zu werden, und nichts darin ist eine Zusage, dass eine veröffentlichte Debatte verfügbar bleibt.
@@ -253,7 +255,7 @@ Wir teilen Ihnen im Voraus auf einem dauerhaften Datenträger mit, was sich wann
 
 **Änderungen dieser Nutzungsbedingungen.** Wir können diese Nutzungsbedingungen aus denselben Arten von Gründen ändern. Bei Änderungen, die Ihre Rechte nicht einschränken, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und senden Ihnen mindestens **30 Tage vor ihrem Inkrafttreten** eine E-Mail; wenn Sie Dialectical Engine nach diesem Datum weiterhin nutzen, stimmen Sie der Änderung zu, und Sie können Ihr Konto vorher schließen. Bei Änderungen, die Ihre Rechte einschränken – darunter Preiserhöhungen für einen bestehenden Tarif, niedrigere Limits, entfernte Funktionen, neue Nutzungen Ihrer Inhalte oder Änderungen der Haftung, des anwendbaren Rechts oder der Streitbeilegung – bitten wir Sie, der neuen Fassung bei Ihrer nächsten Anmeldung ausdrücklich zuzustimmen; die Änderung gilt nur für die Zukunft. Wir nehmen Änderungen niemals rückwirkend vor und verwenden diesen Abschnitt niemals dazu, den Kern Ihrer bereits bezahlten Leistung während der Laufzeit zu ändern, ohne Ihnen eine Beendigungsmöglichkeit einzuräumen. Frühere Fassungen bleiben unter dezbatere.ro/terms/versions verfügbar.
 
-Version 1.1 hat Version 1.0 ersetzt: Abschnitt 8 gibt nun an, dass DeepInfra jedes Modell, das einer Debatte über DeepInfra bereitgestellt wird, auf eigenen Servern betreibt, und die Zusammenfassung wurde entsprechend angepasst.
+Version 1.2 hat Version 1.1 ersetzt: Abschnitt 9 gibt nun an, was eine Stimme für eine öffentliche Debatte ist, dass jedes Konto eine für jede Debatte hat und sie zurücknehmen kann, dass die Liste zeigt, wie viele Stimmen eine Debatte hat, und nie, wer sie abgegeben hat, und dass eine Stimmenzahl nicht mit mehr als einem Konto oder mit automatisierten Mitteln verändert werden darf. Version 1.1 hat Version 1.0 ersetzt: Abschnitt 8 gibt nun an, dass DeepInfra jedes Modell, das einer Debatte über DeepInfra bereitgestellt wird, auf eigenen Servern betreibt, und die Zusammenfassung wurde entsprechend angepasst.
 
 ## 15. Haftung
 

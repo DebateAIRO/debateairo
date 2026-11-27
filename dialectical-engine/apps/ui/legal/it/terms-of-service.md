@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: CONDIZIONI DI SERVIZIO · v1.1 · IN VIGORE DAL 24 NOVEMBRE 2026
+eyebrow: CONDIZIONI DI SERVIZIO · v1.2 · IN VIGORE DAL 27 NOVEMBRE 2026
 title: Ciò che accetti
 lede: Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.
-endMarker: FINE DELLE CONDIZIONI · v1.1
+endMarker: FINE DELLE CONDIZIONI · v1.2
 bodyLabel: Testo delle Condizioni di servizio
 annexTitle: Allegato A — Condizioni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGGE APPLICABILE
 -->
 
-**Version 1.1 · Effective 24 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
+**Version 1.2 · Effective 27 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
 
 **In short.** Devi avere almeno 18 anni. Dialectical Engine costruisce argomentazioni con modelli di IA e tutto ciò che genera può essere errato — non costituisce consulenza. Nel piano Gratuito i tuoi dibattiti sono pubblici una volta conclusi, dopo la verifica dell’IA; nei piani a pagamento sono privati, salvo che tu li pubblichi. Una volta pubblico, chiunque può leggere un dibattito, e questo resta pubblico. Il testo che invii viene trasmesso ai fornitori di IA elencati nel nostro Registro dei fornitori, principalmente DeepInfra, negli Stati Uniti. Le condizioni di DeepInfra, Anthropic e Amazon non consentono loro di addestrare modelli su di esso. Il fornitore di ricerca sul web riceve solo le brevi frasi di ricerca formulate dai modelli (sezione 8). Segnala i contenuti illegali a support@dezbatere.ro, indipendentemente dal fatto che tu abbia un account. Si applica la legge rumena, ma le tutele locali dei consumatori restano impregiudicate.
 
@@ -164,6 +164,8 @@ Nei piani a pagamento i dibattiti sono **privati per impostazione predefinita**:
 
 **Rapporti scritti da chiunque.** Chiunque abbia credito può scrivere un rapporto su un dibattito pubblico mentre non vi si sta aggiungendo più nulla, usando la propria quota. Il rapporto è pubblico. Lo pseudonimo dell’autore è solo un riferimento: un rapporto è scritto dalle IA a partire da ciò che mostra la pagina, e non è una dichiarazione dell’autore. I rapporti precedenti restano leggibili.
 
+**Voti.** Quando hai effettuato l’accesso, puoi votare un dibattito dell’elenco dei dibattiti pubblici, anche uno tuo, per mostrare agli altri lettori che ti è sembrato degno di essere letto. Ogni account ha un voto per ciascun dibattito, e premendo di nuovo il pulsante ritiri il tuo finché il dibattito è nell’elenco. L’elenco mostra quanti voti ha ciascun dibattito e mai chi li ha dati. I tuoi voti vengono cancellati quando la chiusura del tuo account diventa efficace (sezione 6), e i voti di un dibattito vengono cancellati quando la sua pagina pubblica è scomparsa per sempre (Informativa sulla privacy, sezione 7). Non usare più di un account, né alcun mezzo automatizzato, per modificare un conteggio: la sezione 6 ti consente un solo account, e la sezione 7 non consente l’accesso automatizzato.
+
 **Dopo l’uscita dell’autore.** Un dibattito pubblico resta aperto ai contributi dopo che il suo primo autore ha cancellato il proprio account. I nuovi contributi partono dalla copia pubblica. Nessuno è proprietario della pagina: un dibattito pubblico è costruito da più persone e dalle IA. Ciascuno conserva i diritti che ha sulle proprie parole e concede la licenza indicata di seguito. Nessuno diventa comproprietario del dibattito. Nessuno, compreso il primo autore, può ottenere la rimozione del contributo di un’altra persona o impedire ad altri di aggiungervi contributi, se non tramite la procedura di segnalazione di cui alla sezione 10.
 
 **Possiamo sempre rimuovere i contenuti pubblicati.** Possiamo rimuovere un dibattito pubblicato o limitarne l'accesso quando la legge lo richiede, quando lo ordina un tribunale o un'autorità competente oppure quando il dibattito viola le presenti Condizioni o è illecito. Nulla nella presente sezione ci impedisce di agire a seguito di una segnalazione valida ai sensi della sezione 10 e nulla in essa costituisce una promessa che un dibattito pubblicato resterà disponibile.
@@ -253,7 +255,7 @@ Ti comunichiamo anticipatamente, su un supporto durevole, cosa cambia e quando. 
 
 **Alle presenti Condizioni.** Possiamo modificare le presenti Condizioni per le medesime categorie di motivi. In caso di modifiche che non riducono i tuoi diritti, pubblichiamo la nuova versione con una sintesi delle modifiche e ti inviamo un'email almeno **30 giorni** prima della sua entrata in vigore; continuando a utilizzare Dialectical Engine dopo tale data accetti la modifica e puoi chiudere il tuo account prima di allora. In caso di modifiche che riducono i tuoi diritti — compresi aumenti di prezzo di un piano esistente, limiti inferiori, funzionalità eliminate, nuovi utilizzi dei tuoi contenuti o modifiche alla responsabilità, alla legge applicabile o alla risoluzione delle controversie — ti chiediamo di accettare espressamente la nuova versione al tuo accesso successivo e la modifica si applica soltanto per il futuro. Non apportiamo mai una modifica retroattiva e non utilizziamo mai la presente sezione per modificare, durante il relativo periodo, il nucleo di ciò per cui hai pagato senza offrirti una via d'uscita. Le versioni precedenti restano disponibili all'indirizzo dezbatere.ro/terms/versions.
 
-La versione 1.1 ha sostituito la versione 1.0: la sezione 8 indica ora che DeepInfra esegue sui propri server ogni modello fornito a un dibattito tramite DeepInfra, e il riepilogo iniziale è stato modificato di conseguenza.
+La versione 1.2 ha sostituito la versione 1.1: la sezione 9 indica ora che cos’è un voto su un dibattito pubblico, che ogni account ne ha uno per ciascun dibattito e può ritirarlo, che l’elenco mostra quanti voti ha un dibattito e mai chi li ha dati, e che un conteggio non deve essere modificato con più di un account o con mezzi automatizzati. La versione 1.1 ha sostituito la versione 1.0: la sezione 8 indica ora che DeepInfra esegue sui propri server ogni modello fornito a un dibattito tramite DeepInfra, e il riepilogo iniziale è stato modificato di conseguenza.
 
 ## 15. Responsabilità
 

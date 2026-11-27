@@ -796,9 +796,9 @@ Terms or the Privacy Policy that is older than the English text), and only a new
 The Terms and the Privacy Policy each name their version and the day it takes effect. The day follows a rule for each
 text on its own (the release guide's section "The legal texts' day", `deploy/preview-release/v1/README.md`): a text
 whose current version the live site already carries keeps its day, and a new version takes the upload day, because it
-goes live on the site at DR6. Today the Terms 1.1 and the Privacy Policy 1.1 are on the live site and keep 24 November
-2026; a newer version of either takes the upload day. This upload carries the Terms 1.1, which keep 24 November 2026,
-and the Privacy Policy 1.2, a new version, which takes the upload day. Check both, in the same folder:
+goes live on the site at DR6. Today the Terms 1.1 and the Privacy Policy 1.2 are on the live site and keep their days,
+24 November 2026 and 25 November 2026; a newer version of either takes the upload day. This upload carries the Terms
+1.2 and the Privacy Policy 1.3, both new versions, which take the upload day. Check both, in the same folder:
 
 ```sh
 grep -Ho 'Version [0-9.]* · Effective [0-9]* [A-Za-z]* 20[0-9]*' apps/ui/legal/en/terms-of-service.md apps/ui/legal/en/privacy-policy.md
@@ -1007,11 +1007,11 @@ text under that step, or the repair map (after step 23), or ask. Never put a `.b
 ### 2.1 Before the downtime (the site is up)
 
 **1. The texts' days are still right** (Mac, the upload folder). Run the date line of 1.8, step 3, again. A version
-the live site already carries must show its live day (in this upload the Terms 1.1: 24 November 2026), and a new
-version must show today (in this upload the Privacy Policy 1.2; the release guide's section "The legal texts' day",
-`deploy/preview-release/v1/README.md`). If a line shows another day, stop before piece 1 and ask. PRECHECK (step 14)
-reads both texts by the same rule. In this upload it prints `legal day: terms-of-service 1.1, in the live release,
-keeps 24 November 2026` and `legal day: privacy-policy 1.2, new in this release, takes <today>`. Its `legal-date`
+the live site already carries must show its live day (in this upload neither text), and a new version must show
+today (in this upload both, the Terms 1.2 and the Privacy Policy 1.3; the release guide's section "The legal texts'
+day", `deploy/preview-release/v1/README.md`). If a line shows another day, stop before piece 1 and ask. PRECHECK (step
+14) reads both texts by the same rule. In this upload it prints `legal day: terms-of-service 1.2, new in this release,
+takes <today>` and `legal day: privacy-policy 1.3, new in this release, takes <today>`. Its `legal-date`
 subject stops it only when a text does not carry that day; a new day then needs a new commit (the release guide's
 section says how).
 

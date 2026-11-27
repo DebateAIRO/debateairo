@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v1.1 · KEHTIB ALATES 24. NOVEMBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v1.2 · KEHTIB ALATES 27. NOVEMBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v1.1
+endMarker: TINGIMUSTE LÕPP · v1.2
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 1.1 · Effective 24. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 1.2 · Effective 27. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Tasuta paketi korral on teie väitlused pärast lõppu avalikud, pärast tehisintellekti kontrolli; tasulise paketi korral on need privaatsed, kui te neid ei avalda. Kui väitlus on avalik, saab seda lugeda igaüks, ja see jääb avalikuks. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele, peamiselt pakkujale DeepInfra Ameerika Ühendriikides. Pakkujate DeepInfra, Anthropic ja Amazon tingimused ei luba neil selle põhjal mudeleid treenida. Veebiotsingu pakkuja saab ainult lühikesed otsingufraasid, mille mudelid kirjutavad (jaotis 8). Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -164,6 +164,8 @@ Tasulise paketi väitlused on **vaikimisi privaatsed**: miski, mida seal loote, 
 
 **Aruanded igaühelt.** Igaüks, kellel on krediiti, võib kirjutada avaliku väitluse kohta aruande, kui sellele ei lisata enam midagi, kasutades oma kvooti. Aruanne on avalik. Autori pseudonüüm on ainult viide: aruande kirjutavad tehisintellektid lehel näidatu põhjal ja see ei ole autori seisukoht. Varasemad aruanded jäävad loetavaks.
 
+**Hääled.** Kui olete sisse logitud, saate hääletada avalike väitluste loendis oleva väitluse poolt, ka oma väitluse poolt, et näidata teistele lugejatele, et pidasite seda lugemist väärt. Igal kontol on iga väitluse kohta üks hääl ja nupu uuesti vajutamine võtab teie hääle tagasi seni, kuni väitlus on loendis. Loend näitab, mitu häält igal väitlusel on, ja mitte kunagi seda, kes need andis. Teie hääled kustutatakse, kui teie konto sulgemine jõustub (jaotis 6), ja väitluse hääled kustutatakse, kui selle avalik leht on lõplikult kadunud (privaatsuspoliitika, jaotis 7). Ärge kasutage häälte arvu muutmiseks rohkem kui üht kontot ega mingeid automatiseeritud vahendeid: jaotis 6 lubab teile ühe konto ja jaotis 7 ei luba automatiseeritud juurdepääsu.
+
 **Pärast autori lahkumist.** Avalik väitlus jääb uutele panustele avatuks pärast seda, kui selle esimene autor on oma konto kustutanud. Uued panused töötavad avalikust koopiast lähtudes. Lehte ei oma keegi: avalikku väitlust loovad mitu inimest ja tehisintellektid. Igaüks säilitab õigused, mis tal oma sõnade suhtes võivad olla, ja annab allpool kirjeldatud litsentsi. Keegi ei saa väitluse kaasomanikuks. Keegi, sealhulgas esimene autor, ei saa lasta kellegi teise panust eemaldada ega takistada teistel väitlusele lisada, välja arvatud jaotises 10 kirjeldatud teatamiskanali kaudu.
 
 **Võime avaldatud sisu alati eemaldada.** Võime avaldatud väitluse eemaldada või sellele juurdepääsu piirata, kui seda nõuab seadus või kohus või pädev asutus või kui väitlus rikub neid Tingimusi või on ebaseaduslik. Miski selles jaotises ei takista meil tegutseda jaotise 10 kohase kehtiva teate alusel ega luba, et avaldatud väitlus jääb kättesaadavaks.
@@ -253,7 +255,7 @@ Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel o
 
 **Nende Tingimuste muudatused.** Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt **30 päeva** enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions.
 
-Versioon 1.1 asendas versiooni 1.0: jaotises 8 on nüüd öeldud, et DeepInfra käitab oma serverites iga mudelit, mis väitlusele selle kaudu antakse, ning kokkuvõtet muudeti vastavalt.
+Versioon 1.2 asendas versiooni 1.1: jaotises 9 on nüüd öeldud, mis on hääl avalikus väitluses, et igal kontol on iga väitluse kohta üks hääl, mille saab tagasi võtta, et loend näitab, mitu häält väitlusel on, ja mitte kunagi seda, kes need andis, ning et häälte arvu ei tohi muuta rohkem kui ühe kontoga ega automatiseeritud vahenditega. Versioon 1.1 asendas versiooni 1.0: jaotises 8 on nüüd öeldud, et DeepInfra käitab oma serverites iga mudelit, mis väitlusele selle kaudu antakse, ning kokkuvõtet muudeti vastavalt.
 
 ## 15. Vastutus
 

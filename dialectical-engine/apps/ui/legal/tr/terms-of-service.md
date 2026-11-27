@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v1.1 · YÜRÜRLÜK TARİHİ 24 KASIM 2026
+eyebrow: HİZMET KOŞULLARI · v1.2 · YÜRÜRLÜK TARİHİ 27 KASIM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v1.1
+endMarker: KOŞULLARIN SONU · v1.2
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 1.1 · Effective 24 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 1.2 · Effective 27 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Ücretsiz plandaki tartışmalarınız, tamamlandığında ve bir yapay zekâ kontrolünden geçtikten sonra herkese açık olur; ücretli planda ise siz yayımlamadıkça özeldir. Herkese açık olduktan sonra herkes bir tartışmayı okuyabilir ve tartışma herkese açık kalır. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına, ağırlıklı olarak Amerika Birleşik Devletleri'ndeki DeepInfra'ya iletilir. DeepInfra, Anthropic ve Amazon'un koşulları, bu metinle model eğitmelerine izin vermez. Web arama sağlayıcısı yalnızca modellerin yazdığı kısa arama ifadelerini alır (8. bölüm). Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -164,6 +164,8 @@ Bir şeye izin verilip verilmediğinden emin değilseniz, göndermeden önce biz
 
 **Herkesin raporları.** Kredisi olan herkes, kendi kotasını kullanarak, üzerine artık hiçbir şey eklenmiyorken herkese açık bir tartışma hakkında rapor yazabilir. Rapor herkese açıktır. Yazarın takma adı yalnızca bir referanstır: rapor, yapay zekâlar tarafından sayfanın gösterdiklerinden yazılır ve yazarın beyanı değildir. Daha önceki raporlar okunabilir kalır.
 
+**Oylar.** Oturum açtığınızda, herkese açık tartışmalar listesindeki bir tartışmaya, kendi tartışmanız da dahil olmak üzere, okunmaya değer bulduğunuzu diğer okuyuculara göstermek için oy verebilirsiniz. Her hesabın her tartışma için bir oyu vardır ve tartışma listede olduğu sürece düğmeye yeniden basmak oyunuzu geri alır. Liste her tartışmanın kaç oyu olduğunu gösterir, oyları kimin verdiğini ise asla göstermez. Oylarınız, hesabınızın kapatılması yürürlüğe girdiğinde silinir (6. bölüm) ve bir tartışmanın oyları, herkese açık sayfası kalıcı olarak ortadan kalktığında silinir (Gizlilik Politikası, 7. bölüm). Bir sayıyı değiştirmek için birden fazla hesap veya herhangi bir otomatik araç kullanmayın: 6. bölüm size tek bir hesap tanır ve 7. bölüm otomatik erişime izin vermez.
+
 **Yazar ayrıldıktan sonra.** Herkese açık bir tartışma, ilk yazarı hesabını sildikten sonra da katkılara açık kalır. Yeni katkılar herkese açık kopya üzerinden çalışır. Sayfanın sahibi yoktur: herkese açık bir tartışmayı birkaç kişi ve yapay zekâlar oluşturur. Her kişi kendi sözleri üzerinde sahip olduğu hakları korur ve aşağıdaki lisansı verir. Hiç kimse tartışmanın ortak sahibi olmaz. İlk yazar dâhil hiç kimse, 10. bölümdeki bildirim yolu dışında, başka bir kişinin katkısını kaldırtamaz veya başkalarının ona ekleme yapmasını engelleyemez.
 
 **Yayımlanmış içeriği her zaman kaldırabiliriz.** Hukukun gerektirdiği, bir mahkemenin veya yetkili makamın emrettiği ya da içeriğin bu Koşulları ihlal ettiği veya hukuka aykırı olduğu durumlarda yayımlanmış bir tartışmayı kaldırabilir veya erişimi kısıtlayabiliriz. Bu bölümdeki hiçbir hüküm, 10. bölüm kapsamındaki geçerli bir bildirim üzerine işlem yapmamızı engellemez ve yayımlanmış bir tartışmanın erişilebilir kalacağına dair taahhüt oluşturmaz.
@@ -253,7 +255,7 @@ Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildirir
 
 **Bu Koşullarda.** Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az **30 gün önce** size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dâhil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır.
 
-Sürüm 1.1, sürüm 1.0'ın yerini almıştır: 8. bölüm artık DeepInfra'nın, bir tartışmaya kendisi aracılığıyla verilen her modeli kendi sunucularında çalıştırdığını belirtmektedir; özet de buna uygun olarak değiştirilmiştir.
+Sürüm 1.2, sürüm 1.1'in yerini almıştır: 9. bölüm artık herkese açık bir tartışmaya verilen oyun ne olduğunu, her hesabın her tartışma için bir oyu olduğunu ve bunu geri alabileceğini, listenin bir tartışmanın kaç oyu olduğunu gösterip oyları kimin verdiğini asla göstermediğini ve bir sayının birden fazla hesapla veya otomatik araçlarla değiştirilmemesi gerektiğini belirtmektedir. Sürüm 1.1, sürüm 1.0'ın yerini almıştır: 8. bölüm artık DeepInfra'nın, bir tartışmaya kendisi aracılığıyla verilen her modeli kendi sunucularında çalıştırdığını belirtmektedir; özet de buna uygun olarak değiştirilmiştir.
 
 ## 15. Sorumluluk
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v1.1 · VELJAVNI OD 24. NOVEMBRA 2026
+eyebrow: POGOJI UPORABE · v1.2 · VELJAVNI OD 27. NOVEMBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v1.1
+endMarker: KONEC POGOJEV · v1.2
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 1.1 · Effective 24. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 1.2 · Effective 27. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
 **In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Na brezplačnem paketu so vaše razprave po zaključku javne, po preverjanju z umetno inteligenco; na plačljivem paketu so zasebne, razen če jih objavite. Ko je razprava javna, jo lahko prebere vsakdo, in ostane javna. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, predvsem ponudniku DeepInfra, v Združenih državah. Pogoji družb DeepInfra, Anthropic in Amazon jim ne dovoljujejo učenja modelov na njem. Ponudnik spletnega iskanja prejme samo kratke iskalne fraze, ki jih napišejo modeli (razdelek 8). Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
@@ -164,6 +164,8 @@ Na plačljivem paketu so razprave **privzeto zasebne**: nič, kar tam ustvarite,
 
 **Poročila vseh.** Vsak, ki ima dobroimetje, lahko napiše poročilo o javni razpravi, dokler se k njej ničesar več ne dodaja, z uporabo lastne kvote. Poročilo je javno. Psevdonim pisca je zgolj sklic: poročilo napišejo umetne inteligence iz tistega, kar stran prikazuje, in ni izjava pisca. Prejšnja poročila ostanejo berljiva.
 
+**Glasovi.** Ko ste prijavljeni, lahko glasujete za razpravo na seznamu javnih razprav, tudi za svojo, da drugim bralcem pokažete, da se vam je zdela vredna branja. Vsak račun ima za vsako razpravo en glas, ponoven pritisk na gumb pa vaš glas prekliče, dokler je razprava na seznamu. Seznam prikazuje, koliko glasov ima vsaka razprava, in nikoli, kdo jih je oddal. Vaši glasovi se izbrišejo, ko začne učinkovati zaprtje vašega računa (razdelek 6), glasovi razprave pa se izbrišejo, ko njena javna stran za vedno izgine (Pravilnik o zasebnosti, razdelek 7). Za spreminjanje števila glasov ne uporabljajte več kot enega računa ali kakršnih koli samodejnih sredstev: razdelek 6 vam dovoljuje en račun, razdelek 7 pa ne dovoljuje samodejnega dostopa.
+
 **Ko avtor odide.** Javna razprava ostane odprta za prispevke tudi potem, ko je njen prvi avtor izbrisal svoj račun. Novi prispevki delujejo na podlagi javnega izvoda. Strani nima v lasti nihče: javno razpravo gradi več ljudi in umetne inteligence. Vsak obdrži pravice, ki jih ima na svojih besedah, in podeli spodaj navedeno licenco. Nihče ne postane solastnik razprave. Nihče, vključno s prvim avtorjem, ne more doseči odstranitve prispevka druge osebe ali drugim preprečiti, da k razpravi dodajajo, razen po načinu prijave iz razdelka 10.
 
 **Objavljeno vsebino lahko vedno odstranimo.** Objavljeno razpravo lahko odstranimo ali omejimo dostop do nje, kadar to zahteva zakon, odredi sodišče ali pristojni organ oziroma kadar krši te Pogoje ali je nezakonita. Nič v tem razdelku nam ne preprečuje ukrepanja na podlagi veljavnega obvestila po razdelku 10 in nič v njem ne pomeni obljube, da bo objavljena razprava ostala dostopna.
@@ -253,7 +255,7 @@ Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima spre
 
 **Spremembe teh Pogojev.** Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj **30 dni** pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba Dialectical Engine po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions.
 
-Različica 1.1 je nadomestila različico 1.0: razdelek 8 zdaj navaja, da DeepInfra vsak model, ki ga razprava prejme prek nje, izvaja na lastnih strežnikih, povzetek pa je bil ustrezno spremenjen.
+Različica 1.2 je nadomestila različico 1.1: razdelek 9 zdaj navaja, kaj je glas za javno razpravo, da ima vsak račun za vsako razpravo en glas in ga lahko prekliče, da seznam prikazuje, koliko glasov ima razprava, in nikoli, kdo jih je oddal, ter da se števila glasov ne sme spreminjati z več kot enim računom ali s samodejnimi sredstvi. Različica 1.1 je nadomestila različico 1.0: razdelek 8 zdaj navaja, da DeepInfra vsak model, ki ga razprava prejme prek nje, izvaja na lastnih strežnikih, povzetek pa je bil ustrezno spremenjen.
 
 ## 15. Odgovornost
 

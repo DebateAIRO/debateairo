@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v1.1 · VOIMASSA 24. MARRASKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v1.2 · VOIMASSA 27. MARRASKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v1.1
+endMarker: KÄYTTÖEHTOJEN LOPPU · v1.2
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 1.1 · Effective 24. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 1.2 · Effective 27. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Maksuttomassa tilauksessa väittelysi ovat valmistuttuaan julkisia tekoälytarkistuksen jälkeen; maksullisessa tilauksessa ne ovat yksityisiä, ellet julkaise niitä. Kun väittely on julkinen, kuka tahansa voi lukea sen, ja se pysyy julkisena. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, pääasiassa DeepInfralle Yhdysvalloissa. DeepInfran, Anthropicin ja Amazonin ehdot eivät salli niiden kouluttaa malleja sillä. Verkkohakupalvelun tarjoaja saa vain lyhyet hakulausekkeet, jotka mallit kirjoittavat (kohta 8). Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -164,6 +164,8 @@ Maksullisessa tilauksessa väittelyt ovat **oletusarvoisesti yksityisiä**: mik�
 
 **Raportit kenen tahansa tekemänä.** Kuka tahansa, jolla on krediittiä, voi kirjoittaa raportin julkisesta väittelystä, kun siihen ei enää lisätä mitään, omalla kiintiöllään. Raportti on julkinen. Kirjoittajan nimimerkki on vain viite: tekoälyt kirjoittavat raportin sivun näyttämän perusteella, eikä se ole kirjoittajan lausunto. Aiemmat raportit pysyvät luettavina.
 
+**Äänet.** Kun olet kirjautunut sisään, voit äänestää julkisten väittelyjen luettelossa olevaa väittelyä, myös omaasi, osoittaaksesi muille lukijoille, että pidit sitä lukemisen arvoisena. Kullakin tilillä on yksi ääni kutakin väittelyä kohden, ja painikkeen painaminen uudelleen peruu äänesi niin kauan kuin väittely on luettelossa. Luettelo näyttää, kuinka monta ääntä kullakin väittelyllä on, eikä koskaan sitä, kuka ne antoi. Äänesi poistetaan, kun tilisi sulkeminen tulee voimaan (kohta 6), ja väittelyn äänet poistetaan, kun sen julkinen sivu on poistunut lopullisesti (tietosuojakäytäntö, osio 7). Älä käytä useampaa kuin yhtä tiliä tai mitään automaattisia keinoja äänimäärän muuttamiseen: kohta 6 sallii sinulle yhden tilin, eikä kohta 7 salli automaattista käyttöä.
+
 **Kirjoittajan poistuttua.** Julkinen väittely pysyy avoimena osallistumisille sen jälkeen, kun sen ensimmäinen kirjoittaja on poistanut tilinsä. Uudet osallistumiset toimivat julkisen kopion pohjalta. Kukaan ei omista sivua: julkista väittelyä rakentavat useat ihmiset ja tekoälyt. Jokainen säilyttää ne oikeudet, jotka hänellä mahdollisesti on omiin sanoihinsa, ja antaa jäljempänä kuvatun käyttöluvan. Kukaan ei tule väittelyn osaomistajaksi. Kukaan, ensimmäinen kirjoittaja mukaan lukien, ei voi saada toisen henkilön osallistumista poistetuksi tai estää muita lisäämästä väittelyyn, paitsi kohdassa 10 tarkoitetun ilmoitusreitin kautta.
 
 **Voimme aina poistaa julkaistun sisällön.** Voimme poistaa julkaistun väittelyn tai rajoittaa pääsyä siihen, jos laki sitä edellyttää, tuomioistuin tai toimivaltainen viranomainen niin määrää taikka väittely rikkoo näitä käyttöehtoja tai on lainvastainen. Mikään tässä kohdassa ei estä meitä toimimasta kohdassa 10 tarkoitetun pätevän ilmoituksen perusteella, eikä mikään tässä kohdassa ole lupaus julkaistun väittelyn saatavuuden jatkumisesta.
@@ -253,7 +255,7 @@ Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin
 
 **Näiden käyttöehtojen muutokset.** Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään **30 päivää ennen** sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions.
 
-Versio 1.1 korvasi version 1.0: kohdassa 8 todetaan nyt, että DeepInfra ajaa omilla palvelimillaan jokaista mallia, joka väittelylle annetaan sen kautta, ja yhteenvetoa muutettiin vastaavasti.
+Versio 1.2 korvasi version 1.1: kohdassa 9 todetaan nyt, mikä ääni julkisessa väittelyssä on, että kullakin tilillä on yksi ääni kutakin väittelyä kohden ja että sen voi perua, että luettelo näyttää, kuinka monta ääntä väittelyllä on, eikä koskaan sitä, kuka ne antoi, ja ettei äänimäärää saa muuttaa useammalla kuin yhdellä tilillä tai automaattisin keinoin. Versio 1.1 korvasi version 1.0: kohdassa 8 todetaan nyt, että DeepInfra ajaa omilla palvelimillaan jokaista mallia, joka väittelylle annetaan sen kautta, ja yhteenvetoa muutettiin vastaavasti.
 
 ## 15. Vastuu
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v1.1 · CÓ HIỆU LỰC 24 THÁNG 11 NĂM 2026
+eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v1.2 · CÓ HIỆU LỰC 27 THÁNG 11 NĂM 2026
 title: Những điều bạn đồng ý
 lede: Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.
-endMarker: HẾT ĐIỀU KHOẢN · v1.1
+endMarker: HẾT ĐIỀU KHOẢN · v1.2
 bodyLabel: Nội dung Điều khoản dịch vụ
 annexTitle: Phụ lục A — Điều khoản theo khu vực
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 1.1 · Effective 24 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
+**Version 1.2 · Effective 27 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Trên gói Miễn phí, các cuộc tranh luận của bạn trở thành công khai khi kết thúc, sau khi AI kiểm tra; trên gói trả phí, chúng là riêng tư trừ khi bạn công khai chúng. Khi đã công khai, bất kỳ ai cũng có thể đọc một cuộc tranh luận, và nó vẫn công khai. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi, chủ yếu là DeepInfra, tại Hoa Kỳ. Điều khoản của DeepInfra, Anthropic và Amazon không cho phép họ huấn luyện mô hình bằng văn bản đó. Nhà cung cấp dịch vụ tìm kiếm trên web chỉ nhận các cụm từ tìm kiếm ngắn do các mô hình viết ra (mục 8). Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
@@ -164,6 +164,8 @@ Trên gói trả phí, các cuộc tranh luận **mặc định là riêng tư**
 
 **Báo cáo của bất kỳ ai.** Bất kỳ ai có tín dụng đều có thể viết báo cáo về một cuộc tranh luận công khai khi chưa có gì được thêm vào nữa, bằng hạn mức của riêng mình. Báo cáo là công khai. Bút danh của người viết chỉ là một tham chiếu: báo cáo do AI viết từ những gì trang hiển thị, và không phải là tuyên bố của người viết. Các báo cáo trước đó vẫn đọc được.
 
+**Lượt bình chọn.** Khi đã đăng nhập, bạn có thể bình chọn cho một cuộc tranh luận trong danh sách các cuộc tranh luận công khai, kể cả cuộc tranh luận của chính bạn, để cho những người đọc khác thấy rằng bạn thấy nó đáng đọc. Mỗi tài khoản có một lượt bình chọn cho mỗi cuộc tranh luận, và nhấn nút thêm lần nữa sẽ rút lại lượt của bạn khi cuộc tranh luận còn nằm trong danh sách. Danh sách hiển thị mỗi cuộc tranh luận có bao nhiêu lượt bình chọn và không bao giờ hiển thị ai đã bình chọn. Các lượt bình chọn của bạn bị xóa khi việc đóng tài khoản của bạn có hiệu lực (mục 6), và các lượt bình chọn của một cuộc tranh luận bị xóa khi trang công khai của nó đã mất vĩnh viễn (Chính sách quyền riêng tư, mục 7). Không dùng nhiều hơn một tài khoản, hay bất kỳ phương tiện tự động nào, để thay đổi một con số: mục 6 cho phép bạn một tài khoản, và mục 7 không cho phép truy cập tự động.
+
 **Sau khi tác giả rời đi.** Một cuộc tranh luận công khai vẫn mở để đóng góp sau khi tác giả đầu tiên của nó đã xóa tài khoản. Những đóng góp mới hoạt động từ bản sao công khai. Không ai sở hữu trang này: một cuộc tranh luận công khai được xây dựng bởi nhiều người và bởi các AI. Mỗi người giữ mọi quyền mà họ có đối với lời lẽ của chính mình và cấp giấy phép nêu dưới đây. Không ai trở thành đồng sở hữu cuộc tranh luận. Không ai, kể cả tác giả đầu tiên, có thể khiến đóng góp của người khác bị gỡ bỏ hoặc ngăn người khác bổ sung vào đó, trừ khi thông qua kênh báo cáo tại mục 10.
 
 **Chúng tôi luôn có thể gỡ nội dung đã công khai.** Chúng tôi có thể gỡ bỏ hoặc hạn chế quyền truy cập vào một cuộc tranh luận đã công khai khi pháp luật yêu cầu, khi tòa án hoặc cơ quan có thẩm quyền ra lệnh, hoặc khi nội dung vi phạm các Điều khoản này hay trái pháp luật. Không nội dung nào trong mục này ngăn chúng tôi hành động theo một thông báo hợp lệ tại mục 10, và không nội dung nào là cam kết rằng một cuộc tranh luận đã công khai sẽ tiếp tục được cung cấp.
@@ -253,7 +255,7 @@ Chúng tôi thông báo trước cho bạn trên một phương tiện bền v�
 
 **Đối với các Điều khoản này.** Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất **30 ngày** trước khi phiên bản có hiệu lực; tiếp tục sử dụng Dialectical Engine sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions.
 
-Phiên bản 1.1 thay thế phiên bản 1.0: mục 8 hiện nêu rằng DeepInfra chạy trên máy chủ riêng của mình mọi mô hình được cung cấp cho một cuộc tranh luận thông qua DeepInfra, và phần tóm tắt đã được thay đổi cho phù hợp.
+Phiên bản 1.2 thay thế phiên bản 1.1: mục 9 hiện nêu lượt bình chọn cho một cuộc tranh luận công khai là gì, rằng mỗi tài khoản có một lượt cho mỗi cuộc tranh luận và có thể rút lại, rằng danh sách hiển thị một cuộc tranh luận có bao nhiêu lượt bình chọn và không bao giờ hiển thị ai đã bình chọn, và rằng không được thay đổi con số bằng nhiều hơn một tài khoản hay bằng phương tiện tự động. Phiên bản 1.1 thay thế phiên bản 1.0: mục 8 hiện nêu rằng DeepInfra chạy trên máy chủ riêng của mình mọi mô hình được cung cấp cho một cuộc tranh luận thông qua DeepInfra, và phần tóm tắt đã được thay đổi cho phù hợp.
 
 ## 15. Trách nhiệm
 

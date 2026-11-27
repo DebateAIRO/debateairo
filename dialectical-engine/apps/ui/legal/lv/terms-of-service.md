@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v1.1 · SPĒKĀ NO 2026. GADA 24. NOVEMBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v1.2 · SPĒKĀ NO 2026. GADA 27. NOVEMBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v1.1
+endMarker: NOTEIKUMU BEIGAS · v1.2
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 1.1 · Effective 2026. gada 24. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 1.2 · Effective 2026. gada 27. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Bezmaksas plānā jūsu debates kļūst publiskas, kad tās ir pabeigtas, pēc MI pārbaudes; maksas plānā tās ir privātas, ja vien tās nepublicējat. Kad debates ir publiskas, ikviens tās var lasīt, un tās paliek publiskas. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem, galvenokārt DeepInfra, Amerikas Savienotajās Valstīs. DeepInfra, Anthropic un Amazon noteikumi neļauj tiem ar to apmācīt modeļus. Tīmekļa meklēšanas pakalpojumu sniedzējs saņem tikai īsās meklēšanas frāzes, ko uzraksta modeļi (8. sadaļa). Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -164,6 +164,8 @@ Debates maksas plānā **pēc noklusējuma ir privātas**: nekas no tā, ko tur 
 
 **Pārskati no ikviena.** Ikviens, kam ir kredīts, var uzrakstīt pārskatu par publisku debati, kamēr tai vēl nekas netiek pievienots, izmantojot savu kvotu. Pārskats ir publisks. Autora pseidonīms ir tikai atsauce: pārskatu MI raksta pēc tā, ko rāda lapa, un tas nav autora paziņojums. Iepriekšējie pārskati paliek pieejami lasīšanai.
 
+**Balsis.** Kad esat pierakstījies, varat balsot par debatēm publisko debašu sarakstā, arī par savām, lai parādītu citiem lasītājiem, ka tās jums šķita lasīšanas vērtas. Katram kontam ir viena balss par katrām debatēm, un, vēlreiz nospiežot pogu, jūsu balss tiek atsaukta, kamēr debates ir sarakstā. Sarakstā redzams, cik balsu ir katrām debatēm, un nekad tas, kas tās devis. Jūsu balsis tiek dzēstas, kad stājas spēkā jūsu konta slēgšana (6. sadaļa), un debašu balsis tiek dzēstas, kad to publiskā lapa ir zudusi uz visiem laikiem (Privātuma politika, 7. sadaļa). Neizmantojiet vairāk par vienu kontu vai jebkādus automatizētus līdzekļus, lai mainītu balsu skaitu: 6. sadaļa jums atļauj vienu kontu, un 7. sadaļa neatļauj automatizētu piekļuvi.
+
 **Pēc autora aiziešanas.** Publiska debate paliek atvērta ieguldījumiem pēc tam, kad tās pirmais autors ir izdzēsis savu kontu. Jauni ieguldījumi strādā no publiskās kopijas. Lapa nevienam nepieder: publisku debati veido vairākas personas un MI. Katrs patur tās tiesības, kas viņam ir uz saviem vārdiem, un piešķir turpmāk minēto licenci. Neviens nekļūst par debates līdzīpašnieku. Neviens, ieskaitot pirmo autoru, nevar panākt citas personas ieguldījuma noņemšanu vai liegt citiem papildināt debati, izņemot, izmantojot 10. sadaļā aprakstīto ziņošanas kārtību.
 
 **Mēs vienmēr varam noņemt publicētu saturu.** Mēs varam noņemt publicētas debates vai ierobežot piekļuvi tām, ja to prasa tiesību akti, ja to uzdod tiesa vai kompetenta iestāde vai ja tās pārkāpj šos Noteikumus vai ir nelikumīgas. Nekas šajā sadaļā neliedz mums rīkoties pēc derīga paziņojuma saskaņā ar 10. sadaļu, un nekas tajā nav solījums, ka publicētas debates paliks pieejamas.
@@ -253,7 +255,7 @@ Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainī
 
 **Šo Noteikumu izmaiņas.** Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz **30 dienu iepriekš** nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions.
 
-Versija 1.1 aizstāja versiju 1.0: 8. sadaļā tagad norādīts, ka DeepInfra savos serveros darbina katru modeli, kas ar tā starpniecību tiek nodrošināts debatēm, un atbilstoši tam tika mainīts kopsavilkums.
+Versija 1.2 aizstāja versiju 1.1: 9. sadaļā tagad norādīts, kas ir balss par publiskām debatēm, ka katram kontam ir viena balss par katrām debatēm un to var atsaukt, ka sarakstā redzams, cik balsu ir debatēm, un nekad tas, kas tās devis, un ka balsu skaitu nedrīkst mainīt ar vairāk nekā vienu kontu vai automatizētiem līdzekļiem. Versija 1.1 aizstāja versiju 1.0: 8. sadaļā tagad norādīts, ka DeepInfra savos serveros darbina katru modeli, kas ar tā starpniecību tiek nodrošināts debatēm, un atbilstoši tam tika mainīts kopsavilkums.
 
 ## 15. Atbildība
 

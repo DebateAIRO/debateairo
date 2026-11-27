@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v1.1 · OBOWIĄZUJĄ OD 24 LISTOPADA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v1.2 · OBOWIĄZUJĄ OD 27 LISTOPADA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v1.1
+endMarker: KONIEC WARUNKÓW · v1.2
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 1.1 · Effective 24 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 1.2 · Effective 27 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. W planie bezpłatnym Twoje debaty stają się publiczne po zakończeniu, po sprawdzeniu przez AI; w płatnym planie są prywatne, chyba że je opublikujesz. Po upublicznieniu każdy może przeczytać debatę, a ona pozostaje publiczna. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze dostawców, głównie DeepInfra, w Stanach Zjednoczonych. Warunki DeepInfra, Anthropic i Amazon nie pozwalają im trenować na nim modeli. Dostawca wyszukiwania w internecie otrzymuje wyłącznie krótkie frazy wyszukiwania, które piszą modele (sekcja 8). Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -164,6 +164,8 @@ W płatnym planie debaty są **domyślnie prywatne**: żadna treść utworzona t
 
 **Raporty od każdego.** Każdy, kto ma kredyt, może napisać raport o publicznej debacie, gdy nic nie jest już do niej dodawane, korzystając z własnego limitu. Raport jest publiczny. Pseudonim autora jest tylko odniesieniem: raport pisany jest przez AI na podstawie tego, co pokazuje strona, i nie jest oświadczeniem autora. Wcześniejsze raporty pozostają dostępne do odczytu.
 
+**Głosy.** Gdy jesteś zalogowany(-a), możesz zagłosować na debatę z listy debat publicznych, także na własną, aby pokazać innym czytelnikom, że uznałeś(-aś) ją za wartą przeczytania. Każde konto ma jeden głos na każdą debatę, a ponowne naciśnięcie przycisku cofa Twój głos, dopóki debata jest na liście. Lista pokazuje, ile głosów ma każda debata, i nigdy nie pokazuje, kto je oddał. Twoje głosy są usuwane, gdy zamknięcie Twojego konta staje się skuteczne (sekcja 6), a głosy debaty są usuwane, gdy jej publiczna strona zniknie na zawsze (Polityka prywatności, sekcja 7). Nie używaj więcej niż jednego konta ani żadnych zautomatyzowanych środków, aby zmienić liczbę głosów: sekcja 6 pozwala Ci na jedno konto, a sekcja 7 nie pozwala na zautomatyzowany dostęp.
+
 **Po odejściu autora.** Publiczna debata pozostaje otwarta na wkłady po tym, jak jej pierwszy autor usunął swoje konto. Nowe wkłady działają na podstawie publicznej kopii. Strona nie należy do nikogo: publiczną debatę tworzy kilka osób i AI. Każdy zachowuje prawa, jakie ma do własnych słów, i udziela licencji opisanej poniżej. Nikt nie staje się współwłaścicielem debaty. Nikt, łącznie z pierwszym autorem, nie może doprowadzić do usunięcia wkładu innej osoby ani powstrzymać innych przed dodawaniem wkładów do debaty, inaczej niż w trybie zgłoszeń opisanym w sekcji 10.
 
 **Zawsze możemy usunąć opublikowaną treść.** Możemy usunąć opublikowaną debatę lub ograniczyć do niej dostęp, jeżeli wymaga tego prawo, nakaże to sąd lub właściwy organ albo debata narusza niniejsze Warunki lub jest niezgodna z prawem. Żadne postanowienie niniejszej sekcji nie ogranicza naszego prawa do podjęcia działań na podstawie ważnego zgłoszenia dokonanego zgodnie z sekcją 10 ani nie stanowi obietnicy trwałej dostępności opublikowanej debaty.
@@ -253,7 +255,7 @@ Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmiani
 
 **Zmiany niniejszych Warunków.** Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej **30 dni** przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions.
 
-Wersja 1.1 zastąpiła wersję 1.0: sekcja 8 stanowi teraz, że DeepInfra uruchamia na własnych serwerach każdy model, z którego debata korzysta za jego pośrednictwem, a podsumowanie zostało odpowiednio zmienione.
+Wersja 1.2 zastąpiła wersję 1.1: sekcja 9 stanowi teraz, czym jest głos na debatę publiczną, że każde konto ma jeden głos na każdą debatę i może go cofnąć, że lista pokazuje, ile głosów ma debata, i nigdy nie pokazuje, kto je oddał, oraz że liczby głosów nie wolno zmieniać za pomocą więcej niż jednego konta ani zautomatyzowanymi środkami. Wersja 1.1 zastąpiła wersję 1.0: sekcja 8 stanowi teraz, że DeepInfra uruchamia na własnych serwerach każdy model, z którego debata korzysta za jego pośrednictwem, a podsumowanie zostało odpowiednio zmienione.
 
 ## 15. Odpowiedzialność
 
