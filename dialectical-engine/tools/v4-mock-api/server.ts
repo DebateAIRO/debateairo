@@ -53,6 +53,7 @@ import {
   MOCK_SAVED_SWITCH, removeSavedQuestionAtStart, routeSavedQuestions, savedQuestionCounters, savedQuestionSamples, savedQuestionsKept,
   savedQuestionsScene, setSavedQuestionsLogging, setSavedQuestionsScene
 } from "./saved-questions.js";
+import { publicList, publicVoteCounters, publicVoteSamples, routePublicVotes, setPublicVotesLogging } from "./public-votes.js";
 import {
   mockAnswerCarryOn, mockAnswerPathsPart, mockFirstClosingLeft, mockPathRunMs, mockPathRunOf, mockPathRunSamples, mockPathRunSelfCheck,
   mockReportRefusal, mockRunPathsPart, type MockPathRun
@@ -155,6 +156,7 @@ const QUIET = process.env.MOCK_QUIET === "1";
 // The step before Start and the saved questions log their requests as this file does (they never read the environment themselves).
 setStartStepLogging(!QUIET);
 setSavedQuestionsLogging(!QUIET);
+setPublicVotesLogging(!QUIET);
 let roomMode: RoomMode = choice("MOCK_ROOM", process.env.MOCK_ROOM, ROOM_MODES, "FITS");
 let askMode: AskMode = choice("MOCK_ASK", process.env.MOCK_ASK, ASK_MODES, "AUTO");
 let planMode: PlanMode = choice("MOCK_PLAN", process.env.MOCK_PLAN, PLAN_MODES, "PLUS");
@@ -552,6 +554,8 @@ function continueStoppedRun(run: MockRun, now = Date.now()): void {
 const publicDebates = new Map<string, any>(seedPublicDebates().map((debate) => [debate.public_ref as string, structuredClone(debate)]));
 /** Task 75d: the level a public page was asked at, as its public read says (none: a page published without one). */
 const publicLevelOf = (publicRef: string): string | undefined => publicDebates.get(publicRef)?.reading_level;
+/** Upvotes (public-votes.ts): public right now, as the list and the vote routes mean it: a seeded page that is not hidden under review. */
+const isPublicNow = (publicRef: string): boolean => publicDebates.has(publicRef) && mockReview.get(publicRef)?.hidden !== true;
 const SEEDED_CONTRIBUTION_DIGS = [
   { state: "CHECKING", runRef: "c1000000-0000-4000-8000-000000000001", answerId: "aaaac100-0000-4000-8000-000000000001" },
   { state: "ON_THE_PAGE", runRef: "c1000000-0000-4000-8000-000000000002", answerId: "aaaac100-0000-4000-8000-000000000002" },
@@ -1206,7 +1210,12 @@ function startupCheck(): number {
   check("GET /v1/account/moderation-statements", C.ModerationStatementsSchema, MODERATION_STATEMENTS);
   check("GET /v1/geo/availability", C.GeoAvailabilityResponseSchema, { signup: true, pay: true, service: true });
   check("GET /v1/public/ai-providers", C.PublicAiProvidersResponseSchema, { companies: ["anthropic", "openai", "xai"] });
-  check("GET /v1/public/debates", C.PublicDebateListSchema, { items: [], total: 0 });
+  // Upvotes (public-votes.ts): the list as the mock serves it at its start, and the vote routes' answers, built aside.
+  const votes = publicVoteSamples([...publicDebates.values()]);
+  check("GET /v1/public/debates", C.PublicDebateListSchema, votes.list);
+  check("PUT /v1/public/debates/{id}/vote", C.PublicVoteAnswerSchema, votes.cast);
+  check("DELETE /v1/public/debates/{id}/vote", C.PublicVoteAnswerSchema, votes.withdrawn);
+  check("GET /v1/account/public-debate-votes", C.OwnPublicVotesSchema, votes.own);
   for (const debate of publicDebates.values()) check(`GET /v1/public/debates/${String(debate.public_ref)}`, C.PublicDebateSchema, debate);
   // public-d2 A (draft): every chip of the public read's draft field is a contract suggestion, with or without its "dug near" day.
   for (const entry of PUBLIC_DIG_SUGGESTIONS) {
@@ -1747,6 +1756,8 @@ function mockState() {
     start_step: { ...startStepCounters(), used_percent: startStepUsedPercent(), room_scene: startRoomScene(), settings_version: startSettingsVersion(now) },
     // V4 start step, Task 80b: the saved-question calls so far (first saves, later saves, Pick ups, Deletes), how many are kept, the scene.
     savedQuestions: { ...savedQuestionCounters(), kept: savedQuestionsKept(), scene: savedQuestionsScene() },
+    // Upvotes (public-votes.ts): the casts, withdrawals and own-vote reads so far, and how many pages the mock's person upvotes now.
+    public_votes: publicVoteCounters(),
     ask_effective: effectiveAskMode(),
     now: iso(now),
     reading_level: readingLevel,
@@ -1934,6 +1945,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (sessionOut) return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
     if (await routeSavedQuestions(req, res, path, method, { plan: planMode })) return;
   }
+  // Upvotes (public-votes.ts): which of the asked public debates the mock's person upvotes. A stranger's 401 is the account guard's, above.
+  if (path === "/v1/account/public-debate-votes" && isGet) {
+    if (await routePublicVotes(req, res, path, "GET", { isPublic: isPublicNow, refs: url.searchParams.getAll("refs") })) return;
+  }
   if (path === "/v1/auth/logout" && method === "POST") return sendEmpty(req, res, 204, { "set-cookie": clearedSessionCookies() });
   if (path === "/v1/geo/availability" && isGet) {
     return sendJson(req, res, 200, { signup: true, pay: true, service: true }, C.GeoAvailabilityResponseSchema);
@@ -1941,7 +1956,13 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (path === "/v1/public/ai-providers" && isGet) {
     return sendJson(req, res, 200, { companies: ["anthropic", "openai", "xai"] }, C.PublicAiProvidersResponseSchema);
   }
-  if (path === "/v1/public/debates" && isGet) return sendJson(req, res, 200, { items: [], total: 0 }, C.PublicDebateListSchema);
+  // Upvotes (public-votes.ts): the list of public debates, one row per seeded page that is public now, each with its count.
+  if (path === "/v1/public/debates" && isGet) {
+    const limit = positiveInt(url.searchParams.get("limit"), 50);
+    const offset = positiveInt(url.searchParams.get("offset"), 0);
+    if (limit === null || limit < 1 || limit > 100 || offset === null) return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    return sendJson(req, res, 200, publicList([...publicDebates.values()].map(mockReviewed), isPublicNow, limit, offset), C.PublicDebateListSchema);
+  }
   // Decision 33: the private team panel's reads and steps. The passkey is the mock's usual pretend one.
   if (parts[1] === "admin" && parts[2] === "public-review") {
     if (parts.length === 3 && isGet) {
@@ -1961,6 +1982,11 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       if (refused !== null) return sendJson(req, res, 409, { error: refused });
       return sendJson(req, res, 200, { operation_id: crypto.randomUUID(), outcome: "COMPLETED", recorded_at: iso(Date.now()) }, C.SecurityReceiptSchema);
     }
+  }
+  // Upvotes (public-votes.ts): the mock person's own vote on a public debate, and taking it back. A stranger has none (401), as the API's session check says first.
+  if (parts[1] === "public" && parts[2] === "debates" && parts.length === 5 && parts[4] === "vote" && (method === "PUT" || method === "DELETE")) {
+    if (sessionOut) return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
+    if (await routePublicVotes(req, res, path, method, { isPublic: isPublicNow, refs: [] })) return;
   }
   // Decision 35: Report. The word "hide" in the claim hides (the mock's pretend check), "#person" goes to a person, anything else is not found. The queue is the team panel's.
   if (parts[1] === "public" && parts[2] === "debates" && parts.length === 5 && parts[4] === "flag" && method === "POST") {
