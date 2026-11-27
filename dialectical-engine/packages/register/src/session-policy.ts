@@ -159,7 +159,10 @@ const admissionPolicyValueSchema = z.object({
   publish_checks: admissionScopeValueSchema("owner").optional(),
   // Security audit run 3, NV-47: paid question-language fast checks, per owner. No sealed row carries it; the parser
   // applies DEFAULT_LANGUAGE_CHECKS when absent, so the parsed scope is never null.
-  language_checks: admissionScopeValueSchema("owner").optional()
+  language_checks: admissionScopeValueSchema("owner").optional(),
+  // Public debate upvotes (design 2026-11-26): the three upvote routes together, per account. No sealed row carries
+  // it; the parser applies DEFAULT_PUBLIC_VOTES when absent, so the parsed scope is never null.
+  public_votes: admissionScopeValueSchema("owner").optional()
 }).strict();
 
 export type AdmissionPolicyValue = z.infer<typeof admissionPolicyValueSchema>;
@@ -200,6 +203,8 @@ export type AdmissionPolicy = Readonly<{
   publishChecks: AdmissionScopePolicy<"owner">;
   /** NV-47: paid question-language fast checks, per owner; never null (the parser's default when the version carries none). */
   languageChecks: AdmissionScopePolicy<"owner">;
+  /** Public debate upvotes: the three upvote routes together, per account; never null (the parser's default when the version carries none). */
+  publicVotes: AdmissionScopePolicy<"owner">;
   sourceRef: string;
 }>;
 
@@ -345,6 +350,17 @@ const DEFAULT_LANGUAGE_CHECKS = Object.freeze({
   key: "owner" as const, limit: 120, window_ms: 24 * 60 * 60_000, capacity: 196_608
 });
 
+/**
+ * Public debate upvotes (design 2026-11-26, section 5): one account's upvote actions (casting, withdrawing and the
+ * "which have I upvoted" read together) per API process per fixed minute, starting at the account's first counted
+ * action. Applied when the version carries no `public_votes`, which is every sealed version today, so neither row
+ * above is edited. It only stops floods: the one-vote rule is the table's primary key. The capacity is the other
+ * per-minute account scopes'; fail-closed, never evicting. The value is the owner's to rule (V-1).
+ */
+const DEFAULT_PUBLIC_VOTES = Object.freeze({
+  key: "owner" as const, limit: 60, window_ms: 60_000, capacity: 65_536
+});
+
 export function admissionPolicyFromValue(value: unknown, sourceRef: string): AdmissionPolicy {
   const parsed = admissionPolicyValueSchema.safeParse(value);
   if (!parsed.success || sourceRef.trim() === "") {
@@ -353,6 +369,7 @@ export function admissionPolicyFromValue(value: unknown, sourceRef: string): Adm
   const policy = parsed.data;
   const publishChecks = policy.publish_checks ?? DEFAULT_PUBLISH_CHECKS;
   const languageChecks = policy.language_checks ?? DEFAULT_LANGUAGE_CHECKS;
+  const publicVotes = policy.public_votes ?? DEFAULT_PUBLIC_VOTES;
   return Object.freeze({
     asks: Object.freeze({
       key: policy.asks.key,
@@ -449,6 +466,12 @@ export function admissionPolicyFromValue(value: unknown, sourceRef: string): Adm
       limit: languageChecks.limit,
       windowMs: languageChecks.window_ms,
       capacity: languageChecks.capacity
+    }),
+    publicVotes: Object.freeze({
+      key: publicVotes.key,
+      limit: publicVotes.limit,
+      windowMs: publicVotes.window_ms,
+      capacity: publicVotes.capacity
     }),
     sourceRef
   });

@@ -58,6 +58,9 @@
   --accent-text: #2350D8; --accent-bg: #E8EDFC; --accent-border: #B9C7F0; --accent-halo: rgba(35,80,216,.18);
   --brand: #2350D8; --on-brand: #FFFFFF; --on-ink: #FFFFFF;
   --cta: #FF8A2A; --on-cta: #121826; --cta-border: #121826; --cta-shadow: #121826;
+  /* public debate upvotes (design 2026-11-26): the arrow's green, which is also the upvoted box's fill, and the ink
+     drawn on that fill */
+  --vote: #4FA26B; --on-vote: #121826;
   --hard: #121826; --hard-shadow: #121826;
   --shadow-soft: 0 14px 32px -20px rgba(18,24,38,.22);
   --case-ink: #7A8396; --chip: #EEF1F6; --track: #DCE1EA; --dashed: #7A8396;
@@ -176,6 +179,9 @@ html[data-mode="chamber"] {
   --accent-text: #7C9DFF; --accent-bg: #24315A; --accent-border: #3D4F86; --accent-halo: rgba(124,157,255,.32);
   --brand: #7C9DFF; --on-brand: #0E131D; --on-ink: #0E131D;
   --cta: #FF9A45; --on-cta: #0E131D; --cta-border: #FF9A45; --cta-shadow: #8C4510;
+  /* public debate upvotes: the same green; what is drawn on it is the dark page colour, because this mode's ink on
+     that green is only 2.78:1 */
+  --vote: #4FA26B; --on-vote: #0E131D;
   --hard: #C9D3E3; --hard-shadow: #2E3A50;
   --shadow-soft: 0 18px 40px -22px rgba(0,0,0,.8);
   --case-ink: #8B95A8; --chip: #232C3C; --track: #2A3446; --dashed: #66738A;
@@ -8077,6 +8083,76 @@ html:has(.lpRoot) { scroll-padding-top: 104px; }
 }
 .libArrow { flex: 0 0 auto; color: var(--muted); }
 
+/* Public debate upvotes (design 2026-11-26, section 4). A public row that carries a count is wrapped in .libVoteRow.
+   The vote button is the link's sibling, never its child (a button may not sit inside an anchor), and is laid over
+   the room the card keeps free at its start edge. The wrapper carries the row's slide, so box and card move as one,
+   and the link inside it stands still. Every colour is a token, so both modes follow with nothing more. */
+.libVoteRow {
+  position: relative;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.libVoteRow:hover { transform: translateX(4px); }
+.libVoteRow > .libRow:hover { transform: none; }
+/* 88px of room: the card's 18px padding, the 54px box, the row's 16px gap. 88px of height: 15, the box's 58, 15. */
+.libVoteRow .libRowCore { min-height: 88px; padding-inline-start: 88px; }
+/* top is a fixed 15px, not a centring sum, so the box does not move when the status line appears under the card.
+   z-index keeps the box above the card whatever the link is given later (a transformed sibling paints over it).
+   Border and fill are longhands: the test DOM (jsdom) drops a shorthand that holds var(). */
+.libVote {
+  position: absolute;
+  z-index: 1;
+  inset-inline-start: 18px;
+  top: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 54px;
+  height: 58px;
+  margin: 0;
+  padding: 0;
+  border-width: 1.5px;
+  border-style: solid;
+  border-color: var(--ink);
+  border-radius: 11px;
+  background-color: var(--core);
+  color: var(--ink);
+  line-height: 1;
+  cursor: pointer;
+}
+/* The outline is not decoration: on the light hover tint the green fill alone is under 3:1. */
+.libVoteArrow {
+  width: 24px;
+  height: 24px;
+  fill: var(--vote);
+  stroke: var(--agree);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  transition: transform 0.2s ease;
+}
+/* The number takes the button's colour (ink, or the ink for the green fill once upvoted), so it sets none here. */
+.libVoteCount { font-size: 14.5px; font-weight: 700; }
+.libVote:hover { background-color: var(--agree-bg); }
+.libVote:hover .libVoteArrow { transform: translateY(-2px); }
+/* Upvoted. After the hover rule, so an upvoted box keeps its fill under the pointer. The 3px border is the mark
+   other than colour (the PDA-S03 rule above, and the one mark left in forced colours); the box stays 54 by 58. */
+.libVote[aria-pressed="true"] {
+  border-width: 3px;
+  border-color: var(--agree);
+  background-color: var(--vote);
+  color: var(--on-vote);
+}
+.libVote[aria-pressed="true"] .libVoteArrow { fill: var(--on-vote); stroke: var(--on-vote); }
+.libVote:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* The one line under the card: "Sign in to upvote" with its link, or the failure line. */
+.libVoteNote { margin: 6px 0 0; padding-inline-start: 18px; font-size: 11px; color: var(--muted); }
+.libVoteNote a { color: var(--link); text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) {
+  .libVoteRow, .libVoteArrow { transition: none; }
+  .libVoteRow:hover, .libVote:hover .libVoteArrow { transform: none; }
+}
+
 .libEmpty {
   padding: 22px 18px;
   border: 1px dashed var(--line-strong);
@@ -8139,6 +8215,8 @@ html:has(.lpRoot) { scroll-padding-top: 104px; }
   .libTitle { font-size: 28px; }
   .libRowCore { flex-wrap: wrap; gap: 10px; }
   .libRowBody { flex: 1 1 100%; }
+  .libVoteRow .libRowCore { padding-inline-start: 84px; }
+  .libVote { top: 14px; }
 }
 
 /* ============================================================

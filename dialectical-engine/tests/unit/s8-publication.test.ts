@@ -214,6 +214,7 @@ function publicationHarness(releases: ConstructorParameters<typeof PostgresPubli
   );
   /** The publishing account as the public read finds it: its pseudonym, or null once the account is erased. */
   const author: { pseudonym: string | null } = { pseudonym: "Stable Public Name" };
+  const votes: { upvotes: Readonly<Record<string, number>> | undefined } = { upvotes: undefined };
   let storedSnapshot: Readonly<{
     publicationRef: string;
     runId: string;
@@ -249,7 +250,8 @@ function publicationHarness(releases: ConstructorParameters<typeof PostgresPubli
       storedSnapshot?.publicationRef === publicationRef ? { ...storedSnapshot, authorPseudonym: author.pseudonym } : null,
     listPublicRefs: async () => ({
       refs: storedSnapshot === null ? [] : [storedSnapshot.publicationRef],
-      total: storedSnapshot === null ? 0 : 1
+      total: storedSnapshot === null ? 0 : 1,
+      ...(votes.upvotes === undefined ? {} : { upvotes: votes.upvotes })
     }),
     revalidatePublic: async () => true
   } as unknown as PostgresPublicationRepository;
@@ -265,6 +267,7 @@ function publicationHarness(releases: ConstructorParameters<typeof PostgresPubli
   return {
     application,
     author,
+    votes,
     async storeLegacy(content: (publicationRef: string) => unknown = publicDebate) {
       const publicationRef = randomUUID();
       const prepared = await cipher.create(publicationRef, PUBLICATION_RUN_ID);
@@ -1127,6 +1130,18 @@ describe("S8 publication crypto and projection", () => {
     const gone = await harness.application.readPublicDebate(ref);
     expect(gone).toMatchObject({ public_ref: ref, author_pseudonym: "a contributor", author_name_gone: true });
     expect((await harness.application.list(10, 0)).items[0]).toMatchObject({ public_ref: ref, author_pseudonym: "a contributor" });
+  });
+
+  it("serves each listed debate's upvote count from the page it read, and 0 when the page carries none", async () => {
+    const harness = publicationHarness();
+    const ref = (await harness.publish(answerWithTree())).transition.public_ref;
+    expect((await harness.application.list(10, 0)).items[0]).toMatchObject({ public_ref: ref, vote_count: 0 });
+    harness.votes.upvotes = { [ref]: 3, [randomUUID()]: 9 };
+    const listed = await harness.application.list(10, 0);
+    expect(listed.items).toHaveLength(1);
+    expect(listed.items[0]).toMatchObject({ public_ref: ref, vote_count: 3 });
+    harness.votes.upvotes = {};
+    expect((await harness.application.list(10, 0)).items[0]?.vote_count).toBe(0);
   });
 
   it("never reads the name a copy stored before this rule holds: the account's while it lives, none once it is gone", async () => {

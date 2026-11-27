@@ -156,5 +156,10 @@
   "home.removal.close": "Aizvērt",
   "home.flag.underReview": "ATZĪMĒTS · TIEK PĀRSKATĪTS",
   "home.flag.approved": "APSTIPRINĀTS",
-  "home.flag.refused": "NAV APSTIPRINĀTS"
+  "home.flag.refused": "NAV APSTIPRINĀTS",
+  "home.upvote.label.zero": "Balsojiet. {count} balsu",
+  "home.upvote.label.one": "Balsojiet. {count} balss",
+  "home.upvote.label.other": "Balsojiet. {count} balsis",
+  "home.upvote.signedOut": "Pierakstieties, lai balsotu",
+  "home.upvote.failed": "Jūsu balsi neizdevās saglabāt. Mēģiniet vēlreiz."
 }

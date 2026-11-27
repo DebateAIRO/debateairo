@@ -154,5 +154,8 @@
   "home.removal.close": "閉じる",
   "home.flag.underReview": "フラグ付き · 審査中",
   "home.flag.approved": "承認されました",
-  "home.flag.refused": "承認されていません"
+  "home.flag.refused": "承認されていません",
+  "home.upvote.label.other": "投票してください。{count}票",
+  "home.upvote.signedOut": "投票するにはログインしてください",
+  "home.upvote.failed": "投票を保存できませんでした。もう一度お試しください。"
 }

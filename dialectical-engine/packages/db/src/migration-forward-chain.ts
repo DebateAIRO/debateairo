@@ -85,6 +85,7 @@ import { loadForward0190 } from './migration-forward0190.js';
 import { loadForward0191 } from './migration-forward0191.js';
 import { loadForward0192 } from './migration-forward0192.js';
 import { loadForward0193 } from './migration-forward0193.js';
+import { loadForward0194 } from './migration-forward0194.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -200,10 +201,11 @@ export type ChainStep=ForwardStepPlan&Readonly<{n1:N1Declaration}>;
  * without an alert, and 0186's CHECK that only a removal may go unalerted dropped, one amendment of 0186), then the
  * sign-up country read for prices (0192, expand: one function of the API's billing role), then a Google sign-in connecting
  * to its account by itself (0193, expand: one function beside 0178's identity.finish_social_callback_v2, which the release
- * before keeps calling unchanged).
+ * before keeps calling unchanged), then upvotes on public debates (0194, expand: one table and six functions; the API's
+ * billing role casts, withdraws and reads its own, the cross-account marker counts and sweeps, the export worker reads).
  * A new step appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174,loadForward0175,loadForward0176,loadForward0177,loadForward0178,loadForward0179,loadForward0180,loadForward0181,loadForward0182,loadForward0183,loadForward0184,loadForward0185,loadForward0186,loadForward0187,loadForward0188,loadForward0189,loadForward0190,loadForward0191,loadForward0192,loadForward0193]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174,loadForward0175,loadForward0176,loadForward0177,loadForward0178,loadForward0179,loadForward0180,loadForward0181,loadForward0182,loadForward0183,loadForward0184,loadForward0185,loadForward0186,loadForward0187,loadForward0188,loadForward0189,loadForward0190,loadForward0191,loadForward0192,loadForward0193,loadForward0194]);
 
 /** A forward step's file name; the receipt and declaration tables CHECK the same shape. */
 export const FORWARD_STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;

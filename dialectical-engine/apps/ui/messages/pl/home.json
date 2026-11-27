@@ -157,5 +157,11 @@
   "home.removal.close": "Zamknij",
   "home.flag.underReview": "OZNACZONA · W TRAKCIE PRZEGLĄDU",
   "home.flag.approved": "ZATWIERDZONA",
-  "home.flag.refused": "NIEZATWIERDZONA"
+  "home.flag.refused": "NIEZATWIERDZONA",
+  "home.upvote.label.one": "Zagłosuj. {count} głos",
+  "home.upvote.label.few": "Zagłosuj. {count} głosy",
+  "home.upvote.label.many": "Zagłosuj. {count} głosów",
+  "home.upvote.label.other": "Zagłosuj. {count} głosu",
+  "home.upvote.signedOut": "Zaloguj się, aby zagłosować",
+  "home.upvote.failed": "Nie udało się zapisać Twojego głosu. Spróbuj ponownie."
 }

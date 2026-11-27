@@ -1183,3 +1183,14 @@ export const PublicDebateRefusedSchema = z.object({
   message: z.string()
 }).strict();
 export type PublicDebateRefused = z.infer<typeof PublicDebateRefusedSchema>;
+
+/**
+ * Upvotes on public debates (spec 2026-11-26). PUT and DELETE /v1/public/debates/{id}/vote: nothing but the press; the voter is
+ * the session's. Both answer where the account stands now and the debate's count now. No shape here names a voter.
+ */
+export const PublicVoteRequestSchema = z.object({}).strict();
+export const PublicVoteAnswerSchema = z.object({ voted: z.boolean(), vote_count: z.number().int().nonnegative() }).strict();
+export type PublicVoteAnswer = z.infer<typeof PublicVoteAnswerSchema>;
+/** GET /v1/account/public-debate-votes?refs=<uuid,uuid,...>: which of the asked public debates the signed-in account upvotes now. */
+export const OwnPublicVotesSchema = z.object({ voted: z.array(z.uuid()).max(100) }).strict();
+export type OwnPublicVotes = z.infer<typeof OwnPublicVotesSchema>;

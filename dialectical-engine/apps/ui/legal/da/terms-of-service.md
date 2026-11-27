@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: TJENESTEVILKÅR · v1.1 · GÆLDENDE FRA 24. NOVEMBER 2026
+eyebrow: TJENESTEVILKÅR · v1.2 · GÆLDENDE FRA 27. NOVEMBER 2026
 title: Det, du accepterer
 lede: Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.
-endMarker: SLUT PÅ VILKÅRENE · v1.1
+endMarker: SLUT PÅ VILKÅRENE · v1.2
 bodyLabel: Tjenestevilkårenes tekst
 annexTitle: Bilag A — Regionale vilkår
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LOVVALG
 -->
 
-**Version 1.1 · Effective 24. november 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: dansk.**
+**Version 1.2 · Effective 27. november 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: dansk.**
 
 **In short.** Du skal være fyldt 18 år. Dialectical Engine opbygger argumenter ved hjælp af AI-modeller, og alt, hvad tjenesten genererer, kan være forkert — det er ikke rådgivning. På det gratis abonnement er dine debatter offentlige, når de er afsluttet, efter en AI-kontrol; på et betalt abonnement er de private, medmindre du offentliggør dem. Når en debat er offentlig, kan alle læse den, og den forbliver offentlig. Tekst, du indsender, sendes til de AI-udbydere, der er anført i vores udbyderregister, hovedsageligt DeepInfra, i USA. Vilkårene hos DeepInfra, Anthropic og Amazon tillader dem ikke at træne modeller på den. Udbyderen af websøgning modtager kun de korte søgefraser, som modellerne skriver (afsnit 8). Anmeld ulovligt indhold på support@dezbatere.ro, uanset om du har en konto eller ej. Rumænsk ret finder anvendelse, men du bevarer din lokale forbrugerbeskyttelse.
 
@@ -164,6 +164,8 @@ Debatter på et betalt abonnement er **private som standard**: intet, du oprette
 
 **Rapporter fra alle.** Alle med kredit kan skrive en rapport om en offentlig debat, mens intet er ved at blive tilføjet til den, ved hjælp af deres egen kvote. Rapporten er offentlig. Skriverens pseudonym er kun en reference: en rapport skrives af AI-systemerne ud fra det, siden viser, og er ikke skriverens udsagn. Tidligere rapporter forbliver læsbare.
 
+**Stemmer.** Når du er logget ind, kan du stemme på en debat på listen over offentlige debatter, også dine egne, for at vise andre læsere, at du fandt den værd at læse. Hver konto har én stemme for hver debat, og et nyt tryk på knappen trækker din tilbage, mens debatten står på listen. Listen viser, hvor mange stemmer hver debat har, og aldrig, hvem der har givet dem. Dine stemmer slettes, når lukningen af din konto får virkning (afsnit 6), og en debats stemmer slettes, når dens offentlige side er væk for altid (privatlivspolitikken, afsnit 7). Brug ikke mere end én konto eller nogen automatiserede midler til at ændre et antal: afsnit 6 giver dig én konto, og afsnit 7 tillader ikke automatiseret adgang.
+
 **Efter at forfatteren er gået.** En offentlig debat forbliver åben for bidrag, efter at dens første forfatter har slettet sin konto. Nye bidrag arbejder ud fra den offentlige kopi. Ingen ejer siden: en offentlig debat bygges af flere personer og af AI-systemerne. Hver person beholder de rettigheder, vedkommende måtte have i sine egne ord, og giver licensen nedenfor. Ingen bliver medejer af debatten. Ingen, heller ikke den første forfatter, kan få en anden persons bidrag fjernet eller forhindre andre i at tilføje noget til debatten, undtagen via anmeldelsesvejen i afsnit 10.
 
 **Vi kan altid fjerne offentliggjort indhold.** Vi kan fjerne eller begrænse adgangen til en offentliggjort debat, hvis lovgivningen kræver det, hvis en domstol eller kompetent myndighed pålægger os det, eller hvis debatten overtræder disse vilkår eller er ulovlig. Intet i dette afsnit forhindrer os i at handle på grundlag af en gyldig anmeldelse efter afsnit 10, og intet heri er et løfte om, at en offentliggjort debat forbliver tilgængelig.
@@ -253,7 +255,7 @@ Vi oplyser dig på forhånd på et varigt medium om, hvad der ændres og hvornå
 
 **Disse vilkår.** Vi kan ændre disse vilkår af samme type grunde. Ved ændringer, der ikke begrænser dine rettigheder, offentliggør vi den nye version med et resumé af ændringerne og sender dig en e-mail mindst **30 dage**, før den får virkning; hvis du fortsætter med at bruge Dialectical Engine efter denne dato, betyder det, at du accepterer den, og du kan lukke din konto inden da. Ved ændringer, der begrænser dine rettigheder — herunder prisstigninger på et eksisterende abonnement, lavere grænser, fjernede funktioner, nye anvendelser af dit indhold eller ændringer af ansvar, lovvalg eller tvistbilæggelse — beder vi dig udtrykkeligt acceptere den nye version ved dit næste login, og ændringen gælder kun fremadrettet. Vi foretager aldrig ændringer med tilbagevirkende kraft, og vi bruger aldrig dette afsnit til at ændre kernen i det, du har betalt for, midt i en periode uden at tilbyde dig en udvej. Tidligere versioner forbliver tilgængelige på dezbatere.ro/terms/versions.
 
-Version 1.1 erstattede version 1.0: afsnit 8 angiver nu, at DeepInfra kører alle de modeller, som en debat får via DeepInfra, på egne servere, og resuméet er ændret tilsvarende.
+Version 1.2 erstattede version 1.1: afsnit 9 angiver nu, hvad en stemme på en offentlig debat er, at hver konto har én for hver debat og kan trække den tilbage, at listen viser, hvor mange stemmer en debat har, og aldrig, hvem der har givet dem, og at et antal ikke må ændres med mere end én konto eller med automatiserede midler. Version 1.1 erstattede version 1.0: afsnit 8 angiver nu, at DeepInfra kører alle de modeller, som en debat får via DeepInfra, på egne servere, og resuméet er ændret tilsvarende.
 
 ## 15. Ansvar
 

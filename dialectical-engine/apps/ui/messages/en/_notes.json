@@ -81,5 +81,8 @@
   "staff.previewBuyers.countIdle": "Shown instead of the count of who can buy while the list counts for nothing; {count} is how many accounts are on the list.",
   "staff.previewBuyers.since": "Shown under a shortened address in the list; {date} is the day the account was allowed, already written in the reader's language.",
   "staff.previewBuyers.lockHint": "The team tools are unlocked by the server's operator for one hour. Adding and removing work either way; only while they are unlocked does a security alert go out. Keep both halves.",
-  "staff.previewBuyers.locked": "Shown only in the rare case that the team tools lock while an addition or a removal is being saved. Nothing changed, and trying again works with the security key alone."
+  "staff.previewBuyers.locked": "Shown only in the rare case that the team tools lock while an addition or a removal is being saved. Nothing changed, and trying again works with the security key alone.",
+  "home.upvote.label.other": "The spoken name of the upvote button on a public debate's row, read by screen readers; the browser itself says whether the button is pressed. The verb first (vote for this debate), a full stop, then the debate's total number of upvotes. {count} is that total: keep {count} in EVERY plural form, the forms for zero, one and two included, and never write the number as a word.",
+  "home.upvote.signedOut": "A short line that is itself a link to the sign-in page, shown when a person whose session has ended presses the upvote button. Begin with the verb home.signInToStart begins with.",
+  "home.upvote.failed": "Shown by the row when a vote, or taking one back, could not be saved. The same shape as home.sensitiveConsent.failed."
 }

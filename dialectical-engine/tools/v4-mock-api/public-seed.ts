@@ -5,10 +5,14 @@
  * For and Against; one point is still argued (an open question under its path, with the star) and one rests on a checked page ("Sure").
  * PUBLIC_AUTHOR_GONE: the author's account is gone and no dig is on it (a report is written from what the page holds, Task 56h; a dig is allowed).
  * Run ids never appear here: only the page's own references.
+ * Upvotes (design 2026-11-26): three plain pages more (bikes, homework, a four-day week), so the list of public debates has five rows.
  */
 export const PUBLIC_REF = "f1000000-0000-4000-8000-000000000001";
 export const PUBLIC_REF_AUTHOR_GONE = "f1000000-0000-4000-8000-000000000002";
 export const PUBLIC_UPDATE_REF = "f2000000-0000-4000-8000-000000000001";
+export const PUBLIC_REF_BIKES = "f4000000-0000-4000-8000-000000000001";
+export const PUBLIC_REF_HOMEWORK = "f4000000-0000-4000-8000-000000000002";
+export const PUBLIC_REF_FOUR_DAY = "f4000000-0000-4000-8000-000000000003";
 
 const QUESTION = "Should cities make public transport free?";
 
@@ -118,8 +122,37 @@ export function seedPublicDebates(): readonly Record<string, unknown>[] {
       story_short: { ...storyShort, headline: "Our answer: a later start helps teenagers most.", summary: "You asked whether schools should start an hour later. Teenagers sleep longer and do a little better; younger children gain less.", paths: [
         { position_ref: "p-teens", fate: "HELD_UP", line: "Teenagers gain the most: held up.", node_refs: ["n-teens"] }
       ], change: { text: "Long studies that find no gain in sleep.", node_refs: ["n-teens"] } }
-    }
+    },
+    plainPage(PUBLIC_REF_BIKES, "Brisk Wren", "Should cities build more bike lanes?", "2026-10-24T08:00:00.000Z", {
+      headline: "Our answer: more bike lanes help when they join up into a network.",
+      summary: "You asked whether cities should build more bike lanes. Lanes that connect into a network bring many new riders; single short lanes bring few.",
+      path: { position_ref: "p-network", fate: "HELD_UP", line: "Joined-up lanes bring new riders: held up.", node_refs: ["n-network"] },
+      change: "Cities that built full networks and saw no more people cycling."
+    }),
+    plainPage(PUBLIC_REF_HOMEWORK, "Mild Badger", "Should schools stop giving homework?", "2026-10-26T08:00:00.000Z", {
+      headline: "Our answer: a little homework helps older pupils; young children gain little from it.",
+      summary: "You asked whether schools should stop giving homework. Short, regular homework helps older pupils a bit; for young children it adds stress and little learning.",
+      path: { position_ref: "p-age", fate: "PARTLY_HELD", line: "Homework helps only older pupils: partly held.", node_refs: ["n-age"] },
+      change: "Careful studies that find young children learn clearly more with homework."
+    }),
+    plainPage(PUBLIC_REF_FOUR_DAY, "Keen Plover", "Should offices move to a four-day week?", "2026-10-28T08:00:00.000Z", {
+      headline: "Our answer: a four-day week works well in many offices, when the work is planned for it.",
+      summary: "You asked whether offices should move to a four-day week. Trials found people as productive and less tired, where teams cut meetings and planned their work.",
+      path: { position_ref: "p-trials", fate: "HELD_UP", line: "Office trials kept the same output: held up.", node_refs: ["n-trials"] },
+      change: "Long trials in which output fell after the first year."
+    })
   ];
+}
+
+/** Upvotes (design 2026-11-26): a plain page in the second page's shape, with its own summary, one path and its own change. */
+function plainPage(publicRef: string, pseudonym: string, question: string, publishedAt: string,
+  story: Readonly<{ headline: string; summary: string; path: Record<string, unknown>; change: string }>): Record<string, unknown> {
+  const nodeRefs = story.path.node_refs as readonly string[];
+  return {
+    public_ref: publicRef, author_pseudonym: pseudonym, question, published_at: publishedAt, language: "en",
+    answer: { ...answer, as_of: publishedAt, summary_segments: [{ text: story.summary }], reversal_point: story.change },
+    story_short: { ...storyShort, headline: story.headline, summary: story.summary, paths: [story.path], change: { text: story.change, node_refs: [...nodeRefs] } }
+  };
 }
 
 /**

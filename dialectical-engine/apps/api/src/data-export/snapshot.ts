@@ -31,6 +31,8 @@ export const RAW_SECTIONS = [
   "moderation",
   // V4 start step, Task 39e: the questions not started yet (0162, identity.read_data_export_saved_questions), each opened with its own key.
   "saved_questions",
+  // The public debates the person upvoted (0194, identity.read_data_export_public_debate_upvotes): the debate and the time only.
+  "public_debate_upvotes",
 ] as const;
 export type RawSection = typeof RAW_SECTIONS[number];
 export type RawExportRows = Readonly<Record<RawSection, unknown>>;
@@ -157,6 +159,8 @@ export const KEEP_COLUMNS = {
   reserve_events: ["event_no", "kind", "amount_micros", "investigation_id", "report_version", "blocked_window", "blocked_until", "recorded_at"],
   // V4 start step, Task 39e: 0162's reader, per question. Its title and revision are not exported; the content is opened, then read.
   saved_questions: ["saved_question_id", "content_ciphertext", "created_at", "updated_at"],
+  // 0194's reader, per upvote. The archive names the debate by its public reference; nothing about the account is kept.
+  public_debate_upvotes: ["publication_ref", "created_at"],
 } as const;
 
 type RawRow = Record<string, unknown>;
@@ -622,6 +626,8 @@ export async function collectSnapshot(input: {
         // V4 start step, Task 39e: the questions not started yet (never `kept_questions`, the threat reports' name: until the
         // migration that drops them, rows an earlier question check kept are still exported there while the sweep has not erased them).
         questions_not_started: await collectQuestionsNotStarted(raw, claim, decrypt),
+        // 0194: the public debates the person upvoted, oldest first as the reader gives them; named as reports_you_made names a debate.
+        debates_you_upvoted: simple("public_debate_upvotes").map(({ publication_ref, created_at }) => ({ debate_reference: string(publication_ref), upvoted_at: created_at })),
       },
       security: {
         mfa_factors: simple("mfa_factors"), passkeys: simple("passkey_credentials"),

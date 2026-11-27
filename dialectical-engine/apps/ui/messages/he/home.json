@@ -156,5 +156,10 @@
   "home.removal.close": "סגירה",
   "home.flag.underReview": "סומן · בבחינה",
   "home.flag.approved": "אושר",
-  "home.flag.refused": "לא אושר"
+  "home.flag.refused": "לא אושר",
+  "home.upvote.label.one": "להצביע. {count} קול",
+  "home.upvote.label.two": "להצביע. {count} קולות",
+  "home.upvote.label.other": "להצביע. {count} קולות",
+  "home.upvote.signedOut": "יש להתחבר כדי להצביע",
+  "home.upvote.failed": "לא ניתן היה לשמור את הצבעתכם. יש לנסות שוב."
 }

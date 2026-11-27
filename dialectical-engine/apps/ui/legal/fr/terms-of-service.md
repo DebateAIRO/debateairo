@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En bref
-eyebrow: CONDITIONS D’UTILISATION · v1.1 · PRISE D’EFFET 24 NOVEMBRE 2026
+eyebrow: CONDITIONS D’UTILISATION · v1.2 · PRISE D’EFFET 27 NOVEMBRE 2026
 title: Ce que vous acceptez
 lede: Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.
-endMarker: FIN DES CONDITIONS · v1.1
+endMarker: FIN DES CONDITIONS · v1.2
 bodyLabel: Texte des Conditions d’utilisation
 annexTitle: Annexe A — Conditions régionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 DROIT APPLICABLE
 -->
 
-**Version 1.1 · Effective 24 novembre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
+**Version 1.2 · Effective 27 novembre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
 
 **In short.** Vous devez avoir au moins 18 ans. Dialectical Engine construit des arguments à l’aide de modèles d’IA et tout ce qu’il génère peut être erroné — il ne s’agit pas d’un conseil. Sur la formule gratuite, vos débats deviennent publics une fois terminés, après une vérification par IA ; sur une formule payante, ils restent privés, sauf si vous les publiez. Un débat public peut être lu par tous, et il reste public. Le texte que vous soumettez est transmis aux fournisseurs d’IA inscrits dans notre Registre des fournisseurs, principalement DeepInfra, aux États-Unis. Les conditions de DeepInfra, d’Anthropic et d’Amazon ne leur permettent pas d’entraîner des modèles dessus. Le fournisseur de recherche sur le web ne reçoit que les courtes expressions de recherche que rédigent les modèles (section 8). Signalez tout contenu illicite à support@dezbatere.ro, que vous ayez ou non un compte. Le droit roumain s’applique, mais les protections locales dont vous bénéficiez en tant que consommateur demeurent acquises.
 
@@ -164,6 +164,8 @@ Sur une formule payante, les débats sont **privés par défaut** : rien de ce q
 
 **Rapports de toute personne.** Toute personne disposant de crédit peut rédiger un rapport sur un débat public lorsqu’aucun ajout n’y est en cours, avec son propre quota. Le rapport est public. Le pseudonyme de son auteur n’est qu’une référence : le rapport est rédigé par les IA à partir de ce qu’affiche la page, et ce n’est pas la déclaration de son auteur. Les rapports antérieurs restent lisibles.
 
+**Votes.** Lorsque vous êtes connecté, vous pouvez voter pour un débat de la liste des débats publics, y compris les vôtres, pour montrer aux autres lecteurs qu’il vous a semblé digne d’être lu. Chaque compte dispose d’un vote par débat, et un nouvel appui sur le bouton retire le vôtre tant que le débat figure sur la liste. La liste indique combien de votes chaque débat a reçus, et jamais qui les a donnés. Vos votes sont supprimés lorsque la clôture de votre compte prend effet (section 6), et les votes d’un débat sont supprimés lorsque sa page publique a disparu définitivement (Politique de confidentialité, section 7). N’utilisez pas plus d’un compte, ni aucun moyen automatisé, pour modifier un compteur : la section 6 vous autorise un seul compte, et la section 7 n’autorise pas l’accès automatisé.
+
 **Après le départ de l’auteur.** Un débat public reste ouvert aux contributions après que son premier auteur a effacé son compte. Les nouvelles contributions s’appuient sur la copie publique. Personne n’est propriétaire de la page : un débat public est construit par plusieurs personnes et par les IA. Chaque personne conserve les droits qu’elle peut détenir sur ses propres mots et accorde la licence ci-dessous. Personne ne devient copropriétaire du débat. Personne, pas même le premier auteur, ne peut faire retirer la contribution d’une autre personne ni empêcher d’autres personnes d’y ajouter du contenu, si ce n’est par la procédure de signalement de la section 10.
 
 **Nous pouvons toujours retirer un contenu publié.** Nous pouvons supprimer un débat publié ou en restreindre l’accès lorsque la loi l’exige, lorsqu’une juridiction ou une autorité compétente l’ordonne, ou lorsqu’il enfreint les présentes Conditions ou est illicite. Rien dans la présente section ne nous empêche d’agir à la suite d’une notification valide au titre de la section 10 et rien dans celle-ci ne promet qu’un débat publié restera disponible.
@@ -253,7 +255,7 @@ Nous vous informons à l’avance, sur un support durable, de la modification et
 
 **Modifications des présentes Conditions.** Nous pouvons modifier les présentes Conditions pour les mêmes types de motifs. Pour les modifications qui ne réduisent pas vos droits, nous publions la nouvelle version avec un résumé des changements et vous envoyons un e-mail au moins **30 jours** avant son entrée en vigueur ; la poursuite de l’utilisation de Dialectical Engine après cette date vaut acceptation et vous pouvez clôturer votre compte avant celle-ci. Pour les modifications qui réduisent vos droits — notamment les hausses de prix d’une formule existante, les diminutions de limites, la suppression de fonctionnalités, les nouvelles utilisations de votre contenu ou les modifications relatives à la responsabilité, au droit applicable ou au règlement des litiges —, nous vous demandons d’accepter expressément la nouvelle version lors de votre prochaine connexion et la modification ne s’applique que pour l’avenir. Nous n’appliquons jamais une modification rétroactivement et n’utilisons jamais la présente section pour modifier, pendant sa durée, l’essence de ce pour quoi vous avez payé sans vous offrir une possibilité de résiliation. Les versions antérieures restent disponibles à l’adresse dezbatere.ro/terms/versions.
 
-La version 1.1 a remplacé la version 1.0 : la section 8 indique désormais que DeepInfra exécute sur ses propres serveurs tout modèle fourni à un débat par son intermédiaire, et le résumé a été modifié en conséquence.
+La version 1.2 a remplacé la version 1.1 : la section 9 indique désormais ce qu’est un vote sur un débat public, que chaque compte en dispose d’un par débat et peut le retirer, que la liste indique combien de votes un débat a reçus et jamais qui les a donnés, et qu’un compteur ne doit pas être modifié avec plus d’un compte ni par des moyens automatisés. La version 1.1 a remplacé la version 1.0 : la section 8 indique désormais que DeepInfra exécute sur ses propres serveurs tout modèle fourni à un débat par son intermédiaire, et le résumé a été modifié en conséquence.
 
 ## 15. Responsabilité
 

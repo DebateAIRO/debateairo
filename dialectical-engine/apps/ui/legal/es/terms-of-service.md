@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En resumen
-eyebrow: TÉRMINOS DE SERVICIO · v1.1 · EN VIGOR DESDE 24 DE NOVIEMBRE DE 2026
+eyebrow: TÉRMINOS DE SERVICIO · v1.2 · EN VIGOR DESDE 27 DE NOVIEMBRE DE 2026
 title: Lo que usted acepta
 lede: El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.
-endMarker: FIN DE LOS TÉRMINOS · v1.1
+endMarker: FIN DE LOS TÉRMINOS · v1.2
 bodyLabel: Texto de los Términos de servicio
 annexTitle: Anexo A — Términos regionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEY APLICABLE
 -->
 
-**Version 1.1 · Effective 24 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
+**Version 1.2 · Effective 27 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
 
 **In short.** Debe tener al menos 18 años. Dialectical Engine elabora argumentos mediante modelos de IA y todo lo que genera puede ser erróneo; no constituye asesoramiento. En el plan Gratuito, sus debates son públicos cuando terminan, tras una comprobación de IA; en un plan de pago son privados salvo que los publique. Una vez públicos, cualquiera puede leer un debate, y sigue siendo público. El texto que envía se remite a los proveedores de IA incluidos en nuestro Registro de proveedores, principalmente DeepInfra, en Estados Unidos. Las condiciones de DeepInfra, Anthropic y Amazon no les permiten entrenar modelos con él. El proveedor de búsqueda web recibe únicamente las breves frases de búsqueda que redactan los modelos (sección 8). Denuncie contenido ilícito en support@dezbatere.ro, tenga o no una cuenta. Se aplica la legislación rumana, pero usted conserva la protección local que le corresponda como consumidor.
 
@@ -164,6 +164,8 @@ Los debates de un plan de pago son **privados por defecto**: nada de lo que cree
 
 **Informes de cualquiera.** Cualquiera con crédito puede redactar un informe sobre un debate público mientras no se le siga añadiendo nada, con su propia cuota. El informe es público. El seudónimo del autor es solo una referencia: un informe lo redactan las IA a partir de lo que muestra la página, y no es una declaración del autor. Los informes anteriores siguen siendo legibles.
 
+**Votos.** Cuando haya iniciado sesión, puede votar un debate de la lista de debates públicos, incluidos los suyos, para mostrar a otros lectores que le pareció digno de leerse. Cada cuenta tiene un voto por debate, y al pulsar de nuevo el botón se retira el suyo mientras el debate esté en la lista. La lista muestra cuántos votos tiene cada debate y nunca quién los dio. Sus votos se eliminan cuando surte efecto el cierre de su cuenta (sección 6), y los votos de un debate se eliminan cuando su página pública ha desaparecido para siempre (Política de privacidad, sección 7). No utilice más de una cuenta, ni ningún medio automatizado, para cambiar un recuento: la sección 6 le permite una sola cuenta, y la sección 7 no permite el acceso automatizado.
+
 **Después de que el autor se marche.** Un debate público sigue abierto a aportaciones después de que su primer autor haya eliminado su cuenta. Las nuevas aportaciones se basan en la copia pública. Nadie es propietario de la página: un debate público lo construyen varias personas y las IA. Cada persona conserva los derechos que tenga sobre sus propias palabras y concede la licencia que figura a continuación. Nadie se convierte en copropietario del debate. Nadie, incluido el primer autor, puede hacer que se retire la aportación de otra persona ni impedir que otros hagan aportaciones, salvo a través de la vía de denuncia de la sección 10.
 
 **Siempre podemos retirar contenido publicado.** Podemos retirar un debate publicado o restringir el acceso a él cuando así lo exija la ley, lo ordene un órgano jurisdiccional o una autoridad competente, o el debate incumpla estos Términos o sea ilícito. Nada de lo dispuesto en esta sección nos impide actuar en respuesta a una notificación válida conforme a la sección 10, ni constituye una promesa de que un debate publicado seguirá estando disponible.
@@ -253,7 +255,7 @@ Le informaremos de antemano, en un soporte duradero, de qué va a cambiar y cuá
 
 **En estos Términos.** Podemos modificar estos Términos por los mismos tipos de motivos. Para los cambios que no reduzcan sus derechos, publicaremos la nueva versión con un resumen de las modificaciones y le enviaremos un correo electrónico al menos **30 días** antes de que entre en vigor; si continúa utilizando Dialectical Engine después de esa fecha, se entenderá que la acepta, y puede cerrar su cuenta antes de entonces. Para los cambios que reduzcan sus derechos —incluidos aumentos de precio de un plan existente, límites inferiores, funciones retiradas, nuevos usos de su contenido o cambios en la responsabilidad, la ley aplicable o la resolución de controversias—, le pediremos que acepte expresamente la nueva versión la próxima vez que inicie sesión, y el cambio solo se aplicará en lo sucesivo. Nunca aplicamos cambios con carácter retroactivo ni utilizamos esta sección para modificar, durante la vigencia del contrato, la esencia de aquello por lo que ha pagado sin ofrecerle una vía de salida. Las versiones anteriores seguirán disponibles en dezbatere.ro/terms/versions.
 
-La versión 1.1 sustituyó a la versión 1.0: la sección 8 indica ahora que DeepInfra ejecuta en sus propios servidores todos los modelos que se asignan a un debate a través de él, y el resumen se modificó en consecuencia.
+La versión 1.2 sustituyó a la versión 1.1: la sección 9 indica ahora qué es un voto en un debate público, que cada cuenta tiene uno por debate y puede retirarlo, que la lista muestra cuántos votos tiene un debate y nunca quién los dio, y que un recuento no debe cambiarse con más de una cuenta ni por medios automatizados. La versión 1.1 sustituyó a la versión 1.0: la sección 8 indica ahora que DeepInfra ejecuta en sus propios servidores todos los modelos que se asignan a un debate a través de él, y el resumen se modificó en consecuencia.
 
 ## 15. Responsabilidad
 

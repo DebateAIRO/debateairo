@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručně
-eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v1.1 · ÚČINNÉ OD 24. LISTOPADU 2026
+eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v1.2 · ÚČINNÉ OD 27. LISTOPADU 2026
 title: S čím souhlasíte
 lede: Smlouva mezi vámi a DMS Merchandise Shop S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.
-endMarker: KONEC PODMÍNEK · v1.1
+endMarker: KONEC PODMÍNEK · v1.2
 bodyLabel: Text Podmínek poskytování služby
 annexTitle: Příloha A — Regionální podmínky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 1.1 · Effective 24. listopadu 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
+**Version 1.2 · Effective 27. listopadu 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
 
 **In short.** Musí vám být alespoň 18 let. Dialectical Engine vytváří argumenty pomocí modelů AI a vše, co vygeneruje, může být nesprávné — nejde o poradenství. V bezplatném tarifu jsou vaše debaty po dokončení veřejné, po kontrole AI; v placeném tarifu jsou soukromé, dokud je nezveřejníte. Jakmile je debata veřejná, může ji číst kdokoli a zůstává veřejná. Text, který zadáte, je odesílán poskytovatelům AI uvedeným v našem Registru poskytovatelů, především poskytovateli DeepInfra, ve Spojených státech. Podmínky DeepInfra, Anthropic a Amazon jim nedovolují na něm trénovat modely. Poskytovatel vyhledávání na webu obdrží pouze krátké vyhledávací fráze, které napíší modely (oddíl 8). Nezákonný obsah hlaste na support@dezbatere.ro bez ohledu na to, zda máte účet. Rozhodným právem je rumunské právo, vaše místní spotřebitelská ochrana vám však zůstává zachována.
 
@@ -164,6 +164,8 @@ V placeném tarifu jsou debaty **ve výchozím nastavení soukromé**: nic, co t
 
 **Zprávy od kohokoli.** Kdokoli s kreditem může napsat zprávu o veřejné debatě, dokud se k ní nic dalšího nepřidává, a to za použití své vlastní kvóty. Zpráva je veřejná. Pseudonym autora je jen odkaz: zprávu píšou AI z toho, co stránka ukazuje, a není to prohlášení autora. Dřívější zprávy zůstávají čitelné.
 
+**Hlasy.** Když jste přihlášeni, můžete hlasovat pro debatu na seznamu veřejných debat, i pro svou vlastní, abyste ostatním čtenářům ukázali, že vám přišla hodná přečtení. Každý účet má pro každou debatu jeden hlas a opětovné stisknutí tlačítka váš hlas vezme zpět, dokud je debata na seznamu. Seznam ukazuje, kolik hlasů má každá debata, a nikdy ne, kdo je dal. Vaše hlasy se vymažou, když nabude účinku uzavření vašeho účtu (oddíl 6), a hlasy debaty se vymažou, když její veřejná stránka natrvalo zmizí (Zásady ochrany osobních údajů, oddíl 7). Nepoužívejte ke změně počtu hlasů více než jeden účet ani žádné automatizované prostředky: oddíl 6 vám povoluje jeden účet a oddíl 7 nepovoluje automatizovaný přístup.
+
 **Po odchodu autora.** Veřejná debata zůstává otevřená pro příspěvky i poté, co její první autor smazal svůj účet. Nové příspěvky pracují s veřejnou kopií. Stránku nevlastní nikdo: veřejnou debatu vytváří více lidí a AI. Každý si ponechává práva, která má ke svým vlastním slovům, a uděluje licenci uvedenou níže. Nikdo se nestává spoluvlastníkem debaty. Nikdo, ani první autor, nemůže docílit odstranění příspěvku jiné osoby ani zabránit ostatním, aby do debaty přidávali, jinak než postupem pro hlášení uvedeným v oddílu 10.
 
 **Zveřejněný obsah můžeme vždy odstranit.** Zveřejněnou debatu můžeme odstranit nebo k ní omezit přístup, vyžaduje-li to zákon, nařídí-li to soud nebo příslušný orgán, nebo porušuje-li tyto Podmínky či je nezákonná. Nic v tomto oddílu nám nebrání jednat na základě platného oznámení podle oddílu 10 a nic v něm nepředstavuje příslib, že zveřejněná debata zůstane dostupná.
@@ -253,7 +255,7 @@ O tom, co a kdy se mění, vás předem informujeme na trvalém nosiči. Má-li 
 
 **Změny těchto Podmínek.** Tyto Podmínky můžeme měnit ze stejných druhů důvodů. U změn, které neomezují vaše práva, zveřejníme novou verzi se shrnutím změn a nejméně **30 dnů** před nabytím účinku vám zašleme e-mail; pokračováním v používání Dialectical Engine po tomto datu změnu přijímáte a před tímto datem můžete svůj účet uzavřít. U změn, které omezují vaše práva — včetně zvýšení ceny stávajícího tarifu, snížení limitů, odstranění funkcí, nového způsobu použití vašeho obsahu nebo změn odpovědnosti, rozhodného práva či řešení sporů — vás při příštím přihlášení požádáme, abyste novou verzi výslovně přijali, a změna platí pouze do budoucna. Žádnou změnu nikdy neuplatníme zpětně a tento oddíl nikdy nepoužijeme ke změně podstaty toho, za co jste zaplatili, v průběhu sjednaného období, aniž bychom vám nabídli možnost smlouvu ukončit. Předchozí verze zůstávají dostupné na adrese dezbatere.ro/terms/versions.
 
-Verze 1.1 nahradila verzi 1.0: oddíl 8 nyní uvádí, že DeepInfra provozuje na vlastních serverech každý model, který je pro debatu poskytován jejím prostřednictvím, a shrnutí bylo odpovídajícím způsobem upraveno.
+Verze 1.2 nahradila verzi 1.1: oddíl 9 nyní uvádí, co je hlas pro veřejnou debatu, že každý účet má pro každou debatu jeden hlas a může ho vzít zpět, že seznam ukazuje, kolik hlasů má debata, a nikdy ne, kdo je dal, a že počet hlasů se nesmí měnit pomocí více než jednoho účtu ani automatizovanými prostředky. Verze 1.1 nahradila verzi 1.0: oddíl 8 nyní uvádí, že DeepInfra provozuje na vlastních serverech každý model, který je pro debatu poskytován jejím prostřednictvím, a shrnutí bylo odpovídajícím způsobem upraveno.
 
 ## 15. Odpovědnost
 

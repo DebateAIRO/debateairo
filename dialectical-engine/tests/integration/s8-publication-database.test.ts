@@ -963,7 +963,7 @@ describe("S8 publication on real PostgreSQL", () => {
       contentCiphertext: await encryptedSnapshot(publicationRef, runId, "survive")
     })).toBe(true);
     const indexAfter = await repository.listPublicRefs(10,50);
-    expect(indexAfter).toEqual({ refs: [],total:indexBefore.total+1 });
+    expect(indexAfter).toEqual({ refs: [],total:indexBefore.total+1,upvotes:{} });
 
     const raw = await database.pool.query<{ content_ciphertext: unknown }>(
       "SELECT content_ciphertext FROM serve.publication_snapshot WHERE publication_ref=$1",

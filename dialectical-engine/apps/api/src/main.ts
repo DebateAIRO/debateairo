@@ -97,6 +97,8 @@ import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresT
 import { recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
 import { PostgresRegistrationCountryReader } from "@debateai/db";
+import { PostgresPublicDebateUpvoteRepository } from "@debateai/db";
+import { PostgresPublicDebateUpvoteSweepRepository } from "@debateai/db";
 // FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
 // by tools/orphan-audit; the module's state is process-global, so this instance routes the same pools).
 import { assertAccountContextLogins, attestEveryRoute, onOwnConnections } from "../../../packages/db/src/account-context.js";
@@ -189,6 +191,7 @@ import {
 import { TimeShiftedCardPayments } from "./billing/time-shifted-payments.js";
 import { createRetentionPurge } from "./retention-purge.js";
 import { createUnfinishedSignupExpiry, UNFINISHED_SIGNUP_EXPIRY_EVERY_MS } from "./unfinished-signup-expiry.js";
+import { sweepGonePublicDebateUpvotes } from "./public-vote-sweep.js";
 import {
   assertNoRecordsDatedAhead, assertOtherSystemRecordsClosed, assertProviderOnlyNotifySealed, billingCustodyPaths,
   billingModeOf, incompleteNetopiaKey, loadBillingConnectors, loadNetopiaConnectors, type BillingConnectors, type BillingMode, type NetopiaConnectors
@@ -1240,6 +1243,8 @@ const readAccountEmail = accountEmailReader(crossAccountPool(pool, "X27"), dekSt
 const teamLimitRepository = new PostgresTeamLimitRepository(pool);
 const publicReviewRepository = new PostgresPublicReviewRepository(pool);
 const publicFlagRepository = new PostgresPublicFlagRepository(pool);
+// 0194: 0194's three request functions, on the request login under the caller's session.
+const publicDebateUpvoteRepository = new PostgresPublicDebateUpvoteRepository(pool);
 // 0186: the preview's approved buyers. The yes or no at the pay button and the Owner's list and changes run on the request
 // login, whose billing role holds 0186's grants. The Owner's look-up of a typed address and the shortened addresses on the
 // list read other accounts' rows, so they run on the system login (X39), and only after the Owner's authority is checked.
@@ -1618,8 +1623,15 @@ const retentionPurgeTimer=gatedInterval(releaseWatcher,triggerRetentionPurge,86_
 // The security review's 0171 (F5): the clarify reservations no charge took (a refused, skipped or abandoned call) go hourly, and once each time this
 // release becomes current (below), whether or not anyone reserves again, so none outlives about two hours. Outside any request, so `pool` sends it to
 // the API's system login, which holds the cross-account marker the sweep is granted to. Whatever the route: rows may predate a change of it.
+// 0194: the upvotes of a public debate that is gone for good (made private again, or deleted by the end-of-debate check) go on the same hourly
+// pass, in their own try, so neither sweep ever skips the other. Outside any request, so `pool` sends it to the API's system login, which holds the
+// cross-account marker 0194's sweep is granted to. The database decides from the rows alone; a debate that is only held keeps its votes.
+const publicDebateUpvoteSweep = new PostgresPublicDebateUpvoteSweepRepository(pool);
 const triggerAskClarifyReservationSweep=createSingleFlightErasureReconciler(
-  async ()=>{ await sweepAskClarifyReservations((limit)=>deleteAskClarifyReservationsDue(pool,limit)); },
+  async ()=>{
+    try{await sweepGonePublicDebateUpvotes({ repository: publicDebateUpvoteSweep, log: (line) => console.error(line) });}catch{console.error("[PUBLIC_DEBATE_UPVOTE_SWEEP_PENDING]");}
+    await sweepAskClarifyReservations((limit)=>deleteAskClarifyReservationsDue(pool,limit));
+  },
   ()=>console.error("[ASK_CLARIFY_RESERVATION_SWEEP_PENDING]")
 );
 const askClarifyReservationSweepTimer=gatedInterval(releaseWatcher,triggerAskClarifyReservationSweep,ASK_CLARIFY_RESERVATION_SWEEP_EVERY_MS);
@@ -2211,6 +2223,7 @@ const api = buildApi({
   // 0157 (D1): the person's own statements of reasons, their facts opened under the debate's key as the two accounts' review opens them.
   ...(publications === undefined ? {} : { moderationStatements: { repository: moderationStatementRepository,
     withKey: <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => publications.withReviewKey(publicationRef, runId, use) } }),
+  ...(publications === undefined ? {} : { publicVotes: { repository: publicDebateUpvoteRepository } }),
   ...(publications === undefined ? {} : { publicTree: {
     pool, tree: new PostgresPublicTreeRepository(pool), contributions: new PostgresPublicDebateRepository(pool),
     readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef),

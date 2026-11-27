@@ -2,6 +2,8 @@ import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal 
 import { AskClarifyResponseSchema, RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, type AskClarifyRequest, type AskClarifyResponse, type RunContinued, type RunContinueRefused } from "./web.js";
 // V4 start step, Task 57f: Continue on a failed debate: its two refusals, answered as data.
 import { RunNotContinuedSchema, type RunNotContinued } from "./web.js";
+// Upvotes on public debates (spec 2026-11-26): the press's request and answer, and the own-votes read.
+import { OwnPublicVotesSchema, PublicVoteAnswerSchema, PublicVoteRequestSchema, type OwnPublicVotes, type PublicVoteAnswer } from "./web.js";
 import { ModerationStatementsSchema, type ModerationStatements, InvestigationCloseRequestSchema, PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicFlagAnswerSchema, PublicFlagRequestSchema, type PublicFlagAnswer, type PublicFlagRequest, PublicReportRequestSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, type PublicDebateRefused, type PublicReportAccepted, type ResearchedAddRequest, type ResearchedAdded, type ResearchedRefused } from "./web.js";
 import {
   InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
@@ -19,7 +21,6 @@ import {
   SavedQuestionCreateSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionSaveSchema, SavedQuestionWrittenSchema,
   type SavedQuestionDoc, type SavedQuestionList, type SavedQuestionRead, type SavedQuestionWritten
 } from "./saved-questions.js";
-import type { VerdictState } from "./verdict-state.js";
 import { PublicationReviewAskRequestSchema, PublicationReviewAskResponseSchema, PublicationReviewStateSchema,
   type PublicationReviewState } from "./publication-review.js";
 import { SocialStepUpStatusResponseSchema,type SocialStepUpStatusResponse,type CompleteSocialStepUpRequest } from './index.js';
@@ -164,6 +165,7 @@ import {
   type Node,
   type PlanTier,
   type PublicDebate,
+  type PublicDebateList,
   type RemovalNoticeTake,
   type RunEvent,
   type RunProjection,
@@ -474,17 +476,7 @@ export interface ContractClient {
   requestDataExport(stepUpGrant: string, locale: string): Promise<DataExportStatus>;
   readDataExportStatus(): Promise<DataExportStatus>;
   downloadDataExport(token: string): Promise<{ bytes: ArrayBuffer; filename: string }>;
-  readPublicDebates(limit: number, offset: number): Promise<Readonly<{
-    items: readonly Readonly<{
-      public_ref: string;
-      author_pseudonym: string;
-      question: string;
-      published_at: string;
-      verdict: VerdictState | null;
-      confidence_band: string | null;
-    }>[];
-    total: number;
-  }>>;
+  readPublicDebates(limit: number, offset: number): Promise<PublicDebateList>;
   readPublicDebate(publicationRef: string): Promise<PublicDebate>;
   /** Security review F2: `dig` is true for a dig, which is never published (absent from an API before 0171). */
   readRunVisibility(runId: string): Promise<RunVisibility>;
@@ -627,6 +619,14 @@ export interface ContractClient {
   /** Decision 13: "Write a report" on a public page. A 409 comes back as data (nothing started); a 404 and the rest throw. */
   writePublicReport(publicationRef: string): Promise<PublicReportAccepted | PublicDebateRefused>;
   flagPublicDebate(publicationRef: string, body: PublicFlagRequest): Promise<PublicFlagAnswer>;
+  /**
+   * Upvotes: cast (PUT) and withdraw (DELETE) the signed-in account's vote on a public debate. Each is safe to repeat and answers
+   * where the account stands and the count now. A debate that is not public now is a 404; it and every other refusal throw.
+   */
+  castPublicVote(publicationRef: string): Promise<PublicVoteAnswer>;
+  withdrawPublicVote(publicationRef: string): Promise<PublicVoteAnswer>;
+  /** Which of these public debates (1 to 100) the signed-in account upvotes now. A GET, so the server-drawn home page can ask it. */
+  readOwnPublicVotes(publicationRefs: readonly string[]): Promise<OwnPublicVotes>;
   /** 0157 (D1): the signed-in person's own statements of reasons, newest first. */
   readModerationStatements(): Promise<ModerationStatements>;
   readRun(runId: string): Promise<RunProjection>;
@@ -1178,6 +1178,16 @@ export function createContractClient(
     flagPublicDebate: (publicationRef: string, body: PublicFlagRequest) => requestJson<PublicFlagAnswer>(
       root.href, fetchImplementation, `/v1/public/debates/${encodeURIComponent(publicationRef)}/flag`, PublicFlagAnswerSchema,
       { method: "POST", body: JSON.stringify(PublicFlagRequestSchema.parse(body)) }, auth
+    ),
+    castPublicVote: (publicationRef: string) => request(
+      `/v1/public/debates/${encodeURIComponent(publicationRef)}/vote`, PublicVoteAnswerSchema,
+      { method: "PUT", body: JSON.stringify(PublicVoteRequestSchema.parse({})) }
+    ),
+    withdrawPublicVote: (publicationRef: string) => request(
+      `/v1/public/debates/${encodeURIComponent(publicationRef)}/vote`, PublicVoteAnswerSchema, { method: "DELETE" }
+    ),
+    readOwnPublicVotes: (publicationRefs: readonly string[]) => request(
+      `/v1/account/public-debate-votes?${new URLSearchParams({ refs: publicationRefs.join(",") }).toString()}`, OwnPublicVotesSchema
     ),
     readModerationStatements: () => request("/v1/account/moderation-statements", ModerationStatementsSchema),
     writePublicReport: (publicationRef: string) => requestJson<PublicReportAccepted | PublicDebateRefused>(

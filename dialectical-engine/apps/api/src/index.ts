@@ -35,6 +35,7 @@ import { AccountProfileError, type AccountProfileService } from "./account-profi
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
 import { moderationStatementsOf, type ModerationStatementPorts } from "./moderation-statements.js";
 import { pressPublicFlag, type PublicFlagPorts } from "./public-flag.js";
+import { ownVoteRefsOf, type PublicVotePorts } from "./public-vote.js";
 import type { PostgresPublicDebateRepository, PostgresPublicTreeRepository, ProfileSession, PublicContributionRead } from "@debateai/db";
 import { runInRequestScope, setRequestCredential } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
@@ -92,6 +93,9 @@ import {
   PublicReportAcceptedSchema,
   PublicFlagAnswerSchema,
   PublicFlagRequestSchema,
+  PublicVoteAnswerSchema,
+  PublicVoteRequestSchema,
+  OwnPublicVotesSchema,
   PublicReportRequestSchema,
   type PublicDebate,
   type PublicDigParent,
@@ -1609,6 +1613,10 @@ export const authorizationPolicyInventory = Object.freeze([
   // Decision 13: a report on a public debate, by a signed-in person with credit.
   { route: "POST /v1/public/debates/{id}/report", auth: "user", resource: "public-debate", action: "write-report" },
   { route: "POST /v1/public/debates/{id}/flag", auth: "user", resource: "public-debate", action: "flag" },
+  // Upvotes on public debates: a signed-in account's own vote; a write carries the CSRF pair like any user route.
+  { route: "PUT /v1/public/debates/{id}/vote", auth: "user", resource: "public-debate", action: "vote" },
+  { route: "DELETE /v1/public/debates/{id}/vote", auth: "user", resource: "public-debate", action: "withdraw-vote" },
+  { route: "GET /v1/account/public-debate-votes", auth: "user", resource: "public-debate", action: "read-own-votes" },
   { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
   // Anonymous support writes require the exact first-party Origin.
   { route: "POST /v1/support/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
@@ -2118,6 +2126,8 @@ export interface ApiOptions {
   /** Decision 13: digs and reports on a public debate, by anyone with credit (./public-tree.ts); absent: only the first snapshot is readable. */
   readonly publicTree?: PublicTreeOptions;
   readonly publicFlags?: PublicFlagPorts;
+  /** Upvotes on public debates (0194): the vote store, on the request pool under the caller's session. Absent: the two writes answer 404 and the own-votes read answers an empty list. */
+  readonly publicVotes?: PublicVotePorts;
   /** 0157 (D1): the signed-in person's own statements of reasons, their facts opened under each debate's key. */
   readonly moderationStatements?: ModerationStatementPorts;
   /** Decision 5 of 31 Oct (0138): a debate's place, time and purpose lines, sealed under its run key at the ask. */
@@ -4298,6 +4308,43 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (!publicationRef.success) return reply.send(PublicFlagAnswerSchema.parse({ state: "NOT_FOUND" }));
     const state = await pressPublicFlag({ ownerRef, publicationRef: publicationRef.data, flagId: randomUUID(), where: body.data.where, claim: body.data.claim }, options.publicFlags);
     return reply.send(PublicFlagAnswerSchema.parse({ state }));
+  });
+  // Upvotes on public debates (0194): one vote per account per debate; a repeat PUT changes nothing and DELETE takes it back. Every absence is the one 404,
+  // only the count leaves the server, and the account is the session's, never the request's. The three share the publicVotes budget, charged before the id is looked at.
+  api.put<{ Params: { id: string } }>("/v1/public/debates/:id/vote", credentialRoutePolicy("PUT /v1/public/debates/{id}/vote"), async (request, reply) => {
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    if (ownerRef === undefined || options.publicVotes === undefined) return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
+    if (!PublicVoteRequestSchema.safeParse(request.body === undefined ? {} : request.body).success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    if (!admitOrRefuse(reply, "publicVotes", "PUT /v1/public/debates/{id}/vote", ownerRef)) return reply;
+    reply.header("Cache-Control", "no-store");
+    const publicationRef = ResourceIdSchema.safeParse(request.params.id);
+    if (!publicationRef.success) return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
+    const result = await options.publicVotes.repository.cast(ownerRef, publicationRef.data);
+    if ((result.outcome === "CAST" || result.outcome === "ALREADY") && result.upvotes !== null) {
+      return reply.send(PublicVoteAnswerSchema.parse({ voted: true, vote_count: result.upvotes }));
+    }
+    return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
+  });
+  api.delete<{ Params: { id: string } }>("/v1/public/debates/:id/vote", credentialRoutePolicy("DELETE /v1/public/debates/{id}/vote"), async (request, reply) => {
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    if (ownerRef === undefined || options.publicVotes === undefined) return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
+    if (!admitOrRefuse(reply, "publicVotes", "DELETE /v1/public/debates/{id}/vote", ownerRef)) return reply;
+    reply.header("Cache-Control", "no-store");
+    const publicationRef = ResourceIdSchema.safeParse(request.params.id);
+    if (!publicationRef.success) return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
+    const result = await options.publicVotes.repository.withdraw(ownerRef, publicationRef.data);
+    if (result.upvotes === null) return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
+    return reply.send(PublicVoteAnswerSchema.parse({ voted: false, vote_count: result.upvotes }));
+  });
+  api.get<{ Querystring: Record<string, unknown> }>("/v1/account/public-debate-votes", routePolicy("GET /v1/account/public-debate-votes"), async (request, reply) => {
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    if (!admitOrRefuse(reply, "publicVotes", "GET /v1/account/public-debate-votes", authenticated.ownerRef)) return reply;
+    reply.header("Cache-Control", "no-store");
+    const refs = ownVoteRefsOf(request.query.refs);
+    if (refs === null) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    if (options.publicVotes === undefined) return reply.send(OwnPublicVotesSchema.parse({ voted: [] }));
+    return reply.send(OwnPublicVotesSchema.parse({ voted: await options.publicVotes.repository.readOwn(authenticated.ownerRef, refs) }));
   });
   // Decisions 13 and 16: a report on a public debate, by anyone with credit, while nothing is ongoing. The asks' budget: a stranger can press it. Their username is only a reference, and they pay.
   api.post<{ Params: { id: string } }>("/v1/public/debates/:id/report", credentialRoutePolicy("POST /v1/public/debates/{id}/report"), async (request, reply) => {

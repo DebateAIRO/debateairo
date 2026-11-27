@@ -350,7 +350,8 @@ describe("W1-6 inventory and the no-grade rule over every new shape", () => {
     // The threat reports' four staff routes were removed (2026-11-19).
     // 0186: the four staff routes of the preview's approved buyers (GET, POST and POST …/find on /v1/admin/preview-buyers, DELETE …/{ref}).
     // 0188: the five person routes of the Owner's permit for a locked-out account (/v1/auth/recovery-permit/…) and the Owner's three (/v1/admin/recovery-permits…).
-    expect(contractInventory.routes).toHaveLength(220);
+    // Upvotes on public debates: PUT and DELETE /v1/public/debates/{id}/vote, GET /v1/account/public-debate-votes.
+    expect(contractInventory.routes).toHaveLength(223);
   });
 });
 

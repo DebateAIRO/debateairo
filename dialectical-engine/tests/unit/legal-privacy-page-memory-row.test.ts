@@ -66,9 +66,10 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
     // 0157: the moderation notices row in section 2, and its two rows in section 7; Privacy 3.12: the questions not started yet,
     // one row in each. Privacy 3.15: section 7 gains the unfinished sign-up row, and its acceptance row becomes two.
     // Privacy 1.2: the requests for help getting back into an account, one row in each.
-    expect(tableRows("en", 2)).toHaveLength(18);
+    // Privacy 1.3: upvotes on public debates, one row in each.
+    expect(tableRows("en", 2)).toHaveLength(19);
     expect(cells(tableRows("en", 2)[collectAt("en") - 1]!)[0]).toBe("**Debate content**");
-    expect(tableRows("en", 7)).toHaveLength(33);
+    expect(tableRows("en", 7)).toHaveLength(34);
     const names = tableRows("en", 7).map((row) => cells(row)[0]);
     expect(names.indexOf("Page settings and visits")).toBeGreaterThan(names.indexOf("Provider return records and retrieval references"));
     expect(names.indexOf("Provider return records and retrieval references")).toBeGreaterThanOrEqual(0);
@@ -90,7 +91,7 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
     expect(kept[2], `${code}: deletion with the debate points at section 6`).toMatch(/6/u);
     const purpose = cells(tableRows(code, 4)[0]!)[1]!;
     expect(purpose.toLocaleLowerCase(code), `${code}: section 4's first row lists it`).toContain(label.toLocaleLowerCase(code));
-    expect(markdown(code), `${code}: now version 1.2`).toMatch(/v1\.2 /u);
+    expect(markdown(code), `${code}: now version 1.3`).toMatch(/v1\.3 /u);
   });
 
   it.each(Object.entries(PINNED))("%s: the rows read exactly as approved", (code, pinned) => {

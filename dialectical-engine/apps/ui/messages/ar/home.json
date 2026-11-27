@@ -159,5 +159,13 @@
   "home.removal.close": "إغلاق",
   "home.flag.underReview": "مُعلَّم · قيد المراجعة",
   "home.flag.approved": "معتمد",
-  "home.flag.refused": "غير معتمد"
+  "home.flag.refused": "غير معتمد",
+  "home.upvote.label.zero": "صوّت. {count} صوت",
+  "home.upvote.label.one": "صوّت. {count} صوت",
+  "home.upvote.label.two": "صوّت. {count} صوتان",
+  "home.upvote.label.few": "صوّت. {count} أصوات",
+  "home.upvote.label.many": "صوّت. {count} صوتًا",
+  "home.upvote.label.other": "صوّت. {count} صوت",
+  "home.upvote.signedOut": "سجّل الدخول للتصويت",
+  "home.upvote.failed": "تعذّر حفظ صوتك. حاول مجددًا."
 }

@@ -192,6 +192,22 @@ describe("S8 publication HTTP boundary", () => {
     await api.close();
   });
 
+  it("serves vote_count on the list, the same body with and without a session", async () => {
+    // A typed variable on purpose: an unknown member in a callback's returned literal is not a type error, in a typed variable it is.
+    const item: Awaited<ReturnType<PublicationApplication["list"]>>["items"][number] = {
+      public_ref: PUBLIC_REF, author_pseudonym: publicDebate.author_pseudonym, question: publicDebate.question,
+      published_at: publicDebate.published_at, verdict: publicDebate.answer.verdict, confidence_band: publicDebate.answer.confidence_band, vote_count: 7
+    };
+    const api = buildApi({ application: application(), sessions: sessions(), allowedOrigin: ORIGIN,
+      publications: publications({ list: async () => ({ items: [item], total: 1 }) }) });
+    const anonymous = await api.inject({ method: "GET", url: "/v1/public/debates?limit=10&offset=0" });
+    const signedIn = await api.inject({ method: "GET", url: "/v1/public/debates?limit=10&offset=0", headers: { cookie, "user-agent": "s8-test-browser" } });
+    expect(anonymous.statusCode).toBe(200);
+    expect((anonymous.json() as { items: { vote_count?: number }[] }).items[0]?.vote_count).toBe(7);
+    expect(signedIn.body).toBe(anonymous.body);
+    await api.close();
+  });
+
   it("marks the public debate reads as AI-generated, and never their refusals (EU AI Act Art. 50(2))", async () => {
     const api = buildApi({ application: application(), publications: publications() });
     const visible = await api.inject({ method: "GET", url: `/v1/public/debates/${PUBLIC_REF}` });

@@ -17,15 +17,15 @@ import { legalEffectiveDay, legalText, type LegalKind as ResetKind } from "../su
  * before launch clears. The first change after launch was 1.1 of both documents (DeepInfra runs on its own servers every
  * model a debate is given through it). Since 24 November 2026 the release offers all 35 catalogue languages, each
  * translated from the English 1.1 texts and archived at 1.1 (the other 32 languages were first released at 1.1). The
- * Privacy Policy is now at 1.2, written in English first, with two changes: help getting back into an account, and what
- * the AI checks of public text receive and decide. Every language's Privacy Policy says 1.2 and its day in the eyebrow,
- * end marker and version line, and every translation is recorded as made from the current English text. Each
- * document's number and day change for all its languages together, the day with legal-redate.mjs; a released version
- * keeps its own day. The Privacy Policy carries both change summaries, 1.2's first, in each language's own words (the
- * launch languages word for word); the floors stay 1.0, so nobody who accepted 1.0 or 1.1 is asked again; the archive
- * holds exactly the 1.1 texts of all 35 languages, the 1.0 texts of English, French and Romanian, and the Privacy
- * Policy's 1.2 of all 35, which the release step made from the final texts; /terms/versions lists 1.1, in force, and
- * 1.0, linked to its archived English text.
+ * Privacy Policy's 1.2 added help getting back into an account and what the AI checks of public text receive and decide,
+ * and was released in all 35 languages. The Privacy Policy 1.3 and the Terms 1.2, written in English first, add upvotes on
+ * public debates. Every language's text says its current number and day in the eyebrow, end marker and version line, and
+ * every translation is recorded as made from the current English text. Each document's number and day change for all
+ * its languages together, the day with legal-redate.mjs; a released version keeps its own day. Each document carries its
+ * change summaries, newest first, in each language's own words (the launch languages word for word); the floors stay 1.0,
+ * so nobody who accepted an earlier version is asked again; the archive holds 1.0 (English, French, Romanian), 1.1 (all
+ * 35), the Privacy Policy's 1.2 (all 35), and one copy of each current text (35 each), which the release step made from
+ * the final texts; /terms/versions lists 1.2, in force, and 1.1 and 1.0, each linked to its archived English text.
  */
 
 const root = process.cwd();
@@ -34,7 +34,7 @@ const CODES = LOCALES.map(({ code }) => code).sort();
 const OFFERED: readonly string[] = RELEASE_LEGAL_LOCALES;
 const TRANSLATED = CODES.filter((code) => code !== "en");
 /** Each document's current version. */
-const CURRENT: Readonly<Record<ResetKind, string>> = { PRIVACY: "1.2", TERMS: "1.1" };
+const CURRENT: Readonly<Record<ResetKind, string>> = { PRIVACY: "1.3", TERMS: "1.2" };
 const draft = (kind: ResetKind, code: string): string => legalText(kind, code);
 const sha = (text: string): string => createHash("sha256").update(text, "utf8").digest("hex");
 const section14 = (text: string): string[] =>
@@ -52,9 +52,9 @@ const translations = (): Record<string, Record<string, { version: string; sha256
  */
 const RELEASED: Readonly<Record<ResetKind, Readonly<Record<string, Readonly<Record<string, string>>>>>> = {
   PRIVACY: {
-    en: { "1.0": "d02ca4bac99f4a3a84a0f6e00726717e67f9290f61739d15f4ebd2ef27137bcf", "1.1": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515" },
-    fr: { "1.0": "404cce26d246f87be9a1f567e6065771f636afe671e1b85a2da75ca6ff4ea9fd", "1.1": "2c639718616db98b874948e323503ddb1f5ff23e2cd1edf12f22fe42b9f741a0" },
-    ro: { "1.0": "4eb06805885d1e22aee7e26537c682d15eb3448c0c7a3781389a5aee44988497", "1.1": "e23b9600b4afff3ed81bba87c655cdcefd4f61f3f28bbbdd2a86d605e3ff6fe5" }
+    en: { "1.0": "d02ca4bac99f4a3a84a0f6e00726717e67f9290f61739d15f4ebd2ef27137bcf", "1.1": "df5db9a4008f978be02b4245fad90e779178c8c2daf32136eb57ef5ccf287515", "1.2": "ff1a970f8705e03f43aeb4aeaa3e36a835fb5005a43f4911b2ca7d7ccfcc9f77" },
+    fr: { "1.0": "404cce26d246f87be9a1f567e6065771f636afe671e1b85a2da75ca6ff4ea9fd", "1.1": "2c639718616db98b874948e323503ddb1f5ff23e2cd1edf12f22fe42b9f741a0", "1.2": "3e45f14e7720e57bc1e656eb4cefe95eabf9238f41142fd922183df7e1d26cca" },
+    ro: { "1.0": "4eb06805885d1e22aee7e26537c682d15eb3448c0c7a3781389a5aee44988497", "1.1": "e23b9600b4afff3ed81bba87c655cdcefd4f61f3f28bbbdd2a86d605e3ff6fe5", "1.2": "4ff71c09879dbc8591ecdf92f4f985e99749f9229ad1c6c24efbf758e5246b3a" }
   },
   TERMS: {
     en: { "1.0": "737971b09f371ef4c0266610b58c563df067caf3a4ddf52ae55204aa689610d2", "1.1": "49412a20009903fb70679a9fe0451fa27dd92aa2643af4566cee6064575ee8c8" },
@@ -75,13 +75,14 @@ const REPLACED: Readonly<Record<string, Readonly<Record<string, string>>>> = {
     en: "Version 1.2 replaced version 1.1: ",
     fr: "La version 1.2 a remplacé la version 1.1 : ",
     ro: "Versiunea 1.2 a înlocuit versiunea 1.1: "
-  }
+  },
+  "1.3": { en: "Version 1.3 replaced version 1.2: ", fr: "La version 1.3 a remplacé la version 1.2 : ", ro: "Versiunea 1.3 a înlocuit versiunea 1.2: " }
 };
 /** How many times `text` names version `version`, never as part of a longer number. */
 const named = (text: string, version: string): number =>
   text.match(new RegExp(`(?<![\\d.])${version.replace(".", "\\.")}(?!\\d)`, "gu"))?.length ?? 0;
 
-describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.1 and Privacy Policy 1.2 now", () => {
+describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.2 and Privacy Policy 1.3 now", () => {
   it.each(KINDS.flatMap((kind) => CODES.map((code) => [kind, code] as const)))("%s %s: the draft says its current version, and the manifest holds it", (kind, code) => {
     const text = draft(kind, code);
     const lines = text.split("\n");
@@ -113,34 +114,48 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.1 
     expect(privacy[1], "the paragraph on changes points to the versions page").toContain("dezbatere.ro/privacy/versions");
     expect(privacy[2], "the last-updated sentence names the year").toContain("2026");
     expect(OFFERED, "the release offers it").toContain(code);
-    // The Terms' one summary, which every language carries: 1.1's.
-    expect(named(terms[4]!, "1.1"), "the Terms' summary names 1.1 once").toBe(1);
-    expect(named(terms[4]!, "1.0"), "the Terms' summary names 1.0 once").toBe(1);
-    expect(terms[4], "and no other version").not.toMatch(/(?<![\d.])(?!1\.[01](?!\d))\d\.\d+(?!\d)/u);
-    expect(terms[4], "it names the company the change is about").toContain("DeepInfra");
+    // The Terms' two summaries, newest first, which every language carries: 1.2's (upvotes, section 9), then 1.1's.
+    expect(named(terms[4]!, "1.2"), "1.2 is named in its own summary only").toBe(1);
+    expect(named(terms[4]!, "1.1"), "1.1 is named by both summaries").toBe(2);
+    expect(named(terms[4]!, "1.0"), "the Terms' summaries name 1.0 once").toBe(1);
+    expect(terms[4], "and no other version").not.toMatch(/(?<![\d.])(?!1\.[012](?!\d))\d\.\d+(?!\d)/u);
+    expect(terms[4], "1.1's names the company its change is about").toContain("DeepInfra");
+    const nine = terms[4]!.search(/(?<![\d.])9(?!\d|\.\d)/u);
+    expect(nine, "1.2's names the section it changed").toBeGreaterThanOrEqual(0);
+    expect(nine, "and comes before 1.1's").toBeLessThan(terms[4]!.indexOf("DeepInfra"));
     // A section number, standing alone or as an ordinal ("8." in Croatian, Hungarian, Latvian, Turkish), never part of a version or a date.
     expect(terms[4], "it names the section it changed").toMatch(/(?<![\d.])8(?!\d|\.\d)/u);
     // The Privacy Policy's summaries, newest first. 1.2's names the model that now checks a debate's public text, so the
     // model's own number is left out when the versions are counted.
     const summaries = privacy[2]!.replaceAll("Claude Haiku 5.5", "");
-    expect(named(summaries, "1.2"), "1.2 is named in its own summary only").toBe(1);
-    expect(named(summaries, "1.1"), "1.1 is named by both summaries").toBe(2);
+    expect(named(summaries, "1.3"), "1.3 is named in its own summary only").toBe(1);
+    expect(named(summaries, "1.2"), "1.2 is named by 1.3's summary and its own").toBe(2);
+    expect(named(summaries, "1.1"), "1.1 is named by 1.2's summary and its own").toBe(2);
     expect(named(summaries, "1.0"), "1.0 is named once").toBe(1);
-    expect(summaries, "and no other version").not.toMatch(/(?<![\d.])(?!1\.[012](?!\d))\d\.\d+(?!\d)/u);
+    expect(summaries, "and no other version").not.toMatch(/(?<![\d.])(?!1\.[0123](?!\d))\d\.\d+(?!\d)/u);
+    // 1.3's summary (upvotes) comes before 1.2's, which names the model, and names section 10 (what the export holds).
+    expect(privacy[2]!.slice(0, privacy[2]!.indexOf("Claude Haiku 5.5")), "1.3's names section 10").toMatch(/(?<![\d.])10(?!\d|\.\d)/u);
     expect(summaries, "1.1's names the company its change is about").toContain("DeepInfra");
     expect(privacy[2], "the sections 1.1 changed").toMatch(/(?<![\d.])5(?!\d|\.\d).*(?<![\d.])4(?!\d|\.\d)/u);
     expect(privacy[2], "1.2's names the model that checks the public text").toContain("Claude Haiku 5.5");
     if (code in REPLACED["1.1"]!) {
       // The launch languages' wording, word for word.
-      expect(terms[4]!.startsWith(REPLACED["1.1"]![code]!), "the Terms' summary").toBe(true);
-      expect(terms[4], "it names the section it changed").toMatch(/ 8 /u);
+      expect(terms[4]!.startsWith(REPLACED["1.2"]![code]!), "the Terms' 1.2 summary comes first").toBe(true);
+      expect(terms[4]!.split(REPLACED["1.1"]![code]!), "the Terms' 1.1 summary, once").toHaveLength(2);
+      expect(terms[4]!.slice(0, terms[4]!.indexOf(REPLACED["1.1"]![code]!)), "1.2's names the section it changed").toMatch(/ 9 /u);
+      expect(terms[4]!.slice(terms[4]!.indexOf(REPLACED["1.1"]![code]!)), "1.1's names the section it changed").toMatch(/ 8 /u);
       const last = privacy[2]!;
       expect(last.split(REPLACED["1.1"]![code]!), "the Privacy Policy's 1.1 summary, once").toHaveLength(2);
       const eleven = last.slice(last.indexOf(REPLACED["1.1"]![code]!));
       expect(eleven, "1.1's names the sections it changed").toMatch(/ 5 .* 4 /u);
       expect(last.split(REPLACED["1.2"]![code]!), "the Privacy Policy's 1.2 summary, once").toHaveLength(2);
       const at = last.indexOf(REPLACED["1.2"]![code]!);
-      expect(at, "1.2's comes first").toBeLessThan(last.indexOf(REPLACED["1.1"]![code]!));
+      expect(at, "1.2's comes before 1.1's").toBeLessThan(last.indexOf(REPLACED["1.1"]![code]!));
+      expect(last.split(REPLACED["1.3"]![code]!), "the Privacy Policy's 1.3 summary, once").toHaveLength(2);
+      const thirteen = last.indexOf(REPLACED["1.3"]![code]!);
+      expect(thirteen, "1.3's comes first").toBeLessThan(at);
+      // The upvote rows in sections 2, 4 and 7, then what the export holds in section 10.
+      expect(last.slice(thirteen, at), "1.3's names the parts it changed").toMatch(/ 2, 4 \S+ 7 .* 10 /u);
       // Both changes: the rows on help getting back into an account, then the AI checks in sections 5 and 8 and Annex B.
       expect(last.slice(at, last.indexOf(REPLACED["1.1"]![code]!)), "1.2's names the parts it changed")
         .toMatch(/ 2, 4 \S+ 7 .* 5 .* 8 .* B\.4 .* B\.6 /u);
@@ -149,10 +164,10 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.1 
 
   it("the English pages say their current versions, each in force from its own effective day", () => {
     expect([TERMS_OF_SERVICE.version, PRIVACY_POLICY.version]).toEqual([CURRENT.TERMS, CURRENT.PRIVACY]);
-    expect(TERMS_OF_SERVICE.eyebrow).toBe(`TERMS OF SERVICE · v1.1 · EFFECTIVE ${legalEffectiveDay("TERMS").toUpperCase()}`);
-    expect(PRIVACY_POLICY.eyebrow).toBe(`PRIVACY POLICY · v1.2 · EFFECTIVE ${legalEffectiveDay("PRIVACY").toUpperCase()}`);
-    expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v1.1");
-    expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v1.2");
+    expect(TERMS_OF_SERVICE.eyebrow).toBe(`TERMS OF SERVICE · v1.2 · EFFECTIVE ${legalEffectiveDay("TERMS").toUpperCase()}`);
+    expect(PRIVACY_POLICY.eyebrow).toBe(`PRIVACY POLICY · v1.3 · EFFECTIVE ${legalEffectiveDay("PRIVACY").toUpperCase()}`);
+    expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v1.2");
+    expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v1.3");
   });
 
   it.each(KINDS.map((kind) => [kind]))("%s: every draft takes effect on the same day, in its own words, after each earlier version's day", (kind) => {
@@ -178,33 +193,33 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.1 
   it("keeps both re-acceptance floors at 1.0: an acceptance of 1.0, 1.1, or of any pre-launch draft, owes nothing", () => {
     expect(manifest().reacceptance).toEqual({ PRIVACY: "1.0", TERMS: "1.0" });
     expect([reacceptanceFloor("TERMS"), reacceptanceFloor("PRIVACY")]).toEqual(["1.0", "1.0"]);
-    for (const accepted of ["1.0", "1.1", "1.2", "2.0", "2.19", "3.2", "3.16"]) {
+    for (const accepted of ["1.0", "1.1", "1.2", "1.3", "2.0", "2.19", "3.2", "3.16"]) {
       expect(documentVersionAtLeast(accepted, "1.0"), accepted).toBe(true);
     }
   });
 
-  it("the archive holds exactly the 1.1 texts of all 35 languages, the 1.0 texts of English, French and Romanian, and the Privacy Policy's 1.2 of all 35", () => {
+  it("the archive holds exactly the released texts (1.0 in English, French and Romanian, 1.1 in all 35, the Privacy Policy's 1.2 in all 35) and one copy of each current text in all 35", () => {
     const { archive } = manifest();
     const files = readdirSync(resolve(root, "apps/ui/legal/archive"), { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile())
       .map((entry) => join(entry.parentPath, entry.name).slice(resolve(root).length + 1))
       .sort();
     const listed: string[] = [];
-    let privacyCurrent = 0;
+    let current = 0;
     for (const kind of KINDS) {
       expect(Object.keys(archive[kind]!).sort(), kind).toEqual(CODES);
       expect(Object.keys(RELEASED[kind]).sort(), kind).toEqual(["en", "fr", "ro"]);
       for (const code of CODES) {
         const entries = Object.entries(archive[kind]![code]!);
-        // The released texts: the launch languages' pinned 1.0 and 1.1, the others' one text at 1.1. The Privacy Policy's 1.2
-        // is not released yet; the release step archived it from the final texts.
-        const released = entries.filter(([, entry]) => kind === "TERMS" || entry.version !== CURRENT.PRIVACY);
+        // The released texts: the launch languages' pinned ones, the others' 1.1 and the Privacy Policy's 1.2. The current
+        // versions are not released yet; the release step archived them from the final texts.
+        const released = entries.filter(([, entry]) => entry.version !== CURRENT[kind]);
         const pinned = RELEASED[kind][code];
         if (pinned !== undefined) {
           expect(Object.fromEntries(released), `${kind} ${code}`).toEqual(Object.fromEntries(Object.entries(pinned)
             .map(([version, hash]) => [hash, { version, path: `apps/ui/legal/archive/${code}/${hash}.md` }])));
         } else {
-          expect(released.map(([, entry]) => entry.version), `${kind} ${code}`).toEqual(["1.1"]);
+          expect(released.map(([, entry]) => entry.version).sort(), `${kind} ${code}`).toEqual(kind === "PRIVACY" ? ["1.1", "1.2"] : ["1.1"]);
         }
         for (const [hash, { version, path }] of entries) {
           expect(path, `${kind} ${code}`).toBe(`apps/ui/legal/archive/${code}/${hash}.md`);
@@ -216,12 +231,12 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.1 
         // Each document's current version is archived once per language, and that copy is the current text.
         const atCurrent = entries.filter(([, entry]) => entry.version === CURRENT[kind]).map(([hash]) => hash);
         expect(atCurrent, `${kind} ${code}: the current text is the archived one`).toEqual([sha(draft(kind, code))]);
-        if (kind === "PRIVACY") privacyCurrent += atCurrent.length;
+        current += atCurrent.length;
       }
     }
-    // The release step archives every language the release offers at once: the Privacy Policy's 1.2 in all 35.
-    expect(privacyCurrent, "the Privacy Policy's 1.2 copies").toBe(CODES.length);
-    expect(listed).toHaveLength(2 * (CODES.length + 3) + privacyCurrent);
+    // The release step archives every language the release offers at once: the Privacy Policy's 1.3 and the Terms' 1.2 in all 35.
+    expect(current, "the current copies: the Privacy Policy's 1.3 and the Terms' 1.2").toBe(2 * CODES.length);
+    expect(listed).toHaveLength(3 * CODES.length + 2 * 3 + current);
     expect(files).toEqual(listed.sort());
   });
 
@@ -234,9 +249,10 @@ describe("the Terms of Service and the Privacy Policy: 1.0 at launch, Terms 1.1 
     }
   });
 
-  it("lists the Terms' 1.1, in force, and 1.0, linked to its archived English text", () => {
+  it("lists the Terms' 1.2, in force, and 1.1 and 1.0, each linked to its archived English text", () => {
     expect(TERMS_VERSIONS).toEqual([
-      { version: "1.1", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+      { version: "1.2", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+      { version: "1.1", noteKey: "legal.archive.meta", current: false, href: `/terms/versions/${RELEASED.TERMS.en!["1.1"]}` },
       { version: "1.0", noteKey: "legal.archive.meta", current: false, href: `/terms/versions/${RELEASED.TERMS.en!["1.0"]}` }
     ]);
   });

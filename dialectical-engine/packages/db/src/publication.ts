@@ -682,6 +682,7 @@ export class PostgresPublicationRepository {
   async listPublicRefs(limit: number, offset: number): Promise<Readonly<{
     refs: readonly string[];
     total: number;
+    upvotes: Readonly<Record<string, number>>;
   }>> {
     return crossAccount("X10", async () => {
       const result = await this.pool.query<{ publication_ref: string | null; total: string }>(`
@@ -702,11 +703,16 @@ export class PostgresPublicationRepository {
         LEFT JOIN page ON true
         ORDER BY page.at_seq DESC NULLS LAST,page.publication_ref
       `, [limit, offset]);
-      return Object.freeze({
-        refs: Object.freeze(result.rows.flatMap((row) => row.publication_ref === null
-          ? [] : [row.publication_ref])),
-        total: Number(result.rows[0]?.total ?? 0)
-      });
+      const refs = Object.freeze(result.rows.flatMap((row) => row.publication_ref === null
+        ? [] : [row.publication_ref]));
+      const upvotes: Record<string, number> = {};
+      if (refs.length > 0) {
+        // The count is 0194's and the cross-account marker's alone, so it is read here on the system login and not by the request login.
+        const counted = await this.pool.query<{ value: readonly Readonly<{ publication_ref: string; upvotes: number }>[] | null }>(
+          "SELECT identity.read_public_debate_upvote_counts($1::uuid[]) AS value", [[...refs]]);
+        for (const entry of counted.rows[0]?.value ?? []) upvotes[entry.publication_ref] = entry.upvotes;
+      }
+      return Object.freeze({ refs, total: Number(result.rows[0]?.total ?? 0), upvotes: Object.freeze(upvotes) });
     });
   }
 }

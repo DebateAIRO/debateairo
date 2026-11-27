@@ -124,6 +124,10 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/public/ai-providers", auth: "public", resource: "deployment", action: "read-ai-providers" },
   { route: "POST /v1/public/debates/{id}/report", auth: "user", resource: "public-debate", action: "write-report" },
   { route: "POST /v1/public/debates/{id}/flag", auth: "user", resource: "public-debate", action: "flag" },
+  // Upvotes on public debates: the signed-in account's own vote, and its own votes among a page's debates.
+  { route: "PUT /v1/public/debates/{id}/vote", auth: "user", resource: "public-debate", action: "vote" },
+  { route: "DELETE /v1/public/debates/{id}/vote", auth: "user", resource: "public-debate", action: "withdraw-vote" },
+  { route: "GET /v1/account/public-debate-votes", auth: "user", resource: "public-debate", action: "read-own-votes" },
   { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
   // One stateless message door. The removed session and case doors have no policy.
   { route: "POST /v1/support/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
@@ -416,7 +420,8 @@ describe("S7 deny-by-default authorization", () => {
     // The threat reports' four staff routes were removed (2026-11-19): 208.
     // 0186 adds the four staff routes of the preview's approved buyers (GET, POST and POST …/find on /v1/admin/preview-buyers,
     // DELETE …/{ref}): 212. 0188 adds the five person routes of the Owner's permit for a locked-out account and the Owner's three: 220.
-    expect(contractInventory.routes).toHaveLength(220);
+    // Upvotes on public debates add three (PUT and DELETE /v1/public/debates/{id}/vote, GET /v1/account/public-debate-votes): 223.
+    expect(contractInventory.routes).toHaveLength(223);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

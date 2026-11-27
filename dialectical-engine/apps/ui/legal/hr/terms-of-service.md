@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v1.1 · NA SNAZI OD 24. STUDENOGA 2026.
+eyebrow: UVJETI KORIŠTENJA · v1.2 · NA SNAZI OD 27. STUDENOGA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v1.1
+endMarker: KRAJ UVJETA · v1.2
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 1.1 · Effective 24. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 1.2 · Effective 27. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Na besplatnom planu vaše su rasprave javne kada završe, nakon provjere umjetnom inteligencijom; na plaćenom planu privatne su osim ako ih objavite. Kada je rasprava javna, svatko je može pročitati i ona ostaje javna. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja, uglavnom pružatelju DeepInfra, u Sjedinjenim Američkim Državama. Uvjeti društava DeepInfra, Anthropic i Amazon ne dopuštaju im treniranje modela na njemu. Pružatelj usluge pretraživanja interneta prima samo kratke izraze za pretraživanje koje pišu modeli (odjeljak 8.). Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -164,6 +164,8 @@ Rasprave na plaćenom planu su **prema zadanim postavkama privatne**: ništa št
 
 **Izvješća koja može napisati svatko.** Svatko s kreditom može napisati izvješće o javnoj raspravi dok joj se više ništa ne dodaje, koristeći vlastitu kvotu. Izvješće je javno. Pseudonim pisca samo je referenca: izvješće izrađuju umjetne inteligencije iz onoga što prikazuje stranica, a ono nije izjava pisca. Ranija izvješća ostaju čitljiva.
 
+**Glasovi.** Kada ste prijavljeni, možete glasati za raspravu na popisu javnih rasprava, uključujući vlastitu, kako biste drugim čitateljima pokazali da vam se činila vrijednom čitanja. Svaki račun ima jedan glas za svaku raspravu, a ponovni pritisak na gumb povlači vaš glas dok je rasprava na popisu. Popis prikazuje koliko glasova ima svaka rasprava, a nikada tko ih je dao. Vaši se glasovi brišu kada zatvaranje vašeg računa stupi na snagu (odjeljak 6.), a glasovi rasprave brišu se kada njezina javna stranica trajno nestane (Pravila o privatnosti, odjeljak 7.). Ne upotrebljavajte više od jednog računa ni bilo kakva automatizirana sredstva kako biste promijenili broj glasova: odjeljak 6. dopušta vam jedan račun, a odjeljak 7. ne dopušta automatizirani pristup.
+
 **Nakon što autor ode.** Javna rasprava ostaje otvorena za doprinose i nakon što je njezin prvi autor izbrisao svoj račun. Novi doprinosi polaze od javne kopije. Stranica nije ničije vlasništvo: javnu raspravu gradi više osoba i umjetne inteligencije. Svaka osoba zadržava prava koja ima na vlastitim riječima i daje licenciju navedenu u nastavku. Nitko ne postaje suvlasnik rasprave. Nitko, uključujući prvog autora, ne može ishoditi uklanjanje tuđeg doprinosa ni spriječiti druge da joj doprinose, osim putem postupka prijave iz odjeljka 10.
 
 **Objavljeni sadržaj uvijek možemo ukloniti.** Objavljenu raspravu možemo ukloniti ili ograničiti pristup njoj kada to zahtijeva zakon, kada to naloži sud ili nadležno tijelo, ili kada krši ove Uvjete ili je nezakonita. Ništa u ovom odjeljku ne sprječava nas da postupimo po valjanoj obavijesti iz odjeljka 10. niti predstavlja obećanje da će objavljena rasprava ostati dostupna.
@@ -253,7 +255,7 @@ Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promj
 
 **Promjene ovih Uvjeta.** Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam poruku e-pošte najmanje **30 dana** prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions.
 
-Verzija 1.1 zamijenila je verziju 1.0: odjeljak 8. sada navodi da DeepInfra na vlastitim poslužiteljima izvodi svaki model koji se raspravi pruža njezinim posredstvom, a sažetak je izmijenjen u skladu s time.
+Verzija 1.2 zamijenila je verziju 1.1: odjeljak 9. sada navodi što je glas za javnu raspravu, da svaki račun ima jedan glas za svaku raspravu i može ga povući, da popis prikazuje koliko glasova ima rasprava, a nikada tko ih je dao, te da se broj glasova ne smije mijenjati s više od jednog računa ni automatiziranim sredstvima. Verzija 1.1 zamijenila je verziju 1.0: odjeljak 8. sada navodi da DeepInfra na vlastitim poslužiteljima izvodi svaki model koji se raspravi pruža njezinim posredstvom, a sažetak je izmijenjen u skladu s time.
 
 ## 15. Odgovornost
 

@@ -1182,7 +1182,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
     // One function of the API's billing role, its owner set by one reviewed DO block. Found by name: a Google sign-in
-    // connecting to its account by itself (0193) follows it.
+    // connecting to its account by itself (0193) and upvotes on public debates (0194) follow it.
     const at = names.indexOf("0192_registration_country_read.sql");
     expect(names.slice(at - 1, at + 1)).toEqual(["0191_preview_buyer_add_key_only.sql", "0192_registration_country_read.sql"]);
     const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
@@ -1233,9 +1233,11 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains a Google sign-in connecting to its account by itself 0193 after 0192 as an expand step that keeps 0130's verifier, and documents it", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
-    // The chain head: one function of the API's authorization role, its owner set by one reviewed DO block.
-    expect(names.slice(-2)).toEqual(["0192_registration_country_read.sql", "0193_google_return_connects_account.sql"]);
-    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    // One function of the API's authorization role, its owner set by one reviewed DO block. Found by name: upvotes on
+    // public debates (0194) follow it.
+    const at = names.indexOf("0193_google_return_connects_account.sql");
+    expect(names.slice(at - 1, at + 1)).toEqual(["0192_registration_country_read.sql", "0193_google_return_connects_account.sql"]);
+    const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
     expect(JSON.parse((await bytesOf("lineage/google-return-connects-account-forward0193.json")).toString("utf8"))).toEqual({
       version: "google-return-connects-account-forward0193-v1",
       baseRecipeSha256: plan.recipeSha256,
@@ -1292,6 +1294,85 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     ]) expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
       "the sign-up country read for prices (0192, below) the eighty-second, and a Google sign-in connecting to its account by itself (0193, below) the eighty-third");
+  });
+
+  it("chains upvotes on public debates 0194 after 0193 as an expand step that keeps 0130's verifier and gives the erasure login nothing, and documents it", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    // The chain head: one table and six functions, their owner set by one reviewed DO block.
+    expect(names.slice(-2)).toEqual(["0193_google_return_connects_account.sql", "0194_public_debate_upvotes.sql"]);
+    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    expect(JSON.parse((await bytesOf("lineage/public-debate-upvotes-forward0194.json")).toString("utf8"))).toEqual({
+      version: "public-debate-upvotes-forward0194-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: { name: "0193_google_return_connects_account.sql", manifestSha256: sha256(await bytesOf("lineage/google-return-connects-account-forward0193.json")), verifierSha256: previous.verifierSha256 },
+      migration: { name: "0194_public_debate_upvotes.sql", sha256: sha256(await bytesOf("0194_public_debate_upvotes.sql")) },
+      verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) },
+      amendsPostconditionsOf: []
+    });
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/public-debate-upvotes-forward0194.json")));
+    expect(step.previousName).toBe(previous.name);
+    expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+    expect(step.previousVerifierSha256).toBe(previous.verifierSha256);
+    expect(step.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
+    expect(step.replayVerifierSql).toBeUndefined();
+    expect(step.amendsPostconditionsOf ?? []).toEqual([]);
+    // One new table, its index, six new functions, their owner, their revokes and their six grants; nothing earlier
+    // replaced, nothing of billing. (The truncate guard is a SELECT, and each REVOKE's role list is on its second line.)
+    const statements = step.sql.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("--")).join("\n");
+    expect(statements.match(/^(?:CREATE|ALTER|REVOKE|GRANT|DROP|INSERT|UPDATE|DELETE|DO)\b.*$/gmu)).toEqual([
+      "CREATE TABLE IF NOT EXISTS identity.public_debate_upvote (",
+      "CREATE INDEX IF NOT EXISTS public_debate_upvote_owner ON identity.public_debate_upvote (owner_ref, created_at);",
+      "CREATE OR REPLACE FUNCTION identity.cast_public_debate_upvote(p_owner_ref uuid, p_publication_ref uuid) RETURNS jsonb",
+      "CREATE OR REPLACE FUNCTION identity.withdraw_public_debate_upvote(p_owner_ref uuid, p_publication_ref uuid) RETURNS jsonb",
+      "CREATE OR REPLACE FUNCTION identity.read_own_public_debate_upvotes(p_owner_ref uuid, p_publication_refs uuid[]) RETURNS uuid[]",
+      "CREATE OR REPLACE FUNCTION identity.read_public_debate_upvote_counts(p_publication_refs uuid[]) RETURNS jsonb",
+      "CREATE OR REPLACE FUNCTION identity.read_data_export_public_debate_upvotes(p_export_id uuid, p_worker uuid) RETURNS jsonb",
+      "CREATE OR REPLACE FUNCTION identity.delete_gone_public_debate_upvotes(p_limit integer) RETURNS integer",
+      "DO $public_debate_upvotes_owner$",
+      "REVOKE ALL ON identity.public_debate_upvote",
+      "REVOKE ALL ON FUNCTION identity.cast_public_debate_upvote(uuid,uuid)",
+      "REVOKE ALL ON FUNCTION identity.withdraw_public_debate_upvote(uuid,uuid)",
+      "REVOKE ALL ON FUNCTION identity.read_own_public_debate_upvotes(uuid,uuid[])",
+      "REVOKE ALL ON FUNCTION identity.read_public_debate_upvote_counts(uuid[])",
+      "REVOKE ALL ON FUNCTION identity.read_data_export_public_debate_upvotes(uuid,uuid)",
+      "REVOKE ALL ON FUNCTION identity.delete_gone_public_debate_upvotes(integer)",
+      "GRANT EXECUTE ON FUNCTION identity.cast_public_debate_upvote(uuid,uuid) TO debateai_billing_runtime;",
+      "GRANT EXECUTE ON FUNCTION identity.withdraw_public_debate_upvote(uuid,uuid) TO debateai_billing_runtime;",
+      "GRANT EXECUTE ON FUNCTION identity.read_own_public_debate_upvotes(uuid,uuid[]) TO debateai_billing_runtime;",
+      "GRANT EXECUTE ON FUNCTION identity.read_public_debate_upvote_counts(uuid[]) TO debateai_rls_all_accounts;",
+      "GRANT EXECUTE ON FUNCTION identity.delete_gone_public_debate_upvotes(integer) TO debateai_rls_all_accounts;",
+      "GRANT EXECUTE ON FUNCTION identity.read_data_export_public_debate_upvotes(uuid,uuid) TO debateai_data_export_worker;",
+      "DO $public_debate_upvotes_contract$"
+    ]);
+    expect(statements).not.toMatch(/\bbilling\./u);
+    // The erasure login gains nothing: the release before counts the functions it may run at its start.
+    expect(statements).not.toMatch(/\bTO\b[^;]*\bdebateai_erasure_runtime\b/u);
+    const earlier = (await readdir(MIGRATIONS)).filter((name) => /^\d{4}_.*\.sql$/u.test(name) && name < step.name);
+    for (const name of earlier) expect((await bytesOf(name)).toString("utf8"), name).not.toContain("public_debate_upvote");
+    const lines = step.sql.split("\n");
+    const reviewed = lines.findIndex((line) => line.startsWith("-- n1: reviewed "));
+    expect(lines.filter((line) => line.startsWith("-- n1: reviewed "))).toHaveLength(1);
+    expect(lines[reviewed + 1]).toBe("DO $public_debate_upvotes_owner$");
+    const loader = await readFile(new URL("migration-forward0194.ts", DB_SOURCE), "utf8");
+    const signatures = ["identity.cast_public_debate_upvote(uuid,uuid)", "identity.withdraw_public_debate_upvote(uuid,uuid)",
+      "identity.read_own_public_debate_upvotes(uuid,uuid[])", "identity.read_public_debate_upvote_counts(uuid[])",
+      "identity.read_data_export_public_debate_upvotes(uuid,uuid)", "identity.delete_gone_public_debate_upvotes(integer)"];
+    for (const signature of signatures) expect(loader).toContain(`"${signature}"`);
+    expect(loader).toContain('const TABLES: readonly string[] = ["identity.public_debate_upvote"];');
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## Upvotes on public debates (0194)"));
+    expect(section.startsWith("## Upvotes on public debates (0194)")).toBe(true);
+    for (const needle of ["0193", "0194_public_debate_upvotes.sql", "public-debate-upvotes-forward0194.json", "packages/db/src/migration-forward0194.ts",
+      "MIGRATION_FORWARD0194_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "-- n1: reviewed", "verify-effective-capabilities-130.sql", "replayVerifierSql",
+      "previous.manifestSha256", "migration.sha256", "renumber", "identity.public_debate_upvote", ...signatures, "ON DELETE CASCADE",
+      "REQUEST_OWNER_MISMATCH", "PUBLIC_DEBATE_UPVOTE_ACCOUNT_INVALID", "PUBLIC_DEBATE_UPVOTES_OWNER_UNABLE", "NOT_PUBLIC", "core.run_is_published",
+      "core.publication_is_current", "identity.public_review_held", "debateai_billing_runtime", "debateai_rls_all_accounts", "debateai_data_export_worker",
+      "debateai_erasure_runtime", "tests/architecture/public-debate-upvotes-0194-contract.test.ts", "tests/integration/public-debate-upvotes-0194.test.ts"
+    ]) expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "(0193, below) the eighty-third, and upvotes on public debates (0194, below) the eighty-fourth");
   });
 
   // The release before refuses, at its restart on a database ahead of it, an amendment recorded by a step it does not

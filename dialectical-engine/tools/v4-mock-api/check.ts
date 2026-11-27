@@ -27,6 +27,8 @@
  * in this process) and reads them filling in one by one, drawn by the website's own run map builder; asks with no paths and `#carryon`
  * (the AIs choose for 8 s, the carry-on on its answer from the first read); and presses a report that waits for the reset (#reportwaits).
  * It waits 30 s for them.
+ * Upvotes (public-votes.ts): it reads the list's counts and casts and withdraws a vote twice each on the author-gone page, hides it (the list
+ * leaves it out, a cast is not found, the vote is kept) and puts it back, and shows a stranger's three vote calls refused (SESSION_REQUIRED).
  */
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -820,6 +822,61 @@ await step("Report: not found, with a person, hidden (the page answers 410), and
   await client.readPublicDebate(PUBLIC.debate);
   return "three answers, 410 while hidden, the queue, and back";
 }, (value: string) => value);
+// Upvotes (public-votes.ts): the list's counts, the own-votes read, a cast and a withdrawal (each twice), and a hidden page, on the
+// author-gone page (no earlier step hides it), through the website's own client.
+await step("Upvotes: the list's counts, cast and withdraw twice each, a hidden page keeps its votes, an unknown page is not found", async () => {
+  const rowOf = (list: Loose, ref: string): Loose => list.items.find((row: Loose) => row.public_ref === ref);
+  const list: Loose = await client.readPublicDebates(50, 0);
+  must(list.items.every((row: Loose) => Number.isInteger(row.vote_count)), `counts: ${JSON.stringify(list.items.map((row: Loose) => row.vote_count))}`);
+  must(rowOf(list, PUBLIC.debate) !== undefined && rowOf(list, PUBLIC.authorGone) !== undefined, "both seeded pages are listed");
+  const before: number = rowOf(list, PUBLIC.authorGone).vote_count;
+  const total: number = list.total;
+  const none: Loose = await client.readOwnPublicVotes([PUBLIC.authorGone]);
+  must(none.voted.length === 0, `own before: ${JSON.stringify(none)}`);
+  for (const press of [1, 2]) {
+    const cast: Loose = await client.castPublicVote(PUBLIC.authorGone);
+    must(cast.voted === true && cast.vote_count === before + 1, `cast ${String(press)}: ${JSON.stringify(cast)}`);
+  }
+  const own: Loose = await client.readOwnPublicVotes([PUBLIC.authorGone]);
+  must(own.voted.join() === PUBLIC.authorGone, `own after: ${JSON.stringify(own)}`);
+  must(rowOf(await client.readPublicDebates(50, 0), PUBLIC.authorGone)?.vote_count === before + 1, "the list counts the vote");
+  await mock(`/__mock/review?ref=${PUBLIC.authorGone}&step=HIDE`);
+  try {
+    const hiddenList: Loose = await client.readPublicDebates(50, 0);
+    must(rowOf(hiddenList, PUBLIC.authorGone) === undefined && hiddenList.total === total - 1, `while hidden: total ${String(hiddenList.total)}`);
+    let refused = "";
+    try {
+      await client.castPublicVote(PUBLIC.authorGone);
+    } catch (failure) {
+      refused = String((failure as { code?: string }).code);
+    }
+    must(refused === "NOT_FOUND", `a cast while hidden: ${refused || "a body"}`);
+  } finally {
+    await mock(`/__mock/review?ref=${PUBLIC.authorGone}&step=REPUBLISH`);
+  }
+  must(rowOf(await client.readPublicDebates(50, 0), PUBLIC.authorGone)?.vote_count === before + 1, "the vote is kept while hidden");
+  for (const press of [1, 2]) {
+    const withdrawn: Loose = await client.withdrawPublicVote(PUBLIC.authorGone);
+    must(withdrawn.voted === false && withdrawn.vote_count === before, `withdrawal ${String(press)}: ${JSON.stringify(withdrawn)}`);
+  }
+  let unknown = "";
+  try {
+    await client.castPublicVote("f1000000-0000-4000-8000-00000000ffff");
+  } catch (failure) {
+    unknown = String((failure as { code?: string }).code);
+  }
+  must(unknown === "NOT_FOUND", `an unknown page: ${unknown || "a body"}`);
+  return `${String(before)} -> ${String(before + 1)} -> ${String(before)}, hidden kept, unknown NOT_FOUND`;
+}, (value: string) => value);
+// A stranger has no vote: the three vote routes are signed-in only, as in the real API.
+await fetch(`${MOCK}/__mock/set?session=OUT`);
+try {
+  await expectCode("the upvote of a stranger", () => client.castPublicVote(PUBLIC.authorGone), "SESSION_REQUIRED");
+  await expectCode("the upvote withdrawal of a stranger", () => client.withdrawPublicVote(PUBLIC.authorGone), "SESSION_REQUIRED");
+  await expectCode("the own-votes read of a stranger", () => client.readOwnPublicVotes([PUBLIC.authorGone]), "SESSION_REQUIRED");
+} finally {
+  await fetch(`${MOCK}/__mock/set?session=IN`);
+}
 
 // The sign-in helper's cookies must survive the proxy's cookie rules.
 await step("Add to researched: READING, then the outcome; the same page again changes nothing; Free refused", async () => {

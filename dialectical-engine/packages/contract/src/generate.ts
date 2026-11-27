@@ -13,7 +13,8 @@ import { contractInventory, staffContractInventory, fundedStaffContractInventory
   InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, SecurityReceiptSchema,
   StartListsRequestSchema, StartListsEventSchema, StartMergeRequestSchema, StartMergeEventSchema, StartCombineRequestSchema,
   StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema,
-  SavedQuestionCreateSchema, SavedQuestionSaveSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionWrittenSchema } from "./index.js";
+  SavedQuestionCreateSchema, SavedQuestionSaveSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionWrittenSchema,
+  PublicVoteRequestSchema, PublicVoteAnswerSchema, OwnPublicVotesSchema } from "./index.js";
 
 const endpointSchemas = {
   ...passwordResetContractSchemas,
@@ -33,7 +34,9 @@ const endpointSchemas = {
   StartListsRequestSchema, StartListsEventSchema, StartMergeRequestSchema, StartMergeEventSchema, StartCombineRequestSchema,
   StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema,
   // V4 start step, Task 39e: the five saved-question routes.
-  SavedQuestionCreateSchema, SavedQuestionSaveSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionWrittenSchema
+  SavedQuestionCreateSchema, SavedQuestionSaveSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionWrittenSchema,
+  // Upvotes on public debates: the three vote routes.
+  PublicVoteRequestSchema, PublicVoteAnswerSchema, OwnPublicVotesSchema
 };
 type EndpointSchemaName = keyof typeof endpointSchemas;
 const reference = (name: EndpointSchemaName) => ({ $ref: `#/components/schemas/${name}` });
@@ -45,6 +48,13 @@ const eventStream = (schema: unknown) => ({ responses: { "200": { description: "
 const staffEndpointContracts: Record<string, Record<string, unknown>> = {
   // Decision 33: a public debate hidden under review answers 410, with no text of it.
   "GET /v1/public/debates/{id}": { responses: { "200": { description: "The public debate" }, "404": { description: "No public debate here" }, "410": { description: "Hidden under review: error DEBATE_UNDER_REVIEW, no-store" } } },
+  // Upvotes on public debates: the signed-in account's own vote. A debate that is not public now, a hidden one and a guessed id all answer 404 DEBATE_NOT_FOUND.
+  "PUT /v1/public/debates/{id}/vote": { requestBody: { required: false, content: { "application/json": { schema: reference("PublicVoteRequestSchema") } } }, ...response(reference("PublicVoteAnswerSchema")),
+    parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }] },
+  "DELETE /v1/public/debates/{id}/vote": { ...response(reference("PublicVoteAnswerSchema")),
+    parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }] },
+  "GET /v1/account/public-debate-votes": { ...response(reference("OwnPublicVotesSchema")),
+    parameters: [{ name: "refs", in: "query", required: true, schema: { type: "string" }, description: "1 to 100 debate references, comma-separated" }] },
   "POST /v1/auth/social/login/status": {...request(reference("SocialLoginStatusRequestSchema")),...response(reference("SocialLoginStatusResponseSchema"))},
   "POST /v1/auth/recovery/prove": {...request(reference("ConsumerRecoveryProveRequestSchema")),...response(reference("ConsumerRecoveryProofResponseSchema"))},
   "POST /v1/auth/recovery/enrollment/options": {...request(reference("RecoveryEnrollmentBeginRequestSchema")),...response(reference("RecoveryEnrollmentOptionsResponseSchema"))},

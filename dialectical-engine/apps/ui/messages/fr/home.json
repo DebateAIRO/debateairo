@@ -156,5 +156,10 @@
   "home.removal.close": "Fermer",
   "home.flag.underReview": "MARQUÉ · EN COURS D’EXAMEN",
   "home.flag.approved": "APPROUVÉ",
-  "home.flag.refused": "NON APPROUVÉ"
+  "home.flag.refused": "NON APPROUVÉ",
+  "home.upvote.label.one": "Votez. {count} vote",
+  "home.upvote.label.many": "Votez. {count} votes",
+  "home.upvote.label.other": "Votez. {count} votes",
+  "home.upvote.signedOut": "Connectez-vous pour voter",
+  "home.upvote.failed": "Votre vote n’a pas pu être enregistré. Réessayez."
 }

@@ -158,5 +158,12 @@
   "home.removal.close": "Agħlaq",
   "home.flag.underReview": "IMMARKAT · TAĦT RIEŻAMI",
   "home.flag.approved": "APPROVAT",
-  "home.flag.refused": "MHUX APPROVAT"
+  "home.flag.refused": "MHUX APPROVAT",
+  "home.upvote.label.one": "Ivvota. {count} vot",
+  "home.upvote.label.two": "Ivvota. {count} voti",
+  "home.upvote.label.few": "Ivvota. {count} voti",
+  "home.upvote.label.many": "Ivvota. {count}-il vot",
+  "home.upvote.label.other": "Ivvota. {count} vot",
+  "home.upvote.signedOut": "Idħol fil-kont tiegħek biex tivvota",
+  "home.upvote.failed": "Ma setax jinħażen il-vot tiegħek. Erġa’ pprova."
 }

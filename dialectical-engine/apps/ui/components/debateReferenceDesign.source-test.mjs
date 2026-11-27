@@ -27,3 +27,15 @@ test("Turn 3 library shares one row anatomy and carries real public model metada
   assert.match(css, /\.libRowCore \{[^}]*background: var\(--core\);[^}]*border: 1px solid var\(--line\);[^}]*border-radius: 13px;[^}]*padding: 14px 18px;/);
   assert.match(css, /\.libRow:hover \{ transform: translateX\(4px\);/);
 });
+
+test("a public row's vote box wraps the unchanged row link and is never drawn in this file", () => {
+  // Upvotes (design 2026-11-26, section 4): a button may not sit inside an anchor, so the box is the client island
+  // LibraryVote, which wraps the server-rendered link. This file stays a server module: no directive, no hook, no button.
+  assert.doesNotMatch(library, /^\s*["']use client["']/m);
+  assert.doesNotMatch(library, /<button\b|\buse[A-Z][A-Za-z]*\(/);
+  assert.match(library, /<LibraryVote\b[\s\S]*?<\/LibraryVote>/);
+  // The row's question carries the id the box points at; it is set only for a row inside a box.
+  assert.match(library, /<div className="libRowClaim" id=\{claimId\}>\{claim\}<\/div>/);
+  // The wrapper slides box and card together on hover, so the link inside it must not slide a second time.
+  assert.match(css, /\.libVoteRow > \.libRow:hover \{ transform: none; \}/);
+});

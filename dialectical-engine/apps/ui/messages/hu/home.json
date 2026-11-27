@@ -155,5 +155,9 @@
   "home.removal.close": "Bezárás",
   "home.flag.underReview": "MEGJELÖLT · FELÜLVIZSGÁLAT ALATT",
   "home.flag.approved": "JÓVÁHAGYVA",
-  "home.flag.refused": "NEM JÓVÁHAGYVA"
+  "home.flag.refused": "NEM JÓVÁHAGYVA",
+  "home.upvote.label.one": "Szavazzon. {count} szavazat",
+  "home.upvote.label.other": "Szavazzon. {count} szavazat",
+  "home.upvote.signedOut": "Jelentkezzen be a szavazáshoz",
+  "home.upvote.failed": "A szavazatát nem sikerült menteni. Próbálja újra."
 }

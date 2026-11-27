@@ -155,5 +155,9 @@
   "home.removal.close": "Kapat",
   "home.flag.underReview": "İŞARETLENDİ · İNCELENİYOR",
   "home.flag.approved": "ONAYLANDI",
-  "home.flag.refused": "ONAYLANMADI"
+  "home.flag.refused": "ONAYLANMADI",
+  "home.upvote.label.one": "Oy verin. {count} oy",
+  "home.upvote.label.other": "Oy verin. {count} oy",
+  "home.upvote.signedOut": "Oy vermek için oturum açın",
+  "home.upvote.failed": "Oyunuz kaydedilemedi. Tekrar deneyin."
 }

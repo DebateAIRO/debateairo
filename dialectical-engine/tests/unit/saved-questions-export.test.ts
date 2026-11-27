@@ -180,16 +180,16 @@ describe("the questions not started yet in account.json", () => {
 });
 
 describe("the worker reads 0162's reader", () => {
-  it("as one more function in its role witness (twenty-five, after 0157's moderation reader), and beside the snapshot in readRaw", async () => {
+  it("as one more function in its role witness (the twenty-fifth, after 0157's moderation reader; twenty-six since 0194), and beside the snapshot in readRaw", async () => {
     const seen: unknown[][] = [];
     const principal = (name: string, workerCount: number) => ({ principal: name, authorization_member: name === "request",
       worker_member: name === "worker", request_count: name === "request" ? 4 : 0, worker_count: workerCount, privileged: false });
     const pool = (name: string, workerCount: number) => ({ query: async (_sql: string, params: unknown[]) => {
       seen.push(params); return { rows: [principal(name, workerCount)] }; } });
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 25) as never)).resolves.toBeUndefined();
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 26) as never)).resolves.toBeUndefined();
     expect(seen[1]?.[1]).toContain("identity.read_data_export_saved_questions(uuid,uuid)");
-    expect((seen[1]?.[1] as string[]).length).toBe(25);
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 24) as never))
+    expect((seen[1]?.[1] as string[]).length).toBe(26);
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 25) as never))
       .rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
 
     const sql: string[] = [];

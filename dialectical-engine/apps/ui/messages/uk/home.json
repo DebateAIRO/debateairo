@@ -157,5 +157,11 @@
   "home.removal.close": "Закрити",
   "home.flag.underReview": "ПОЗНАЧЕНО · НА РОЗГЛЯДІ",
   "home.flag.approved": "СХВАЛЕНО",
-  "home.flag.refused": "НЕ СХВАЛЕНО"
+  "home.flag.refused": "НЕ СХВАЛЕНО",
+  "home.upvote.label.one": "Проголосуйте. {count} голос",
+  "home.upvote.label.few": "Проголосуйте. {count} голоси",
+  "home.upvote.label.many": "Проголосуйте. {count} голосів",
+  "home.upvote.label.other": "Проголосуйте. {count} голосу",
+  "home.upvote.signedOut": "Увійдіть, щоб проголосувати",
+  "home.upvote.failed": "Не вдалося зберегти ваш голос. Спробуйте ще раз."
 }

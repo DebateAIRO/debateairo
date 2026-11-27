@@ -158,5 +158,12 @@
   "home.removal.close": "Dún",
   "home.flag.underReview": "MARCÁILTE · FAOI ATHBHREITHNIÚ",
   "home.flag.approved": "FORMHEASTA",
-  "home.flag.refused": "GAN FORMHEAS"
+  "home.flag.refused": "GAN FORMHEAS",
+  "home.upvote.label.one": "Vótáil. {count} vóta",
+  "home.upvote.label.two": "Vótáil. {count} vóta",
+  "home.upvote.label.few": "Vótáil. {count} vóta",
+  "home.upvote.label.many": "Vótáil. {count} vóta",
+  "home.upvote.label.other": "Vótáil. {count} vóta",
+  "home.upvote.signedOut": "Sínigh isteach chun vótáil",
+  "home.upvote.failed": "Níorbh fhéidir do vóta a shábháil. Bain triail eile as."
 }

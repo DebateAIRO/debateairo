@@ -153,3 +153,9 @@ tests/integration/unfinished-signup-expiry-database.test.ts
 tests/integration/free-debate-refused-by-check-0189.test.ts
 # The sign-up country, read for prices (0192): only the request's own account learns its country, never the US state, and no other account, request or login learns it.
 tests/integration/registration-country-0192.test.ts
+# Upvotes on public debates (0194): one vote per account and debate, counts for public debates only and the same for every caller, a vote goes with its account and with a debate gone for good, and no login reads the table.
+tests/integration/public-debate-upvotes-0194.test.ts
+# The upvote repositories (0194): the vote, its withdrawal and the own-votes read on the request login inside a request; the public list's counts and the sweep of debates gone for good on the system login.
+tests/integration/public-debate-upvotes-repository.test.ts
+# An upvote end to end (0194): the API's own routes on the product's logins: cast, counted for every reader, taken back, kept under a hold, swept when its debate is gone, and braked per account.
+tests/integration/public-vote-flow.test.ts

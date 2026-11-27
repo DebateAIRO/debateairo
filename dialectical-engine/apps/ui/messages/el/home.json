@@ -155,5 +155,9 @@
   "home.removal.close": "Κλείσιμο",
   "home.flag.underReview": "ΕΠΙΣΗΜΑΣΜΕΝΗ · ΥΠΟ ΕΞΕΤΑΣΗ",
   "home.flag.approved": "ΕΓΚΕΚΡΙΜΕΝΗ",
-  "home.flag.refused": "ΜΗ ΕΓΚΕΚΡΙΜΕΝΗ"
+  "home.flag.refused": "ΜΗ ΕΓΚΕΚΡΙΜΕΝΗ",
+  "home.upvote.label.one": "Ψηφίστε. {count} ψήφος",
+  "home.upvote.label.other": "Ψηφίστε. {count} ψήφοι",
+  "home.upvote.signedOut": "Συνδεθείτε για να ψηφίσετε",
+  "home.upvote.failed": "Δεν ήταν δυνατή η αποθήκευση της ψήφου σας. Δοκιμάστε ξανά."
 }

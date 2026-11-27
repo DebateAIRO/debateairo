@@ -98,7 +98,9 @@ export type ExportSnapshot = Readonly<{
     /** 0157: the statements of reasons, and 0156's earlier notices. */
     moderation_notices: Row[]; earlier_moderation_notices: Row[];
     /** V4 start step, Task 39e: the questions not started yet, each opened with its own key (saved questions spec 2026-11-04 §3.9). */
-    questions_not_started: Row[] }>;
+    questions_not_started: Row[];
+    /** 0194: the public debates the person upvoted, each by its public reference, with when. */
+    debates_you_upvoted: Row[] }>;
   security: Readonly<{ mfa_factors: Row[]; passkeys: Row[]; recovery_codes: Row | null; sessions: Row[]; social_identities: Row[]; email_changes: Row[]; recovery_email_changes: Row[]; recovery_requests: Row[] }>;
   consents: Readonly<{ legal_acceptances: Row[]; sensitive_data_consents: Row[] }>;
   debates: Readonly<{ debates: DebateEntry[]; web_sources: WebSourceEntry[] }>;

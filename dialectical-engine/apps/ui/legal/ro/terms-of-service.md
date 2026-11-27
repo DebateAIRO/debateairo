@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: TERMENII SERVICIULUI · v1.1 · ÎN VIGOARE DE LA 24 NOIEMBRIE 2026
+eyebrow: TERMENII SERVICIULUI · v1.2 · ÎN VIGOARE DE LA 27 NOIEMBRIE 2026
 title: Ce acceptați
 lede: Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.
-endMarker: SFÂRȘITUL TERMENILOR · v1.1
+endMarker: SFÂRȘITUL TERMENILOR · v1.2
 bodyLabel: Textul Termenilor serviciului
 annexTitle: Anexa A — Termeni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGEA APLICABILĂ
 -->
 
-**Version 1.1 · Effective 24 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
+**Version 1.2 · Effective 27 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
 
 **In short.** Trebuie să aveți cel puțin 18 ani. Dialectical Engine construiește argumente cu modele de inteligență artificială, iar tot ceea ce generează poate fi greșit — nu constituie consultanță. Pe planul gratuit, dezbaterile dumneavoastră sunt publice după ce se încheie, în urma unei verificări cu IA; pe un plan cu plată, sunt private dacă nu le publicați. Odată publică, o dezbatere poate fi citită de oricine și rămâne publică. Textul pe care îl transmiteți este trimis furnizorilor de IA enumerați în Registrul furnizorilor de IA, în principal DeepInfra, în Statele Unite. Condițiile DeepInfra, Anthropic și Amazon nu le permit să antreneze modele pe baza lui. Furnizorul de căutare pe web primește numai expresiile scurte de căutare pe care le scriu modelele (secțiunea 8). Raportați conținutul ilegal la support@dezbatere.ro, indiferent dacă aveți sau nu un cont. Se aplică legea română, însă protecția locală a consumatorilor de care beneficiați se menține.
 
@@ -164,6 +164,8 @@ Dezbaterile de pe un plan cu plată sunt **private în mod implicit**: nimic din
 
 **Rapoarte de către oricine.** Oricine are credit poate scrie un raport despre o dezbatere publică, atât timp cât nu se mai adaugă nimic la ea, folosind propria cotă. Raportul este public. Pseudonimul celui care a scris raportul este doar o referință: un raport este scris de sistemele de IA pornind de la ce arată pagina și nu reprezintă declarația acelei persoane. Rapoartele anterioare rămân lizibile.
 
+**Voturi.** Când sunteți autentificat, puteți vota o dezbatere din lista dezbaterilor publice, inclusiv una de-a dumneavoastră, pentru a arăta celorlalți cititori că ați găsit-o demnă de citit. Fiecare cont are un vot pentru fiecare dezbatere, iar o nouă apăsare a butonului vă retrage votul cât timp dezbaterea se află în listă. Lista arată câte voturi are fiecare dezbatere și niciodată cine le-a dat. Voturile dumneavoastră sunt șterse când închiderea contului produce efecte (secțiunea 6), iar voturile unei dezbateri sunt șterse când pagina ei publică a dispărut definitiv (Politica de confidențialitate, secțiunea 7). Nu folosiți mai mult de un cont și niciun mijloc automatizat pentru a modifica un număr de voturi: secțiunea 6 vă permite un singur cont, iar secțiunea 7 nu permite accesul automatizat.
+
 **După plecarea autorului.** O dezbatere publică rămâne deschisă contribuțiilor după ce primul ei autor și-a șters contul. Contribuțiile noi lucrează pornind de la copia publică. Nimeni nu deține pagina: o dezbatere publică este construită de mai multe persoane și de sistemele de IA. Fiecare persoană își păstrează drepturile pe care le are, dacă le are, asupra propriilor cuvinte și acordă licența de mai jos. Nimeni nu devine coproprietar al dezbaterii. Nimeni, inclusiv primul autor, nu poate obține eliminarea contribuției altei persoane și nu îi poate împiedica pe alții să adauge la dezbatere, decât prin procedura de raportare din secțiunea 10.
 
 **Putem elimina oricând conținutul publicat.** Putem elimina sau restricționa accesul la o dezbatere publicată atunci când legea o impune, când o instanță sau o autoritate competentă dispune acest lucru ori când dezbaterea încalcă acești Termeni sau este ilegală. Nicio dispoziție din această secțiune nu ne împiedică să acționăm în temeiul unei notificări valabile conform secțiunii 10 și nicio dispoziție din aceasta nu reprezintă o promisiune că o dezbatere publicată va rămâne disponibilă.
@@ -253,7 +255,7 @@ Vă informăm în avans, pe un suport durabil, ce se modifică și când. Dacă 
 
 **Cu privire la acești Termeni.** Putem modifica acești Termeni pentru aceleași tipuri de motive. Pentru modificările care nu vă reduc drepturile, publicăm noua versiune însoțită de un rezumat al modificărilor și vă trimitem un e-mail cu cel puțin **30 de zile** înainte ca aceasta să producă efecte; continuarea utilizării Dialectical Engine după data respectivă înseamnă că o acceptați și vă puteți închide contul înainte de acea dată. Pentru modificările care vă reduc drepturile — inclusiv majorarea prețurilor unui plan existent, reducerea limitelor, eliminarea unor funcții, noi utilizări ale conținutului dumneavoastră sau modificări privind răspunderea, legea aplicabilă ori soluționarea litigiilor — vă solicităm să acceptați în mod expres noua versiune la următoarea autentificare, iar modificarea se aplică numai pentru viitor. Nu aplicăm niciodată retroactiv o modificare și nu folosim niciodată această secțiune pentru a modifica, pe parcursul termenului, esența serviciului pentru care ați plătit fără să vă oferim o posibilitate de încetare. Versiunile anterioare rămân disponibile la dezbatere.ro/terms/versions.
 
-Versiunea 1.1 a înlocuit versiunea 1.0: secțiunea 8 arată acum că DeepInfra rulează pe propriile servere fiecare model pus la dispoziția unei dezbateri prin intermediul său, iar rezumatul a fost modificat în mod corespunzător.
+Versiunea 1.2 a înlocuit versiunea 1.1: secțiunea 9 arată acum ce este un vot pentru o dezbatere publică, că fiecare cont are un vot pentru fiecare dezbatere și îl poate retrage, că lista arată câte voturi are o dezbatere și niciodată cine le-a dat și că numărul de voturi nu trebuie modificat cu mai multe conturi sau prin mijloace automatizate. Versiunea 1.1 a înlocuit versiunea 1.0: secțiunea 8 arată acum că DeepInfra rulează pe propriile servere fiecare model pus la dispoziția unei dezbateri prin intermediul său, iar rezumatul a fost modificat în mod corespunzător.
 
 ## 15. Răspunderea
 

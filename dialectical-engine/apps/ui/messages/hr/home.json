@@ -156,5 +156,10 @@
   "home.removal.close": "Zatvorite",
   "home.flag.underReview": "OZNAČENO · U PREGLEDU",
   "home.flag.approved": "ODOBRENO",
-  "home.flag.refused": "NIJE ODOBRENO"
+  "home.flag.refused": "NIJE ODOBRENO",
+  "home.upvote.label.one": "Glasajte. {count} glas",
+  "home.upvote.label.few": "Glasajte. {count} glasa",
+  "home.upvote.label.other": "Glasajte. {count} glasova",
+  "home.upvote.signedOut": "Prijavite se kako biste glasali",
+  "home.upvote.failed": "Vaš glas nije bilo moguće spremiti. Pokušajte ponovno."
 }

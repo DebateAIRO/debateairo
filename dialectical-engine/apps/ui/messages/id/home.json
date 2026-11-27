@@ -154,5 +154,8 @@
   "home.removal.close": "Tutup",
   "home.flag.underReview": "DITANDAI · DALAM PENINJAUAN",
   "home.flag.approved": "DISETUJUI",
-  "home.flag.refused": "TIDAK DISETUJUI"
+  "home.flag.refused": "TIDAK DISETUJUI",
+  "home.upvote.label.other": "Beri suara. {count} suara",
+  "home.upvote.signedOut": "Masuk untuk memberi suara",
+  "home.upvote.failed": "Suara Anda tidak dapat disimpan. Coba lagi."
 }

@@ -155,5 +155,9 @@
   "home.removal.close": "Sluiten",
   "home.flag.underReview": "GEMARKEERD · IN BEOORDELING",
   "home.flag.approved": "GOEDGEKEURD",
-  "home.flag.refused": "NIET GOEDGEKEURD"
+  "home.flag.refused": "NIET GOEDGEKEURD",
+  "home.upvote.label.one": "Stem. {count} stem",
+  "home.upvote.label.other": "Stem. {count} stemmen",
+  "home.upvote.signedOut": "Meld u aan om te stemmen",
+  "home.upvote.failed": "Uw stem kon niet worden opgeslagen. Probeer het opnieuw."
 }

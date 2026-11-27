@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v1.1 · EFFECTIVE 24 NOVEMBER 2026
+eyebrow: TERMS OF SERVICE · v1.2 · EFFECTIVE 27 NOVEMBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v1.1
+endMarker: END OF TERMS · v1.2
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 1.1 · Effective 24 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 1.2 · Effective 27 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. On the Free plan your debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Once public, anyone can read a debate, and it stays public. Text you submit is sent to the AI providers listed in our Provider Register, mainly DeepInfra, in the United States. The terms of DeepInfra, Anthropic and Amazon do not allow them to train models on it. The web search provider receives only the short search phrases the models write (section 8). Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -164,6 +164,8 @@ Debates on a paid plan are **private by default**: nothing you create there is v
 
 **Reports by anyone.** Anyone with credit can write a report on a public debate while nothing is still being added to it, using their own quota. The report is public. The writer's pseudonym is only a reference: a report is written by the AIs from what the page shows, and it is not the writer's statement. Earlier reports stay readable.
 
+**Upvotes.** When you are signed in, you can upvote a debate on the list of public debates, your own included, to show other readers that you found it worth reading. Each account has one upvote for each debate, and pressing the button again takes yours back while the debate is on the list. The list shows how many upvotes each debate has and never who gave them. Your upvotes are deleted when the closure of your account takes effect (section 6), and a debate's upvotes are deleted when its public page is gone for good (Privacy Policy, section 7). Do not use more than one account, or any automated means, to change a count: section 6 allows you one account, and section 7 does not allow automated access.
+
 **After the author leaves.** A public debate stays open to contributions after its first author has erased their account. New contributions work from the public copy. Nobody owns the page: a public debate is built by several people and by the AIs. Each person keeps whatever rights they have in their own words and gives the licence below. Nobody becomes a co-owner of the debate. Nobody, the first author included, can have another person's contribution removed or stop others adding to it, except through the reporting route in section 10.
 
 **We can always take published content down.** We may remove or restrict access to a published debate where the law requires it, where a court or competent authority orders it, or where it breaches these Terms or is illegal. Nothing in this section prevents us from acting on a valid notice under section 10, and nothing in it is a promise that a published debate will remain available.
@@ -253,7 +255,7 @@ We tell you in advance, on a durable medium, what is changing and when. If the c
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
 
-Version 1.1 replaced version 1.0: section 8 now says that DeepInfra runs on its own servers every model a debate is given through it, and the summary was changed to match.
+Version 1.2 replaced version 1.1: section 9 now says what an upvote on a public debate is, that each account has one for each debate and can take it back, that the list shows how many upvotes a debate has and never who gave them, and that a count must not be changed with more than one account or by automated means. Version 1.1 replaced version 1.0: section 8 now says that DeepInfra runs on its own servers every model a debate is given through it, and the summary was changed to match.
 
 ## 15. Liability
 

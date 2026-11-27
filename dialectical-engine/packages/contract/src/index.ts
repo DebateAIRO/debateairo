@@ -50,7 +50,8 @@ import { PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicReportRequ
   ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, RoomReserveSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema,
   WEB_CONTRACT_LIMITS, AnswerDigSchema, AnswerPathRewritesSchema, DigTooDeepSchema, DigPicksOnePathSchema, DigFreePicksMaxSchema, MonthPauseSchema, PathRewriteSchema,
   PathRewritesSchema, PointOfViewVerdictSchema, RoomNewStartsSchema, RunContinueRefusedSchema, RunContinueRequestSchema,
-  RunContinuedSchema, RunNotContinuedSchema, UsageBorrowSchema, UsageBorrowsSchema } from "./web.js";
+  RunContinuedSchema, RunNotContinuedSchema, UsageBorrowSchema, UsageBorrowsSchema,
+  OwnPublicVotesSchema, PublicVoteAnswerSchema, PublicVoteRequestSchema } from "./web.js";
 export * from "./web.js";
 import { InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
   InvestigationReportWritingSchema, PublicReportVersionSchema } from "./investigation-report.js";
@@ -1461,7 +1462,10 @@ export const PublicDebateSummarySchema = z.object({
   // floor label (`PublicDebate.floor.verdict_state`), so the public library row
   // shows the label the page shows instead of "verdict unavailable". Absent
   // for every other snapshot; the floor's position and cause never ride here.
-  floor_verdict: VerdictStateSchema.optional()
+  floor_verdict: VerdictStateSchema.optional(),
+  // Upvotes (spec 2026-11-26): how many accounts upvote this debate now. A number only, never who.
+  // Optional: an API from before the upvotes sends none (additive only), and the row then shows no vote box.
+  vote_count: z.number().int().nonnegative().optional()
 }).strict();
 export type PublicDebateSummary = z.infer<typeof PublicDebateSummarySchema>;
 
@@ -2160,6 +2164,10 @@ export const contractInventory = Object.freeze({
     // Decision 13: a report on a public debate.
     "POST /v1/public/debates/{id}/report",
     "POST /v1/public/debates/{id}/flag",
+    // Upvotes on public debates: cast, take back, and the signed-in person's own votes among a page's debates.
+    "PUT /v1/public/debates/{id}/vote",
+    "DELETE /v1/public/debates/{id}/vote",
+    "GET /v1/account/public-debate-votes",
     "GET /v1/geo/availability",
     "POST /v1/support/messages",
     "GET /v1/support/status",
@@ -2278,6 +2286,8 @@ export const contractInventory = Object.freeze({
     // The owner's changes of 31 Oct (./web.ts): the shapes the Tree and Public lanes fill; no route yet.
     PurposeLinesSchema, MainAnswerVersionSchema, AnswerMainAnswerSchema, PublicDigParentSchema, AnswerContributionSchema,
     PublicContributionSchema, PublicMainAnswerSchema, PublicReportVersionSchema, PublicReportRequestSchema, PublicReportAcceptedSchema, PublicDebateRefusedSchema,
+    // Upvotes on public debates (./web.ts): the press's request and answer, and the own-votes read.
+    PublicVoteRequestSchema, PublicVoteAnswerSchema, OwnPublicVotesSchema,
     // Decision 29: dynamic step 2.
     AskClarifyRequestSchema, AskClarifyResponseSchema,
     // V4 start step, Task 30: the four calls before Start, their requests and what each answers (an event of a stream, or JSON).

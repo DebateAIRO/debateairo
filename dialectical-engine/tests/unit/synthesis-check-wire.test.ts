@@ -30,10 +30,10 @@ describe("the synthesis check's closed public wire", () => {
     expect(SynthesisFlagSchema.safeParse({ verdict: "FLAGGED", extra: true }).success).toBe(false);
   });
 
-  it("PublicDebateSummarySchema's key set is exactly the 27e21e5e1 set", () => {
+  it("PublicDebateSummarySchema's key set is exactly the 27e21e5e1 set and the upvote count", () => {
     expect(Object.keys(PublicDebateSummarySchema.shape)).toEqual([
       "public_ref", "author_pseudonym", "question", "published_at", "models",
-      "verdict", "confidence_band", "floor_verdict"
+      "verdict", "confidence_band", "floor_verdict", "vote_count"
     ]);
   });
 

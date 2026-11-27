@@ -154,5 +154,8 @@
   "home.removal.close": "닫기",
   "home.flag.underReview": "플래그 표시됨 · 검토 중",
   "home.flag.approved": "승인됨",
-  "home.flag.refused": "승인되지 않음"
+  "home.flag.refused": "승인되지 않음",
+  "home.upvote.label.other": "투표하세요. {count}표",
+  "home.upvote.signedOut": "투표하려면 로그인하세요",
+  "home.upvote.failed": "투표를 저장하지 못했습니다. 다시 시도하세요."
 }
