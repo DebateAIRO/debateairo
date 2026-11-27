@@ -103,14 +103,31 @@ The owner's answer: the basis as drafted (contract, Art. 6(1)(b)), approved with
 
 ## Open: telling account holders before the feature is switched on
 
-- **What the texts say.** Privacy Policy section 14: "For a change that adds a new purpose or a new recipient we tell
-  you before the new processing starts, by email and in the product, and give you time to object." Terms section 14:
-  "we post the new version with a summary of what changed and email you at least **30 days** before it takes effect".
-- **This change.** Section 4 gains a purpose, and the Terms gain a rule on counts. No such notice exists in the code.
+- **What the texts say.** Three promises, each in force today and unchanged by this slice:
+  - Privacy Policy section 14: "For a change that adds a new purpose or a new recipient we tell you before the new
+    processing starts, by email and in the product, and give you time to object."
+  - Terms section 14, "To these Terms": "we post the new version with a summary of what changed and email you at least
+    **30 days** before it takes effect".
+  - Terms section 14, "To the service", for a change beyond keeping the service working as described, such as adding a
+    feature: "We tell you in advance, on a durable medium, what is changing and when."
+- **This change.** Privacy Policy section 4 gains a purpose, the Terms gain a rule on counts, and the service gains a
+  feature. No code sends any of the three notices: nothing emails account holders and nothing tells them in the
+  product before the feature is switched on.
 - **Before.** For Terms 1.1 the owner chose the upload day without the email because every account on the site was his
   own (`docs/legal/2026-11-24-partner-model-out.md:98-99`).
+- **The choice.** Whether the feature and both new versions take effect on the upload day without these notices is the
+  owner's choice. It is recorded in the line below before the upload that carries them (the release guide's "The legal
+  texts' day", `deploy/preview-release/v1/README.md:5351`, sets the day before SB1). The two possible answers, and what
+  the upload then does with today's tools:
+  - "The upload day stands, without the notices", with the reason (for example, that every account on the site is the
+    owner's own). The upload runs `legal:redate` with the upload day, as the release guide says.
+  - "The notices go out first". The operator emails every account holder, and tells them in the product, what is
+    changing and when, at least 30 days before the day; the upload runs `legal:redate` with that day, and the feature
+    is not uploaded before it.
+- **Not reviewed by counsel.** This reading of section 14 of both documents has not been reviewed by counsel.
 
-The owner's answer:
+The owner's answer: not given yet (27 November 2026). It must be written here, covering all three promises, before the
+upload that carries Privacy Policy 1.3 and Terms 1.2.
 
 ## Open: upvotes on debates about politics, religion or health
 
