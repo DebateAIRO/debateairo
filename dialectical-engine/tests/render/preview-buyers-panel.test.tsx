@@ -12,9 +12,10 @@ import { CSRF_COOKIE, holdReadableCookies, STAFF_CSRF_COOKIE } from "../support/
 beforeEach(() => holdReadableCookies(CSRF_COOKIE, STAFF_CSRF_COOKIE).drop);
 
 /**
- * The Owner's box on the Team page for who may buy while payments are in test mode (migration 0186). Everything runs
- * through the real client over a fake server, so each case reads the bodies that would reach the API: the look-up that
- * shows the account's shortened address before any key, the key ceremony's intent, and the change. Addresses are made up.
+ * The Owner's box on the Team page for who may buy while the whole site is open with buying kept to listed accounts
+ * (migration 0186), with test payments or with real money. Everything runs through the real client over a fake server,
+ * so each case reads the bodies that would reach the API: the look-up that shows the account's shortened address before
+ * any key, the key ceremony's intent, and the change. Addresses are made up.
  */
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 
@@ -28,9 +29,9 @@ const handle = "a".repeat(43);
 const proofHandle = "b".repeat(43);
 const credential = { id: "aA", rawId: "aA", type: "public-key" as const, response: { clientDataJSON: "aA", authenticatorData: "aA", signature: "aA", userHandle: null }, clientExtensionResults: {} };
 
-type Page = Readonly<{ applies: boolean; team_count: number; cap: number; revision: number; buyers: ReadonlyArray<Readonly<{ ref: string; masked_address: string | null; since: string }>> }>;
+type Page = Readonly<{ applies: boolean; environment: "sandbox" | "live"; team_count: number; cap: number; revision: number; buyers: ReadonlyArray<Readonly<{ ref: string; masked_address: string | null; since: string }>> }>;
 const basePage: Page = {
-  applies: true, team_count: 2, cap: 20, revision: 4,
+  applies: true, environment: "sandbox", team_count: 2, cap: 20, revision: 4,
   buyers: [{ ref: ANA, masked_address: "a•••@example.com", since: "2026-11-24T09:00:00.000Z" }, { ref: BOB, masked_address: null, since: "2026-11-20T09:00:00.000Z" }]
 };
 const withNew: Page = { ...basePage, revision: 5, buyers: [...basePage.buyers, { ref: NEW_REF, masked_address: MASKED, since: "2026-11-25T09:00:00.000Z" }] };
@@ -151,7 +152,7 @@ describe("the list", () => {
   });
   it("while the list counts for nothing, says so, offers no addition, and still offers Remove", async () => {
     await mount(server({ ...basePage, applies: false }));
-    expect(text()).toContain("This list counts only while the whole site is open with test payments. It counts for nothing right now.");
+    expect(text()).toContain("This list counts only while the whole site is open with buying kept to invited accounts. It counts for nothing right now.");
     expect(host.querySelector("form[data-preview-buyers-form]")).toBeNull();
     expect(button("Remove", row(ANA))).toBeDefined();
   });
@@ -212,7 +213,7 @@ describe("allowing an account to buy", () => {
     [409, "PREVIEW_BUYER_ON_TEAM", "That account is on the team: it can buy already."],
     [409, "PREVIEW_BUYER_ALREADY", "That account can buy already."],
     [409, "PREVIEW_BUYERS_FULL", "The list is full (20 accounts, the team included). Remove one first."],
-    [409, "PREVIEW_BUYERS_NOT_OPEN", "Adding works only while the whole site is open with test payments. Nothing changed."],
+    [409, "PREVIEW_BUYERS_NOT_OPEN", "Adding works only while the whole site is open with buying kept to invited accounts. Nothing changed."],
     [422, "STAFF_INPUT_INVALID", "That is not an email address. Check it and try again."]
   ])("the look-up's %i %s is said plainly, before any key, and the field is cleared", async (status_, error, sentence) => {
     const api = server(basePage, { refuse: { path: "/v1/admin/preview-buyers/find", status: status_, error } });
@@ -277,6 +278,40 @@ describe("allowing an account to buy", () => {
     await mount(api);
     await allow(ADDRESS);
     await confirm();
+    expect(host.innerHTML).toBe("");
+  });
+});
+
+describe("with real payments", () => {
+  const live: Page = { ...basePage, environment: "live" };
+  it("the title and the hint say real money, and nothing speaks of test plans", async () => {
+    await mount(server(live));
+    expect(host.querySelector("h2")?.textContent).toBe("Who may buy plans with real money");
+    expect(text()).toContain("While the whole site is open, the team and the accounts below can buy a plan with real money.");
+    expect(text()).not.toContain("test mode");
+    expect(host.querySelector("[data-preview-buyers-count]")?.textContent).toBe("4 of 20 accounts can buy, the team included.");
+  });
+  it("the confirmation says real money and that a plan renews, with no rule to withdraw it, then proves and sends the change", async () => {
+    const api = server(live, { after: { ...withNew, environment: "live" } });
+    await mount(api);
+    await allow(ADDRESS);
+    const confirmBox = host.querySelector("[data-preview-buyers-confirm=add]")!;
+    expect(confirmBox.textContent).toContain(`Allow ${MASKED} to buy plans with real money? A plan it buys renews each month on its card until it is cancelled.`);
+    expect(confirmBox.textContent).not.toMatch(/test plan|14 days/u);
+    await confirm();
+    expect(api.proofs()).toEqual([{ action: "PREVIEW_BUYER_ADD", address: ADDRESS, expected_revision: 4, operation_id: expect.any(String) }]);
+    expect(status()).toBe("Done: this account can buy now.");
+    expect(row(NEW_REF).textContent).toContain(MASKED);
+  });
+  it("while the list counts for nothing, the box says so in the same words as with test payments", async () => {
+    await mount(server({ ...live, applies: false }));
+    expect(host.querySelector("h2")?.textContent).toBe("Who may buy plans with real money");
+    expect(host.querySelector("[data-preview-buyers-not-now]")?.textContent).toBe(S["staff.previewBuyers.notNow"]);
+    expect(host.querySelector("form[data-preview-buyers-form]")).toBeNull();
+  });
+  it("an answer that names no payment system is not the page's shape, and renders nothing", async () => {
+    const { environment: _environment, ...without } = basePage;
+    await mount(server(without as unknown as Page));
     expect(host.innerHTML).toBe("");
   });
 });

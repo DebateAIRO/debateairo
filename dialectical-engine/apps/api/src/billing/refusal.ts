@@ -81,9 +81,10 @@ export type BillingRefusalCode =
    */
   | "ACCOUNT_ERASURE_PENDING"
   /**
-   * On the hosted preview, the buyer rule refused a checkout or an upgrade: while payments are real the account may not
-   * ask questions there, so it would pay and then be refused every question; on the sandbox the account is not on the
-   * team list. Nothing was written (403).
+   * On the hosted preview, the buyer rule refused a checkout or an upgrade. Under the team rule with real payments the
+   * account may not ask questions there, so it would pay and then be refused every question; otherwise the account is on
+   * neither the team list nor, under "everyone-with-listed-buyers", the Owner's list of approved buyers. Nothing was
+   * written (403).
    */
   | "PREVIEW_TEAM_ONLY"
   /**

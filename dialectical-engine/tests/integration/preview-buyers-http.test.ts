@@ -38,7 +38,7 @@ let close: (() => Promise<unknown>) | undefined;
 afterEach(async () => { await close?.(); close = undefined; });
 
 type Options = Readonly<{ allowed?: boolean; designation?: "OWNER" | "DELEGATED"; proof?: boolean; locked?: boolean; applies?: boolean; present?: boolean;
-  revision?: number; buyers?: number; team?: readonly string[]; databaseSays?: string }>;
+  revision?: number; buyers?: number; team?: readonly string[]; databaseSays?: string; payments?: "sandbox" | "live" }>;
 function server(options: Options = {}) {
   const record = Object.freeze({ context: Object.freeze({ staffId: randomUUID(), userId: account.authenticated.userId, ordinarySessionId: account.authenticated.session.session_id,
     privilegeSessionId: randomUUID(), designation: options.designation ?? "OWNER", securityEpoch: 1, accountSecurityEpoch: 1, grantRevision: 1, capabilities: Object.freeze(["TEAM_READ", "TEAM_GRANT"]) }),
@@ -76,7 +76,7 @@ function server(options: Options = {}) {
     ...(options.present === false ? {} : { previewBuyers: {
       repository: repository as never,
       readEmail: async (userId: string) => { reads.push("readEmail"); return PEOPLE.find((p) => p.userId === userId)?.address ?? null; },
-      blindIndex: blind, teamUserIds: options.team ?? [TEAM.userId], applies: options.applies ?? true
+      blindIndex: blind, teamUserIds: options.team ?? [TEAM.userId], applies: options.applies ?? true, paymentEnvironment: options.payments ?? "sandbox"
     } })
   } as never });
   close = () => built.close();
@@ -92,7 +92,7 @@ describe("reading the list", () => {
     const page = await s.built.inject({ method: "GET", url: "/v1/admin/preview-buyers", headers: headers() });
     expect(page.statusCode, page.body).toBe(200);
     expect(page.headers["cache-control"]).toBe("no-store");
-    expect(page.json()).toEqual({ applies: true, team_count: 1, cap: PREVIEW_TEAM_MAX_MEMBERS, revision: 4, buyers: [
+    expect(page.json()).toEqual({ applies: true, environment: "sandbox", team_count: 1, cap: PREVIEW_TEAM_MAX_MEMBERS, revision: 4, buyers: [
       { ref: REF_ANA, masked_address: "ste•••n.n•••our@example.com", since: "2026-11-20T10:00:00.000Z" },
       { ref: REF_BEN, masked_address: "an•••be•••la@example.org", since: "2026-11-21T10:00:00.000Z" }] });
     for (const secret of [ANA.address, BEN.address, ANA.userId, BEN.userId]) expect(page.body).not.toContain(secret);
@@ -107,7 +107,15 @@ describe("reading the list", () => {
       await close!(); close = undefined;
     }
   });
-  it("off the preview or with real payments there is no list: the Owner gets 404, anyone else still the plain refusal", async () => {
+  it("with real payments the list is there too, and its page says so", async () => {
+    const s = server({ payments: "live" });
+    const page = await s.built.inject({ method: "GET", url: "/v1/admin/preview-buyers", headers: headers() });
+    expect(page.statusCode, page.body).toBe(200);
+    expect(page.json()).toMatchObject({ applies: true, environment: "live", team_count: 1, revision: 4 });
+    const found = await s.built.inject({ method: "POST", url: "/v1/admin/preview-buyers/find", headers: headers(true), payload: { address: NEW.address } });
+    expect([found.statusCode, found.json()]).toEqual([200, { masked_address: "mar•••pop•••scu@example.net" }]);
+  });
+  it("off the preview or with billing off there is no list: the Owner gets 404, anyone else still the plain refusal", async () => {
     const owner = server({ present: false });
     expect((await owner.built.inject({ method: "GET", url: "/v1/admin/preview-buyers", headers: headers() })).statusCode).toBe(404);
     await close!(); close = undefined;

@@ -1,12 +1,12 @@
 // Where the asks lock meets the payments lock: on the hosted preview a checkout or a plan upgrade, the two steps that
 // create a charge and open NETOPIA's page, follow the buyer rule. Any signed-in account may buy only with real payments
 // and asks open to everyone, or in the friends' test on the sandbox (everyone-with-test-payments). Everywhere else on the
-// preview only an account on the team list may: with the team rule while payments are real, and on the sandbox under the
-// team rule and under everyone-with-listed-buyers, where anyone may ask but only the listed accounts may buy. Off the
-// preview there is no rule. The price requests before the last button carry no rule, and neither does the card change.
-// Under everyone-with-listed-buyers on the sandbox, an account not on the team list may also buy when the Owner's list of
-// approved buyers (migration 0186) says so; the list is read for nobody else, and when it cannot be read the purchase is
-// refused (503 PREVIEW_BUYERS_UNAVAILABLE) with nothing written.
+// preview only an account on the team list may: under the team rule, and under everyone-with-listed-buyers, on the
+// sandbox or with real payments, where anyone may ask but only the listed accounts may buy. Off the preview there is no
+// rule. The price requests before the last button carry no rule, and neither does the card change. Under
+// everyone-with-listed-buyers, with either payment system, an account not on the team list may also buy when the Owner's
+// list of approved buyers (migration 0186) says so; the list is read for nobody else, and when it cannot be read the
+// purchase is refused (503 PREVIEW_BUYERS_UNAVAILABLE) with nothing written.
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { buildApi } from "@debateai/api";
@@ -100,7 +100,7 @@ const memberMayBuy = (setup: Setup): boolean => !refusesStranger(setup) || teamL
 
 const VALUES = [undefined, "everyone", "everyone-with-test-payments", "everyone-with-listed-buyers"] as const;
 /** The pairings the API's boot admits on the preview; the others are refused at start (lock-asks-boot.test.ts). */
-const BOOTS = (setup: Setup): boolean => !setup.preview || setup.asks === undefined
+const BOOTS = (setup: Setup): boolean => !setup.preview || setup.asks === undefined || setup.asks === "everyone-with-listed-buyers"
   || (setup.payments === "live" ? setup.asks === "everyone" : setup.asks !== "everyone");
 const label = (setup: Setup): string => `${setup.preview ? "preview" : "off the preview"}, ${setup.payments} payments${
   setup.preview ? `, ${setup.asks ?? "team rule"}` : ""}`;
@@ -111,16 +111,15 @@ const SETUPS = ALL.filter(BOOTS).map((setup) => [label(setup), setup] as const);
 const REFUSED_AT_BOOT = ALL.filter((setup) => !BOOTS(setup)).map((setup) => [label(setup), setup] as const);
 
 describe("the cases, named", () => {
-  it("are the four the owner meets on the sandbox, the two with real payments, and off the preview", () => {
+  it("are the three the owner meets on the sandbox, the three with real payments, and off the preview", () => {
     expect(SETUPS.map(([name]) => name)).toEqual([
       "preview, sandbox payments, team rule", "preview, sandbox payments, everyone-with-test-payments",
       "preview, sandbox payments, everyone-with-listed-buyers",
-      "preview, live payments, team rule", "preview, live payments, everyone",
+      "preview, live payments, team rule", "preview, live payments, everyone", "preview, live payments, everyone-with-listed-buyers",
       "off the preview, sandbox payments", "off the preview, live payments"
     ]);
     expect(REFUSED_AT_BOOT.map(([name]) => name)).toEqual([
-      "preview, sandbox payments, everyone", "preview, live payments, everyone-with-test-payments",
-      "preview, live payments, everyone-with-listed-buyers"
+      "preview, sandbox payments, everyone", "preview, live payments, everyone-with-test-payments"
     ]);
   });
 });
@@ -202,14 +201,15 @@ describe("apps/api/src/index.ts hands the rule over on the preview only, as one 
 /**
  * The Owner's list of approved buyers (0186), the whole matrix: each asks value and payment system (the pairings the boot
  * refuses too), an account on the team list or not, and the list's answer for it (listed, not listed, a throw, or no list
- * handed at all). Written out: the list is asked only under everyone-with-listed-buyers on the sandbox, only for an
- * account not on the team list; listed buys, not listed is refused 403, and a list that cannot be read is refused 503;
+ * handed at all). Written out: the list is asked only under everyone-with-listed-buyers, with either payment system,
+ * only for an account not on the team list; listed buys, not listed is refused 403, and a list that cannot be read is
+ * refused 503;
  * every refusal comes before the checkout budget and the checkout service (the only writer of a charge row), and before
  * the upgrade's body is read.
  */
 type ListAnswer = "listed" | "not listed" | "throws" | "no list";
 const ANSWERS: readonly ListAnswer[] = ["listed", "not listed", "throws", "no list"];
-const listCounts = (setup: Setup): boolean => setup.preview && setup.payments === "sandbox" && setup.asks === "everyone-with-listed-buyers";
+const listCounts = (setup: Setup): boolean => setup.preview && setup.asks === "everyone-with-listed-buyers";
 function expected(setup: Setup, onTeam: boolean, answer: ListAnswer): "BUYS" | "REFUSED" | "UNAVAILABLE" {
   if (!refusesStranger(setup)) return "BUYS";
   if (onTeam && teamListed(setup)) return "BUYS";
@@ -222,7 +222,8 @@ const MATRIX = [...SETUPS, ...REFUSED_AT_BOOT].flatMap(([name, setup]) => [true,
 describe("the Owner's list of approved buyers decides only where it counts", () => {
   it("covers every asks value, both payment systems, the team list and the four answers", () => {
     expect(MATRIX).toHaveLength(10 * 2 * 4);
-    expect(MATRIX.filter(([, setup, onTeam]) => listCounts(setup) && !onTeam)).toHaveLength(4);
+    expect(MATRIX.filter(([, setup, onTeam]) => listCounts(setup) && !onTeam)).toHaveLength(8);
+    expect(MATRIX.filter(([, setup, onTeam]) => listCounts(setup) && !onTeam && setup.payments === "live")).toHaveLength(4);
   });
   it.each(MATRIX)("%s", async (_label, setup, onTeam, answer) => {
     const member = testHttpIdentity("approved-member"), stranger = testHttpIdentity("approved-stranger");
@@ -248,8 +249,8 @@ describe("the Owner's list of approved buyers decides only where it counts", () 
         expect(decide).not.toHaveBeenCalled();
         expect(checkout.start).not.toHaveBeenCalled();
       }
-      // The list is read only where it counts, and only for an account not on the team list: never with real payments,
-      // never with asks closed, never in the friends' test, never off the preview, never for a team member.
+      // The list is read only where it counts, and only for an account not on the team list: never under "everyone" with
+      // real payments, never with asks closed, never in the friends' test, never off the preview, never for a team member.
       const asked = listCounts(setup) && !(onTeam && teamListed(setup));
       if (list !== null) expect(list.listed).toHaveBeenCalledTimes(asked ? 2 : 0);
       // Each unreadable answer leaves one content-free line; nothing else is logged.
@@ -259,6 +260,28 @@ describe("the Owner's list of approved buyers decides only where it counts", () 
       errors.mockRestore();
       await api.close();
     }
+  });
+});
+
+describe("previewBuyerVerdict with real payments under everyone-with-listed-buyers", () => {
+  const TEAM = "22222222-2222-4222-8222-222222222222", OTHER = "11111111-1111-4111-8111-111111111111";
+  const live = { config: PREVIEW, teamUserIds: [TEAM], asksOpenTo: "everyone-with-listed-buyers" as const, livePayments: true };
+  it("admits a team account without reading the list, a listed account, and refuses one the list does not name or cannot read", async () => {
+    const lines: string[] = [];
+    const log = (line: string) => lines.push(line);
+    const list = approvedList(async (userId) => userId === OTHER);
+    await expect(previewBuyerVerdict({ ...live, userId: TEAM, approved: list, log })).resolves.toBe("ADMIT");
+    expect(list.listed).not.toHaveBeenCalled();
+    await expect(previewBuyerVerdict({ ...live, userId: OTHER, approved: list, log })).resolves.toBe("ADMIT");
+    await expect(previewBuyerVerdict({ ...live, userId: OTHER, approved: approvedList(), log })).resolves.toBe("REFUSE");
+    await expect(previewBuyerVerdict({ ...live, userId: OTHER, approved: approvedList(async () => { throw new Error("database down"); }), log })).resolves.toBe("UNAVAILABLE");
+    await expect(previewBuyerVerdict({ ...live, userId: OTHER, approved: undefined, log })).resolves.toBe("UNAVAILABLE");
+    expect(lines).toEqual([PREVIEW_BUYER_CHECK_UNAVAILABLE_LINE, PREVIEW_BUYER_CHECK_UNAVAILABLE_LINE]);
+  });
+  it("under everyone any signed-in account buys, and the list is never read", async () => {
+    const list = approvedList();
+    await expect(previewBuyerVerdict({ ...live, asksOpenTo: "everyone", teamUserIds: [], userId: OTHER, approved: list, log: () => undefined })).resolves.toBe("ADMIT");
+    expect(list.listed).not.toHaveBeenCalled();
   });
 });
 

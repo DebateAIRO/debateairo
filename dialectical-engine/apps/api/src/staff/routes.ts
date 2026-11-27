@@ -85,7 +85,7 @@ export interface StaffHttpApplication {
     teamLimit?: TeamLimitStaffService;
     publicReview?: PublicReviewStaffService;
     publicFlags?: PublicFlagStaffService;
-    /** 0186: the preview's approved buyers; absent off the preview and with real payments, where the routes answer 404. */
+    /** 0186: the preview's approved buyers; absent off the preview and with billing off, where the routes answer 404. */
     previewBuyers?: PreviewBuyerStaffService;
     /** 0188: the asks to get back into an account that wait for the Owner; absent, the routes answer 404. */
     recoveryPermits?: RecoveryPermitStaffService;

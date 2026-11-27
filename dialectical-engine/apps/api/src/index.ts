@@ -2031,7 +2031,7 @@ export interface ApiOptions {
   readonly previewAsksOpenTo?: PreviewAsksOpenTo;
   /**
    * The Owner's list of approved buyers (migration 0186), read by the buyer rule only, and only for an account not on the
-   * team line while asks are open to everyone with buying kept to listed accounts on the sandbox
+   * team line while asks are open to everyone with buying kept to listed accounts, with test payments or real ones
    * (previewBuyerNeedsApproval). Absent there, such an account is refused 503 PREVIEW_BUYERS_UNAVAILABLE: it fails closed.
    */
   readonly previewApprovedBuyers?: PreviewApprovedBuyers;
@@ -6088,9 +6088,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   const billingAgeConfirmation = billingSessions?.readAgeConfirmation?.bind(billingSessions);
   // Who may start a purchase (a checkout or a plan upgrade) on the preview, by previewBuyerVerdict: any signed-in account
   // only with real payments and asks open to everyone, or in the friends' test on the sandbox (everyone-with-test-payments);
-  // otherwise the team list, and under everyone-with-listed-buyers on the sandbox also the Owner's list of approved buyers
-  // (0186), read only for an account not on the team list and refusing when it cannot be read. The price requests and the
-  // card change carry no rule. Off the preview nothing changes.
+  // otherwise the team list, and under everyone-with-listed-buyers, with test payments or real ones, also the Owner's list
+  // of approved buyers (0186), read only for an account not on the team list and refusing when it cannot be read. The price
+  // requests and the card change carry no rule. Off the preview nothing changes.
   const previewBuyerRule = previewConfig === undefined ? undefined
     : (session: AuthenticatedSession) => previewBuyerVerdict({ config: previewConfig, teamUserIds: options.previewTeamUserIds,
       asksOpenTo: options.previewAsksOpenTo, livePayments: options.billing?.paymentEnvironment === "live", userId: session.userId,

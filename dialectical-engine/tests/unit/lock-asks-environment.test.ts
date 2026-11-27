@@ -138,7 +138,7 @@ describe("PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers: asks open, and the t
   });
 
   it("its two new start refusals are named refusals the launchers print", () => {
-    for (const code of ["PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_WITHOUT_TEAM", "PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX"]) {
+    for (const code of ["PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_WITHOUT_TEAM", "PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_BILLING_OFF"]) {
       expect(refusals.isNamedRefusal(code), code).toBe(true);
     }
   });

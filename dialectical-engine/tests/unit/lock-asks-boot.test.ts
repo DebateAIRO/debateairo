@@ -1,8 +1,9 @@
 // PREVIEW_ASKS_OPEN_TO at the API's boot, once the room and billing are built: open asks need the room (it alone bounds
 // each person's spending), "everyone" needs real payments (on the sandbox a public test card would buy real AI credit,
-// and with billing off no account has a plan window of its own), and "everyone-with-test-payments" and
-// "everyone-with-listed-buyers" are refused on any other payment system than the sandbox, so the boot line is always
-// true. With the listed buyers' value a second line counts the accounts that may buy.
+// and with billing off no account has a plan window of its own), "everyone-with-test-payments" is refused on any other
+// payment system than the sandbox, so the boot line is always true, and "everyone-with-listed-buyers" runs on the sandbox
+// or with real payments (buying stays with the listed accounts either way) and is refused with billing off. With the
+// listed buyers' value a second line counts the accounts that may buy.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { assertPreviewAsksOpenBoot, previewAsksOpenBootLine, previewListedBuyersBootLine } from "../../apps/api/src/preview-asks-open.js";
@@ -20,7 +21,7 @@ function expected(asksOpen: typeof VALUES[number], roomComposed: boolean, paymen
     return payment === "sandbox" ? "PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING" : payment === null ? "PREVIEW_ASKS_OPEN_TO_BILLING_OFF" : null;
   }
   if (asksOpen === "everyone-with-test-payments") return payment === "sandbox" ? null : "PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX";
-  return payment === "sandbox" ? null : "PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX";
+  return payment === null ? "PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_BILLING_OFF" : null;
 }
 
 describe("assertPreviewAsksOpenBoot", () => {
@@ -45,8 +46,9 @@ describe("assertPreviewAsksOpenBoot", () => {
     expect(expected("everyone-with-test-payments", true, "sandbox")).toBeNull();
     expect(expected("everyone", true, "sandbox")).toBe("PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING");
     expect(expected("everyone-with-listed-buyers", true, "sandbox")).toBeNull();
-    expect(expected("everyone-with-listed-buyers", true, "live")).toBe("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX");
-    expect(expected("everyone-with-listed-buyers", true, null)).toBe("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_NOT_SANDBOX");
+    expect(expected("everyone-with-listed-buyers", true, "live")).toBeNull();
+    expect(expected("everyone-with-listed-buyers", true, null)).toBe("PREVIEW_ASKS_OPEN_TO_LISTED_BUYERS_BILLING_OFF");
+    expect(expected("everyone-with-test-payments", true, "live")).toBe("PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX");
   });
 
   it("the boot line names the opening that runs, and nothing with the team rule", () => {
@@ -100,6 +102,15 @@ describe("apps/api/src/main.ts wires the setting", () => {
     expect(count(value)).toBe(1);
     expect(main.indexOf(value)).toBeGreaterThan(main.indexOf("const api = buildApi({"));
     expect(count("previewAsksOpenTo")).toBe(1);
+  });
+
+  it("hands the Team page's list routes the list on the preview with billing on, whether payments are the sandbox's or real", () => {
+    const staff = main.slice(main.indexOf("const previewBuyerStaff = "), main.indexOf("};", main.indexOf("const previewBuyerStaff = ")));
+    expect(staff.replace(/\s+/gu, " ")).toContain("const previewBuyerStaff = previewBuyerRepository === undefined || billingConnectors === null ? undefined : {");
+    expect(staff).toContain("applies: environment.PREVIEW_ASKS_OPEN === \"everyone-with-listed-buyers\"");
+    expect(staff).toContain("paymentEnvironment: billingConnectors.paymentEnvironment");
+    expect(main).not.toContain('paymentEnvironment !== "sandbox" ? undefined');
+    expect(main).toContain("...(previewBuyerStaff === undefined ? {} : { previewBuyers: previewBuyerStaff }),");
   });
 
   it("prints the count line right after the asks line, from the parsed team line", () => {

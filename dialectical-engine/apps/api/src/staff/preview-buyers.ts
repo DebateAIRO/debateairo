@@ -9,8 +9,9 @@ import type { StaffAccessApplication, StaffAuthentication } from "./access.js";
 import type { StaffAlertIntentProducer } from "./alerts.js";
 
 /**
- * THE PREVIEW'S APPROVED BUYERS over HTTP (migration 0186). While the site is open to everyone with test payments and
- * buying kept to listed accounts, the Owner allows more accounts to buy on the Team page, or stops them, with no restart.
+ * THE PREVIEW'S APPROVED BUYERS over HTTP (migration 0186). While the site is open to everyone with buying kept to listed
+ * accounts, with test payments or real ones, the Owner allows more accounts to buy on the Team page, or stops them, with
+ * no restart.
  *
  * Only the Owner: every route asks TEAM_GRANT and the owner designation before it reads anything, so nobody else learns
  * whether an address has an account or who is listed. A change needs the Owner's fresh hardware-key proof, made by the
@@ -34,8 +35,10 @@ export interface PreviewBuyerStaffService {
   blindIndex(address: string): Buffer;
   /** The team line as this API read it at start: those accounts buy anyway and are never added to the list. */
   teamUserIds: readonly string[];
-  /** Whether the list counts on this API now: asks open to everyone with buying kept to listed accounts, on the sandbox. */
+  /** Whether the list counts on this API now: asks open to everyone with buying kept to listed accounts. */
   applies: boolean;
+  /** The payment system a listed account buys with (billing's connectors): the page says whether that is real money. */
+  paymentEnvironment: "sandbox" | "live";
 }
 
 const sha = (bytes: string | Buffer) => createHash("sha256").update(bytes).digest("hex");
@@ -140,7 +143,7 @@ export function registerPreviewBuyerRoutes(route: Route, service: () => PreviewB
     if (authentication.context.designation !== "OWNER") throw REFUSED();
     return authentication;
   }
-  /** Off the preview, or with real payments, there is no list: main.ts hands no service. */
+  /** Off the preview, or with billing off, there is no list: main.ts hands no service. */
   const present = (): PreviewBuyerStaffService => {
     const value = service();
     if (value === undefined) throw new PreviewBuyerHttpError(404, "NOT_FOUND");
@@ -169,8 +172,8 @@ export function registerPreviewBuyerRoutes(route: Route, service: () => PreviewB
       try { address = await value.readEmail(row.userId); } catch { address = null; }
       buyers.push({ ref: row.ref, masked_address: address === null ? null : maskedAddress(address), since: row.since.toISOString() });
     }
-    const page = contract.PreviewBuyersPageSchema.safeParse({ applies: value.applies, team_count: value.teamUserIds.length, cap: PREVIEW_TEAM_MAX_MEMBERS,
-      revision: list.revision, buyers });
+    const page = contract.PreviewBuyersPageSchema.safeParse({ applies: value.applies, environment: value.paymentEnvironment,
+      team_count: value.teamUserIds.length, cap: PREVIEW_TEAM_MAX_MEMBERS, revision: list.revision, buyers });
     if (!page.success) throw new PreviewBuyerHttpError(503, "STAFF_UNAVAILABLE");
     return page.data;
   });

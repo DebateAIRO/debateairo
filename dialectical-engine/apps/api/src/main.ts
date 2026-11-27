@@ -1248,14 +1248,15 @@ const publicDebateUpvoteRepository = new PostgresPublicDebateUpvoteRepository(po
 // 0186: the preview's approved buyers. The yes or no at the pay button and the Owner's list and changes run on the request
 // login, whose billing role holds 0186's grants. The Owner's look-up of a typed address and the shortened addresses on the
 // list read other accounts' rows, so they run on the system login (X39), and only after the Owner's authority is checked.
-// The list counts only on the preview with the sandbox's payments; with real payments the routes answer 404 and the buyer
-// rule never reads it.
+// The list counts only on the preview with billing on, the sandbox's payments or real ones; with billing off the routes
+// answer 404 and the buyer rule never reads it. The page is told which payments the list buys with.
 const previewBuyerAccounts = crossAccountPool(pool, "X39");
 const previewBuyerRepository = previewGate === undefined ? undefined : new PostgresPreviewBuyerRepository(pool, previewBuyerAccounts);
-const previewBuyerStaff = previewBuyerRepository === undefined || billingConnectors?.paymentEnvironment !== "sandbox" ? undefined : {
+const previewBuyerStaff = previewBuyerRepository === undefined || billingConnectors === null ? undefined : {
   repository: previewBuyerRepository, readEmail: accountEmailReader(previewBuyerAccounts, dekStore),
   blindIndex: (address: string) => createEmailBlindIndex(blindIndexKey, address),
-  teamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [], applies: environment.PREVIEW_ASKS_OPEN === "everyone-with-listed-buyers"
+  teamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [], applies: environment.PREVIEW_ASKS_OPEN === "everyone-with-listed-buyers",
+  paymentEnvironment: billingConnectors.paymentEnvironment
 };
 // 0188: the Owner's list of asks to get back into an account, and the door that approves or refuses one, run on the
 // request login, whose billing role holds 0188's grants. The shortened address of each asking account and whether it
