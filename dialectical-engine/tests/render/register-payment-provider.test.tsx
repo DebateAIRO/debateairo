@@ -16,8 +16,9 @@ import {
  * Privacy 3.15: the Register also lists the payment provider, NETOPIA Payments, the one row
  * that is not an AI provider. The AI rows are unchanged (`providerRegister`); `/providers` shows them and then
  * NETOPIA's row on every answer (`legalRegister`). Its row says what NETOPIA receives (the same list as Privacy §5),
- * "not applicable" for the AI-only facts, and what NETOPIA publishes about itself: where it keeps data, for how long,
- * what it keeps of a card, and its privacy contact. The intro still says AI
+ * "not applicable" for the AI-only facts, and what NETOPIA told us in writing and publishes about itself: that it keeps
+ * data only in the European Union, for how long, that it stores no full card details and what it keeps of a card, and
+ * its privacy contact. Every language says the two facts in its own words. The intro still says AI
  * providers never receive email, account, IP or payment details, and says the last entry does. The plans are on sale,
  * so the row and the intro no longer say "once paid plans start", and both name the check of a new card, which sends
  * NETOPIA the same details as a payment.
@@ -46,7 +47,7 @@ describe("the Register lists the payment provider after the AI providers", () =>
       key: "netopia", provider: "NETOPIA Payments", models: "", entity: "NETOPIA Financial Services S.A.",
       homeCountryKey: "legal.providers.romania", purposes: ["payments"], purposesConfirmed: true,
       locationKey: "legal.providers.locationNetopia", retentionKey: "legal.providers.retentionNetopia",
-      zeroRetention: "notApplicable", training: "notApplicable", basisKey: "legal.providers.euBasis", contact: "gdpr@netopia.ro", checkedOn: "2026-11-27"
+      zeroRetention: "notApplicable", training: "notApplicable", basisKey: "legal.providers.euBasis", contact: "gdpr@netopia.ro", checkedOn: "2026-11-28"
     });
     expect(PROVIDER_PURPOSES).toContain("payments");
   });
@@ -62,10 +63,10 @@ describe("the Register lists the payment provider after the AI providers", () =>
     expect(html).toContain(escaped(en["legal.providers.retentionNetopia"]));
     const row = html.slice(html.indexOf('id="legal-provider-netopia"'));
     expect(row).toContain("gdpr@netopia.ro");
-    expect(row).toContain("2026-11-27");
+    expect(row).toContain("2026-11-28");
     expect(row, "no fact of the row is left open").not.toContain("[");
-    expect(en["legal.providers.locationNetopia"]).toBe("Romania, in general. NETOPIA's privacy policy says it may in some cases send data to other countries in the European Economic Area or outside it, and that it then relies on an EU adequacy decision or the EU standard contractual clauses");
-    expect(en["legal.providers.retentionNetopia"]).toBe("5 years from the date of each payment, to meet its duties on money laundering, fraud, accounting and tax. NETOPIA says it does not store your full card number, expiry date or security code: it passes them to its bank, to Visa or Mastercard and to the bank that issued your card, and keeps only the first 6 and last 4 digits and the cardholder's name");
+    expect(en["legal.providers.locationNetopia"]).toBe("The European Union only. NETOPIA has told us in writing that it keeps the data in data centres in the EU, one of them in Romania, and stores none outside the EU");
+    expect(en["legal.providers.retentionNetopia"]).toBe("5 years from the date of each payment, then deleted automatically; longer only while an investigation, a court case or an authority's request is under way. NETOPIA does not store your full card details: it passes them to its bank, to Visa or Mastercard and to the bank that issued your card, and keeps only the first 6 and last 4 digits and the cardholder's name");
     expect(en["legal.providers.purpose.payments"]).toBe("Your name, email address, phone number and billing address, a customer code that stays the same, our reference for the order, the amount, the currency and a short description, with each card payment and when you check a new card, and at a renewal the IP address you last paid from yourself — to take card payments and check new cards");
     expect(en["legal.providers.notApplicable"]).toBe("Not applicable — not an AI provider");
     expect(en["legal.providers.euBasis"]).toBe("None needed — a company in the European Union (Romania)");
@@ -73,13 +74,17 @@ describe("the Register lists the payment provider after the AI providers", () =>
     expect(en["legal.providers.intro"]).toContain("The last entry is not an AI provider: it is our payment provider, NETOPIA Payments, which takes card payments and checks new cards. It does receive your name, your email address, your phone number, your billing address and, at a renewal, an IP address, and its entry says what it receives and why.");
   });
 
-  it.each(Object.keys(catalogs).map((code) => [code]))("%s: the three new keys are there and translated, and the intro names NETOPIA Payments", (code) => {
+  it.each(Object.keys(catalogs).map((code) => [code]))("%s: the row's five keys are there and translated, and the intro names NETOPIA Payments", (code) => {
     const catalog = catalogs[code]!;
-    for (const key of ["legal.providers.purpose.payments", "legal.providers.notApplicable", "legal.providers.euBasis"]) {
+    for (const key of ["legal.providers.purpose.payments", "legal.providers.notApplicable", "legal.providers.euBasis", "legal.providers.locationNetopia", "legal.providers.retentionNetopia"]) {
       expect(catalog[key]?.trim(), `${code}: ${key}`).toBeTruthy();
       if (code !== "en") expect(catalog[key], `${code}: ${key} is translated`).not.toBe((en as Record<string, string>)[key]);
     }
-    for (const key of ["legal.providers.locationNetopia", "legal.providers.retentionNetopia"]) expect(catalog[key]?.trim(), `${code}: ${key}`).toBeTruthy();
+    // The names and the numbers of NETOPIA's facts stand in every language.
+    expect(catalog["legal.providers.locationNetopia"], `${code}: location names NETOPIA`).toContain("NETOPIA");
+    for (const token of ["NETOPIA", "Visa", "Mastercard", "5", "6", "4"]) {
+      expect(catalog["legal.providers.retentionNetopia"], `${code}: retention keeps ${token}`).toContain(token);
+    }
     expect(catalog["legal.providers.intro"], `${code}: the intro names the payment provider`).toContain("NETOPIA Payments");
     const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} entries={legalRegister(["deepinfra"])} />);
     expect(html).toContain('id="legal-provider-netopia"');
