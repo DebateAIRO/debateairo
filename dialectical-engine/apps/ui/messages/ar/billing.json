@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "ضريبة القيمة المضافة بآلية الاحتساب العكسي",
   "billing.checkout.noTax": "بلا ضريبة",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} شهريًا. تتجدد في اليوم {day} من كل شهر إلى أن تلغي.",
-  "billing.consent.renewal": "أوافق على أن تحتفظ NETOPIA Payments ببطاقتي وأن يُخصم منها {total} كل شهر إلى أن ألغي الاشتراك. يمكنني الإلغاء في أي وقت من الإعدادات أو عبر dezbatere.ro/cancel.",
+  "billing.consent.renewal": "أوافق على أن يُخصم {total} من هذه البطاقة كل شهر إلى أن ألغي الاشتراك، وعلى أن تُحفظ البطاقة لهذه المدفوعات. تتولى NETOPIA Payments معالجة البطاقة؛ ولا تخزّن NETOPIA ولا نحن بيانات البطاقة الكاملة. يمكنني الإلغاء في أي وقت من الإعدادات أو عبر dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "ابدأ خطتي الآن. أفهم أنني إذا انسحبت خلال 14 يومًا، أدفع فقط مقابل الحصة التي استخدمتها من رصيد الخطة.",
   "billing.checkout.withdrawalWhere": "يمكنك الانسحاب خلال {days} يومًا من الاشتراك، دون ذكر سبب: في الإعدادات، ضمن «الاشتراك»، اضغط «انسحب من العقد من هنا»، ثم «تأكيد الانسحاب».",
   "billing.checkout.withdrawalLink": "كيفية الانسحاب، ونموذج الانسحاب",

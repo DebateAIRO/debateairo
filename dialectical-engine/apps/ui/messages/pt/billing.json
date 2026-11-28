@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "IVA em autoliquidação",
   "billing.checkout.noTax": "sem impostos",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} por mês. Renova-se no dia {day} de cada mês até cancelar.",
-  "billing.consent.renewal": "Aceito que a NETOPIA Payments guarde o meu cartão e que {total} seja cobrado nesse cartão todos os meses, até eu cancelar a subscrição. Posso cancelar a qualquer momento nas Definições ou em dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Aceito que {total} seja cobrado neste cartão todos os meses, até eu cancelar a subscrição, e que o cartão fique memorizado para estes pagamentos. O cartão é tratado pela NETOPIA Payments; nem a NETOPIA nem nós armazenamos os dados completos do cartão. Posso cancelar a qualquer momento nas Definições ou em dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Iniciar o meu plano agora. Compreendo que, se exercer o direito de livre resolução no prazo de 14 dias, pago apenas a parte do crédito do plano que tiver utilizado.",
   "billing.checkout.withdrawalWhere": "Pode exercer o direito de livre resolução no prazo de {days} dias a contar da subscrição, sem indicar um motivo: nas Definições, em Subscrição, prima «Retrate-se do contrato aqui» e depois «Confirmar retratação».",
   "billing.checkout.withdrawalLink": "Como exercer a livre resolução, e o modelo de formulário de livre resolução",

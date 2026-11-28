@@ -78,7 +78,7 @@ describe("sign-in methods, in the English legal texts", () => {
   it("no change history says that signing in changed: both texts said how you sign in at launch", () => {
     const history = (text: string): string[] => [...text.matchAll(/(Version|version) \d+\.\d+ replaced/gu)].map((match) => match[0]);
     expect(history(terms)).toEqual(["Version 1.2 replaced", "Version 1.1 replaced"]);
-    expect(history(privacy)).toEqual(["Version 1.3 replaced", "Version 1.2 replaced", "Version 1.1 replaced"]);
+    expect(history(privacy)).toEqual(["Version 1.4 replaced", "Version 1.3 replaced", "Version 1.2 replaced", "Version 1.1 replaced"]);
     // 1.1's summary is about DeepInfra, and says nothing of signing in.
     for (const text of [terms, privacy]) {
       const summary = text.slice(text.indexOf("Version 1.1 replaced"));

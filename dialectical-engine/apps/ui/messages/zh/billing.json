@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "增值税反向征收",
   "billing.checkout.noTax": "无税费",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = 每月 {total}。每月 {day} 日自动续订，直到您取消。",
-  "billing.consent.renewal": "我同意由 NETOPIA Payments 保存我的银行卡，并在我取消之前每月从该卡扣取 {total}。我可以随时在“设置”中或在 dezbatere.ro/cancel 取消。",
+  "billing.consent.renewal": "我同意在我取消之前每月从这张银行卡扣取 {total}，并同意为这些付款记住这张卡。该卡由 NETOPIA Payments 处理；NETOPIA 和我们都不会存储完整的银行卡详情。我可以随时在“设置”中或在 dezbatere.ro/cancel 取消。",
   "billing.consent.immediateStart": "立即开始我的方案。我了解，如果我在 14 天内撤回，只需按已使用方案额度的比例付费。",
   "billing.checkout.withdrawalWhere": "您可以在订阅后 {days} 天内撤回，无需说明理由：在“设置”的“订阅”下，按“在此撤回合同”，然后按“确认撤回”。",
   "billing.checkout.withdrawalLink": "如何撤回，以及撤回示范表格",

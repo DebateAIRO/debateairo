@@ -484,13 +484,15 @@ export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
  * Privacy 3.15: the Register also lists the payment provider, NETOPIA Payments, the one row
  * that is not an AI provider. What it receives with each payment is
  * `buildHostedStartBody` / `buildSavedCardChargeBody` (packages/payments-netopia/src/requests.ts), the same list as
- * Privacy Policy §5. Where it processes, how long it keeps data and the privacy contact are what NETOPIA publishes:
- * its privacy policy (netopia-payments.com/politica-de-confidentialitate, "Transferul datelor") and its notice for
- * payers (netopia-payments.com/nota-de-informare-gdpr-platitori, "Stocarea datelor" and "Ce date personale
- * prelucrăm"). Both pages name NETOPIA Financial Services S.A. in Romania and say it acts as a controller when it
- * processes a payment; the name has not been compared with the contract. Romania is in the EU, so no transfer basis
- * is needed. Zero data retention and training are facts about AI providers: "not applicable". Listed on every answer,
- * after the AI rows (`legalRegister`).
+ * Privacy Policy §5. Where it keeps data (in data centres in the EU, one of them in Romania, none outside the EU) and
+ * how long (5 years from each payment, then deleted automatically, and that it does not store full card details) come
+ * from NETOPIA's written answer to the company and from its notice for payers
+ * (netopia-payments.com/nota-de-informare-gdpr-platitori, "Stocarea datelor" and "Ce date personale prelucrăm"). The
+ * privacy contact is from that notice and its privacy policy (netopia-payments.com/politica-de-confidentialitate).
+ * Both pages name NETOPIA Financial Services S.A. in Romania and say it acts as a controller when it processes a
+ * payment; the name has not been compared with the contract. Romania is in the EU, so no transfer basis is needed.
+ * Zero data retention and training are facts about AI providers: "not applicable". Listed on every answer, after the
+ * AI rows (`legalRegister`).
  */
 export const NETOPIA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   key: "netopia",
@@ -508,7 +510,7 @@ export const NETOPIA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   training: "notApplicable",
   basisKey: "legal.providers.euBasis",
   contact: "gdpr@netopia.ro",
-  checkedOn: "2026-11-27"
+  checkedOn: "2026-11-28"
 });
 
 /**

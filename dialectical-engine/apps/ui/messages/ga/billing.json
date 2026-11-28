@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "CBL faoin muirear droim ar ais",
   "billing.checkout.noTax": "gan cháin",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} sa mhí. Athnuaitear é ar lá {day} de gach mí go dtí go gcuireann tú ar ceal é.",
-  "billing.consent.renewal": "Aontaím go gcoinneoidh NETOPIA Payments mo chárta agus go ngearrfar {total} air gach mí go dtí go gcuirim mo shíntiús ar ceal. Is féidir liom é a chur ar ceal am ar bith sna Socruithe nó ag dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Aontaím go ngearrfar {total} ar an gcárta seo gach mí go dtí go gcuirim mo shíntiús ar ceal, agus go gcuimhneofar ar an gcárta le haghaidh na n-íocaíochtaí seo. Is é NETOPIA Payments a láimhseálann an cárta; ní stórálann NETOPIA ná sinne sonraí iomlána an chárta. Is féidir liom mo shíntiús a chur ar ceal am ar bith sna Socruithe nó ag dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Tosaigh mo phlean anois. Tuigim, má tharraingím siar laistigh de 14 lá, nach n-íocaim ach as an gcuid de chreidmheas an phlean atá úsáidte agam.",
   "billing.checkout.withdrawalWhere": "Is féidir leat tarraingt siar laistigh de {days} lá ó liostáil, gan cúis a thabhairt: sna Socruithe, sa chuid Síntiús, brúigh “Tarraing siar ón gconradh anseo”, agus ansin “Dearbhaigh an tarraingt siar”.",
   "billing.checkout.withdrawalLink": "Conas tarraingt siar, agus an fhoirm tarraingthe siar shamplach",

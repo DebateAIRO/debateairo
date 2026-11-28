@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "DPH – prenesenie daňovej povinnosti",
   "billing.checkout.noTax": "bez dane",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} mesačne. Obnovuje sa každý mesiac {day}. dňa, kým nezrušíte.",
-  "billing.consent.renewal": "Súhlasím s tým, že NETOPIA Payments uchová moju kartu a že z nej bude každý mesiac stiahnutá suma {total}, kým predplatné nezruším. Zrušiť ho môžem kedykoľvek v Nastaveniach alebo na dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Súhlasím s tým, že z tejto karty bude každý mesiac stiahnutá suma {total}, kým predplatné nezruším, a že karta bude pre tieto platby zapamätaná. Kartu spracúva NETOPIA Payments; NETOPIA ani my neukladáme úplné údaje o karte. Predplatné môžem kedykoľvek zrušiť v Nastaveniach alebo na dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Spustite môj program hneď. Beriem na vedomie, že ak odstúpim do 14 dní, zaplatím len za využitý podiel kreditu programu.",
   "billing.checkout.withdrawalWhere": "Do {days} dní od predplatenia môžete odstúpiť od zmluvy bez udania dôvodu: v Nastaveniach v časti Predplatné stlačte „Odstúpiť od zmluvy tu“ a potom „Potvrdiť odstúpenie od zmluvy“.",
   "billing.checkout.withdrawalLink": "Ako odstúpiť od zmluvy a vzorový formulár na odstúpenie od zmluvy",

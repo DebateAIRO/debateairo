@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "PVM atvirkštinis apmokestinimas",
   "billing.checkout.noTax": "be mokesčio",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} per mėnesį. Atnaujinama kiekvieno mėnesio {day} d., kol atšauksite.",
-  "billing.consent.renewal": "Sutinku, kad NETOPIA Payments saugotų mano kortelę ir kad iš jos kas mėnesį būtų nuskaitoma {total}, kol atšauksiu prenumeratą. Galiu atšaukti bet kada nustatymuose arba adresu dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Sutinku, kad iš šios kortelės kas mėnesį būtų nuskaitoma {total}, kol atšauksiu prenumeratą, ir kad kortelė būtų įsiminta šiems mokėjimams. Kortelę tvarko NETOPIA Payments; nei NETOPIA, nei mes nesaugome visų kortelės duomenų. Galiu atšaukti prenumeratą bet kada nustatymuose arba adresu dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Pradėkite mano planą dabar. Suprantu, kad jei atsisakysiu sutarties per 14 dienų, mokėsiu tik už tą plano kredito dalį, kurią panaudojau.",
   "billing.checkout.withdrawalWhere": "Per {days} dienų nuo užsiprenumeravimo galite atsisakyti sutarties nenurodydami priežasties: nustatymų skiltyje „Prenumerata“ paspauskite „Atsisakyti sutarties čia“, tada „Patvirtinti sutarties atsisakymą“.",
   "billing.checkout.withdrawalLink": "Kaip atsisakyti sutarties ir sutarties atsisakymo formos pavyzdys",

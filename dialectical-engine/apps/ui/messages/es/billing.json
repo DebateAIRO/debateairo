@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "IVA por inversión del sujeto pasivo",
   "billing.checkout.noTax": "sin impuestos",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} al mes. Se renueva el día {day} de cada mes hasta que cancele.",
-  "billing.consent.renewal": "Acepto que NETOPIA Payments conserve mi tarjeta y que se cargue en ella {total} cada mes hasta que cancele la suscripción. Puedo cancelarla en cualquier momento en Configuración o en dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Acepto que se cargue en esta tarjeta {total} cada mes hasta que cancele la suscripción, y que la tarjeta quede guardada para estos pagos. La tarjeta la gestiona NETOPIA Payments; ni NETOPIA ni nosotros almacenamos los datos completos de la tarjeta. Puedo cancelar la suscripción en cualquier momento en Configuración o en dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Iniciar mi plan ahora. Entiendo que, si desisto en un plazo de 14 días, pago solo la parte del crédito del plan que haya utilizado.",
   "billing.checkout.withdrawalWhere": "Puede desistir en un plazo de {days} días desde la suscripción, sin indicar el motivo: en Configuración, en Suscripción, pulse «Desistir del contrato aquí» y, después, «Confirmar desistimiento».",
   "billing.checkout.withdrawalLink": "Cómo desistir y modelo de formulario de desistimiento",

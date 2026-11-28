@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "VAT theo cơ chế tính thuế ngược",
   "billing.checkout.noTax": "không có thuế",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} mỗi tháng. Gia hạn vào ngày {day} hằng tháng cho đến khi bạn hủy.",
-  "billing.consent.renewal": "Tôi đồng ý rằng NETOPIA Payments lưu giữ thẻ của tôi và {total} được trừ từ thẻ đó mỗi tháng cho đến khi tôi hủy gói đăng ký. Tôi có thể hủy bất cứ lúc nào trong Cài đặt hoặc tại dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Tôi đồng ý rằng {total} được trừ từ thẻ này mỗi tháng cho đến khi tôi hủy gói đăng ký, và thẻ được ghi nhớ cho các khoản thanh toán này. Thẻ do NETOPIA Payments xử lý; cả NETOPIA lẫn chúng tôi đều không lưu trữ đầy đủ thông tin thẻ. Tôi có thể hủy bất cứ lúc nào trong Cài đặt hoặc tại dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Bắt đầu gói của tôi ngay. Tôi hiểu rằng nếu rút lại trong vòng 14 ngày, tôi chỉ trả cho phần tín dụng của gói mà tôi đã dùng.",
   "billing.checkout.withdrawalWhere": "Bạn có thể rút lại hợp đồng trong vòng {days} ngày kể từ khi đăng ký, không cần nêu lý do: trong Cài đặt, ở mục Gói đăng ký, nhấn “Rút lại hợp đồng tại đây”, rồi nhấn “Xác nhận rút lại”.",
   "billing.checkout.withdrawalLink": "Cách rút lại hợp đồng và mẫu đơn rút lại",

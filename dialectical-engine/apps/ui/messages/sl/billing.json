@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "DDV po sistemu obrnjene davčne obveznosti",
   "billing.checkout.noTax": "brez davka",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} na mesec. Obnovi se vsak mesec {day}. dne, dokler ne prekličete.",
-  "billing.consent.renewal": "Strinjam se, da NETOPIA Payments hrani mojo kartico in da se z nje vsak mesec zaračuna {total}, dokler ne prekličem naročnine. Prekličem jo lahko kadar koli v Nastavitvah ali na dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Strinjam se, da se s te kartice vsak mesec zaračuna {total}, dokler ne prekličem naročnine, in da se kartica za ta plačila zapomni. Kartico obdeluje NETOPIA Payments; niti NETOPIA niti mi ne shranjujemo celotnih podatkov o kartici. Naročnino lahko kadar koli prekličem v Nastavitvah ali na dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Zaženite moj paket zdaj. Razumem, da če odstopim v 14 dneh, plačam samo porabljeni delež dobroimetja paketa.",
   "billing.checkout.withdrawalWhere": "Od pogodbe lahko odstopite v {days} dneh od sklenitve naročnine, ne da bi navedli razlog: v Nastavitvah, v razdelku Naročnina, pritisnite »Kliknite tukaj za odstop od pogodbe«, nato »Potrdi odstop od pogodbe«.",
   "billing.checkout.withdrawalLink": "Kako odstopiti od pogodbe in vzorčni obrazec za odstop od pogodbe",

@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "PVN apgrieztā maksāšana",
   "billing.checkout.noTax": "bez nodokļa",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} mēnesī. Atjaunojas katra mēneša {day}. datumā, līdz atceļat.",
-  "billing.consent.renewal": "Piekrītu, ka NETOPIA Payments glabā manu karti un ka no tās katru mēnesi tiek iekasēta summa {total}, līdz es atceļu abonementu. Es varu to atcelt jebkurā laikā iestatījumos vai vietnē dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Piekrītu, ka no šīs kartes katru mēnesi tiek iekasēta summa {total}, līdz es atceļu abonementu, un ka karte tiek saglabāta šiem maksājumiem. Karti apstrādā NETOPIA Payments; ne NETOPIA, ne mēs neuzglabājam pilnus kartes datus. Es varu atcelt abonementu jebkurā laikā iestatījumos vai vietnē dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Sāciet manu plānu tūlīt. Es saprotu, ka, ja atsakos no līguma 14 dienu laikā, es maksāju tikai par izmantoto plāna kredīta daļu.",
   "billing.checkout.withdrawalWhere": "Jūs varat atteikties no līguma {days} dienu laikā pēc abonēšanas, nenorādot iemeslu: iestatījumos sadaļā „Abonements” nospiediet „Atteikties no līguma”, pēc tam „Apstiprināt atteikumu”.",
   "billing.checkout.withdrawalLink": "Kā atteikties no līguma, un atteikuma veidlapas paraugs",

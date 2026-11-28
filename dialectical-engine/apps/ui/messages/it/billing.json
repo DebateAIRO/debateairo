@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "IVA in inversione contabile",
   "billing.checkout.noTax": "nessuna imposta",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} al mese. Si rinnova il giorno {day} di ogni mese finché non disdici.",
-  "billing.consent.renewal": "Accetto che NETOPIA Payments conservi la mia carta e che ogni mese vi venga addebitato l’importo di {total}, finché non disdico l’abbonamento. Posso disdire in qualsiasi momento nelle Impostazioni o su dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Accetto che ogni mese venga addebitato su questa carta l’importo di {total}, finché non disdico l’abbonamento, e che la carta venga memorizzata per questi pagamenti. La carta è gestita da NETOPIA Payments; né NETOPIA né noi conserviamo i dati completi della carta. Posso disdire in qualsiasi momento nelle Impostazioni o su dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Avvia subito il mio piano. Capisco che, se recedo entro 14 giorni, pago solo la parte del credito del piano che ho utilizzato.",
   "billing.checkout.withdrawalWhere": "Puoi recedere entro {days} giorni dall’abbonamento, senza indicarne il motivo: nelle Impostazioni, alla voce Abbonamento, premi «Recedere dal contratto qui», poi «Conferma recesso».",
   "billing.checkout.withdrawalLink": "Come recedere e il modulo tipo di recesso",

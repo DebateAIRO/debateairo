@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "Fordított adózású ÁFA",
   "billing.checkout.noTax": "adó nélkül",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = havi {total}. Minden hónap {day}. napján megújul, amíg le nem mondja.",
-  "billing.consent.renewal": "Elfogadom, hogy a NETOPIA Payments megőrzi a kártyámat, és arról minden hónapban {total} összeget terhelnek, amíg le nem mondom az előfizetést. Bármikor lemondhatom a Beállításokban vagy a dezbatere.ro/cancel oldalon.",
+  "billing.consent.renewal": "Elfogadom, hogy erről a kártyáról minden hónapban {total} összeget terhelnek, amíg le nem mondom az előfizetést, és hogy a kártyát e fizetésekhez megjegyzik. A kártyát a NETOPIA Payments kezeli; sem a NETOPIA, sem mi nem tároljuk a kártya teljes adatait. Bármikor lemondhatom az előfizetést a Beállításokban vagy a dezbatere.ro/cancel oldalon.",
   "billing.consent.immediateStart": "Indítsák el most a csomagomat. Tudomásul veszem, hogy ha 14 napon belül elállok, csak a csomag kreditjének általam felhasznált részéért fizetek.",
   "billing.checkout.withdrawalWhere": "Az előfizetéstől számított {days} napon belül indokolás nélkül elállhat: a Beállításokban, az Előfizetés alatt nyomja meg az „Elállás a szerződéstől”, majd az „Elállás megerősítése” gombot.",
   "billing.checkout.withdrawalLink": "Az elállás módja és az elállási nyilatkozatminta",
