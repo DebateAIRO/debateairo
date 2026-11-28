@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "Moms enligt omvänd skattskyldighet",
   "billing.checkout.noTax": "ingen skatt",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} per månad. Förnyas den {day} varje månad tills du säger upp.",
-  "billing.consent.renewal": "Jag godkänner att NETOPIA Payments sparar mitt kort och att {total} dras från det varje månad tills jag säger upp abonnemanget. Jag kan säga upp när som helst i Inställningar eller på dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Jag godkänner att {total} dras från det här kortet varje månad tills jag säger upp abonnemanget, och att kortet sparas för dessa betalningar. Kortet hanteras av NETOPIA Payments; varken NETOPIA eller vi lagrar de fullständiga kortuppgifterna. Jag kan säga upp när som helst i Inställningar eller på dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Starta mitt abonnemang nu. Jag förstår att om jag ångrar mig inom 14 dagar betalar jag bara för den andel av abonnemangets kredit som jag har använt.",
   "billing.checkout.withdrawalWhere": "Du kan ångra avtalet inom {days} dagar från att du tecknade abonnemanget, utan att ange något skäl: i Inställningar, under Abonnemang, trycker du på ”Ångra avtalet här” och sedan på ”Bekräfta frånträde”.",
   "billing.checkout.withdrawalLink": "Så ångrar du avtalet, och standardformuläret för utövande av ångerrätt",

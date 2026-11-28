@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "Btw verlegd",
   "billing.checkout.noTax": "geen belasting",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} per maand. Wordt elke maand op dag {day} verlengd tot u opzegt.",
-  "billing.consent.renewal": "Ik ga ermee akkoord dat NETOPIA Payments mijn kaart bewaart en dat er elke maand {total} van wordt afgeschreven, totdat ik opzeg. Ik kan op elk moment opzeggen in Instellingen of op dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Ik ga ermee akkoord dat er elke maand {total} van deze kaart wordt afgeschreven, totdat ik opzeg, en dat de kaart voor deze betalingen wordt onthouden. De kaart wordt verwerkt door NETOPIA Payments; noch NETOPIA noch wij slaan de volledige kaartgegevens op. Ik kan op elk moment opzeggen in Instellingen of op dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Start mijn abonnement nu. Ik begrijp dat als ik binnen 14 dagen herroep, ik alleen betaal voor het deel van het abonnementstegoed dat ik heb gebruikt.",
   "billing.checkout.withdrawalWhere": "U kunt binnen {days} dagen na het afsluiten van uw abonnement herroepen, zonder opgave van redenen: in Instellingen, onder Abonnement, drukt u op “Hier de overeenkomst herroepen” en daarna op “Herroeping bevestigen”.",
   "billing.checkout.withdrawalLink": "Hoe u herroept, en het modelformulier voor herroeping",

@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "PDV prijenos porezne obveze",
   "billing.checkout.noTax": "bez poreza",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} mjesečno. Obnavlja se {day}. dana svakog mjeseca dok ne otkažete.",
-  "billing.consent.renewal": "Slažem se da NETOPIA Payments čuva moju karticu i da se s nje svaki mjesec naplaćuje {total} dok ne otkažem pretplatu. Mogu je otkazati u bilo kojem trenutku u Postavkama ili na dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Slažem se da se s ove kartice svaki mjesec naplaćuje {total} dok ne otkažem pretplatu i da se kartica zapamti za ta plaćanja. Karticu obrađuje NETOPIA Payments; ni NETOPIA ni mi ne pohranjujemo potpune podatke o kartici. Pretplatu mogu otkazati u bilo kojem trenutku u Postavkama ili na dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Pokrenite moj plan odmah. Razumijem da, ako raskinem ugovor u roku od 14 dana, plaćam samo iskorišteni udio kredita plana.",
   "billing.checkout.withdrawalWhere": "Ugovor možete raskinuti u roku od {days} dana od pretplate, bez navođenja razloga: u Postavkama, pod Pretplata, pritisnite „Odustati od ugovora”, a zatim „Potvrditi odustajanje”.",
   "billing.checkout.withdrawalLink": "Kako raskinuti ugovor i obrazac za jednostrani raskid ugovora",

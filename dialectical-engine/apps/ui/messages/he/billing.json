@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "מע״מ בחיוב הפוך",
   "billing.checkout.noTax": "ללא מס",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} לחודש. מתחדש ב-{day} בכל חודש עד שתבטלו.",
-  "billing.consent.renewal": "אני מסכים/ה ש-NETOPIA Payments תשמור את הכרטיס שלי ושסכום של {total} יחויב ממנו בכל חודש, עד שאבטל את המינוי. אפשר לבטל בכל עת בהגדרות או ב-dezbatere.ro/cancel.",
+  "billing.consent.renewal": "אני מסכים/ה שסכום של {total} יחויב מהכרטיס הזה בכל חודש, עד שאבטל את המינוי, ושהכרטיס יישמר לצורך התשלומים האלה. הכרטיס מטופל על ידי NETOPIA Payments; לא NETOPIA ולא אנחנו מאחסנים את פרטי הכרטיס המלאים. אפשר לבטל בכל עת בהגדרות או ב-dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "התחילו את התוכנית שלי עכשיו. ידוע לי שאם אבטל את ההתקשרות תוך 14 ימים, אשלם רק על החלק שניצלתי מהקרדיט של התוכנית.",
   "billing.checkout.withdrawalWhere": "אפשר לבטל את העסקה תוך {days} ימים מההרשמה למינוי, בלי לנמק: בהגדרות, תחת ״מינוי״, לחצו על ״לביטול העסקה כאן״ ואחר כך על ״אישור הביטול״.",
   "billing.checkout.withdrawalLink": "איך מבטלים את העסקה, וטופס הביטול לדוגמה",

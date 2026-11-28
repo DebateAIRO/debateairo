@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "ALV, käännetty verovelvollisuus",
   "billing.checkout.noTax": "ei veroa",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} kuukaudessa. Uusiutuu joka kuun {day}. päivä, kunnes peruutat.",
-  "billing.consent.renewal": "Hyväksyn, että NETOPIA Payments säilyttää korttini ja että siltä veloitetaan {total} joka kuukausi, kunnes peruutan tilauksen. Voin peruuttaa milloin tahansa Asetuksissa tai osoitteessa dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Hyväksyn, että tältä kortilta veloitetaan {total} joka kuukausi, kunnes peruutan tilauksen, ja että kortti muistetaan näitä maksuja varten. Korttia käsittelee NETOPIA Payments; NETOPIA ei tallenna kortin täydellisiä tietoja, emmekä myöskään me. Voin peruuttaa milloin tahansa Asetuksissa tai osoitteessa dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Aloita tilaukseni nyt. Ymmärrän, että jos peruutan sopimuksen 14 päivän kuluessa, maksan vain siitä osuudesta tilauksen krediitistä, jonka olen käyttänyt.",
   "billing.checkout.withdrawalWhere": "Voit peruuttaa {days} päivän kuluessa tilaamisesta syytä ilmoittamatta: Asetuksissa, kohdassa Tilaus, paina ”Peruuta sopimus tästä” ja sitten ”Vahvista peruuttaminen”.",
   "billing.checkout.withdrawalLink": "Näin peruutat, ja peruuttamislomakkeen malli",

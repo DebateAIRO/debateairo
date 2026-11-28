@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "VAT reverse charge",
   "billing.checkout.noTax": "no tax",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} per month. Renews on the {day} of each month until you cancel.",
-  "billing.consent.renewal": "I agree that NETOPIA Payments keeps my card and that {total} is charged to it every month until I cancel. I can cancel at any time in Settings or at dezbatere.ro/cancel.",
+  "billing.consent.renewal": "I agree that {total} is charged to this card every month until I cancel, and that the card is remembered for these payments. The card is handled by NETOPIA Payments; neither NETOPIA nor we store the full card details. I can cancel at any time in Settings or at dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Start my plan now. I understand that if I withdraw within 14 days, I pay only for the share of the plan's credit I have used.",
   "billing.checkout.withdrawalWhere": "You can withdraw within {days} days of subscribing, without giving a reason: in Settings, under Subscription, press “Withdraw from contract here”, then “Confirm withdrawal”.",
   "billing.checkout.withdrawalLink": "How to withdraw, and the model withdrawal form",

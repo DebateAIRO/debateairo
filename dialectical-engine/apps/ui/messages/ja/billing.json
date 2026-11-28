@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "VAT リバースチャージ",
   "billing.checkout.noTax": "税金なし",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = 月額 {total}。解約するまで毎月 {day} 日に更新されます。",
-  "billing.consent.renewal": "NETOPIA Payments がカードを保管し、解約するまで毎月 {total} がそのカードに請求されることに同意します。設定または dezbatere.ro/cancel からいつでも解約できます。",
+  "billing.consent.renewal": "解約するまで毎月 {total} がこのカードに請求されること、およびこれらの支払いのためにカードが登録されることに同意します。カードは NETOPIA Payments が取り扱い、NETOPIA も当社も完全なカード情報を保存しません。設定または dezbatere.ro/cancel からいつでも解約できます。",
   "billing.consent.immediateStart": "今すぐプランを開始します。14 日以内に撤回した場合、プランのクレジットのうちすでに利用した割合に相当する分のみを支払うことを理解しています。",
   "billing.checkout.withdrawalWhere": "登録から {days} 日以内であれば、理由を示さずに撤回できます。設定の「サブスクリプション」で「ここで契約を撤回する」を押し、次に「撤回を確定する」を押してください。",
   "billing.checkout.withdrawalLink": "撤回の方法と撤回書式のひな形",

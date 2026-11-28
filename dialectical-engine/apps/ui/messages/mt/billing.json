@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "VAT b’ħlas invers",
   "billing.checkout.noTax": "l-ebda taxxa",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} fix-xahar. Jiġġedded fil-jum {day} ta’ kull xahar sakemm tikkanċella.",
-  "billing.consent.renewal": "Naqbel li NETOPIA Payments iżżomm il-karta tiegħi u li {total} jiġi ddebitat minnha kull xahar, sakemm nikkanċella l-abbonament. Nista’ nikkanċella fi kwalunkwe ħin fl-Issettjar jew f’dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Naqbel li {total} jiġi ddebitat minn din il-karta kull xahar, sakemm nikkanċella l-abbonament, u li l-karta tibqa’ rreġistrata għal dawn il-pagamenti. Il-karta tiġi ġestita minn NETOPIA Payments; la NETOPIA u lanqas aħna ma naħżnu d-dettalji sħaħ tal-karta. Nista’ nikkanċella fi kwalunkwe ħin fl-Issettjar jew f’dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Ibda l-pjan tiegħi issa. Nifhem li jekk nirtira fi żmien 14-il jum, inħallas biss għas-sehem mill-kreditu tal-pjan li nkun użajt.",
   "billing.checkout.withdrawalWhere": "Tista’ tirtira fi żmien {days}-il jum minn meta tabbona, mingħajr ma tagħti raġuni: fl-Issettjar, taħt Abbonament, agħfas “Irtira mill-kuntratt hawnhekk”, imbagħad “Ikkonferma r-reċess”.",
   "billing.checkout.withdrawalLink": "Kif tirtira, u l-formola mudell għall-irtirar",

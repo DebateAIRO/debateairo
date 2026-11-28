@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "USt. – Steuerschuldnerschaft des Leistungsempfängers",
   "billing.checkout.noTax": "keine Steuer",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} pro Monat. Verlängert sich jeden Monat am {day}., bis Sie kündigen.",
-  "billing.consent.renewal": "Ich stimme zu, dass NETOPIA Payments meine Karte speichert und dass sie jeden Monat mit {total} belastet wird, bis ich kündige. Ich kann jederzeit in den Einstellungen oder unter dezbatere.ro/cancel kündigen.",
+  "billing.consent.renewal": "Ich stimme zu, dass diese Karte jeden Monat mit {total} belastet wird, bis ich kündige, und dass die Karte für diese Zahlungen hinterlegt bleibt. Die Karte wird von NETOPIA Payments verarbeitet; weder NETOPIA noch wir speichern die vollständigen Kartendaten. Ich kann jederzeit in den Einstellungen oder unter dezbatere.ro/cancel kündigen.",
   "billing.consent.immediateStart": "Meinen Tarif jetzt starten. Mir ist bewusst, dass ich bei einem Widerruf innerhalb von 14 Tagen nur für den Anteil des Tarifguthabens bezahle, den ich genutzt habe.",
   "billing.checkout.withdrawalWhere": "Sie können innerhalb von {days} Tagen nach Abschluss des Abonnements ohne Angabe von Gründen widerrufen: Klicken Sie in den Einstellungen unter „Abonnement“ auf „Vertrag widerrufen“ und dann auf „Widerruf bestätigen“.",
   "billing.checkout.withdrawalLink": "Anleitung zum Widerruf und Muster-Widerrufsformular",

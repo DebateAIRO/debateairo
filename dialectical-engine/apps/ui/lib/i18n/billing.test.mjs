@@ -174,7 +174,9 @@ test("the spec's sentences G2, G3, B1–B5 read exactly as approved in English (
   assert.equal(english["billing.checkout.countryUnavailable"], "Paid plans aren't available in your country yet. You can keep using the Free plan.");
   assert.equal(english["billing.checkout.confirmCountry"], "Your connection looks like it's from {ipCountry}. Do you live in {declaredCountry}?");
   assert.equal(english["billing.checkout.total"], "{plan} — {net} + {taxLabel} = {total} per month. Renews on the {day} of each month until you cancel.");
-  assert.equal(english["billing.consent.renewal"], "I agree that NETOPIA Payments keeps my card and that {total} is charged to it every month until I cancel. I can cancel at any time in Settings or at dezbatere.ro/cancel.");
+  // As NETOPIA confirmed in writing: the card is remembered for the renewals, and neither NETOPIA nor we store the full
+  // card details.
+  assert.equal(english["billing.consent.renewal"], "I agree that {total} is charged to this card every month until I cancel, and that the card is remembered for these payments. The card is handled by NETOPIA Payments; neither NETOPIA nor we store the full card details. I can cancel at any time in Settings or at dezbatere.ro/cancel.");
   // Owner's decision of 16 November 2026: a withdrawal is paid for by the plan credit used alone; days do not count.
   assert.equal(english["billing.consent.immediateStart"], "Start my plan now. I understand that if I withdraw within 14 days, I pay only for the share of the plan's credit I have used.");
   assert.equal(english["billing.checkout.subscribeAndPay"], "Subscribe and pay");

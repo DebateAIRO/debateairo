@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "TVA en autoliquidation",
   "billing.checkout.noTax": "sans taxe",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} par mois. Renouvellement le {day} de chaque mois jusqu’à résiliation.",
-  "billing.consent.renewal": "J’accepte que NETOPIA Payments conserve ma carte et que {total} y soit débité chaque mois, jusqu’à ce que je résilie mon abonnement. Je peux résilier à tout moment dans les Paramètres ou sur dezbatere.ro/cancel.",
+  "billing.consent.renewal": "J’accepte que {total} soit débité sur cette carte chaque mois, jusqu’à ce que je résilie mon abonnement, et que la carte soit mémorisée pour ces paiements. La carte est gérée par NETOPIA Payments ; ni NETOPIA ni nous ne conservons les données complètes de la carte. Je peux résilier à tout moment dans les Paramètres ou sur dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Démarrez ma formule maintenant. Je comprends que si je me rétracte dans les 14 jours, je ne paie que la part du crédit de la formule que j’ai utilisée.",
   "billing.checkout.withdrawalWhere": "Vous pouvez vous rétracter dans les {days} jours suivant votre abonnement, sans donner de motif : dans Paramètres, sous Abonnement, appuyez sur « Se rétracter du contrat ici », puis sur « Confirmer la rétractation ».",
   "billing.checkout.withdrawalLink": "Comment se rétracter, et le modèle de formulaire de rétractation",

@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "Käibemaksu pöördmaksustamine",
   "billing.checkout.noTax": "maksuta",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = {total} kuus. Uueneb iga kuu {day}. kuupäeval, kuni tühistate.",
-  "billing.consent.renewal": "Nõustun, et NETOPIA Payments säilitab minu kaardi ja et sellelt võetakse igal kuul {total}, kuni ma tellimuse tühistan. Saan tühistada igal ajal seadetes või aadressil dezbatere.ro/cancel.",
+  "billing.consent.renewal": "Nõustun, et sellelt kaardilt võetakse igal kuul {total}, kuni ma tellimuse tühistan, ja et kaart jäetakse nende maksete jaoks meelde. Kaarti käsitleb NETOPIA Payments; ei NETOPIA ega meie ei salvesta kaardi täielikke andmeid. Saan tühistada igal ajal seadetes või aadressil dezbatere.ro/cancel.",
   "billing.consent.immediateStart": "Alustage minu paketti kohe. Mõistan, et kui taganen 14 päeva jooksul, maksan ainult paketi krediidi selle osa eest, mille olen kasutanud.",
   "billing.checkout.withdrawalWhere": "Võite {days} päeva jooksul pärast tellimist taganeda ilma põhjust esitamata: vajutage seadetes jaotises „Tellimus“ nuppu „Taganen lepingust“ ja seejärel „Kinnitan taganemise“.",
   "billing.checkout.withdrawalLink": "Kuidas taganeda ja taganemisavalduse tüüpvorm",

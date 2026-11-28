@@ -87,7 +87,7 @@
   "billing.checkout.taxReverseCharge": "KDV tersine vergilendirme",
   "billing.checkout.noTax": "vergi yok",
   "billing.checkout.total": "{plan} — {net} + {taxLabel} = ayda {total}. İptal edene kadar her ayın {day}. günü yenilenir.",
-  "billing.consent.renewal": "NETOPIA Payments’in kartımı saklamasını ve ben iptal edene kadar her ay bu karttan {total} tahsil edilmesini kabul ediyorum. İstediğim zaman Ayarlar’dan veya dezbatere.ro/cancel adresinden iptal edebilirim.",
+  "billing.consent.renewal": "Ben iptal edene kadar her ay bu karttan {total} tahsil edilmesini ve kartın bu ödemeler için hatırlanmasını kabul ediyorum. Kart NETOPIA Payments tarafından işlenir; ne NETOPIA ne de biz tam kart bilgilerini depolamayız. İstediğim zaman Ayarlar’dan veya dezbatere.ro/cancel adresinden iptal edebilirim.",
   "billing.consent.immediateStart": "Planımı şimdi başlatın. 14 gün içinde cayma hakkımı kullanırsam, yalnızca plan kredisinin kullandığım kısmı için ödeme yapacağımı anlıyorum.",
   "billing.checkout.withdrawalWhere": "Abone olduğunuz günden itibaren {days} gün içinde gerekçe göstermeden cayabilirsiniz: Ayarlar’da, Abonelik bölümünde “Sözleşmeden burada cayın” düğmesine, ardından “Caymayı onaylayın” düğmesine basın.",
   "billing.checkout.withdrawalLink": "Nasıl cayılır ve örnek cayma formu",
